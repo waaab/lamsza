@@ -19,9 +19,10 @@ Primary use case: every new browser tab + browsing local services.
 
 ## Tech Stack (locked)
 - Frontend: SvelteKit + vanilla CSS + vanilla JS
-- Backend: Go 1.23+ + PostgreSQL
+- Backend: Go 1.25.7+ + PostgreSQL
 - Web server: Nginx
 - Hosting: DigitalOcean Droplet (Ubuntu 24.04 LTS)
+- CI/CD: GitHub Actions (Build & Test only)
 - Extension: Manifest V3
 
 ## Versioning & Scope

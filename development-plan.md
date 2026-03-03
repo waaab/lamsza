@@ -57,3 +57,5 @@
 23. Bundle size & perf check
 24. Add footer, meta tags, error states
 25. Create manifest.json for extension
+26. Set up strict environment variables (.env) for configuration (done)
+27. Create GitHub Actions for automated build testing (CI) (done)
