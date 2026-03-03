@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "Szekely Gugel",
+    "version": "1.0.0",
+    "description": "Erdelyi magyar startlap es kereso - Na lamsza, kicsibaratom!",
+    "chrome_url_overrides": {
+        "newtab": "index.html"
+    },
+    "icons": {
+        "128": "icon.png"
+    },
+    "permissions": [
+        "storage"
+    ]
+}

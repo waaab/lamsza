@@ -1,0 +1,69 @@
+<svelte:head>
+    <title>Változásnapló - Székely Gugel</title>
+    <meta
+        name="description"
+        content="Székely Gugel változásnapló - új funkciók és fejlesztések listája."
+    />
+</svelte:head>
+
+<h1 class="page-title">Változásnapló</h1>
+<p class="greeting">Újítások, javítások - emberi nyelven.</p>
+
+<section class="faq">
+    <h2 class="faq-title">Aplikáció verziók</h2>
+    <div class="faq-list">
+        <details class="faq-item" open>
+            <summary>v1.0.0 - 2026. március 1.</summary>
+            <ul>
+                <li>Teljes újraindítás - a Székely Gugel él és virul!</li>
+                <li>
+                    Helyi kereső: kereshetsz orvosra, iskolára, mesteremberre és
+                    hivatalra
+                </li>
+                <li>Időjárás jelenlegi helyi adatok alapján</li>
+                <li>Friss hírek erdélyi forrásokból</li>
+                <li>Gyorslinkek rács</li>
+                <li>Székely mondás naponta</li>
+                <li>Sötét / Világos / Rendszer alapú témavalásztó</li>
+                <li>Szolgáltatások oldal kategóriák szerint szűrhető</li>
+            </ul>
+        </details>
+
+        <details class="faq-item">
+            <summary>v0.9.5 - 2026. február 28.</summary>
+            <ul>
+                <li>Alap elrendezés és fejléc kialakítva</li>
+                <li>
+                    Keresősáv hozzáadva Google, Bing, DuckDuckGo és Yandex
+                    gombokkal
+                </li>
+                <li>Székely mondások megjelennek a főoldal alján</li>
+                <li>Teljesen reszponzív, mobil-barát elrendezés</li>
+            </ul>
+        </details>
+
+        <details class="faq-item">
+            <summary>v0.9.0 - 2026. február 20.</summary>
+            <ul>
+                <li>Kezdeti dizájn és alapok letéve</li>
+                <li>Székely színvilág és tipográfia meghatározva</li>
+                <li>SvelteKit + Go backend elindítva</li>
+            </ul>
+        </details>
+
+        <details class="faq-item">
+            <summary>v0.8.0 - 2026. február 12.</summary>
+            <ul>
+                <li>PostgreSQL adatbázis felállítva</li>
+                <li>Első API végpontok elkészültek</li>
+            </ul>
+        </details>
+
+        <details class="faq-item">
+            <summary>v0.7.0 - 2026. február 1.</summary>
+            <ul>
+                <li>A projekt elindult - „Na lámsza, csináljuk meg!"</li>
+            </ul>
+        </details>
+    </div>
+</section>

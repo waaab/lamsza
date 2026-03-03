@@ -1,0 +1,18 @@
+
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lamsza-db
+    environment:
+      POSTGRES_USER: lamsza_user
+      POSTGRES_PASSWORD: lamsza_password
+      POSTGRES_DB: lamsza
+    ports:
+      - "5433:5432" # Mapping to 5433 to avoid conflicts with markupcheck on 5432
+    volumes:
+      - pgdata_lamsza:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata_lamsza:
