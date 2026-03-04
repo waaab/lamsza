@@ -1,9 +1,7 @@
 <script>
     import { onMount } from "svelte";
 
-    let dynamicCategories = [
-        { id: "osszes", label: "Összes", url: "/szolgaltatasok" },
-    ];
+    let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
     let services = [];
     let loading = true;
     let error = null;
@@ -35,7 +33,7 @@
                     "VITE_API_BASE_URL is not set. Falling back to http://localhost:3000",
                 );
             const baseUrl = apiBase || "http://localhost:3000";
-            const res = await fetch(`${baseUrl}/api/szolgaltatasok`);
+            const res = await fetch(`${baseUrl}/api/directory`);
             if (!res.ok) throw new Error("Hálózati hiba");
             services = (await res.json()) || [];
 
@@ -46,11 +44,11 @@
                 return {
                     id: catName,
                     label: catName,
-                    url: "/szolgaltatasok/" + encodeURIComponent(catName),
+                    url: "/index/" + encodeURIComponent(catName),
                 };
             });
             dynamicCategories = [
-                { id: "osszes", label: "Összes", url: "/szolgaltatasok" },
+                { id: "osszes", label: "Összes", url: "/index" },
                 ...generatedCats,
             ];
         } catch (err) {
@@ -63,11 +61,11 @@
 </script>
 
 <svelte:head>
-    <title>Szekely Gugel - Szolgaltatasok</title>
+    <title>Szekely Gugel - Index</title>
 </svelte:head>
 
 <div class="container" style="min-height: calc(100vh - 120px)">
-    <h1 class="page-title">Helyi Szolgáltatások</h1>
+    <h1 class="page-title">Index</h1>
     <p class="greeting">Keresd meg a helyi szakembereket és intézményeket!</p>
 
     <div class="header-tabs">
@@ -197,7 +195,7 @@
     {:else if error}
         <div class="error-msg">{error}</div>
     {:else if services.length === 0}
-        <div class="error-msg">Nincs megjeleníthető szolgáltatás.</div>
+        <div class="error-msg">Nincs megjeleníthető bejegyzés.</div>
     {:else}
         <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
             {#each displayItems as service}
@@ -206,18 +204,30 @@
                         {service.category}
                     </span>
                     <h3 class="service-name">
-                        {#if service.url}
+                        <a
+                            href="/bejegyzes/{service.slug}"
+                            style="color:inherit;text-decoration:none;"
+                            >{service.name}</a
+                        >
+                    </h3>
+                    {#if service.url}
+                        <div
+                            class="service-info"
+                            style="margin-bottom: 0.5rem;"
+                        >
+                            <span
+                                style="color: var(--text-faint); margin-right: 0.3rem;"
+                                >🔗</span
+                            >
                             <a
                                 href={service.url}
                                 target="_blank"
                                 rel="nofollow noopener"
-                                style="color:inherit;text-decoration:none;"
-                                >{service.name}</a
+                                style="color: var(--primary-color); text-decoration: none;"
+                                >{service.url}</a
                             >
-                        {:else}
-                            {service.name}
-                        {/if}
-                    </h3>
+                        </div>
+                    {/if}
                     <div class="service-info">
                         📍 {service.location} - {service.address}
                     </div>

@@ -74,7 +74,7 @@
             try {
                 const [resultsRes, suggestionsRes] = await Promise.all([
                     fetch(
-                        `${baseUrl}/api/szolgaltatasok?q=` +
+                        `${baseUrl}/api/directory?q=` +
                             encodeURIComponent(query),
                     ),
                     fetch(
@@ -181,7 +181,7 @@
                 html += `<div class="info-box">`;
                 html += `<p>`;
                 if (directoryCount === 0) {
-                    html += `<span>Nincs találat a szolgáltatásokban erre a keresésre.</span>`;
+                    html += `<span>Nincs találat az Indexben erre a keresésre.</span>`;
                     if (dirSuggestionsText)
                         html += `<span style="color:var(--text-faint); margin:0 0.5rem;">|</span> ${dirSuggestionsText}`;
                 } else {
@@ -241,22 +241,27 @@
                     hasCards = true;
                 }
 
-                // Directory Cards
+                // 2.1 Directory Cards (Green)
                 if (directoryCount > 0) {
                     html += data
                         .map(
                             (service) => `
                         <div class="card service">
-                            <div class="badge">Szolgáltatás: ${service.category}</div>
+                            ${
+                                service.is_direct_match
+                                    ? `<div class="badge" style="background-color: var(--primary-color);">Közvetlen Találat</div>`
+                                    : `<div class="badge" style="background-color: var(--text-faint);">Tartalom Találat</div>`
+                            }
+                            <div class="badge">Index: ${service.category}</div>
                             <h3 class="service-name">
-                                ${service.url ? `<a href="${service.url}" target="_blank" rel="nofollow noopener" style="color:inherit;text-decoration:none;">${service.name}</a>` : service.name}
+                                ${service.entity_type === "settlement" ? `<a href="/${service.county_slug}-megye/${service.slug}" style="color:inherit;text-decoration:none;">${service.name}</a>` : `<a href="/bejegyzes/${service.slug}" style="color:inherit;text-decoration:none;">${service.name}</a>`}
                             </h3>
+                            ${service.url ? `<div class="service-info" style="margin-bottom: 0.5rem;"><span style="color: var(--text-faint); margin-right: 0.3rem;">🔗</span><a href="${service.url}" target="_blank" rel="nofollow noopener" style="color: var(--primary-color); text-decoration: none;">${service.url}</a></div>` : ""}
                             <div class="service-info">📍 ${service.location} - ${service.address}</div>
                             <div class="service-info"> ${service.phone}</div>
                             ${
-                                service.tags
+                                service.tags && service.tags.length > 0
                                     ? `<div class="service-tags">${service.tags
-                                          .split(" ")
                                           .map(
                                               (t) =>
                                                   `<span class="service-tag">${t.startsWith("#") ? t : "#" + t}</span>`,
@@ -271,7 +276,30 @@
                         .join("");
                 }
 
-                // News Cards
+                // 2.2 Weather Cards (Blue)
+                if (
+                    qLower.includes("idő") ||
+                    qLower.includes("időjárás") ||
+                    qLower.includes("milyen") ||
+                    qLower.includes("hőmérséklet")
+                ) {
+                    const cachedWeather = localStorage.getItem("weather_cache");
+                    if (cachedWeather) {
+                        try {
+                            const { temp, desc } = JSON.parse(cachedWeather);
+                            html += `
+                                <div class="card weather">
+                                    <div class="weather-badge">Időjárás</div>
+                                    <h3 class="service-name">Jelenlegi idő</h3>
+                                    <div class="weather-current" style="font-size:2rem;">${temp}°C</div>
+                                    <div class="weather-desc">${desc}</div>
+                                </div>
+                            `;
+                        } catch (e) {}
+                    }
+                }
+
+                // 2.3 News Cards (Orange)
                 if (newsCount > 0) {
                     html += matchingNews
                         .map(
@@ -286,60 +314,31 @@
                     `,
                         )
                         .join("");
-                }
-
-                if (!html.includes("card service")) {
-                    // Check for specialized results
-                    if (
-                        qLower.includes("idő") ||
-                        qLower.includes("időjárás") ||
-                        qLower.includes("milyen") ||
-                        qLower.includes("hőmérséklet")
-                    ) {
-                        const cachedWeather =
-                            localStorage.getItem("weather_cache");
-                        if (cachedWeather) {
-                            try {
-                                const { temp, desc } =
-                                    JSON.parse(cachedWeather);
+                } else if (
+                    qLower.includes("hír") ||
+                    qLower.includes("hirek") ||
+                    qLower.includes("hírek")
+                ) {
+                    const cachedNews = localStorage.getItem("news_cache");
+                    if (cachedNews) {
+                        try {
+                            const { items } = JSON.parse(cachedNews);
+                            if (items && items.length > 0) {
                                 html += `
-                                    <div class="card weather">
-                                        <div class="weather-badge">Időjárás</div>
-                                        <h3 class="service-name">Jelenlegi idő</h3>
-                                        <div class="weather-current" style="font-size:2rem;">${temp}°C</div>
-                                        <div class="weather-desc">${desc}</div>
+                                    <div class="card news">
+                                        <div class="badge">Hírek</div>
+                                        <h3 class="service-name">Kapcsolódó hírek</h3>
+                                        ${items
+                                            .slice(0, 3)
+                                            .map(
+                                                (i) =>
+                                                    `<div style="margin-bottom:0.8rem;"><a href="${i.link}" style="text-decoration:none; font-weight:600; font-size:1.1rem;" target="_blank" rel="nofollow noopener">📰 ${i.title}</a></div>`,
+                                            )
+                                            .join("")}
                                     </div>
                                 `;
-                            } catch (e) {}
-                        }
-                    }
-
-                    if (
-                        qLower.includes("hír") ||
-                        qLower.includes("hirek") ||
-                        qLower.includes("hírek")
-                    ) {
-                        const cachedNews = localStorage.getItem("news_cache");
-                        if (cachedNews) {
-                            try {
-                                const { items } = JSON.parse(cachedNews);
-                                if (items && items.length > 0) {
-                                    html += `
-                                        <div class="card news">
-                                            <div class="badge">Hírek</div>
-                                            <h3 class="service-name">Kapcsolódó hírek</h3>
-                                            ${items
-                                                .slice(0, 3)
-                                                .map(
-                                                    (i) =>
-                                                        `<div style="margin-bottom:0.8rem;"><a href="${i.link}" style="text-decoration:none; font-weight:600; font-size:1.1rem;" target="_blank" rel="nofollow noopener">📰 ${i.title}</a></div>`,
-                                                )
-                                                .join("")}
-                                        </div>
-                                    `;
-                                }
-                            } catch (e) {}
-                        }
+                            }
+                        } catch (e) {}
                     }
                 }
 

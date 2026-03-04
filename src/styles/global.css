@@ -799,6 +799,19 @@ section {
   margin-right: 0.25rem;
 }
 
+/* Search Results Color Coding */
+.card.service {
+  border: 2px solid var(--szekely-green);
+}
+
+.card.weather {
+  border: 2px solid var(--szekely-blue);
+}
+
+.card.news {
+  border: 2px solid var(--warning-orange);
+}
+
 .tab {
   display: none;
   /* Replaced by buttons */

@@ -1,0 +1,4 @@
+2026/03/04 07:12:15 Connected to PostgreSQL
+2026/03/04 07:12:15 Backend API active on port 3000
+2026/03/04 07:12:15 listen tcp :3000: bind: address already in use
+exit status 1

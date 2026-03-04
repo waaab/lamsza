@@ -1,17 +1,20 @@
 <script>
-    import { onMount, tick } from "svelte";
+    import { onMount } from "svelte";
+
+    const getBase = () =>
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
     let authenticated = false;
     let password = "";
-
     let activeTab = "mondasok";
 
     let mondasok = [];
     let quickLinks = [];
     let newsFeeds = [];
     let locations = [];
-    let services = [];
-    let serviceCategories = [];
+    let entries = [];
+    let entryCategories = [];
+    let entryTypes = [];
 
     // Per-feed loading state
     let loadingFeeds = new Set();
@@ -21,19 +24,76 @@
     let newMondas = { text: "" };
     let newLink = { title: "", url: "", bg_color: "var(--card-bg)" };
     let newNews = { title: "", feed_url: "", bg_color: "var(--warning-bg)" };
-    let newLocation = { name: "", county: "", type: "" };
-    let newService = {
+    let newLocation = {
+        name: "",
+        name_ro: "",
+        name_de: "",
+        county: "",
+        type: "",
+        slug: "",
+    };
+    let newEntry = {
         location_id: "",
         category_id: "",
         name: "",
+        slug: "",
         url: "",
         phone: "",
         address: "",
         notes: "",
-        is_magyar_language: true,
+        type: "service",
+        languages: ["HU"],
         tags: "",
     };
-    let newServiceCategory = { name: "" };
+    let newEntryCategory = { name: "" };
+    let newEntryType = { name: "" };
+
+    // Edit modal state
+    let editingEntry = null;
+    let editTagsStr = "";
+    let editingLocation = null;
+    let editingCategory = null;
+    let editingType = null;
+    let editingMondas = null;
+    let editingLink = null;
+    let editingNews = null;
+
+    const LANGUAGES = ["HU", "RO", "DE", "EN"];
+    const COUNTIES = ["Hargita", "Kovászna", "Maros"];
+    const LOCATION_TYPES = ["város", "község", "falu", "megye"];
+
+    // Custom dialog state
+    let dialogVisible = false;
+    let dialogMsg = "";
+    let dialogType = "alert"; // "alert" or "confirm"
+    let dialogResolve = null;
+
+    function showAlert(msg) {
+        return new Promise((resolve) => {
+            dialogMsg = msg;
+            dialogType = "alert";
+            dialogResolve = resolve;
+            dialogVisible = true;
+        });
+    }
+    function showConfirm(msg) {
+        return new Promise((resolve) => {
+            dialogMsg = msg;
+            dialogType = "confirm";
+            dialogResolve = resolve;
+            dialogVisible = true;
+        });
+    }
+    function dialogOk() {
+        dialogVisible = false;
+        if (dialogResolve) dialogResolve(true);
+        dialogResolve = null;
+    }
+    function dialogCancel() {
+        dialogVisible = false;
+        if (dialogResolve) dialogResolve(false);
+        dialogResolve = null;
+    }
 
     onMount(() => {
         if (localStorage.getItem("admin_auth") === "true") {
@@ -71,28 +131,22 @@
         fetchQuickLinks();
         fetchNewsFeeds();
         fetchLocations();
-        fetchServices();
-        fetchServiceCategories();
+        fetchEntries();
+        fetchEntryCategories();
+        fetchEntryTypes();
     }
 
-    // generic fetch
+    // generic fetch helper
     async function loadData(endpoint, setter) {
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL;
-            if (!apiBase)
-                console.warn(
-                    "VITE_API_BASE_URL is not set. Falling back to http://localhost:3000",
-                );
-            const baseUrl = apiBase || "http://localhost:3000";
-
-            const res = await fetch(`${baseUrl}/api/admin/${endpoint}`);
+            const res = await fetch(`${getBase()}/api/admin/${endpoint}`);
             if (res.ok) setter(await res.json());
         } catch (e) {
             console.error(e);
         }
     }
 
-    // specific fetches
+    // --- specific fetches ---
     function fetchMondasok() {
         loadData("mondasok", (d) => (mondasok = d));
     }
@@ -105,24 +159,20 @@
     function fetchLocations() {
         loadData("locations", (d) => (locations = d));
     }
-    function fetchServices() {
-        loadData("services", (d) => (services = d));
+    function fetchEntries() {
+        loadData("entries", (d) => (entries = d));
     }
-    function fetchServiceCategories() {
-        loadData("service_categories", (d) => (serviceCategories = d));
+    function fetchEntryCategories() {
+        loadData("entry_categories", (d) => (entryCategories = d));
+    }
+    function fetchEntryTypes() {
+        loadData("entry_types", (d) => (entryTypes = d));
     }
 
     // generic create
     async function createRecord(endpoint, data, reloadFunc, resetFormFunc) {
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL;
-            if (!apiBase)
-                console.warn(
-                    "VITE_API_BASE_URL is not set. Falling back to http://localhost:3000",
-                );
-            const baseUrl = apiBase || "http://localhost:3000";
-
-            const res = await fetch(`${baseUrl}/api/admin/${endpoint}`, {
+            const res = await fetch(`${getBase()}/api/admin/${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
@@ -131,7 +181,25 @@
                 reloadFunc();
                 resetFormFunc();
             } else {
-                alert("Hiba történt a mentés során.");
+                showAlert("Hiba: " + (await res.text()));
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    // generic update (PUT)
+    async function updateRecord(endpoint, data, reloadFunc) {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/${endpoint}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            if (res.ok) {
+                reloadFunc();
+            } else {
+                showAlert("Mentési hiba: " + (await res.text()));
             }
         } catch (e) {
             console.error(e);
@@ -140,24 +208,14 @@
 
     // generic delete
     async function deleteRecord(endpoint, id, reloadFunc) {
-        if (!confirm("Biztosan törölni szeretnéd?")) return;
+        const ok = await showConfirm("Biztosan törölni szeretnéd?");
+        if (!ok) return;
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL;
-            if (!apiBase)
-                console.warn(
-                    "VITE_API_BASE_URL is not set. Falling back to http://localhost:3000",
-                );
-            const baseUrl = apiBase || "http://localhost:3000";
-
             const res = await fetch(
-                `${baseUrl}/api/admin/${endpoint}?id=${id}`,
-                {
-                    method: "DELETE",
-                },
+                `${getBase()}/api/admin/${endpoint}?id=${id}`,
+                { method: "DELETE" },
             );
-            if (res.ok) {
-                reloadFunc();
-            }
+            if (res.ok) reloadFunc();
         } catch (e) {
             console.error(e);
         }
@@ -203,20 +261,13 @@
     }
 
     async function updateSingleFeed(feed) {
-        // Mark this feed as loading
         loadingFeeds.add(feed.id);
         loadingFeeds = new Set(loadingFeeds);
 
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL;
-            if (!apiBase)
-                console.warn(
-                    "VITE_API_BASE_URL is not set. Falling back to http://localhost:3000",
-                );
-            const baseUrl = apiBase || "http://localhost:3000";
-
             const proxiedUrl =
-                `${baseUrl}/api/proxy?url=` + encodeURIComponent(feed.feed_url);
+                `${getBase()}/api/proxy?url=` +
+                encodeURIComponent(feed.feed_url);
             const res = await fetch(proxiedUrl);
             if (res.ok) {
                 feedTimestamps[feed.feed_url] = Date.now();
@@ -225,7 +276,6 @@
                     JSON.stringify(feedTimestamps),
                 );
                 feedTimestamps = { ...feedTimestamps };
-                // Invalidate combined cache so frontend re-fetches on next load
                 localStorage.removeItem("news_cache");
             }
         } catch (e) {
@@ -241,52 +291,219 @@
             "locations",
             newLocation,
             fetchLocations,
-            () => (newLocation = { name: "", county: "", type: "" }),
+            () =>
+                (newLocation = {
+                    name: "",
+                    name_ro: "",
+                    name_de: "",
+                    county: "",
+                    type: "",
+                    slug: "",
+                }),
         );
     }
-    function submitService(e) {
+
+    // --- Location edit helpers ---
+    function startEditLocation(loc) {
+        editingLocation = { ...loc };
+    }
+    function cancelEditLocation() {
+        editingLocation = null;
+    }
+    async function saveEditLocation() {
+        if (!editingLocation) return;
+        await updateRecord("locations", editingLocation, fetchLocations);
+        cancelEditLocation();
+    }
+
+    // --- Submit entry category ---
+    function submitEntryCategory(e) {
         e.preventDefault();
-        newService.location_id = parseInt(newService.location_id);
-        if (newService.category_id) {
-            newService.category_id = parseInt(newService.category_id);
-        }
         createRecord(
-            "services",
-            newService,
-            fetchServices,
+            "entry_categories",
+            newEntryCategory,
+            fetchEntryCategories,
+            () => (newEntryCategory = { name: "" }),
+        );
+    }
+
+    // --- Submit entry type ---
+    function submitEntryType(e) {
+        e.preventDefault();
+        createRecord(
+            "entry_types",
+            newEntryType,
+            fetchEntryTypes,
+            () => (newEntryType = { name: "" }),
+        );
+    }
+
+    // --- Inline edit helpers for categories ---
+    async function startEditCategory(cat) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingCategory = { ...cat };
+    }
+    function cancelEditCategory() {
+        editingCategory = null;
+    }
+    async function saveEditCategory() {
+        if (!editingCategory) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord(
+            "entry_categories",
+            editingCategory,
+            fetchEntryCategories,
+        );
+        editingCategory = null;
+    }
+
+    // --- Inline edit helpers for types ---
+    async function startEditType(et) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingType = { ...et };
+    }
+    function cancelEditType() {
+        editingType = null;
+    }
+    async function saveEditType() {
+        if (!editingType) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord("entry_types", editingType, fetchEntryTypes);
+        editingType = null;
+    }
+
+    // --- Inline edit helpers for mondasok ---
+    async function startEditMondas(m) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingMondas = { ...m };
+    }
+    function cancelEditMondas() {
+        editingMondas = null;
+    }
+    async function saveEditMondas() {
+        if (!editingMondas) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord("mondasok", editingMondas, fetchMondasok);
+        editingMondas = null;
+    }
+
+    // --- Inline edit helpers for quick links ---
+    async function startEditLink(ql) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingLink = { ...ql };
+    }
+    function cancelEditLink() {
+        editingLink = null;
+    }
+    async function saveEditLink() {
+        if (!editingLink) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord("quick_links", editingLink, fetchQuickLinks);
+        editingLink = null;
+    }
+
+    // --- Inline edit helpers for news feeds ---
+    async function startEditNews(nf) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingNews = { ...nf };
+    }
+    function cancelEditNews() {
+        editingNews = null;
+    }
+    async function saveEditNews() {
+        if (!editingNews) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord("news_feeds", editingNews, fetchNewsFeeds);
+        editingNews = null;
+    }
+    // --- Tag helpers ---
+    function tagsFromStr(str) {
+        return (str || "")
+            .split(/[\s,]+/)
+            .map((t) => t.replace(/^#/, "").trim())
+            .filter(Boolean);
+    }
+    function tagsToStr(arr) {
+        return (arr || []).map((t) => "#" + t).join(" ");
+    }
+    function getLocationName(id) {
+        const l = locations.find((loc) => loc.id === id);
+        return l ? `${l.name}${l.county ? " (" + l.county + ")" : ""}` : id;
+    }
+    function getCategoryName(id) {
+        const c = entryCategories.find((cat) => cat.id === id);
+        return c ? c.name : "–";
+    }
+
+    // --- Submit entry (Create) ---
+    function submitEntry(e) {
+        e.preventDefault();
+        const payload = {
+            ...newEntry,
+            location_id: parseInt(newEntry.location_id) || 0,
+            category_id: newEntry.category_id
+                ? parseInt(newEntry.category_id)
+                : null,
+            tags: tagsFromStr(newEntry.tags),
+        };
+        createRecord(
+            "entries",
+            payload,
+            fetchEntries,
             () =>
-                (newService = {
+                (newEntry = {
                     location_id: "",
-                    category_id: "",
+                    category_id: null,
                     name: "",
                     url: "",
                     phone: "",
                     address: "",
                     notes: "",
-                    is_magyar_language: true,
+                    type: "service",
+                    languages: ["HU"],
                     tags: "",
                 }),
         );
     }
 
-    function submitServiceCategory(e) {
-        e.preventDefault();
-        createRecord(
-            "service_categories",
-            newServiceCategory,
-            fetchServiceCategories,
-            () => (newServiceCategory = { name: "" }),
-        );
+    // --- Edit modal ---
+    async function openEdit(entry) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingEntry = {
+            ...entry,
+            languages: entry.languages ? [...entry.languages] : ["HU"],
+        };
+        editTagsStr = tagsToStr(entry.tags);
     }
-
-    function getLocationName(id) {
-        const l = locations.find((loc) => loc.id === id);
-        return l ? l.name : id;
+    function closeEdit() {
+        editingEntry = null;
+        editTagsStr = "";
     }
-
-    function getCategoryName(id) {
-        const c = serviceCategories.find((cat) => cat.id === id);
-        return c ? c.name : "N/A";
+    async function saveEdit() {
+        if (!editingEntry) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        const payload = {
+            ...editingEntry,
+            location_id: parseInt(editingEntry.location_id) || 0,
+            category_id: editingEntry.category_id
+                ? parseInt(editingEntry.category_id)
+                : null,
+            tags: tagsFromStr(editTagsStr),
+        };
+        await updateRecord("entries", payload, fetchEntries);
+        closeEdit();
     }
 </script>
 
@@ -297,16 +514,9 @@
 {#if !authenticated}
     <div class="container">
         <div class="admin-login-wrapper">
-            <div
-                class="admin-container"
-                style="max-width: 400px; text-align:center; width: 100%;"
-            >
+            <div class="admin-container login-box">
                 <h2>Adminisztráció Belépés</h2>
-                <form
-                    class="admin-form"
-                    style="margin: 2rem auto;"
-                    on:submit={login}
-                >
+                <form class="admin-form mt-lg" on:submit={login}>
                     <input
                         type="password"
                         bind:value={password}
@@ -413,11 +623,11 @@
                 </svg>
             </button>
             <button
-                class="admin-sidebar-btn {activeTab === 'services'
+                class="admin-sidebar-btn {activeTab === 'entries'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "services")}
-                title="Szolgáltatások"
+                on:click={() => (activeTab = "entries")}
+                title="Index"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                     ><rect x="3" y="3" width="7" height="7"></rect><rect
@@ -429,6 +639,27 @@
                     ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
                 >
             </button>
+            <button
+                class="admin-sidebar-btn {activeTab === 'entry_types'
+                    ? 'active'
+                    : ''}"
+                on:click={() => (activeTab = "entry_types")}
+                title="Bejegyzés típusok"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                    <polyline points="2 17 12 22 22 17"></polyline>
+                    <polyline points="2 12 12 17 22 12"></polyline>
+                </svg>
+            </button>
         </aside>
 
         <main class="admin-main">
@@ -438,16 +669,17 @@
                     {#if activeTab === "quicklinks"}Gyorslinkek Kezelése{/if}
                     {#if activeTab === "newsfeeds"}Hírfolyamok Kezelése{/if}
                     {#if activeTab === "locations"}Települések Kezelése{/if}
-                    {#if activeTab === "service_categories"}Szolgáltatás
-                        Kategóriák Kezelése{/if}
-                    {#if activeTab === "services"}Szolgáltatások Kezelése{/if}
+                    {#if activeTab === "service_categories"}Index Kategóriák
+                        Kezelése{/if}
+                    {#if activeTab === "entries"}Index Kezelése{/if}
+                    {#if activeTab === "entry_types"}Bejegyzés Típusok Kezelése{/if}
                 </h2>
                 <button class="btn-logout" on:click={logout}
                     >Kijelentkezés</button
                 >
             </div>
 
-            <div class="admin-container" style="margin:0; max-width:100%;">
+            <div class="admin-container w-full">
                 <!-- Mondások Tab -->
                 {#if activeTab === "mondasok"}
                     <h3>Új mondás hozzáadása</h3>
@@ -478,8 +710,14 @@
                                     <tr>
                                         <td>{m.id}</td>
                                         <td>{m.text}</td>
-                                        <td
-                                            ><button
+                                        <td class="action-gap">
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditMondas(m)}
+                                                >Szerk.</button
+                                            >
+                                            <button
                                                 class="btn-delete"
                                                 on:click={() =>
                                                     deleteRecord(
@@ -487,8 +725,8 @@
                                                         m.id,
                                                         fetchMondasok,
                                                     )}>Törlés</button
-                                            ></td
-                                        >
+                                            >
+                                        </td>
                                     </tr>
                                 {:else}
                                     <tr
@@ -548,19 +786,26 @@
                                     <tr>
                                         <td>
                                             <span
-                                                style="display:inline-block; width:20px; height:20px; background:{q.bg_color}; border:1px solid var(--border-color);"
+                                                class="color-swatch"
+                                                style="background:{q.bg_color};"
                                             ></span>
                                         </td>
-                                        <td
-                                            ><a
+                                        <td>
+                                            <a
                                                 href={q.url}
                                                 target="_blank"
                                                 rel="nofollow noopener"
                                                 >{q.title}</a
-                                            ></td
-                                        >
-                                        <td
-                                            ><button
+                                            >
+                                        </td>
+                                        <td class="action-gap">
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditLink(q)}
+                                                >Szerk.</button
+                                            >
+                                            <button
                                                 class="btn-delete"
                                                 on:click={() =>
                                                     deleteRecord(
@@ -568,8 +813,8 @@
                                                         q.id,
                                                         fetchQuickLinks,
                                                     )}>Törlés</button
-                                            ></td
-                                        >
+                                            >
+                                        </td>
                                     </tr>
                                 {:else}
                                     <tr
@@ -640,7 +885,7 @@
                                             {:else}
                                                 Soha
                                             {/if}
-                                            <div style="margin-top: 5px;">
+                                            <div class="mt-xs">
                                                 <button
                                                     type="button"
                                                     class="btn-update"
@@ -655,13 +900,20 @@
                                                 >
                                             </div>
                                         </td>
-                                        <td
-                                            ><span
-                                                style="display:inline-block; width:20px; height:20px; background:{nf.bg_color}; border:1px solid var(--border-color);"
-                                            ></span></td
-                                        >
-                                        <td
-                                            ><button
+                                        <td>
+                                            <span
+                                                class="color-swatch"
+                                                style="background:{nf.bg_color};"
+                                            ></span>
+                                        </td>
+                                        <td class="action-gap">
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditNews(nf)}
+                                                >Szerk.</button
+                                            >
+                                            <button
                                                 class="btn-delete"
                                                 on:click={() =>
                                                     deleteRecord(
@@ -669,8 +921,8 @@
                                                         nf.id,
                                                         fetchNewsFeeds,
                                                     )}>Törlés</button
-                                            ></td
-                                        >
+                                            >
+                                        </td>
                                     </tr>
                                 {:else}
                                     <tr
@@ -688,7 +940,7 @@
                 {#if activeTab === "locations"}
                     <h3>Új Település</h3>
                     <form class="admin-form" on:submit={submitLocation}>
-                        <label for="loc_name">Település neve</label>
+                        <label for="loc_name">Település neve (HU)</label>
                         <input
                             id="loc_name"
                             type="text"
@@ -696,20 +948,36 @@
                             required
                         />
 
-                        <label for="loc_county">Megye</label>
+                        <label for="loc_name_ro">Név (RO)</label>
                         <input
-                            id="loc_county"
+                            id="loc_name_ro"
                             type="text"
-                            bind:value={newLocation.county}
+                            bind:value={newLocation.name_ro}
+                            placeholder="opcionális"
                         />
 
-                        <label for="loc_type">Típus (város, község, falu)</label
-                        >
+                        <label for="loc_name_de">Név (DE)</label>
                         <input
-                            id="loc_type"
+                            id="loc_name_de"
                             type="text"
-                            bind:value={newLocation.type}
+                            bind:value={newLocation.name_de}
+                            placeholder="opcionális"
                         />
+
+                        <label for="loc_county">Megye</label>
+                        <select id="loc_county" bind:value={newLocation.county}>
+                            <option value="">Válassz...</option>
+                            {#each COUNTIES as c}<option value={c}>{c}</option
+                                >{/each}
+                        </select>
+
+                        <label for="loc_type">Típus</label>
+                        <select id="loc_type" bind:value={newLocation.type}>
+                            <option value="">Válassz...</option>
+                            {#each LOCATION_TYPES as t}<option value={t}
+                                    >{t}</option
+                                >{/each}
+                        </select>
 
                         <button type="submit" class="admin-submit-btn"
                             >Hozzáadás</button
@@ -721,7 +989,9 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
-                                    <th>Név</th>
+                                    <th>Név (HU)</th>
+                                    <th>Név (RO)</th>
+                                    <th>Név (DE)</th>
                                     <th>Megye</th>
                                     <th>Típus</th>
                                     <th>Művelet</th>
@@ -732,10 +1002,22 @@
                                     <tr>
                                         <td>{l.id}</td>
                                         <td>{l.name}</td>
-                                        <td>{l.county}</td>
-                                        <td>{l.type}</td>
-                                        <td
-                                            ><button
+                                        <td>{l.name_ro || "–"}</td>
+                                        <td>{l.name_de || "–"}</td>
+                                        <td>{l.county || "–"}</td>
+                                        <td>
+                                            <span class="badge"
+                                                >{l.type || "–"}</span
+                                            >
+                                        </td>
+                                        <td class="action-gap">
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditLocation(l)}
+                                                >Szerk.</button
+                                            >
+                                            <button
                                                 class="btn-delete"
                                                 on:click={() =>
                                                     deleteRecord(
@@ -743,12 +1025,12 @@
                                                         l.id,
                                                         fetchLocations,
                                                     )}>Törlés</button
-                                            ></td
-                                        >
+                                            >
+                                        </td>
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="5"
+                                        ><td colspan="7"
                                             >Nincsenek települések.</td
                                         ></tr
                                     >
@@ -761,12 +1043,12 @@
                 <!-- Service Categories Tab -->
                 {#if activeTab === "service_categories"}
                     <h3>Új Kategória</h3>
-                    <form class="admin-form" on:submit={submitServiceCategory}>
+                    <form class="admin-form" on:submit={submitEntryCategory}>
                         <label for="cat_name">Kategória neve</label>
                         <input
                             id="cat_name"
                             type="text"
-                            bind:value={newServiceCategory.name}
+                            bind:value={newEntryCategory.name}
                             required
                         />
 
@@ -785,18 +1067,24 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each serviceCategories as cat}
+                                {#each entryCategories as cat}
                                     <tr>
                                         <td>{cat.id}</td>
                                         <td>{cat.name}</td>
-                                        <td>
+                                        <td class="action-gap">
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditCategory(cat)}
+                                                >Szerk.</button
+                                            >
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
                                                     deleteRecord(
-                                                        "service_categories",
+                                                        "entry_categories",
                                                         cat.id,
-                                                        fetchServiceCategories,
+                                                        fetchEntryCategories,
                                                     )}>Törlés</button
                                             >
                                         </td>
@@ -813,14 +1101,21 @@
                     </div>
                 {/if}
 
-                <!-- Services Tab -->
-                {#if activeTab === "services"}
-                    <h3>Új Szolgáltatás</h3>
-                    <form class="admin-form" on:submit={submitService}>
+                <!-- Entries Tab -->
+                {#if activeTab === "entries"}
+                    <h3>Új bejegyzés</h3>
+                    <form class="admin-form" on:submit={submitEntry}>
+                        <label for="serv_type">Típus</label>
+                        <select id="serv_type" bind:value={newEntry.type}>
+                            {#each entryTypes as t}<option value={t.name}
+                                    >{t.name}</option
+                                >{/each}
+                        </select>
+
                         <label for="serv_loc">Település</label>
                         <select
                             id="serv_loc"
-                            bind:value={newService.location_id}
+                            bind:value={newEntry.location_id}
                             required
                         >
                             <option value="">Válassz...</option>
@@ -832,13 +1127,9 @@
                         </select>
 
                         <label for="serv_cat">Kategória</label>
-                        <select
-                            id="serv_cat"
-                            bind:value={newService.category_id}
-                            required
-                        >
-                            <option value="">Válassz...</option>
-                            {#each serviceCategories as cat}
+                        <select id="serv_cat" bind:value={newEntry.category_id}>
+                            <option value={null}>–</option>
+                            {#each entryCategories as cat}
                                 <option value={cat.id}>{cat.name}</option>
                             {/each}
                         </select>
@@ -847,7 +1138,7 @@
                         <input
                             id="serv_name"
                             type="text"
-                            bind:value={newService.name}
+                            bind:value={newEntry.name}
                             required
                         />
 
@@ -855,46 +1146,64 @@
                         <input
                             id="serv_url"
                             type="url"
-                            bind:value={newService.url}
+                            bind:value={newEntry.url}
                         />
 
                         <label for="serv_phone">Telefon</label>
                         <input
                             id="serv_phone"
                             type="text"
-                            bind:value={newService.phone}
+                            bind:value={newEntry.phone}
                         />
 
                         <label for="serv_addr">Cím</label>
                         <input
                             id="serv_addr"
                             type="text"
-                            bind:value={newService.address}
+                            bind:value={newEntry.address}
                         />
 
-                        <textarea id="serv_notes" bind:value={newService.notes}
+                        <label for="serv_notes">Megjegyzések</label>
+                        <textarea id="serv_notes" bind:value={newEntry.notes}
                         ></textarea>
 
                         <label for="serv_tags">Címkék (#cimke1 #cimke2)</label>
                         <input
                             id="serv_tags"
                             type="text"
-                            bind:value={newService.tags}
+                            bind:value={newEntry.tags}
                             placeholder="#cimke1 #cimke2"
                         />
 
-                        <label
-                            for="serv_lang"
-                            style="display:flex; align-items:center; gap:0.5rem; font-weight:normal; margin-top:0.5rem;"
-                        >
-                            <input
-                                id="serv_lang"
-                                type="checkbox"
-                                bind:checked={newService.is_magyar_language}
-                                style="width:auto;"
-                            />
-                            Magyar nyelvű kiszolgálás
-                        </label>
+                        <span class="form-group-label">Nyelvek</span>
+                        <div class="flex gap-lg flex-wrap mb-lg">
+                            {#each LANGUAGES as lang}
+                                <label
+                                    class="flex items-center gap-xs font-normal"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={newEntry.languages.includes(
+                                            lang,
+                                        )}
+                                        on:change={() =>
+                                            (newEntry.languages =
+                                                newEntry.languages.includes(
+                                                    lang,
+                                                )
+                                                    ? newEntry.languages.filter(
+                                                          (l) => l !== lang,
+                                                      )
+                                                    : [
+                                                          ...newEntry.languages,
+                                                          lang,
+                                                      ])}
+                                        class="w-auto"
+                                    />
+                                    {lang}
+                                </label>
+                            {/each}
+                        </div>
 
                         <button type="submit" class="admin-submit-btn"
                             >Hozzáadás</button
@@ -906,47 +1215,121 @@
                             <thead>
                                 <tr>
                                     <th>Név</th>
+                                    <th>Típus</th>
                                     <th>URL</th>
                                     <th>Település</th>
                                     <th>Kategória</th>
+                                    <th>Nyelvek</th>
                                     <th>Címkék</th>
                                     <th>Művelet</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each services as s}
+                                {#each entries as s}
                                     <tr>
                                         <td>{s.name}</td>
-                                        <td>{s.url ? s.url : "-"}</td>
+                                        <td
+                                            ><span class="badge"
+                                                >{s.type || "service"}</span
+                                            ></td
+                                        >
+                                        <td>{s.url ? s.url : "–"}</td>
                                         <td>{getLocationName(s.location_id)}</td
                                         >
                                         <td>{getCategoryName(s.category_id)}</td
                                         >
+                                        <td>{(s.languages || []).join(", ")}</td
+                                        >
                                         <td>
-                                            {#if s.tags}
+                                            {#if s.tags && s.tags.length > 0}
                                                 <div class="admin-table-tags">
-                                                    {s.tags}
+                                                    {s.tags
+                                                        .map((t) => "#" + t)
+                                                        .join(" ")}
                                                 </div>
-                                            {:else}
-                                                -
-                                            {/if}
+                                            {:else}–{/if}
                                         </td>
-                                        <td
-                                            ><button
+                                        <td>
+                                            <button
+                                                class="btn-update"
+                                                on:click={() => openEdit(s)}
+                                                >Szerk.</button
+                                            >
+                                            <button
                                                 class="btn-delete"
                                                 on:click={() =>
                                                     deleteRecord(
-                                                        "services",
+                                                        "entries",
                                                         s.id,
-                                                        fetchServices,
+                                                        fetchEntries,
                                                     )}>Törlés</button
-                                            ></td
-                                        >
+                                            >
+                                        </td>
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="4"
-                                            >Nincsenek szolgáltatások.</td
+                                        ><td colspan="8"
+                                            >Nincsenek bejegyzések.</td
+                                        ></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+
+                <!-- Entry Types Tab -->
+                {#if activeTab === "entry_types"}
+                    <h3>Új Típus</h3>
+                    <form class="admin-form" on:submit={submitEntryType}>
+                        <label for="etype_name">Típus neve</label>
+                        <input
+                            id="etype_name"
+                            type="text"
+                            bind:value={newEntryType.name}
+                            required
+                            placeholder="pl. service, business..."
+                        />
+                        <button type="submit" class="admin-submit-btn"
+                            >Hozzáadás</button
+                        >
+                    </form>
+
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Név</th>
+                                    <th>Művelet</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each entryTypes as et}
+                                    <tr>
+                                        <td>{et.id}</td>
+                                        <td>{et.name}</td>
+                                        <td class="action-gap">
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditType(et)}
+                                                >Szerk.</button
+                                            >
+                                            <button
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteRecord(
+                                                        "entry_types",
+                                                        et.id,
+                                                        fetchEntryTypes,
+                                                    )}>Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="3">Nincsenek típusok.</td
                                         ></tr
                                     >
                                 {/each}
@@ -957,8 +1340,593 @@
             </div>
         </main>
     </div>
+
+    <!-- Edit Mondas Modal -->
+    {#if editingMondas}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditMondas}
+            on:keydown={(e) => e.key === "Escape" && cancelEditMondas()}
+        >
+            <div class="admin-modal">
+                <h3>Mondás szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditMondas}
+                >
+                    <label for="emondas_text">Mondás szövege</label>
+                    <textarea
+                        id="emondas_text"
+                        bind:value={editingMondas.text}
+                        required
+                        rows="4"
+                        class="w-full"
+                    ></textarea>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditMondas}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Edit QuickLink Modal -->
+    {#if editingLink}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditLink}
+            on:keydown={(e) => e.key === "Escape" && cancelEditLink()}
+        >
+            <div class="admin-modal">
+                <h3>Gyorslink szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditLink}
+                >
+                    <label for="elink_title">Cím</label>
+                    <input
+                        id="elink_title"
+                        type="text"
+                        bind:value={editingLink.title}
+                        required
+                    />
+
+                    <label for="elink_url">URL</label>
+                    <input
+                        id="elink_url"
+                        type="url"
+                        bind:value={editingLink.url}
+                        required
+                    />
+
+                    <label for="elink_color">Háttérszín</label>
+                    <input
+                        id="elink_color"
+                        type="text"
+                        bind:value={editingLink.bg_color}
+                    />
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditLink}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Edit News Modal -->
+    {#if editingNews}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditNews}
+            on:keydown={(e) => e.key === "Escape" && cancelEditNews()}
+        >
+            <div class="admin-modal">
+                <h3>Hírfolyam szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditNews}
+                >
+                    <label for="enews_title">Hírportál neve</label>
+                    <input
+                        id="enews_title"
+                        type="text"
+                        bind:value={editingNews.title}
+                        required
+                    />
+
+                    <label for="enews_url">RSS URL</label>
+                    <input
+                        id="enews_url"
+                        type="url"
+                        bind:value={editingNews.feed_url}
+                        required
+                    />
+
+                    <label for="enews_color">Háttérszín</label>
+                    <input
+                        id="enews_color"
+                        type="text"
+                        bind:value={editingNews.bg_color}
+                    />
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditNews}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Edit Entry Modal -->
+    {#if editingEntry}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={closeEdit}
+            on:keydown={(e) => e.key === "Escape" && closeEdit()}
+        >
+            <div class="admin-modal">
+                <h3>Bejegyzés szerkesztése</h3>
+                <form class="admin-form" on:submit|preventDefault={saveEdit}>
+                    <label for="edit_type">Típus</label>
+                    <select id="edit_type" bind:value={editingEntry.type}>
+                        {#each entryTypes as t}<option value={t.name}
+                                >{t.name}</option
+                            >{/each}
+                    </select>
+
+                    <label for="edit_loc">Település</label>
+                    <select
+                        id="edit_loc"
+                        bind:value={editingEntry.location_id}
+                        required
+                    >
+                        {#each locations as loc}
+                            <option value={loc.id}
+                                >{loc.name} ({loc.county})</option
+                            >
+                        {/each}
+                    </select>
+
+                    <label for="edit_cat">Kategória</label>
+                    <select id="edit_cat" bind:value={editingEntry.category_id}>
+                        <option value={null}>–</option>
+                        {#each entryCategories as cat}
+                            <option value={cat.id}>{cat.name}</option>
+                        {/each}
+                    </select>
+
+                    <label for="edit_name">Név</label>
+                    <input
+                        id="edit_name"
+                        type="text"
+                        bind:value={editingEntry.name}
+                        required
+                    />
+
+                    <label for="edit_slug">Slug (URL azonosító)</label>
+                    <input
+                        id="edit_slug"
+                        type="text"
+                        bind:value={editingEntry.slug}
+                    />
+
+                    <label for="edit_url">URL / Weblap</label>
+                    <input
+                        id="edit_url"
+                        type="url"
+                        bind:value={editingEntry.url}
+                    />
+
+                    <label for="edit_phone">Telefon</label>
+                    <input
+                        id="edit_phone"
+                        type="text"
+                        bind:value={editingEntry.phone}
+                    />
+
+                    <label for="edit_addr">Cím</label>
+                    <input
+                        id="edit_addr"
+                        type="text"
+                        bind:value={editingEntry.address}
+                    />
+
+                    <label for="edit_notes">Megjegyzések</label>
+                    <textarea id="edit_notes" bind:value={editingEntry.notes}
+                    ></textarea>
+
+                    <label for="edit_tags">Címkék (#cimke1 #cimke2)</label>
+                    <input
+                        id="edit_tags"
+                        type="text"
+                        bind:value={editTagsStr}
+                        placeholder="#cimke1 #cimke2"
+                    />
+
+                    <span class="form-group-label">Nyelvek</span>
+                    <div class="flex gap-lg flex-wrap mb-lg">
+                        {#each LANGUAGES as lang}
+                            <label class="flex items-center gap-xs font-normal">
+                                <input
+                                    type="checkbox"
+                                    checked={editingEntry.languages.includes(
+                                        lang,
+                                    )}
+                                    on:change={() =>
+                                        (editingEntry.languages =
+                                            editingEntry.languages.includes(
+                                                lang,
+                                            )
+                                                ? editingEntry.languages.filter(
+                                                      (l) => l !== lang,
+                                                  )
+                                                : [
+                                                      ...editingEntry.languages,
+                                                      lang,
+                                                  ])}
+                                    class="w-auto"
+                                />
+                                {lang}
+                            </label>
+                        {/each}
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={closeEdit}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Edit Location Modal -->
+    {#if editingLocation}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditLocation}
+            on:keydown={(e) => e.key === "Escape" && cancelEditLocation()}
+        >
+            <div class="admin-modal">
+                <h3>Település szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditLocation}
+                >
+                    <label for="eloc_name">Név (HU)</label>
+                    <input
+                        id="eloc_name"
+                        type="text"
+                        bind:value={editingLocation.name}
+                        required
+                    />
+
+                    <label for="eloc_name_ro">Név (RO)</label>
+                    <input
+                        id="eloc_name_ro"
+                        type="text"
+                        bind:value={editingLocation.name_ro}
+                    />
+
+                    <label for="eloc_name_de">Név (DE)</label>
+                    <input
+                        id="eloc_name_de"
+                        type="text"
+                        bind:value={editingLocation.name_de}
+                    />
+
+                    <label for="eloc_county">Megye</label>
+                    <select
+                        id="eloc_county"
+                        bind:value={editingLocation.county}
+                    >
+                        <option value="">–</option>
+                        {#each COUNTIES as c}<option value={c}>{c}</option
+                            >{/each}
+                    </select>
+
+                    <label for="eloc_type">Típus</label>
+                    <select id="eloc_type" bind:value={editingLocation.type}>
+                        <option value="">–</option>
+                        {#each LOCATION_TYPES as t}<option value={t}>{t}</option
+                            >{/each}
+                    </select>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditLocation}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Edit Category Modal -->
+    {#if editingCategory}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditCategory}
+            on:keydown={(e) => e.key === "Escape" && cancelEditCategory()}
+        >
+            <div class="admin-modal">
+                <h3>Kategória szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditCategory}
+                >
+                    <label for="ecat_name">Kategória neve</label>
+                    <input
+                        id="ecat_name"
+                        type="text"
+                        bind:value={editingCategory.name}
+                        required
+                    />
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditCategory}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Edit Type Modal -->
+    {#if editingType}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditType}
+            on:keydown={(e) => e.key === "Escape" && cancelEditType()}
+        >
+            <div class="admin-modal">
+                <h3>Típus szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditType}
+                >
+                    <label for="etype_name_edit">Típus neve</label>
+                    <input
+                        id="etype_name_edit"
+                        type="text"
+                        bind:value={editingType.name}
+                        required
+                    />
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditType}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- Custom Dialog -->
+    {#if dialogVisible}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-dialog-overlay"
+            role="alertdialog"
+            tabindex="-1"
+            on:click|self={dialogCancel}
+        >
+            <div class="admin-dialog">
+                <p>{dialogMsg}</p>
+                <div class="admin-dialog-actions">
+                    {#if dialogType === "confirm"}
+                        <button class="btn-delete" on:click={dialogCancel}
+                            >Mégse</button
+                        >
+                    {/if}
+                    <button class="admin-submit-btn" on:click={dialogOk}
+                        >OK</button
+                    >
+                </div>
+            </div>
+        </div>
+    {/if}
 {/if}
 
 <style>
     @import "../../styles/admin.css";
+
+    .admin-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+    .admin-modal {
+        background: var(--card-bg, #1e1e2e);
+        border: 1px solid var(--border-color, #444);
+        border-radius: 12px;
+        padding: 2rem;
+        width: min(600px, 95vw);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .admin-modal h3 {
+        margin-top: 0;
+    }
+    .btn-update {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.8rem;
+        border: 1px solid var(--primary, #5c6bc0);
+        color: var(--primary, #5c6bc0);
+        background: transparent;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .btn-update:hover {
+        background: var(--primary, #5c6bc0);
+        color: #fff;
+    }
+    .badge {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        background: var(--accent-bg, #2a2a3e);
+        color: var(--muted, #aaa);
+        border: 1px solid var(--border-color, #444);
+    }
+    .admin-dialog-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    .admin-dialog {
+        background: var(--card-bg, #1e1e2e);
+        border: 1px solid var(--border-color, #444);
+        border-radius: 12px;
+        padding: 1.5rem 2rem;
+        width: min(420px, 90vw);
+        text-align: center;
+    }
+    .admin-dialog p {
+        margin: 0 0 1.25rem;
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+    .admin-dialog-actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+    }
+    .admin-dialog-actions button {
+        min-width: 80px;
+    }
+    .form-group-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.35rem;
+    }
+    .w-full {
+        width: 100%;
+    }
+    .gap-xs {
+        gap: 0.3rem;
+    }
+    .gap-lg {
+        gap: 1rem;
+    }
+    .mt-xs {
+        margin-top: 5px;
+    }
+    .color-swatch {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 1px solid var(--border-color);
+    }
+    .modal-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+    .login-box {
+        max-width: 400px;
+        text-align: center;
+        width: 100%;
+    }
+    .mt-lg {
+        margin: 2rem auto;
+    }
+    .action-gap {
+        display: flex;
+        gap: 0.4rem;
+    }
+    .flex {
+        display: flex;
+    }
+    .flex-wrap {
+        flex-wrap: wrap;
+    }
+    .items-center {
+        align-items: center;
+    }
+    .font-normal {
+        font-weight: normal;
+    }
+    .w-auto {
+        width: auto;
+    }
+    .mb-lg {
+        margin-bottom: 1rem;
+    }
 </style>

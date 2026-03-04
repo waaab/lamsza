@@ -3,32 +3,50 @@
 CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    name_ro VARCHAR(255),
+    name_de VARCHAR(255),
     county VARCHAR(255),
     type VARCHAR(50),
     CONSTRAINT unique_location UNIQUE (name, county, type)
 );
 
-CREATE TABLE IF NOT EXISTS service_categories (
+CREATE TABLE IF NOT EXISTS entry_categories (
+CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE
 );
 
 CREATE TABLE IF NOT EXISTS services (
+CREATE TABLE IF NOT EXISTS entries (
+CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     location_id INTEGER REFERENCES locations(id),
-    category_id INTEGER REFERENCES service_categories(id),
+    category_id INTEGER REFERENCES entry_categories(id),
+    type VARCHAR(50) NOT NULL DEFAULT 'service',
     category VARCHAR(100),
     name VARCHAR(255) NOT NULL,
     url VARCHAR(255),
     phone VARCHAR(50),
     address TEXT,
     notes TEXT,
-    is_magyar_language BOOLEAN DEFAULT true,
-    tags TEXT,
-    CONSTRAINT unique_service UNIQUE (name, location_id)
+    languages VARCHAR(10)[] DEFAULT '{"HU"}',
+    CONSTRAINT unique_entry UNIQUE (name, location_id)
+);
+
+CREATE TABLE IF NOT EXISTS tags (
+CREATE TABLE IF NOT EXISTS locations (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS entry_tags (
+    entry_id INTEGER REFERENCES entries(id) ON DELETE CASCADE,
+    tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+    PRIMARY KEY (entry_id, tag_id)
 );
 
 CREATE TABLE IF NOT EXISTS mondasok (
+CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
     category VARCHAR(100),
@@ -36,6 +54,7 @@ CREATE TABLE IF NOT EXISTS mondasok (
 );
 
 CREATE TABLE IF NOT EXISTS quick_links (
+CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     url VARCHAR(255) NOT NULL UNIQUE,
@@ -44,6 +63,7 @@ CREATE TABLE IF NOT EXISTS quick_links (
 );
 
 CREATE TABLE IF NOT EXISTS news_feeds (
+CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     feed_url VARCHAR(255) NOT NULL UNIQUE,

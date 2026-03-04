@@ -9,7 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - Full SvelteKit + Go + PostgreSQL stack
-- Local directory search (`/api/szolgaltatasok?q=...`) with Go API and Postgres
+- Local directory search (`/api/directory?q=...`) with Go API and Postgres
 - Weather widget (proxied via Go, cached 30 min, OpenWeatherMap)
 - RSS news widget (proxied via Go, cached, multiple feeds from DB)
 - Quick links grid (admin-manageable, custom bg colors, SVG icons)

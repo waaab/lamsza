@@ -48,7 +48,7 @@ Primary use case: every new browser tab + browsing local services.
   - Weather: if query contains "idő", "időjárás", "milyen", "hőmérséklet" + city name (e.g. "milyen az ido Csikba?") → show in blue section
   - News: keyword search in titles/descriptions → show in orange section
 - Highlighting: Different colors for directory (green), weather (blue), news (orange)
-- Backend: PostgreSQL + Go API for dynamic queries (/api/szolgaltatasok?q=...&category=...)
+- Backend: PostgreSQL + Go API for dynamic queries (/api/directory?q=...&category=...)
 
 **Admin Panel Design**
 - Protected page: /admin (basic password or Google Sign-In in v1.2)

@@ -1,0 +1,21 @@
+
+> lamsza@0.0.1 dev
+> vite dev
+
+Vite config loaded — allowedHosts: [ '.test', 'localhost', '127.0.0.1', '::1' ]
+
+  VITE v7.3.1  ready in 622 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+  ➜  press h + enter to show help
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
