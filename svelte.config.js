@@ -12,8 +12,11 @@ const config = {
 			assets: 'dist',
 			fallback: 'app.html',
 			precompress: false,
-			strict: true
-		})
+			strict: false
+		}),
+		prerender: {
+			handleUnseenRoutes: 'ignore'
+		}
 	}
 };
 
