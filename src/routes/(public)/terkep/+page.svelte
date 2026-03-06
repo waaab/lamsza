@@ -3,18 +3,16 @@
 </script>
 
 <svelte:head>
-    <title>Szekely Gugel - Térkép</title>
+    <title>Szekely Gugel - Székelyföld Térkép</title>
 </svelte:head>
 
-<div class="container" style="min-height: calc(100vh - 120px)">
-    <h1 class="page-title">Erdély Térkép</h1>
+<div class="container main-container">
+    <h1 class="page-title">Székelyföld Térkép</h1>
     <p class="greeting">
         Hamarosan érkezik az interaktív térképünk helyi adatokkal!
     </p>
 
-    <div
-        style="width: 100%; height: 60vh; background-color: var(--surface-bg); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;"
-    >
+    <div class="map-container">
         <!-- Placeholder SVG for Map -->
         <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -22,7 +20,7 @@
             height="100%"
             viewBox="0 0 800 600"
             preserveAspectRatio="xMidYMid slice"
-            style="opacity: 0.1;"
+            class="map-skeleton-svg"
         >
             <defs>
                 <pattern
@@ -51,9 +49,7 @@
             <circle cx="250" cy="400" r="8" fill="currentColor" />
         </svg>
 
-        <div
-            style="position: absolute; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem;"
-        >
+        <div class="map-overlay">
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="48"
@@ -72,10 +68,45 @@
                     y2="21"
                 ></line></svg
             >
-            <h2 style="margin: 0;">Fejlesztés alatt</h2>
-            <p style="margin: 0; color: var(--text-faint);">
+            <h2 class="overlay-title">Fejlesztés alatt</h2>
+            <p class="overlay-text">
                 Ide kerül az OpenStreetMap (OSM) TileServer integráció.
             </p>
         </div>
     </div>
 </div>
+
+<style>
+    .main-container {
+        min-height: calc(100vh - 120px);
+    }
+    .map-container {
+        width: 100%;
+        height: 60vh;
+        background-color: var(--surface-bg);
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        position: relative;
+    }
+    .map-skeleton-svg {
+        opacity: 0.1;
+    }
+    .map-overlay {
+        position: absolute;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+    .overlay-title {
+        margin: 0;
+    }
+    .overlay-text {
+        margin: 0;
+        color: var(--text-faint);
+    }
+</style>

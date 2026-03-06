@@ -48,17 +48,12 @@
     {/if}
 </svelte:head>
 
-<div class="container" style="min-height: calc(100vh - 120px);">
+<div class="container main-content">
     {#if loading}
-        <div
-            class="skeleton skeleton-text"
-            style="width: 40%; height: 2rem; margin-bottom: 2rem;"
-        ></div>
+        <div class="skeleton skeleton-text skeleton-title-loader"></div>
     {:else if error}
-        <div class="error-msg">{error}</div>
-        <a href="/" class="btn" style="margin-top: 1rem; display: inline-block;"
-            >Vissza a főoldalra</a
-        >
+        <div class="note error">{error}</div>
+        <a href="/" class="btn back-to-home">Vissza a főoldalra</a>
     {:else if entry}
         <Breadcrumbs
             label={entry.name}
@@ -69,32 +64,20 @@
             settlementType={entry.location_type}
         />
 
-        <div style="margin-top: 2rem;">
+        <div class="entry-content">
             <!-- Remodeled Full-Width Profile -->
-            <div style="margin-bottom: 2rem;">
-                <div
-                    class="badge"
-                    style="font-size: 1rem; margin-bottom: 1rem; display: inline-block;"
-                >
-                    Index: {entry.category}
-                </div>
-                <h1
-                    style="margin: 0 0 1rem; font-size: 2.5rem; color: var(--text-color);"
-                >
-                    {entry.name}
-                </h1>
+            <div class="entry-header">
+                <div class="badge">Index: {entry.category}</div>
+                <h1 class="entry-title">{entry.name}</h1>
 
                 {#if entry.url}
-                    <div style="margin-bottom: 1.5rem; font-size: 1.1rem;">
-                        <span
-                            style="color: var(--text-faint); margin-right: 0.5rem;"
-                            >🔗 Weboldal:</span
-                        >
+                    <div class="entry-url-row">
+                        <span class="entry-url-label">🔗 Weboldal:</span>
                         <a
                             href={entry.url}
                             target="_blank"
                             rel="nofollow noopener"
-                            style="color: var(--primary-color); text-decoration: none; font-weight: 500;"
+                            class="entry-url-link"
                         >
                             {entry.url}
                         </a>
@@ -103,20 +86,12 @@
             </div>
 
             <!-- Distinct Contact Block -->
-            <div
-                style="padding: 1.5rem; background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 2rem;"
-            >
-                <h3
-                    style="margin-top: 0; color: var(--text-color); font-size: 1.2rem; margin-bottom: 1rem;"
-                >
-                    Kapcsolat
-                </h3>
-                <div style="display: grid; gap: 1rem;">
+            <div class="contact-card">
+                <h3 class="contact-title">Kapcsolat</h3>
+                <div class="contact-grid">
                     {#if entry.location || entry.address}
-                        <div
-                            style="display: flex; align-items: flex-start; gap: 0.8rem; font-size: 1.1rem;"
-                        >
-                            <span style="font-size: 1.3rem;">📍</span>
+                        <div class="contact-item">
+                            <span class="contact-icon">📍</span>
                             <div>
                                 {#if entry.location || entry.location_ro || entry.location_de}
                                     <strong
@@ -138,14 +113,11 @@
                     {/if}
 
                     {#if entry.phone}
-                        <div
-                            style="display: flex; align-items: center; gap: 0.8rem; font-size: 1.1rem;"
-                        >
-                            <span style="font-size: 1.3rem;">📞</span>
+                        <div class="contact-item-center">
+                            <span class="contact-icon">📞</span>
                             <a
                                 href={`tel:${entry.phone.replace(/[^0-9+]/g, "")}`}
-                                style="color: var(--text-color); text-decoration: none;"
-                                >{entry.phone}</a
+                                class="contact-link">{entry.phone}</a
                             >
                         </div>
                     {/if}
@@ -153,19 +125,10 @@
             </div>
 
             <!-- Details Block -->
-            <div
-                style="padding: 1.5rem; background: var(--bg-body); border-radius: 12px; margin-bottom: 2rem;"
-            >
-                <h3
-                    style="margin-top: 0; color: var(--text-color); font-size: 1.2rem; margin-bottom: 1rem;"
-                >
-                    Részletek & Megjegyzések
-                </h3>
+            <div class="details-section">
+                <h3 class="details-title">Részletek & Megjegyzések</h3>
                 {#if entry.notes}
-                    <div
-                        class="service-notes"
-                        style="font-size: 1.05rem; line-height: 1.6; margin-bottom: 1.5rem; white-space: pre-wrap; color: var(--text-faint);"
-                    >
+                    <div class="service-notes entry-notes">
                         {entry.notes}
                     </div>
                 {/if}
@@ -173,9 +136,7 @@
                 {#if entry.tags && entry.tags.length > 0}
                     <div class="service-tags">
                         {#each entry.tags as t}
-                            <span
-                                class="service-tag"
-                                style="padding: 0.4rem 0.8rem; font-size: 0.95rem;"
+                            <span class="service-tag tag-padded"
                                 >{t.startsWith("#") ? t : "#" + t}</span
                             >
                         {/each}
@@ -185,3 +146,96 @@
         </div>
     {/if}
 </div>
+
+<style>
+    .main-content {
+        min-height: calc(100vh - 120px);
+    }
+    .skeleton-title-loader {
+        width: 40%;
+        height: 2rem;
+        margin-bottom: 2rem;
+    }
+    .back-to-home {
+        margin-top: 1rem;
+        display: inline-block;
+    }
+    .entry-content {
+        margin-top: 2rem;
+    }
+    .entry-header {
+        margin-bottom: 2rem;
+    }
+    .entry-title {
+        margin: 0 0 1rem;
+    }
+    .entry-url-row {
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+    .entry-url-label {
+        color: var(--text-faint);
+        margin-right: 0.5rem;
+    }
+    .entry-url-link {
+        color: var(--primary-color);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .contact-card {
+        padding: 1.5rem;
+        background: var(--card-bg);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+        margin-bottom: 2rem;
+    }
+    .contact-title {
+        margin-top: 0;
+        color: var(--text-color);
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+    }
+    .contact-grid {
+        display: grid;
+        gap: 1rem;
+    }
+    .contact-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.8rem;
+        font-size: 1.1rem;
+    }
+    .contact-item-center {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        font-size: 1.1rem;
+    }
+    .contact-icon {
+        font-size: 1.3rem;
+    }
+    .contact-link {
+        color: var(--text-color);
+        text-decoration: none;
+    }
+    .details-section {
+        margin-bottom: 2rem;
+    }
+    .details-title {
+        margin-top: 0;
+        color: var(--text-color);
+        font-size: 1.2rem;
+        margin-bottom: 1rem;
+    }
+    .entry-notes {
+        font-size: 1.05rem;
+        line-height: 1.6;
+        margin-bottom: 1.5rem;
+        white-space: pre-wrap;
+        color: var(--text-faint);
+    }
+    .tag-padded {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.95rem;
+    }
+</style>

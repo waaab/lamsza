@@ -69,7 +69,7 @@
 
         if (engine === "szekely") {
             searchResultsHTML =
-                '<div class="skeleton skeleton-text" style="width:100%; height:40px;">Keresés...</div>';
+                '<div class="skeleton skeleton-text search-loading-skeleton">Keresés...</div>';
 
             try {
                 const [resultsRes, suggestionsRes] = await Promise.all([
@@ -183,11 +183,11 @@
                 if (directoryCount === 0) {
                     html += `<span>Nincs találat az Indexben erre a keresésre.</span>`;
                     if (dirSuggestionsText)
-                        html += `<span style="color:var(--text-faint); margin:0 0.5rem;">|</span> ${dirSuggestionsText}`;
+                        html += `<span class="results-separator">|</span> ${dirSuggestionsText}`;
                 } else {
                     html += `🔍 Keresés: <span class="active">${query}</span>`;
                     if (dirSuggestionsText)
-                        html += `<span style="color:var(--text-faint); margin:0 0.5rem;">|</span> ${dirSuggestionsText}`;
+                        html += `<span class="results-separator">|</span> ${dirSuggestionsText}`;
                 }
                 html += `</p>`;
                 html += `<p><span>(${directoryCount} találat)</span></p>`;
@@ -197,7 +197,7 @@
                 if (newsCount > 0 || newsKeywords.length > 0) {
                     let newsSuggestionsText =
                         newsKeywords.length > 0
-                            ? `<span class="active" style="margin-right:0.5rem;">📰 Hírekben:</span>` +
+                            ? `<span class="active news-badge-label">📰 Hírekben:</span>` +
                               newsKeywords
                                   .map(
                                       (s) =>
@@ -211,11 +211,11 @@
                     if (newsCount === 0) {
                         html += `<span>Nincs találat a hírekben erre a keresésre.</span>`;
                         if (newsSuggestionsText)
-                            html += `<span style="color:var(--text-faint); margin:0 0.5rem;">|</span> ${newsSuggestionsText}`;
+                            html += `<span class="results-separator">|</span> ${newsSuggestionsText}`;
                     } else {
                         html += `📰 Hírek: <span class="active">${query}</span>`;
                         if (newsSuggestionsText)
-                            html += `<span style="color:var(--text-faint); margin:0 0.5rem;">|</span> ${newsSuggestionsText}`;
+                            html += `<span class="results-separator">|</span> ${newsSuggestionsText}`;
                     }
                     html += `</p>`;
                     html += `<p><span>(${newsCount} találat)</span></p>`;
@@ -249,14 +249,14 @@
                         <div class="card service">
                             ${
                                 service.is_direct_match
-                                    ? `<div class="badge" style="background-color: var(--primary-color);">Közvetlen Találat</div>`
-                                    : `<div class="badge" style="background-color: var(--text-faint);">Tartalom Találat</div>`
+                                    ? `<div class="badge">Közvetlen Találat</div>`
+                                    : `<div class="badge">Tartalom Találat</div>`
                             }
                             <div class="badge">Index: ${service.category}</div>
                             <h3 class="service-name">
-                                ${service.entity_type === "settlement" ? `<a href="/${service.county_slug}-megye/${service.slug}" style="color:inherit;text-decoration:none;">${service.name}</a>` : `<a href="/bejegyzes/${service.slug}" style="color:inherit;text-decoration:none;">${service.name}</a>`}
+                                ${service.entity_type === "settlement" ? `<a href="/${service.county_slug}-megye/${service.slug}" class="service-link">${service.name}</a>` : `<a href="/bejegyzes/${service.slug}" class="service-link">${service.name}</a>`}
                             </h3>
-                            ${service.url ? `<div class="service-info" style="margin-bottom: 0.5rem;"><span style="color: var(--text-faint); margin-right: 0.3rem;">🔗</span><a href="${service.url}" target="_blank" rel="nofollow noopener" style="color: var(--primary-color); text-decoration: none;">${service.url}</a></div>` : ""}
+                            ${service.url ? `<div class="service-info service-url-box"><span class="service-url-icon">🔗</span><a href="${service.url}" target="_blank" rel="nofollow noopener" class="service-url-link">${service.url}</a></div>` : ""}
                             <div class="service-info">📍 ${service.location} - ${service.address}</div>
                             <div class="service-info"> ${service.phone}</div>
                             ${
@@ -291,7 +291,7 @@
                                 <div class="card weather">
                                     <div class="weather-badge">Időjárás</div>
                                     <h3 class="service-name">Jelenlegi idő</h3>
-                                    <div class="weather-current" style="font-size:2rem;">${temp}°C</div>
+                                    <div class="weather-current-large">${temp}°C</div>
                                     <div class="weather-desc">${desc}</div>
                                 </div>
                             `;
@@ -307,7 +307,7 @@
                         <div class="card news">
                             <div class="badge">Hírek: ${item.source}</div>
                             <h3 class="service-name">
-                                <a href="${item.link}" target="_blank" rel="nofollow noopener" style="color:inherit;text-decoration:none;">📰 ${item.title}</a>
+                                <a href="${item.link}" target="_blank" rel="nofollow noopener" class="service-link">📰 ${item.title}</a>
                             </h3>
                             <div class="service-info">${new Date(item.pubDate).toLocaleDateString("hu-HU")}</div>
                         </div>
@@ -332,7 +332,7 @@
                                             .slice(0, 3)
                                             .map(
                                                 (i) =>
-                                                    `<div style="margin-bottom:0.8rem;"><a href="${i.link}" style="text-decoration:none; font-weight:600; font-size:1.1rem;" target="_blank" rel="nofollow noopener">📰 ${i.title}</a></div>`,
+                                                    `<div class="news-item-link-box"><a href="${i.link}" class="news-item-link" target="_blank" rel="nofollow noopener">📰 ${i.title}</a></div>`,
                                             )
                                             .join("")}
                                     </div>
@@ -741,22 +741,14 @@
 {#if mondasLoading || mondasText !== "" || mondasError}
     <section id="szekely-mondasok">
         <div class="mondas-inner">
+            <div class="mondas-label-row">
+                <span class="heading-label">Napi Székely Mondás</span>
+            </div>
             {#if mondasLoading}
                 <div class="skeleton mondas-skeleton"></div>
             {:else if mondasError}
-                <div class="mondas-label-row">
-                    <span class="mondas-label">Napi Székely Mondás</span>
-                </div>
-                <p
-                    class="error-msg"
-                    style="margin:0; padding:0; font-style:italic;"
-                >
-                    A mondás jelenleg nem elérhető.
-                </p>
+                <p class="mondas-quote">A mondás jelenleg nem elérhető.</p>
             {:else}
-                <div class="mondas-label-row">
-                    <span class="mondas-label">Napi Székely Mondás</span>
-                </div>
                 <blockquote class="mondas-quote">{mondasText}</blockquote>
             {/if}
         </div>
@@ -766,7 +758,7 @@
 {#if quickLinksLoading || quickLinksData.length > 0 || quickLinksError}
     <section id="gyorslinkek">
         <div class="quick-links-heading">
-            <span class="quick-links-label">Gyorslinkek</span>
+            <span class="heading-label">Gyorslinkek</span>
         </div>
         <div class="quick-links">
             {#if quickLinksLoading}
@@ -779,10 +771,7 @@
                     </div>
                 {/each}
             {:else if quickLinksError}
-                <p
-                    class="error-msg"
-                    style="margin:0; padding:0.5rem 0; font-style:italic;"
-                >
+                <p class="error-msg quick-links-error">
                     A gyorslinkek jelenleg nem elérhetők.
                 </p>
             {:else}
@@ -795,7 +784,7 @@
                     >
                         <div
                             class="link-card-icon"
-                            style="background:{q.bg_color || '#2f4f4f'};"
+                            style:background={q.bg_color || "#2f4f4f"}
                         >
                             <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -825,7 +814,7 @@
 <section id="idojaras">
     <div id="weatherLoading" class="weather-card">
         <div class="weather-left">
-            <span class="section-title">Időjárás</span>
+            <span class="widget-title">Időjárás</span>
             <div class="weather-temp-row">
                 <div class="skeleton weather-skeleton-temp"></div>
             </div>
@@ -833,20 +822,17 @@
                 <div class="skeleton weather-skeleton-desc"></div>
             </div>
             <div class="weather-footer">
-                <div
-                    class="skeleton"
-                    style="width:120px; height:0.75rem;"
-                ></div>
-                <div class="skeleton" style="width:90px; height:0.75rem;"></div>
+                <div class="skeleton skeleton-footer-1"></div>
+                <div class="skeleton skeleton-footer-2"></div>
             </div>
         </div>
         <div class="weather-right">
             <span class="weather-icon">⛅</span>
         </div>
     </div>
-    <div id="weatherContent" class="weather-card" style="display: none;">
+    <div id="weatherContent" class="weather-card weather-hidden">
         <div class="weather-left">
-            <span class="section-title">Csíkszereda</span>
+            <span class="widget-title">Csíkszereda</span>
             <div class="weather-temp-row">
                 <span class="weather-temp" id="temp"></span><span
                     class="weather-temp-unit">°C</span
@@ -855,10 +841,10 @@
             </div>
             <div class="weather-desc"><span id="desc"></span></div>
             <div class="weather-footer">
-                <small class="weather-source">Forrás: OpenWeatherMap</small>
                 <small class="weather-timestamp" id="weatherTimestamp"
                     >1 orája</small
                 >
+                <small class="weather-source">Forrás: OpenWeatherMap</small>
             </div>
         </div>
         <div class="weather-right">
@@ -894,7 +880,7 @@
                 y2="10"
             ></line></svg
         >
-        <span class="section-title">Friss hírek erdélyi forrásból</span>
+        <span class="widget-title">Friss hírek erdélyi forrásból</span>
     </div>
 
     {#if newsLoadingTeaser}
@@ -909,14 +895,14 @@
             </div>
         {/each}
     {:else if newsFeedsError}
-        <div class="error-msg">
+        <div class="note error">
             Hírek jelenleg nincsenek konfigurálva vagy nem elérhetők.
         </div>
     {:else}
         {#each teaserItems as item}
             <div class="news-item">
                 <div class="news-item-meta">
-                    <span class="badge" style="background:{item.bgColor};"
+                    <span class="badge" style:background={item.bgColor}
                         >{item.source}</span
                     >
                     <time
@@ -938,3 +924,74 @@
         <a href="/hirek" class="nav-btn">Erdélyi hírek →</a>
     </div>
 </section>
+
+<style>
+    :global(.search-loading-skeleton) {
+        width: 100%;
+        height: 40px;
+    }
+
+    /* Dynamic Search Results Styles (Global as they are injected via @html) */
+    :global(.results-separator) {
+        color: var(--text-faint);
+        margin: 0 0.5rem;
+    }
+
+    :global(.news-badge-label) {
+        margin-right: 0.5rem;
+    }
+
+    :global(.service-link) {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    :global(.service-url-box) {
+        margin-bottom: 0.5rem;
+    }
+
+    :global(.service-url-icon) {
+        color: var(--text-faint);
+        margin-right: 0.3rem;
+    }
+
+    :global(.service-url-link) {
+        color: var(--primary-color);
+        text-decoration: none;
+    }
+
+    :global(.weather-current-large) {
+        font-size: 2rem;
+    }
+
+    :global(.news-item-link-box) {
+        margin-bottom: 0.8rem;
+    }
+
+    :global(.news-item-link) {
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+
+    /* Static Parts Styles */
+    .quick-links-error {
+        margin: 0;
+        padding: 0.5rem 0;
+        font-style: italic;
+    }
+
+    .skeleton-footer-1 {
+        width: 120px;
+        height: 0.75rem;
+    }
+
+    .skeleton-footer-2 {
+        width: 90px;
+        height: 0.75rem;
+    }
+
+    .weather-hidden {
+        display: none;
+    }
+</style>

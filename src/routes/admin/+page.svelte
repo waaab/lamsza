@@ -15,6 +15,7 @@
     let entries = [];
     let entryCategories = [];
     let entryTypes = [];
+    let events = [];
 
     // Per-feed loading state
     let loadingFeeds = new Set();
@@ -22,8 +23,8 @@
 
     // Form binding objects
     let newMondas = { text: "" };
-    let newLink = { title: "", url: "", bg_color: "var(--card-bg)" };
-    let newNews = { title: "", feed_url: "", bg_color: "var(--warning-bg)" };
+    let newLink = { title: "", url: "", bg_color: "#e6f0ff" };
+    let newNews = { title: "", feed_url: "", bg_color: "#ffebd6" };
     let newLocation = {
         name: "",
         name_ro: "",
@@ -31,6 +32,11 @@
         county: "",
         type: "",
         slug: "",
+        post_code: "",
+        coordinates: "",
+        population: "",
+        area: "",
+        parent_id: null,
     };
     let newEntry = {
         location_id: "",
@@ -47,6 +53,32 @@
     };
     let newEntryCategory = { name: "" };
     let newEntryType = { name: "" };
+    let newEvent = {
+        location_id: "",
+        title: "",
+        description: "",
+        start_date: "",
+        start_time: "",
+        end_date: "",
+        end_time: "",
+        event_type: "cultural",
+        organizer: "",
+    };
+
+    let newOrganizerModalVisible = false;
+    let newOrganizerEntry = {
+        location_id: "",
+        category_id: "",
+        name: "",
+        slug: "",
+        url: "",
+        phone: "",
+        address: "",
+        notes: "",
+        type: "service",
+        languages: ["HU"],
+        tags: "",
+    };
 
     // Edit modal state
     let editingEntry = null;
@@ -57,10 +89,11 @@
     let editingMondas = null;
     let editingLink = null;
     let editingNews = null;
+    let editingEvent = null;
 
     const LANGUAGES = ["HU", "RO", "DE", "EN"];
     const COUNTIES = ["Hargita", "Kovászna", "Maros"];
-    const LOCATION_TYPES = ["város", "község", "falu", "megye"];
+    const LOCATION_TYPES = ["város", "község", "falu", "megye", "municípium"];
 
     // Custom dialog state
     let dialogVisible = false;
@@ -134,6 +167,7 @@
         fetchEntries();
         fetchEntryCategories();
         fetchEntryTypes();
+        fetchEvents();
     }
 
     // generic fetch helper
@@ -167,6 +201,9 @@
     }
     function fetchEntryTypes() {
         loadData("entry_types", (d) => (entryTypes = d));
+    }
+    function fetchEvents() {
+        loadData("events", (d) => (events = d));
     }
 
     // generic create
@@ -255,7 +292,7 @@
                 (newNews = {
                     title: "",
                     feed_url: "",
-                    bg_color: "var(--warning-bg)",
+                    bg_color: "#ffebd6",
                 }),
         );
     }
@@ -298,9 +335,63 @@
                     name_de: "",
                     county: "",
                     type: "",
-                    slug: "",
+                    post_code: "",
+                    coordinates: "",
+                    population: "",
+                    area: "",
+                    crest: "",
+                    parent_id: null,
                 }),
         );
+    }
+    function submitEvent(e) {
+        e.preventDefault();
+        createRecord(
+            "events",
+            { ...newEvent, location_id: parseInt(newEvent.location_id) || 0 },
+            fetchEvents,
+            () =>
+                (newEvent = {
+                    location_id: "",
+                    title: "",
+                    description: "",
+                    start_date: "",
+                    start_time: "",
+                    end_date: "",
+                    end_time: "",
+                    event_type: "cultural",
+                    organizer: "",
+                }),
+        );
+    }
+
+    function submitNewOrganizer(e) {
+        e.preventDefault();
+        const payload = {
+            ...newOrganizerEntry,
+            location_id: parseInt(newOrganizerEntry.location_id) || 0,
+            category_id: newOrganizerEntry.category_id
+                ? parseInt(newOrganizerEntry.category_id)
+                : null,
+            tags: tagsFromStr(newOrganizerEntry.tags),
+        };
+        createRecord("entries", payload, fetchEntries, () => {
+            newEvent.organizer = newOrganizerEntry.name;
+            newOrganizerModalVisible = false;
+            newOrganizerEntry = {
+                location_id: "",
+                category_id: "",
+                name: "",
+                slug: "",
+                url: "",
+                phone: "",
+                address: "",
+                notes: "",
+                type: "service",
+                languages: ["HU"],
+                tags: "",
+            };
+        });
     }
 
     // --- Location edit helpers ---
@@ -426,6 +517,21 @@
         await updateRecord("news_feeds", editingNews, fetchNewsFeeds);
         editingNews = null;
     }
+    async function startEditEvent(ev) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingEvent = { ...ev };
+    }
+    function cancelEditEvent() {
+        editingEvent = null;
+    }
+    async function saveEditEvent() {
+        if (!editingEvent) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord("events", editingEvent, fetchEvents);
+        editingEvent = null;
+    }
     // --- Tag helpers ---
     function tagsFromStr(str) {
         return (str || "")
@@ -442,7 +548,7 @@
     }
     function getCategoryName(id) {
         const c = entryCategories.find((cat) => cat.id === id);
-        return c ? c.name : "–";
+        return c ? c.name : "-";
     }
 
     // --- Submit entry (Create) ---
@@ -599,6 +705,24 @@
             </button>
 
             <button
+                class="admin-sidebar-btn {activeTab === 'events'
+                    ? 'active'
+                    : ''}"
+                on:click={() => (activeTab = "events")}
+                title="Események"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                    ><rect x="3" y="4" width="18" height="18" rx="2" ry="2"
+                    ></rect><line x1="16" y1="2" x2="16" y2="6"></line><line
+                        x1="8"
+                        y1="2"
+                        x2="8"
+                        y2="6"
+                    ></line><line x1="3" y1="10" x2="21" y2="10"></line></svg
+                >
+            </button>
+
+            <button
                 class="admin-sidebar-btn {activeTab === 'service_categories'
                     ? 'active'
                     : ''}"
@@ -671,7 +795,7 @@
                     {#if activeTab === "locations"}Települések Kezelése{/if}
                     {#if activeTab === "service_categories"}Index Kategóriák
                         Kezelése{/if}
-                    {#if activeTab === "entries"}Index Kezelése{/if}
+                    {#if activeTab === "entries"}Index Bejegyzések Kezelése{/if}
                     {#if activeTab === "entry_types"}Bejegyzés Típusok Kezelése{/if}
                 </h2>
                 <button class="btn-logout" on:click={logout}
@@ -702,7 +826,8 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Szöveg</th>
-                                    <th>Művelet</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -710,13 +835,15 @@
                                     <tr>
                                         <td>{m.id}</td>
                                         <td>{m.text}</td>
-                                        <td class="action-gap">
+                                        <td>
                                             <button
                                                 class="btn-update"
                                                 on:click={() =>
                                                     startEditMondas(m)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -730,7 +857,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="3">Nincsenek idézetek.</td
+                                        ><td colspan="4">Nincsenek idézetek.</td
                                         ></tr
                                     >
                                 {/each}
@@ -764,7 +891,7 @@
                             id="link_color"
                             type="text"
                             bind:value={newLink.bg_color}
-                            placeholder="var(--card-bg)"
+                            placeholder="#e6f0ff"
                         />
 
                         <button type="submit" class="admin-submit-btn"
@@ -778,7 +905,8 @@
                                 <tr>
                                     <th>Szín</th>
                                     <th>Cím</th>
-                                    <th>Művelet</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -787,7 +915,7 @@
                                         <td>
                                             <span
                                                 class="color-swatch"
-                                                style="background:{q.bg_color};"
+                                                style:background={q.bg_color}
                                             ></span>
                                         </td>
                                         <td>
@@ -798,13 +926,15 @@
                                                 >{q.title}</a
                                             >
                                         </td>
-                                        <td class="action-gap">
+                                        <td>
                                             <button
                                                 class="btn-update"
                                                 on:click={() =>
                                                     startEditLink(q)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -818,7 +948,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="3"
+                                        ><td colspan="4"
                                             >Nincsenek gyorslinkek.</td
                                         ></tr
                                     >
@@ -853,7 +983,7 @@
                             id="news_color"
                             type="text"
                             bind:value={newNews.bg_color}
-                            placeholder="var(--warning-bg)"
+                            placeholder="#ffebd6"
                         />
 
                         <button type="submit" class="admin-submit-btn"
@@ -869,7 +999,8 @@
                                     <th>Forrás</th>
                                     <th>Utolsó frissítés</th>
                                     <th>Szín</th>
-                                    <th>Művelet</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -903,16 +1034,18 @@
                                         <td>
                                             <span
                                                 class="color-swatch"
-                                                style="background:{nf.bg_color};"
+                                                style:background={nf.bg_color}
                                             ></span>
                                         </td>
-                                        <td class="action-gap">
+                                        <td>
                                             <button
                                                 class="btn-update"
                                                 on:click={() =>
                                                     startEditNews(nf)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -926,7 +1059,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="5"
+                                        ><td colspan="6"
                                             >Nincsenek hírfolyamok.</td
                                         ></tr
                                     >
@@ -979,6 +1112,56 @@
                                 >{/each}
                         </select>
 
+                        <label for="loc_post_code">Posta kód</label>
+                        <input
+                            id="loc_post_code"
+                            type="text"
+                            bind:value={newLocation.post_code}
+                        />
+
+                        <label for="loc_coords">Koordináták</label>
+                        <input
+                            id="loc_coords"
+                            type="text"
+                            bind:value={newLocation.coordinates}
+                        />
+
+                        <label for="loc_pop">Lakosság (fő)</label>
+                        <input
+                            id="loc_pop"
+                            type="text"
+                            bind:value={newLocation.population}
+                        />
+
+                        <label for="loc_area">Terület (km²)</label>
+                        <input
+                            id="loc_area"
+                            type="text"
+                            bind:value={newLocation.area}
+                        />
+
+                        <label for="loc_crest">Címer URL</label>
+                        <input
+                            id="loc_crest"
+                            type="text"
+                            bind:value={newLocation.crest}
+                        />
+
+                        <label for="loc_parent">Kapcsolt település</label>
+                        <select
+                            id="loc_parent"
+                            bind:value={newLocation.parent_id}
+                        >
+                            <option value={null}
+                                >Nincs (Önálló város/község)</option
+                            >
+                            {#each locations as loc}
+                                <option value={loc.id}
+                                    >{loc.name} ({loc.county})</option
+                                >
+                            {/each}
+                        </select>
+
                         <button type="submit" class="admin-submit-btn"
                             >Hozzáadás</button
                         >
@@ -994,7 +1177,14 @@
                                     <th>Név (DE)</th>
                                     <th>Megye</th>
                                     <th>Típus</th>
-                                    <th>Művelet</th>
+                                    <th title="Posta kód">Irányítószám</th>
+                                    <th>Koordináták</th>
+                                    <th>Lakosság (fő)</th>
+                                    <th>Terület (km²)</th>
+                                    <th>Címer</th>
+                                    <th>Szülő település</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1002,21 +1192,35 @@
                                     <tr>
                                         <td>{l.id}</td>
                                         <td>{l.name}</td>
-                                        <td>{l.name_ro || "–"}</td>
-                                        <td>{l.name_de || "–"}</td>
-                                        <td>{l.county || "–"}</td>
+                                        <td>{l.name_ro || "-"}</td>
+                                        <td>{l.name_de || "-"}</td>
+                                        <td>{l.county || "-"}</td>
                                         <td>
                                             <span class="badge"
-                                                >{l.type || "–"}</span
+                                                >{l.type || "-"}</span
                                             >
                                         </td>
-                                        <td class="action-gap">
+                                        <td>{l.post_code || "-"}</td>
+                                        <td>{l.coordinates || "-"}</td>
+                                        <td>{l.population || "-"}</td>
+                                        <td>{l.area || "-"}</td>
+                                        <td>{l.crest ? "Van" : "-"}</td>
+                                        <td>
+                                            {#if l.parent_id}
+                                                {getLocationName(l.parent_id)}
+                                            {:else}
+                                                -
+                                            {/if}
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-update"
                                                 on:click={() =>
                                                     startEditLocation(l)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -1030,8 +1234,191 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="7"
+                                        ><td colspan="14"
                                             >Nincsenek települések.</td
+                                        ></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+
+                <!-- Events Tab -->
+                {#if activeTab === "events"}
+                    <h3>Új Esemény</h3>
+                    <form class="admin-form" on:submit={submitEvent}>
+                        <label for="event_loc">Település / Helyszín</label>
+                        <select
+                            id="event_loc"
+                            bind:value={newEvent.location_id}
+                            required
+                        >
+                            <option value="">Válassz...</option>
+                            {#each locations as loc}
+                                <option value={loc.id}
+                                    >{loc.name} ({loc.county})</option
+                                >
+                            {/each}
+                        </select>
+
+                        <label for="event_title">Esemény neve</label>
+                        <input
+                            id="event_title"
+                            type="text"
+                            bind:value={newEvent.title}
+                            required
+                        />
+
+                        <label for="event_desc">Leírás</label>
+                        <textarea
+                            id="event_desc"
+                            bind:value={newEvent.description}
+                        ></textarea>
+
+                        <div class="flex gap-lg">
+                            <div class="flex-1">
+                                <label for="event_start_date">Kezdő dátum</label
+                                >
+                                <input
+                                    id="event_start_date"
+                                    type="date"
+                                    bind:value={newEvent.start_date}
+                                    required
+                                />
+                            </div>
+                            <div class="flex-1">
+                                <label for="event_start_time"
+                                    >Kezdő időpont</label
+                                >
+                                <input
+                                    id="event_start_time"
+                                    type="time"
+                                    bind:value={newEvent.start_time}
+                                />
+                            </div>
+                        </div>
+
+                        <div class="flex gap-lg">
+                            <div class="flex-1">
+                                <label for="event_end_date"
+                                    >Befejező dátum</label
+                                >
+                                <input
+                                    id="event_end_date"
+                                    type="date"
+                                    bind:value={newEvent.end_date}
+                                    required
+                                />
+                            </div>
+                            <div class="flex-1">
+                                <label for="event_end_time"
+                                    >Befejező időpont</label
+                                >
+                                <input
+                                    id="event_end_time"
+                                    type="time"
+                                    bind:value={newEvent.end_time}
+                                />
+                            </div>
+                        </div>
+
+                        <label for="event_type">Típus</label>
+                        <select
+                            id="event_type"
+                            bind:value={newEvent.event_type}
+                        >
+                            <option value="cultural">Kulturális</option>
+                            <option value="sports">Sport</option>
+                            <option value="festival">Fesztivál</option>
+                            <option value="religious">Vallási</option>
+                            <option value="other">Egyéb</option>
+                        </select>
+
+                        <label for="event_org">Szervező</label>
+                        <div class="flex gap-sm items-center">
+                            <input
+                                id="event_org"
+                                type="text"
+                                bind:value={newEvent.organizer}
+                                list="organizers_list"
+                                autocomplete="off"
+                                class="flex-1"
+                            />
+                            <datalist id="organizers_list">
+                                {#each entries as e}
+                                    <option value={e.name}></option>
+                                {/each}
+                            </datalist>
+                            <button
+                                type="button"
+                                class="btn-update"
+                                style="margin-bottom:0"
+                                on:click={() =>
+                                    (newOrganizerModalVisible = true)}
+                            >
+                                Új szervező
+                            </button>
+                        </div>
+
+                        <button type="submit" class="admin-submit-btn"
+                            >Hozzáadás</button
+                        >
+                    </form>
+
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Cím</th>
+                                    <th>Dátum és Idő</th>
+                                    <th>Helyszín</th>
+                                    <th>Szervező</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each events as e}
+                                    <tr>
+                                        <td>{e.title}</td>
+                                        <td>
+                                            {new Date(
+                                                e.start_date,
+                                            ).toLocaleDateString("hu-HU")}
+                                            {#if e.start_time}
+                                                - {e.start_time.slice(
+                                                    0,
+                                                    5,
+                                                )}{/if}
+                                        </td>
+                                        <td>{getLocationName(e.location_id)}</td
+                                        >
+                                        <td>{e.organizer || "-"}</td>
+                                        <td>
+                                            <button
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditEvent(e)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteRecord(
+                                                        "events",
+                                                        e.id,
+                                                        fetchEvents,
+                                                    )}>Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="6"
+                                            >Nincsenek események.</td
                                         ></tr
                                     >
                                 {/each}
@@ -1063,7 +1450,8 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Név</th>
-                                    <th>Művelet</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1071,13 +1459,15 @@
                                     <tr>
                                         <td>{cat.id}</td>
                                         <td>{cat.name}</td>
-                                        <td class="action-gap">
+                                        <td>
                                             <button
                                                 class="btn-update"
                                                 on:click={() =>
                                                     startEditCategory(cat)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -1091,7 +1481,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="3"
+                                        ><td colspan="4"
                                             >Nincsenek kategóriák.</td
                                         ></tr
                                     >
@@ -1128,7 +1518,7 @@
 
                         <label for="serv_cat">Kategória</label>
                         <select id="serv_cat" bind:value={newEntry.category_id}>
-                            <option value={null}>–</option>
+                            <option value={null}>-</option>
                             {#each entryCategories as cat}
                                 <option value={cat.id}>{cat.name}</option>
                             {/each}
@@ -1221,7 +1611,8 @@
                                     <th>Kategória</th>
                                     <th>Nyelvek</th>
                                     <th>Címkék</th>
-                                    <th>Művelet</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1233,7 +1624,7 @@
                                                 >{s.type || "service"}</span
                                             ></td
                                         >
-                                        <td>{s.url ? s.url : "–"}</td>
+                                        <td>{s.url ? s.url : "-"}</td>
                                         <td>{getLocationName(s.location_id)}</td
                                         >
                                         <td>{getCategoryName(s.category_id)}</td
@@ -1247,7 +1638,7 @@
                                                         .map((t) => "#" + t)
                                                         .join(" ")}
                                                 </div>
-                                            {:else}–{/if}
+                                            {:else}-{/if}
                                         </td>
                                         <td>
                                             <button
@@ -1255,6 +1646,8 @@
                                                 on:click={() => openEdit(s)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -1268,7 +1661,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="8"
+                                        ><td colspan="9"
                                             >Nincsenek bejegyzések.</td
                                         ></tr
                                     >
@@ -1301,7 +1694,8 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Név</th>
-                                    <th>Művelet</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1309,13 +1703,15 @@
                                     <tr>
                                         <td>{et.id}</td>
                                         <td>{et.name}</td>
-                                        <td class="action-gap">
+                                        <td>
                                             <button
                                                 class="btn-update"
                                                 on:click={() =>
                                                     startEditType(et)}
                                                 >Szerk.</button
                                             >
+                                        </td>
+                                        <td>
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
@@ -1329,7 +1725,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="3">Nincsenek típusok.</td
+                                        ><td colspan="4">Nincsenek típusok.</td
                                         ></tr
                                     >
                                 {/each}
@@ -1524,7 +1920,7 @@
 
                     <label for="edit_cat">Kategória</label>
                     <select id="edit_cat" bind:value={editingEntry.category_id}>
-                        <option value={null}>–</option>
+                        <option value={null}>-</option>
                         {#each entryCategories as cat}
                             <option value={cat.id}>{cat.name}</option>
                         {/each}
@@ -1664,16 +2060,67 @@
                         id="eloc_county"
                         bind:value={editingLocation.county}
                     >
-                        <option value="">–</option>
+                        <option value="">-</option>
                         {#each COUNTIES as c}<option value={c}>{c}</option
                             >{/each}
                     </select>
 
                     <label for="eloc_type">Típus</label>
                     <select id="eloc_type" bind:value={editingLocation.type}>
-                        <option value="">–</option>
+                        <option value="">-</option>
                         {#each LOCATION_TYPES as t}<option value={t}>{t}</option
                             >{/each}
+                    </select>
+
+                    <label for="eloc_post_code" title="Posta kód"
+                        >Irányítószám</label
+                    >
+                    <input
+                        id="eloc_post_code"
+                        type="text"
+                        bind:value={editingLocation.post_code}
+                    />
+
+                    <label for="eloc_coords">Koordináták</label>
+                    <input
+                        id="eloc_coords"
+                        type="text"
+                        bind:value={editingLocation.coordinates}
+                    />
+
+                    <label for="eloc_pop">Lakosság (fő)</label>
+                    <input
+                        id="eloc_pop"
+                        type="text"
+                        bind:value={editingLocation.population}
+                    />
+
+                    <label for="eloc_area">Terület (km²)</label>
+                    <input
+                        id="eloc_area"
+                        type="text"
+                        bind:value={editingLocation.area}
+                    />
+
+                    <label for="eloc_crest">Címer URL</label>
+                    <input
+                        id="eloc_crest"
+                        type="text"
+                        bind:value={editingLocation.crest}
+                    />
+
+                    <label for="eloc_parent">Kapcsolódó település</label>
+                    <select
+                        id="eloc_parent"
+                        bind:value={editingLocation.parent_id}
+                    >
+                        <option value={null}>Nincs (Önálló város/község)</option
+                        >
+                        {#each locations.filter((l) => l.id !== editingLocation.id) as loc}
+                            <option value={loc.id}
+                                >{loc.name} ({loc.county})</option
+                            >
+                        {/each}
                     </select>
 
                     <div class="modal-actions">
@@ -1793,6 +2240,216 @@
             </div>
         </div>
     {/if}
+
+    <!-- Edit Event Modal -->
+    {#if editingEvent}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditEvent}
+            on:keydown={(e) => e.key === "Escape" && cancelEditEvent()}
+        >
+            <div class="admin-modal">
+                <h3>Esemény szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditEvent}
+                >
+                    <label for="edit_ev_loc">Helyszín</label>
+                    <select
+                        id="edit_ev_loc"
+                        bind:value={editingEvent.location_id}
+                        required
+                    >
+                        {#each locations as loc}
+                            <option value={loc.id}
+                                >{loc.name} ({loc.county})</option
+                            >
+                        {/each}
+                    </select>
+
+                    <label for="edit_ev_title">Cím</label>
+                    <input
+                        id="edit_ev_title"
+                        type="text"
+                        bind:value={editingEvent.title}
+                        required
+                    />
+
+                    <label for="edit_ev_desc">Leírás</label>
+                    <textarea
+                        id="edit_ev_desc"
+                        bind:value={editingEvent.description}
+                    ></textarea>
+
+                    <div class="flex gap-lg">
+                        <div class="flex-1">
+                            <label for="edit_ev_start_date">Kezdő dátum</label>
+                            <input
+                                id="edit_ev_start_date"
+                                type="date"
+                                value={editingEvent.start_date
+                                    ? editingEvent.start_date.split("T")[0]
+                                    : ""}
+                                on:change={(e) =>
+                                    (editingEvent.start_date = e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div class="flex-1">
+                            <label for="edit_ev_start_time">Kezdő időpont</label
+                            >
+                            <input
+                                id="edit_ev_start_time"
+                                type="time"
+                                bind:value={editingEvent.start_time}
+                            />
+                        </div>
+                    </div>
+                    <div class="flex gap-lg">
+                        <div class="flex-1">
+                            <label for="edit_ev_end_date">Befejező dátum</label>
+                            <input
+                                id="edit_ev_end_date"
+                                type="date"
+                                value={editingEvent.end_date
+                                    ? editingEvent.end_date.split("T")[0]
+                                    : ""}
+                                on:change={(e) =>
+                                    (editingEvent.end_date = e.target.value)}
+                                required
+                            />
+                        </div>
+                        <div class="flex-1">
+                            <label for="edit_ev_end_time"
+                                >Befejező időpont</label
+                            >
+                            <input
+                                id="edit_ev_end_time"
+                                type="time"
+                                bind:value={editingEvent.end_time}
+                            />
+                        </div>
+                    </div>
+
+                    <label for="edit_ev_type">Típus</label>
+                    <select
+                        id="edit_ev_type"
+                        bind:value={editingEvent.event_type}
+                    >
+                        <option value="cultural">Kulturális</option>
+                        <option value="sports">Sport</option>
+                        <option value="festival">Fesztivál</option>
+                        <option value="religious">Vallási</option>
+                        <option value="other">Egyéb</option>
+                    </select>
+
+                    <label for="edit_ev_org">Szervező</label>
+                    <div class="flex gap-sm items-center">
+                        <input
+                            id="edit_ev_org"
+                            type="text"
+                            bind:value={editingEvent.organizer}
+                            list="organizers_list"
+                            autocomplete="off"
+                            class="flex-1"
+                        />
+                        <button
+                            type="button"
+                            class="btn-update"
+                            style="margin-bottom:0"
+                            on:click={() => (newOrganizerModalVisible = true)}
+                        >
+                            Új szervező
+                        </button>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditEvent}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
+    <!-- New Organizer Modal -->
+    {#if newOrganizerModalVisible}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={() => (newOrganizerModalVisible = false)}
+            on:keydown={(e) =>
+                e.key === "Escape" && (newOrganizerModalVisible = false)}
+        >
+            <div class="admin-modal">
+                <h3>Új Szervező Hozzáadása</h3>
+                <form class="admin-form" on:submit={submitNewOrganizer}>
+                    <label for="org_loc">Település</label>
+                    <select
+                        id="org_loc"
+                        bind:value={newOrganizerEntry.location_id}
+                        required
+                    >
+                        <option value="">Válassz...</option>
+                        {#each locations as loc}
+                            <option value={loc.id}
+                                >{loc.name} ({loc.county})</option
+                            >
+                        {/each}
+                    </select>
+
+                    <label for="org_name">Név (Szervezet Neve)</label>
+                    <input
+                        id="org_name"
+                        type="text"
+                        bind:value={newOrganizerEntry.name}
+                        required
+                    />
+
+                    <label for="org_cat">Kategória</label>
+                    <select
+                        id="org_cat"
+                        bind:value={newOrganizerEntry.category_id}
+                    >
+                        <option value={null}>-</option>
+                        {#each entryCategories as cat}
+                            <option value={cat.id}>{cat.name}</option>
+                        {/each}
+                    </select>
+
+                    <label for="org_phone">Telefon</label>
+                    <input
+                        id="org_phone"
+                        type="text"
+                        bind:value={newOrganizerEntry.phone}
+                    />
+
+                    <div class="modal-actions mt-lg">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés és Kiválasztás</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={() => (newOrganizerModalVisible = false)}
+                            >Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
 {/if}
 
 <style>
@@ -1906,10 +2563,6 @@
     }
     .mt-lg {
         margin: 2rem auto;
-    }
-    .action-gap {
-        display: flex;
-        gap: 0.4rem;
     }
     .flex {
         display: flex;

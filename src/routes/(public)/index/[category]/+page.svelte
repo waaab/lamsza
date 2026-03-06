@@ -12,14 +12,27 @@
     let viewMode = "grid";
     let currentCategory = "";
     let visibleCount = 12;
+    let sortMode = "title";
+    let sortOpen = false;
+
+    const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
+
+    function setSortMode(mode) {
+        sortMode = mode;
+        sortOpen = false;
+    }
 
     $: filteredServices = services.filter(
         (s) =>
             currentCategory === "osszes" ||
             s.category.toLowerCase() === currentCategory.toLowerCase(),
     );
-    $: totalCount = filteredServices.length;
-    $: displayItems = filteredServices.slice(0, visibleCount);
+    $: sortedServices = [...filteredServices].sort((a, b) => {
+        if (sortMode === "newest") return b.id - a.id;
+        return a.name.localeCompare(b.name);
+    });
+    $: totalCount = sortedServices.length;
+    $: displayItems = sortedServices.slice(0, visibleCount);
 
     function loadMore() {
         visibleCount += 12;
@@ -95,12 +108,12 @@
     <title>Szekely Gugel - Index</title>
 </svelte:head>
 
-<div class="container" style="min-height: calc(100vh - 120px)">
+<div class="container main-container">
     <h1 class="page-title">Index</h1>
     <p class="greeting">Keresd meg a helyi szakembereket és intézményeket!</p>
 
     <div class="header-tabs">
-        <span class="header-tabs-label">Kategóriák:</span>
+        <span class="header-tabs-label">Kiemelt Kategóriák:</span>
         {#if loading}
             {#each Array(6) as _}
                 <div class="btn-skeleton"></div>
@@ -131,8 +144,52 @@
         </div>
 
         <div class="view-mode-toggle">
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="sort-toggle">
+                <button
+                    class="btn btn-sm"
+                    on:click={() => (sortOpen = !sortOpen)}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><line x1="4" y1="6" x2="16" y2="6"></line><line
+                            x1="4"
+                            y1="12"
+                            x2="12"
+                            y2="12"
+                        ></line><line x1="4" y1="18" x2="8" y2="18"
+                        ></line><polyline points="15 15 18 18 21 15"
+                        ></polyline><line x1="18" y1="10" x2="18" y2="18"
+                        ></line></svg
+                    >
+                    <span>{sortLabels[sortMode]}</span>
+                </button>
+                {#if sortOpen}
+                    <div class="sort-toggle-menu" on:click|stopPropagation>
+                        <button
+                            class:active={sortMode === "title"}
+                            on:click={() => setSortMode("title")}
+                            >Név (A→Z)</button
+                        >
+                        <button
+                            class:active={sortMode === "newest"}
+                            on:click={() => setSortMode("newest")}
+                            >Legújabb</button
+                        >
+                    </div>
+                {/if}
+            </div>
+
             <button
-                class="view-btn {viewMode === 'grid' ? 'active' : ''}"
+                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
                 on:click={() => (viewMode = "grid")}
                 title="Rács nézet"
             >
@@ -157,7 +214,7 @@
                 <span>Rács</span>
             </button>
             <button
-                class="view-btn {viewMode === 'flex' ? 'active' : ''}"
+                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
                 on:click={() => (viewMode = "flex")}
                 title="Lista nézet"
             >
@@ -196,29 +253,17 @@
     {#if loading}
         <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
             {#each Array(6) as _}
-                <article
-                    class="card service--skeleton"
-                    style="height: 150px; display: flex; flex-direction: column; padding: 1rem; gap: 0.5rem;"
-                >
-                    <div
-                        class="skeleton skeleton-text"
-                        style="width: 30%;"
-                    ></div>
-                    <div
-                        class="skeleton skeleton-text"
-                        style="width: 80%; margin-top: 0.5rem; height: 1.2rem;"
-                    ></div>
-                    <div
-                        class="skeleton skeleton-text"
-                        style="width: 60%; margin-top: auto;"
-                    ></div>
+                <article class="card service--skeleton">
+                    <div class="skeleton skeleton-text skeleton-cat"></div>
+                    <div class="skeleton skeleton-text skeleton-title"></div>
+                    <div class="skeleton skeleton-text skeleton-loc"></div>
                 </article>
             {/each}
         </div>
     {:else if error}
-        <div class="error-msg">{error}</div>
+        <div class="note error">{error}</div>
     {:else if services.length === 0}
-        <div class="error-msg">
+        <div class="note error">
             Nincs megjeleníthető bejegyzés ebben a kategóriában.
         </div>
     {:else}
@@ -232,32 +277,23 @@
                         {#if service.entity_type === "settlement"}
                             <a
                                 href="/{service.county_slug}-megye/{service.slug}"
-                                style="color:inherit;text-decoration:none;"
-                                >{service.name}</a
+                                class="service-link">{service.name}</a
                             >
                         {:else}
                             <a
                                 href="/bejegyzes/{service.slug}"
-                                style="color:inherit;text-decoration:none;"
-                                >{service.name}</a
+                                class="service-link">{service.name}</a
                             >
                         {/if}
                     </h3>
                     {#if service.url}
-                        <div
-                            class="service-info"
-                            style="margin-bottom: 0.5rem;"
-                        >
-                            <span
-                                style="color: var(--text-faint); margin-right: 0.3rem;"
-                                >🔗</span
-                            >
+                        <div class="service-info service-url-wrap">
+                            <span class="service-url-icon">🔗</span>
                             <a
                                 href={service.url}
                                 target="_blank"
                                 rel="nofollow noopener"
-                                style="color: var(--primary-color); text-decoration: none;"
-                                >{service.url}</a
+                                class="service-url-link">{service.url}</a
                             >
                         </div>
                     {/if}
@@ -275,7 +311,7 @@
         {#if visibleCount < totalCount}
             <div class="load-more">
                 <button class="nav-btn" on:click={loadMore}>
-                    Több betöltése
+                    Több betöltése ↓
                 </button>
             </div>
         {/if}
@@ -294,8 +330,52 @@
         </div>
 
         <div class="view-mode-toggle">
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="sort-toggle">
+                <button
+                    class="btn btn-sm"
+                    on:click={() => (sortOpen = !sortOpen)}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><line x1="4" y1="6" x2="16" y2="6"></line><line
+                            x1="4"
+                            y1="12"
+                            x2="12"
+                            y2="12"
+                        ></line><line x1="4" y1="18" x2="8" y2="18"
+                        ></line><polyline points="15 15 18 18 21 15"
+                        ></polyline><line x1="18" y1="10" x2="18" y2="18"
+                        ></line></svg
+                    >
+                    <span>{sortLabels[sortMode]}</span>
+                </button>
+                {#if sortOpen}
+                    <div class="sort-toggle-menu" on:click|stopPropagation>
+                        <button
+                            class:active={sortMode === "title"}
+                            on:click={() => setSortMode("title")}
+                            >Név (A→Z)</button
+                        >
+                        <button
+                            class:active={sortMode === "newest"}
+                            on:click={() => setSortMode("newest")}
+                            >Legújabb</button
+                        >
+                    </div>
+                {/if}
+            </div>
+
             <button
-                class="view-btn {viewMode === 'grid' ? 'active' : ''}"
+                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
                 on:click={() => (viewMode = "grid")}
                 title="Rács nézet"
             >
@@ -320,7 +400,7 @@
                 <span>Rács</span>
             </button>
             <button
-                class="view-btn {viewMode === 'flex' ? 'active' : ''}"
+                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
                 on:click={() => (viewMode = "flex")}
                 title="Lista nézet"
             >
@@ -355,4 +435,89 @@
             </button>
         </div>
     </div>
+
+    <section class="faq">
+        <h2 class="faq-title">Gyakori kérdések</h2>
+        <div class="faq-list">
+            <details class="faq-item" open>
+                <summary>Honnan származnak az adatok?</summary>
+                <p>
+                    Az adatok a helyi szakemberektől és intézményektől
+                    származnak, akiket a rendszerünk folyamatosan indexel, hogy
+                    a legfrissebb elérhetőségeket biztosítsa.
+                </p>
+            </details>
+            <details class="faq-item" open>
+                <summary>Hogyan kerülhet be valaki a címtárba?</summary>
+                <p>
+                    A beküldési folyamat hamarosan elérhető lesz az oldalon.
+                    Addig is, ha ismersz olyan szolgáltatót, aki még nem
+                    szerepel nálunk, keress minket bizalommal.
+                </p>
+            </details>
+            <details class="faq-item" open>
+                <summary>Ingyenes-e a megjelenés?</summary>
+                <p>
+                    Igen, az alapvető megjelenés és az adatok listázása teljesen
+                    ingyenes minden helyi szolgáltató, mesterember és intézmény
+                    számára.
+                </p>
+            </details>
+            <details class="faq-item" open>
+                <summary>Hogyan működik a keresés?</summary>
+                <p>
+                    A keresőnk kulcsszavak, kategóriák és települések alapján
+                    szűri a találatokat. A kereső prioritást ad a közvetlen név-
+                    és kategória-egyezéseknek, de a leírásokban is keres.
+                </p>
+            </details>
+        </div>
+    </section>
+
+    <div class="note info">
+        A lamsza.com indexe egy ingyenes információs szolgáltatás. Az adatok
+        pontosságáért és a szolgáltatások minőségéért a lamsza.com nem vállal
+        felelősséget. Kérjük, minden esetben ellenőrizze az adatokat a
+        szolgáltatóval való kapcsolatfelvétel előtt.
+    </div>
 </div>
+
+<style>
+    .main-container {
+        min-height: calc(100vh - 120px);
+    }
+    .service--skeleton {
+        height: 150px;
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+        gap: 0.5rem;
+    }
+    .skeleton-cat {
+        width: 30%;
+    }
+    .skeleton-title {
+        width: 80%;
+        margin-top: 0.5rem;
+        height: 1.2rem;
+    }
+    .skeleton-loc {
+        width: 60%;
+        margin-top: auto;
+    }
+    .service-link {
+        color: inherit;
+        text-decoration: none;
+    }
+    .service-url-wrap {
+        margin-bottom: 0.5rem;
+    }
+    .service-url-icon {
+        color: var(--text-faint);
+        margin-right: 0.3rem;
+    }
+    .service-url-link {
+        color: var(--primary-color);
+        text-decoration: none;
+    }
+</style>

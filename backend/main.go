@@ -127,6 +127,36 @@ type Entry struct {
 	IsDirectMatch  bool     `json:"is_direct_match"`
 }
 
+type Event struct {
+	ID           int    `json:"id"`
+	LocationID   int    `json:"location_id"`
+	LocationName string `json:"location_name"`
+	LocationSlug string `json:"location_slug"`
+	County       string `json:"county"`
+	CountySlug   string `json:"county_slug"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	StartDate    string `json:"start_date"`
+	StartTime    string `json:"start_time"`
+	EndDate      string `json:"end_date"`
+	EndTime      string `json:"end_time"`
+	EventType    string `json:"event_type"`
+	Organizer    string `json:"organizer"`
+}
+
+type AdminEvent struct {
+	ID          int    `json:"id"`
+	LocationID  int    `json:"location_id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	StartDate   string `json:"start_date"`
+	StartTime   string `json:"start_time"`
+	EndDate     string `json:"end_date"`
+	EndTime     string `json:"end_time"`
+	EventType   string `json:"event_type"`
+	Organizer   string `json:"organizer"`
+}
+
 var db *sql.DB
 
 func initDB() {
@@ -149,7 +179,33 @@ func initDB() {
 				id SERIAL PRIMARY KEY,
 				name VARCHAR(50) NOT NULL UNIQUE
 			)`)
-			db.Exec(`INSERT INTO entry_types (name) VALUES ('service'), ('business'), ('other') ON CONFLICT (name) DO NOTHING`)
+			db.Exec(`INSERT INTO entry_types (name) VALUES ('service'), ('business'), ('other'), ('event') ON CONFLICT (name) DO NOTHING`)
+
+			// Auto-create events table if not exists
+			db.Exec(`CREATE TABLE IF NOT EXISTS events (
+				id SERIAL PRIMARY KEY,
+				location_id INTEGER REFERENCES locations(id),
+				title VARCHAR(255) NOT NULL,
+				description TEXT,
+				start_date DATE NOT NULL,
+				start_time TIME,
+				end_date DATE NOT NULL,
+				end_time TIME,
+				event_type VARCHAR(50) DEFAULT 'other',
+				organizer VARCHAR(255),
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			)`)
+
+			// Seed initial events if table is empty
+			var count int
+			db.QueryRow("SELECT COUNT(*) FROM events").Scan(&count)
+			if count == 0 {
+				db.Exec(`INSERT INTO events (location_id, title, description, start_date, start_time, end_date, end_time, event_type, organizer)
+					VALUES 
+					(1, 'Csíksomlyói búcsú', 'A legnagyobb magyar katolikus búcsújáró ünnep.', '2026-06-06', '11:00', '2026-06-06', '18:00', 'cultural', 'Gyulafehérvári Római Katolikus Érsekség'),
+					(1, 'Hargita Rallye', 'Hagyományos aszfaltos autóverseny.', '2026-05-15', '09:00', '2026-05-17', '18:00', 'sports', 'HMT'),
+					(2, 'Székelyudvarhelyi Városnapok', 'Koncertek, vásár, szórakozás.', '2026-05-22', '10:00', '2026-05-24', '23:00', 'cultural', 'Polgármesteri Hivatal')`)
+			}
 		}
 	}
 }
@@ -550,14 +606,20 @@ func handleAdminNewsFeeds(w http.ResponseWriter, r *http.Request) {
 }
 
 type Location struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
-	NameRo     string `json:"name_ro"`
-	NameDe     string `json:"name_de"`
-	County     string `json:"county"`
-	CountySlug string `json:"county_slug"`
-	Type       string `json:"type"`
-	Slug       string `json:"slug"`
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	NameRo      string `json:"name_ro"`
+	NameDe      string `json:"name_de"`
+	County      string `json:"county"`
+	CountySlug  string `json:"county_slug"`
+	Type        string `json:"type"`
+	Slug        string `json:"slug"`
+	PostCode    string `json:"post_code"`
+	Coordinates string `json:"coordinates"`
+	Population  string `json:"population"`
+	Area        string `json:"area"`
+	Crest       string `json:"crest"`
+	ParentID    *int   `json:"parent_id"`
 }
 
 func handleAdminLocations(w http.ResponseWriter, r *http.Request) {
@@ -578,7 +640,7 @@ func handleAdminLocations(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
-		rows, err := db.Query("SELECT id, name, COALESCE(name_ro, ''), COALESCE(name_de, ''), COALESCE(county, ''), COALESCE(county_slug, ''), COALESCE(type, ''), COALESCE(slug, '') FROM locations ORDER BY name ASC")
+		rows, err := db.Query("SELECT id, name, COALESCE(name_ro, ''), COALESCE(name_de, ''), COALESCE(county, ''), COALESCE(county_slug, ''), COALESCE(type, ''), COALESCE(slug, ''), COALESCE(post_code, ''), COALESCE(coordinates, ''), COALESCE(population, ''), COALESCE(area, ''), COALESCE(crest, ''), parent_id FROM locations ORDER BY name ASC")
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -587,7 +649,7 @@ func handleAdminLocations(w http.ResponseWriter, r *http.Request) {
 		var res []Location
 		for rows.Next() {
 			var loc Location
-			if err := rows.Scan(&loc.ID, &loc.Name, &loc.NameRo, &loc.NameDe, &loc.County, &loc.CountySlug, &loc.Type, &loc.Slug); err == nil {
+			if err := rows.Scan(&loc.ID, &loc.Name, &loc.NameRo, &loc.NameDe, &loc.County, &loc.CountySlug, &loc.Type, &loc.Slug, &loc.PostCode, &loc.Coordinates, &loc.Population, &loc.Area, &loc.Crest, &loc.ParentID); err == nil {
 				res = append(res, loc)
 			}
 		}
@@ -604,8 +666,8 @@ func handleAdminLocations(w http.ResponseWriter, r *http.Request) {
 		}
 		l.Slug = slugify(l.Name)
 		l.CountySlug = slugify(l.County)
-		err := db.QueryRow("INSERT INTO locations (name, name_ro, name_de, county, county_slug, type, slug) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-			l.Name, l.NameRo, l.NameDe, l.County, l.CountySlug, l.Type, l.Slug).Scan(&l.ID)
+		err := db.QueryRow("INSERT INTO locations (name, name_ro, name_de, county, county_slug, type, slug, post_code, coordinates, population, area, crest, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id",
+			l.Name, l.NameRo, l.NameDe, l.County, l.CountySlug, l.Type, l.Slug, l.PostCode, l.Coordinates, l.Population, l.Area, l.Crest, l.ParentID).Scan(&l.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -620,8 +682,8 @@ func handleAdminLocations(w http.ResponseWriter, r *http.Request) {
 		}
 		l.Slug = slugify(l.Name)
 		l.CountySlug = slugify(l.County)
-		_, err := db.Exec("UPDATE locations SET name=$1, name_ro=$2, name_de=$3, county=$4, county_slug=$5, type=$6, slug=$7 WHERE id=$8",
-			l.Name, l.NameRo, l.NameDe, l.County, l.CountySlug, l.Type, l.Slug, l.ID)
+		_, err := db.Exec("UPDATE locations SET name=$1, name_ro=$2, name_de=$3, county=$4, county_slug=$5, type=$6, slug=$7, post_code=$8, coordinates=$9, population=$10, area=$11, crest=$12, parent_id=$13 WHERE id=$14",
+			l.Name, l.NameRo, l.NameDe, l.County, l.CountySlug, l.Type, l.Slug, l.PostCode, l.Coordinates, l.Population, l.Area, l.Crest, l.ParentID, l.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -1138,6 +1200,130 @@ func handleWeather(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, resp.Body)
 }
 
+func handleEvents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	locationSlug := r.URL.Query().Get("location_slug")
+	countySlug := r.URL.Query().Get("county_slug")
+
+	var rows *sql.Rows
+	var err error
+
+	if locationSlug != "" {
+		rows, err = db.Query(`
+			SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description, 
+			       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
+			FROM events e
+			JOIN locations l ON e.location_id = l.id
+			WHERE l.slug = $1
+			ORDER BY e.start_date ASC`, locationSlug)
+	} else if countySlug != "" {
+		rows, err = db.Query(`
+			SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description, 
+			       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
+			FROM events e
+			JOIN locations l ON e.location_id = l.id
+			WHERE l.county_slug = $1
+			ORDER BY e.start_date ASC`, countySlug)
+	} else {
+		rows, err = db.Query(`
+			SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description, 
+			       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
+			FROM events e
+			JOIN locations l ON e.location_id = l.id
+			ORDER BY e.start_date ASC`)
+	}
+
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+
+	events := []Event{}
+	for rows.Next() {
+		var ev Event
+		if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer); err == nil {
+			events = append(events, ev)
+		}
+	}
+	json.NewEncoder(w).Encode(events)
+}
+
+func handleAdminEvents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case "GET":
+		rows, err := db.Query(`SELECT id, location_id, title, description, start_date::text, start_time::text, end_date::text, end_time::text, event_type, organizer FROM events ORDER BY start_date DESC`)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		defer rows.Close()
+		events := []AdminEvent{}
+		for rows.Next() {
+			var ev AdminEvent
+			if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer); err == nil {
+				events = append(events, ev)
+			}
+		}
+		json.NewEncoder(w).Encode(events)
+
+	case "POST":
+		var ev AdminEvent
+		if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		err := db.QueryRow(`INSERT INTO events (location_id, title, description, start_date, start_time, end_date, end_time, event_type, organizer) 
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+			ev.LocationID, ev.Title, ev.Description, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventType, ev.Organizer).Scan(&ev.ID)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		json.NewEncoder(w).Encode(ev)
+
+	case "PUT":
+		var ev AdminEvent
+		if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		_, err := db.Exec(`UPDATE events SET location_id=$1, title=$2, description=$3, start_date=$4, start_time=$5, end_date=$6, end_time=$7, event_type=$8, organizer=$9 WHERE id=$10`,
+			ev.LocationID, ev.Title, ev.Description, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventType, ev.Organizer, ev.ID)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+
+	case "DELETE":
+		id := r.URL.Query().Get("id")
+		if id != "" {
+			db.Exec("DELETE FROM events WHERE id = $1", id)
+		}
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func handleAutosuggest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -1229,6 +1415,7 @@ func main() {
 	http.HandleFunc("/api/weather", handleWeather)
 	http.HandleFunc("/api/autosuggest", handleAutosuggest)
 	http.HandleFunc("/api/locations", handleAdminLocations) // Public GET access for locations list
+	http.HandleFunc("/api/events", handleEvents)
 
 	http.HandleFunc("/api/admin/mondasok", handleAdminMondasok)
 	http.HandleFunc("/api/admin/quick_links", handleAdminQuickLinks)
@@ -1238,6 +1425,7 @@ func main() {
 	http.HandleFunc("/api/admin/entry_categories", handleAdminEntryCategories)
 	http.HandleFunc("/api/admin/entry_types", handleAdminEntryTypes)
 	http.HandleFunc("/api/admin/locations", handleAdminLocations)
+	http.HandleFunc("/api/admin/events", handleAdminEvents)
 
 	port := os.Getenv("PORT")
 	if port == "" {

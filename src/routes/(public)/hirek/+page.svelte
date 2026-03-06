@@ -160,7 +160,7 @@
         return Object.entries(freq)
             .filter(([, c]) => c >= 2)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 20);
+            .slice(0, 10);
     })();
 
     // Stage 3: filter by selected word (case-insensitive substring match)
@@ -303,8 +303,7 @@
                                         )?.textContent,
                                     ).getTime() || 0,
                                 source: feedObj.title || "Ismeretlen",
-                                bgColor:
-                                    feedObj.bg_color || "var(--warning-bg)",
+                                bgColor: feedObj.bg_color || "#222",
                                 image: extractImage(node),
                             });
                         } catch (e) {
@@ -362,6 +361,84 @@
             loading = false;
         }
     });
+    let canScrollLeft = false;
+    let canScrollRight = false;
+    let chipsContainer;
+
+    function checkScroll(node) {
+        if (!node) return;
+        canScrollLeft = node.scrollLeft > 5;
+        canScrollRight =
+            node.scrollLeft < node.scrollWidth - node.clientWidth - 5;
+    }
+
+    // Drag to scroll logic for chips
+    function dragScroll(node) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        const onMouseDown = (e) => {
+            isDown = true;
+            node.classList.add("active");
+            startX = e.pageX - node.offsetLeft;
+            scrollLeft = node.scrollLeft;
+        };
+
+        const onMouseLeave = () => {
+            isDown = false;
+            node.classList.remove("active");
+        };
+
+        const onMouseUp = () => {
+            isDown = false;
+            node.classList.remove("active");
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - node.offsetLeft;
+            const walk = (x - startX) * 2; // Scroll-fast factor
+            node.scrollLeft = scrollLeft - walk;
+            checkScroll(node);
+        };
+
+        const onScroll = () => {
+            checkScroll(node);
+        };
+
+        const onResize = () => {
+            checkScroll(node);
+        };
+
+        node.addEventListener("mousedown", onMouseDown);
+        node.addEventListener("mouseleave", onMouseLeave);
+        node.addEventListener("mouseup", onMouseUp);
+        node.addEventListener("mousemove", onMouseMove);
+        node.addEventListener("scroll", onScroll);
+        window.addEventListener("resize", onResize);
+
+        // Initial check after a short delay for layout
+        setTimeout(() => checkScroll(node), 100);
+
+        return {
+            destroy() {
+                node.removeEventListener("mousedown", onMouseDown);
+                node.removeEventListener("mouseleave", onMouseLeave);
+                node.removeEventListener("mouseup", onMouseUp);
+                node.removeEventListener("mousemove", onMouseMove);
+                node.removeEventListener("scroll", onScroll);
+                window.removeEventListener("resize", onResize);
+            },
+        };
+    }
+
+    function scrollChips(amount) {
+        if (chipsContainer) {
+            chipsContainer.scrollBy({ left: amount, behavior: "smooth" });
+        }
+    }
 </script>
 
 <svelte:head>
@@ -376,32 +453,56 @@
 <p class="greeting">Helyi hírcsatornák legfrissebb hírei időrendben.</p>
 
 {#if loading}
-    <div class="header-tabs">
+    <div class="header-tabs chips">
         <span class="header-tabs-label">Leggyakoribb témák:</span>
-        {#each Array(6) as _}
-            <div class="btn-skeleton"></div>
-        {/each}
+        <div class="chips-scroll-wrapper">
+            <div class="chips-list">
+                {#each Array(6) as _}
+                    <div class="btn-skeleton"></div>
+                {/each}
+            </div>
+        </div>
     </div>
 {:else if allNewsItems.length > 0}
-    <div class="header-tabs">
+    <div class="header-tabs chips">
         <span class="header-tabs-label">Leggyakoribb témák:</span>
-        {#each topWords as [word, count]}
+        <div
+            class="chips-scroll-wrapper"
+            class:can-left={canScrollLeft}
+            class:can-right={canScrollRight}
+        >
             <button
-                class="btn btn-md {selectedWord === word ? 'active' : ''}"
-                on:click={() => {
-                    selectedWord = selectedWord === word ? null : word;
-                    scrollToTop();
-                }}
+                class="scroll-arrow left"
+                aria-label="Görgetés balra"
+                on:click={() => scrollChips(-200)}>‹</button
             >
-                {word} <span class="news-word-count">{count}</span>
-            </button>
-        {/each}
+            <div class="chips-list" use:dragScroll bind:this={chipsContainer}>
+                {#each topWords as [word, count]}
+                    <button
+                        class="btn btn-md {selectedWord === word
+                            ? 'active'
+                            : ''}"
+                        on:click={() => {
+                            selectedWord = selectedWord === word ? null : word;
+                            scrollToTop();
+                        }}
+                    >
+                        {word} <span class="news-word-count">{count}</span>
+                    </button>
+                {/each}
+            </div>
+            <button
+                class="scroll-arrow right"
+                aria-label="Görgetés jobbra"
+                on:click={() => scrollChips(200)}>›</button
+            >
+        </div>
     </div>
 {/if}
 
 {#if selectedSource || selectedWord}
     <div class="filter-actions">
-        <div class="info-box brown">
+        <div class="info-box">
             <p>
                 {#if selectedSource && selectedWord}
                     💡 Leszűrve:<span class="active"
@@ -493,7 +594,7 @@
     </div>
 {:else}
     <div class="filter-actions">
-        <div class="info-box brown">
+        <div class="info-box">
             <p>
                 💡 Leszűrve: <span class="active">Összes</span>
             </p>
@@ -582,7 +683,7 @@
                 {/each}
             </div>
         {:else if error}
-            <div class="error-msg">
+            <div class="note error">
                 Hírek jelenleg nem elérhetők. Próbáld újra hamarosan.
             </div>
         {:else}
@@ -605,7 +706,7 @@
                                 />
                                 <span
                                     class="news-source badge"
-                                    style="background:{item.bgColor};"
+                                    style:background={item.bgColor}
                                     >{item.source}</span
                                 >
                             </div>
@@ -628,165 +729,6 @@
                 </div>
             {/if}
         {/if}
-
-        {#if selectedSource || selectedWord}
-            <div class="filter-actions">
-                <div class="info-box brown">
-                    <p>
-                        {#if selectedSource && selectedWord}
-                            💡 Leszűrve:<span class="active"
-                                >{selectedSource} és {selectedWord}</span
-                            >
-                        {:else if selectedSource}
-                            💡 Leszűrve:<span class="active"
-                                >{selectedSource}</span
-                            >
-                        {:else if selectedWord}
-                            💡 Leszűrve:<span class="active"
-                                >{selectedWord}</span
-                            >
-                        {/if}
-
-                        <button
-                            class="clear-filters btn btn-sm"
-                            aria-label="Szűrők törlése"
-                            title="Szűrők törlése"
-                            on:click={() => {
-                                selectedSource = null;
-                                selectedWord = null;
-                                scrollToTop();
-                            }}
-                        >
-                            Szűrő törlése
-                        </button>
-                    </p>
-                    <p>
-                        <span>({displayItems.length}/{totalCount})</span>
-                    </p>
-                </div>
-
-                <div class="view-mode-toggle">
-                    <button
-                        class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
-                        on:click={() => (viewMode = "grid")}
-                        title="Rács nézet"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="16"
-                            height="16"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            fill="none"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            ><rect x="3" y="3" width="7" height="7"></rect><rect
-                                x="14"
-                                y="3"
-                                width="7"
-                                height="7"
-                            ></rect><rect x="14" y="14" width="7" height="7"
-                            ></rect><rect x="3" y="14" width="7" height="7"
-                            ></rect></svg
-                        >
-                        <span>Rács</span>
-                    </button>
-                    <button
-                        class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
-                        on:click={() => (viewMode = "flex")}
-                        title="Lista nézet"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="16"
-                            height="16"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            fill="none"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            ><line x1="8" y1="6" x2="21" y2="6"></line><line
-                                x1="8"
-                                y1="12"
-                                x2="21"
-                                y2="12"
-                            ></line><line x1="8" y1="18" x2="21" y2="18"
-                            ></line><line x1="3" y1="6" x2="3.01" y2="6"
-                            ></line><line x1="3" y1="12" x2="3.01" y2="12"
-                            ></line><line x1="3" y1="18" x2="3.01" y2="18"
-                            ></line></svg
-                        >
-                        <span>Lista</span>
-                    </button>
-                </div>
-            </div>
-        {:else}
-            <div class="filter-actions">
-                <div class="info-box brown">
-                    <p>
-                        💡 Leszűrve: <span class="active">Összes</span>
-                    </p>
-                    <p>
-                        <span>({displayItems.length}/{totalCount})</span>
-                    </p>
-                </div>
-
-                <div class="view-mode-toggle">
-                    <button
-                        class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
-                        on:click={() => (viewMode = "grid")}
-                        title="Rács nézet"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="16"
-                            height="16"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            fill="none"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            ><rect x="3" y="3" width="7" height="7"></rect><rect
-                                x="14"
-                                y="3"
-                                width="7"
-                                height="7"
-                            ></rect><rect x="14" y="14" width="7" height="7"
-                            ></rect><rect x="3" y="14" width="7" height="7"
-                            ></rect></svg
-                        >
-                        <span>Rács</span>
-                    </button>
-                    <button
-                        class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
-                        on:click={() => (viewMode = "flex")}
-                        title="Lista nézet"
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            width="16"
-                            height="16"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            fill="none"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            ><line x1="8" y1="6" x2="21" y2="6"></line><line
-                                x1="8"
-                                y1="12"
-                                x2="21"
-                                y2="12"
-                            ></line><line x1="8" y1="18" x2="21" y2="18"
-                            ></line><line x1="3" y1="6" x2="3.01" y2="6"
-                            ></line><line x1="3" y1="12" x2="3.01" y2="12"
-                            ></line><line x1="3" y1="18" x2="3.01" y2="18"
-                            ></line></svg
-                        >
-                        <span>Lista</span>
-                    </button>
-                </div>
-            </div>
-        {/if}
     </section>
 
     <!-- Sidebar -->
@@ -808,21 +750,20 @@
                     <ul class="news-sidebar-sources">
                         {#each Array(5) as _}
                             <div
-                                class="news-sidebar-source-item"
-                                style="pointer-events:none;"
+                                class="news-sidebar-source-item sidebar-loader-item"
                             >
                                 <span class="news-source-dot skeleton"></span>
                                 <span
-                                    class="skeleton skeleton-text"
-                                    style="width:70%; height:0.75rem; margin:0;"
+                                    class="skeleton skeleton-text sidebar-loader-text"
                                 ></span>
                             </div>
                         {/each}
                     </ul>
-                    <small class="news-cache-timestamp" style="opacity:0.45;">
+                    <small
+                        class="news-cache-timestamp sidebar-cache-timestamp-loading"
+                    >
                         &#128336; Utoljára frissítve: <span
-                            class="skeleton skeleton-text"
-                            style="display:inline-block; width:4rem; height:0.65rem; vertical-align:middle; margin:0;"
+                            class="skeleton skeleton-text sidebar-loader-ts-skeleton"
                         ></span>
                     </small>
                 {:else if sources.length > 0}
@@ -835,9 +776,7 @@
                                 scrollToTop();
                             }}
                         >
-                            <span
-                                class="news-source-dot"
-                                style="background: var(--border-color);"
+                            <span class="news-source-dot dot-all-sources"
                             ></span>
                             Minden forrás
                         </button>
@@ -855,7 +794,7 @@
                             >
                                 <span
                                     class="news-source-dot"
-                                    style="background:{src.bg_color};"
+                                    style:background={src.bg_color}
                                 ></span>
                                 {src.title}
                             </button>
@@ -884,6 +823,171 @@
         <!-- Topics moved to header -->
     </aside>
 </div>
+
+{#if selectedSource || selectedWord}
+    <div class="filter-actions">
+        <div class="info-box">
+            <p>
+                {#if selectedSource && selectedWord}
+                    💡 Leszűrve:<span class="active"
+                        >{selectedSource} és {selectedWord}</span
+                    >
+                {:else if selectedSource}
+                    💡 Leszűrve:<span class="active">{selectedSource}</span>
+                {:else if selectedWord}
+                    💡 Leszűrve:<span class="active">{selectedWord}</span>
+                {/if}
+
+                <button
+                    class="clear-filters btn btn-sm"
+                    aria-label="Szűrők törlése"
+                    title="Szűrők törlése"
+                    on:click={() => {
+                        selectedSource = null;
+                        selectedWord = null;
+                        scrollToTop();
+                    }}
+                >
+                    Szűrő törlése
+                </button>
+            </p>
+            <p>
+                <span>({displayItems.length}/{totalCount})</span>
+            </p>
+        </div>
+
+        <div class="view-mode-toggle">
+            <button
+                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
+                on:click={() => (viewMode = "grid")}
+                title="Rács nézet"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><rect x="3" y="3" width="7" height="7"></rect><rect
+                        x="14"
+                        y="3"
+                        width="7"
+                        height="7"
+                    ></rect><rect x="14" y="14" width="7" height="7"
+                    ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
+                >
+                <span>Rács</span>
+            </button>
+            <button
+                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
+                on:click={() => (viewMode = "flex")}
+                title="Lista nézet"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="8" y1="6" x2="21" y2="6"></line><line
+                        x1="8"
+                        y1="12"
+                        x2="21"
+                        y2="12"
+                    ></line><line x1="8" y1="18" x2="21" y2="18"></line><line
+                        x1="3"
+                        y1="6"
+                        x2="3.01"
+                        y2="6"
+                    ></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line
+                        x1="3"
+                        y1="18"
+                        x2="3.01"
+                        y2="18"
+                    ></line></svg
+                >
+                <span>Lista</span>
+            </button>
+        </div>
+    </div>
+{:else}
+    <div class="filter-actions">
+        <div class="info-box">
+            <p>
+                💡 Leszűrve: <span class="active">Összes</span>
+            </p>
+            <p>
+                <span>({displayItems.length}/{totalCount})</span>
+            </p>
+        </div>
+
+        <div class="view-mode-toggle">
+            <button
+                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
+                on:click={() => (viewMode = "grid")}
+                title="Rács nézet"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><rect x="3" y="3" width="7" height="7"></rect><rect
+                        x="14"
+                        y="3"
+                        width="7"
+                        height="7"
+                    ></rect><rect x="14" y="14" width="7" height="7"
+                    ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
+                >
+                <span>Rács</span>
+            </button>
+            <button
+                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
+                on:click={() => (viewMode = "flex")}
+                title="Lista nézet"
+            >
+                <svg
+                    viewBox="0 0 24 24"
+                    width="16"
+                    height="16"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    fill="none"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="8" y1="6" x2="21" y2="6"></line><line
+                        x1="8"
+                        y1="12"
+                        x2="21"
+                        y2="12"
+                    ></line><line x1="8" y1="18" x2="21" y2="18"></line><line
+                        x1="3"
+                        y1="6"
+                        x2="3.01"
+                        y2="6"
+                    ></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line
+                        x1="3"
+                        y1="18"
+                        x2="3.01"
+                        y2="18"
+                    ></line></svg
+                >
+                <span>Lista</span>
+            </button>
+        </div>
+    </div>
+{/if}
 
 <section class="faq">
     <h2 class="faq-title">Hogyan működik ez az oldal?</h2>
@@ -956,3 +1060,32 @@
     tartalmáért. Az oldalon megjelenő időpont vagy dátum azt az időpillanatot
     jelöli, amikor a hírt a rendszerünk indexelte.
 </div>
+
+<style>
+    .news-word-count {
+        opacity: 0.6;
+        font-size: 0.85em;
+        margin-left: 0.3rem;
+    }
+    .sidebar-loader-item {
+        pointer-events: none;
+    }
+    .sidebar-loader-text {
+        width: 70%;
+        height: 0.75rem;
+        margin: 0;
+    }
+    .sidebar-cache-timestamp-loading {
+        opacity: 0.45;
+    }
+    .sidebar-loader-ts-skeleton {
+        display: inline-block;
+        width: 4rem;
+        height: 0.65rem;
+        vertical-align: middle;
+        margin: 0;
+    }
+    .dot-all-sources {
+        background: var(--border-color);
+    }
+</style>

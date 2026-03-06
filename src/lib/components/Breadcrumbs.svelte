@@ -9,45 +9,22 @@
     export let settlementType = ""; // e.g., 'város', 'falu'
 </script>
 
-<div
-    class="breadcrumbs"
-    style="color: var(--text-faint); font-size: 0.9rem; margin-bottom: 1rem;"
->
-    <a href="/" style="color: var(--primary-color); text-decoration: none;"
-        >Főoldal</a
-    >
+<div class="breadcrumbs">
+    <a href="/">Főoldal</a>
     &rsaquo;
-    <a
-        href={parentUrl}
-        style="color: var(--primary-color); text-decoration: none;"
-        >{parentLabel}</a
-    >
+    <a href={parentUrl}>{parentLabel}</a>
     &rsaquo;
     {#if countyName && countySlug}
-        <a
-            href="/{countySlug}-megye"
-            style="color: var(--primary-color); text-decoration: none;"
-            >{countyName}</a
-        >
+        <a href="/{countySlug}-megye">{countyName}</a>
         &rsaquo;
     {/if}
     {#if settlementSlug && settlementName}
-        <a
-            href="/{countySlug}-megye/{settlementSlug}"
-            style="color: var(--primary-color); text-decoration: none;"
-            >{settlementName}</a
-        >
+        <a href="/{countySlug}-megye/{settlementSlug}">{settlementName}</a>
         &rsaquo;
-        <span class="active" style="color: var(--text-color); font-weight: 500;"
-            >{label}</span
-        >
+        <span class="active">{label}</span>
     {:else if settlementType}
-        <span class="active" style="color: var(--text-color); font-weight: 500;"
-            >{settlementType}: {label}</span
-        >
+        <span class="active">{settlementType}: {label}</span>
     {:else}
-        <span class="active" style="color: var(--text-color); font-weight: 500;"
-            >{label}</span
-        >
+        <span class="active">{label}</span>
     {/if}
 </div>

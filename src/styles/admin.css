@@ -39,7 +39,6 @@
 
 .admin-sidebar-btn:hover {
     background: var(--border-color);
-    color: var(--szekely-green);
 }
 
 .admin-sidebar-btn.active {
@@ -163,7 +162,6 @@
     font-size: 1rem;
     font-weight: bold;
     transition: background 0.2s ease;
-    margin-top: 1rem;
 }
 
 .admin-submit-btn:hover {

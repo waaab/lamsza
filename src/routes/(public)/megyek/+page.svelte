@@ -24,29 +24,41 @@
 </script>
 
 <svelte:head>
-    <title>Megyék - Index</title>
+    <title>Székelyföldi Megyék - Lámsza Index</title>
 </svelte:head>
 
-<div class="container" style="min-height: calc(100vh - 120px)">
-    <Breadcrumbs label="Megyék" />
-    <h1 class="page-title">Erdélyi Megyék</h1>
+<div class="container main-container">
+    <Breadcrumbs label="Székelyföldi Megyék" />
+    <h1 class="page-title">Székelyföldi Megyék</h1>
 
-    <div style="display: flex; flex-wrap: wrap; gap: 0.8rem; margin-top:2rem;">
+    <div class="page-inner">
         {#if loading}
-            <div
-                class="skeleton skeleton-text"
-                style="width: 100px; height: 30px;"
-            ></div>
+            <div class="skeleton skeleton-text skeleton-badge"></div>
         {:else}
             {#each locations as loc}
-                <a
-                    href="/{loc.slug}-megye"
-                    class="badge"
-                    style="text-decoration: none; color: var(--primary-color); background: var(--card-bg); font-weight: 500; padding: 0.8rem 1.5rem; border: 1px solid var(--border-color); font-size: 1.1rem;"
-                >
+                <a href="/{loc.slug}-megye" class="badge county-badge">
                     {loc.name}
                 </a>
             {/each}
         {/if}
     </div>
 </div>
+
+<style>
+    .main-container {
+        min-height: calc(100vh - 120px);
+    }
+    .skeleton-badge {
+        width: 100px;
+        height: 30px;
+    }
+    .county-badge {
+        text-decoration: none;
+        color: var(--primary-color);
+        background: var(--card-bg);
+        font-weight: 500;
+        padding: 0.8rem 1.5rem;
+        border: 1px solid var(--border-color);
+        font-size: 1.1rem;
+    }
+</style>

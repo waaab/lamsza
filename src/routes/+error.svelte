@@ -6,12 +6,9 @@
     <title>Hiba {$page.status} - Székely Gugel</title>
 </svelte:head>
 
-<div
-    class="layout-bg"
-    style="display: flex; flex-direction: column; min-height: 100vh;"
->
+<div class="layout-bg error-layout">
     <!-- Simple header specifically for the root error page when it doesn't get the public layout -->
-    <header class="toolbar" style="padding: 1rem;">
+    <header class="toolbar error-toolbar">
         <div class="nav">
             <a href="/" class="nav-btn" title="Vissza a főoldalra">
                 <svg
@@ -33,21 +30,45 @@
         </div>
     </header>
 
-    <main class="container home-main" style="flex: 1;">
-        <h1 class="page-title" style="color: var(--szekely-red);">
+    <main class="container home-main error-main">
+        <h1 class="page-title error-title">
             Hoppácska! (Hiba: {$page.status})
         </h1>
-        <p
-            class="greeting"
-            style="text-align: center; margin-top: 1rem; color: var(--text-primary);"
-        >
+        <p class="greeting error-greeting">
             {$page.error?.message || "Valami hiba történt a rendszerben."}
         </p>
 
-        <div style="text-align: center; margin-top: 2rem;">
-            <button class="btn" onclick={() => navigate("/")}>
+        <div class="error-actions">
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <button class="btn" on:click={() => (window.location.href = "/")}>
                 Vissza a főoldalra
             </button>
         </div>
     </main>
 </div>
+
+<style>
+    .error-layout {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+    .error-toolbar {
+        padding: 1rem;
+    }
+    .error-main {
+        flex: 1;
+    }
+    .error-title {
+        color: var(--szekely-red);
+    }
+    .error-greeting {
+        text-align: center;
+        margin-top: 1rem;
+        color: var(--text-primary);
+    }
+    .error-actions {
+        text-align: center;
+        margin-top: 2rem;
+    }
+</style>

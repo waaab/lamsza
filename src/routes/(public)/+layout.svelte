@@ -72,13 +72,17 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path
-                    d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"
-                /></svg
             >
+                <line x1="10" x2="21" y1="6" y2="6" />
+                <line x1="10" x2="21" y1="12" y2="12" />
+                <line x1="10" x2="21" y1="18" y2="18" />
+                <path d="M4 6h1v4" />
+                <path d="M4 10h2" />
+                <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
+            </svg>
             <span>Index</span>
         </a>
-        <a href="/megyek" class="nav-btn" title="Index">
+        <a href="/megyek" class="nav-btn" title="Székelyföldi Megyék">
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -89,13 +93,12 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path
-                    d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"
-                /></svg
             >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
             <span>Megyék</span>
         </a>
-        <a href="/varosok" class="nav-btn" title="Index">
+        <a href="/varosok" class="nav-btn" title="Székelyföldi Városok">
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -106,11 +109,54 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><rect width="20" height="14" x="2" y="7" rx="2" ry="2" /><path
-                    d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"
-                /></svg
             >
-            <span>Varosok</span>
+                <rect width="8" height="18" x="3" y="3" rx="2" />
+                <path d="M7 7h0" />
+                <path d="M7 11h0" />
+                <path d="M7 15h0" />
+                <rect width="8" height="12" x="13" y="9" rx="2" />
+                <path d="M17 13h0" />
+                <path d="M17 17h0" />
+            </svg>
+            <span>Városok</span>
+        </a>
+        <a href="/falvak" class="nav-btn" title="Székelyföldi Falvak">
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path d="M3 20v-8l7-5 7 5v8"></path>
+                <path d="M7 20v-4h6v4"></path>
+                <path d="M17 20h4v-7l-4-3"></path>
+                <path d="M3 20h18"></path>
+            </svg>
+            <span>Falvak</span>
+        </a>
+        <a href="/esemenyek" class="nav-btn" title="Események">
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+            >
+                <path d="M8 2v4" />
+                <path d="M16 2v4" />
+                <rect width="18" height="18" x="3" y="4" rx="2" />
+                <path d="M3 10h18" />
+            </svg>
+            <span>Események</span>
         </a>
     </div>
     <div class="nav">
@@ -201,18 +247,34 @@
 </main>
 
 <footer>
-    Készítette sok ❤️-el <a
-        href="https://bogozi.com"
-        target="_blank"
-        rel="nofollow noopener"
-        title="bogozi.com - webfejlesztés, webshop készítés, keresőoptimalizálás"
-        >bogozi.com</a
-    >
-    © {new Date().getFullYear()} &bull; Na lámsza - Erdélyi magyar startlap és kereső.
-    Az internet székely kapuja &bull;
-    <a href="/valtozasnaplo" title="Verzió és Változásnapló"
-        >v1.0.0 - Változásnapló</a
-    >
+    <div class="footer-top">
+        Készítette sok ❤️-el <a
+            href="https://bogozi.com"
+            target="_blank"
+            rel="nofollow noopener"
+            title="bogozi.com - webfejlesztés, webshop készítés, keresőoptimalizálás"
+            >bogozi.com</a
+        >
+        © {new Date().getFullYear()} &bull; Na lámsza - Erdélyi magyar startlap
+        és kereső. Az internet székely kapuja &bull;
+        <a href="/valtozasnaplo" title="Verzió és Változásnapló"
+            >v1.0.0 - Változásnapló</a
+        >
+    </div>
+    <div class="footer-bottom">
+        <div class="logo">Székely Gugel</div>
+        <div class="social-links">
+            <a href="/" target="_blank" rel="noopener" title="Facebook"
+                >Facebook</a
+            >
+            <a href="/" target="_blank" rel="noopener" title="Twitter"
+                >Twitter</a
+            >
+            <a href="/" target="_blank" rel="noopener" title="Instagram"
+                >Instagram</a
+            >
+        </div>
+    </div>
 </footer>
 
 {#if scrollY > 500}
