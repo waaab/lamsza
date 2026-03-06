@@ -9,10 +9,32 @@
 <h1 class="page-title">Változásnapló</h1>
 <p class="greeting">Újítások, javítások - emberi nyelven.</p>
 
-<section class="faq">
+<section class="faq" id="gyik">
     <h2 class="faq-title">Aplikáció verziók</h2>
     <div class="faq-list">
         <details class="faq-item" open>
+            <summary>v1.1.0 - 2026. március 6.</summary>
+            <ul>
+                <li>
+                    <strong>Moduláris felépítés</strong>: A háttérrendszer
+                    mostantól modulokra oszlik, így könnyebben fejleszthető és
+                    karbantartható.
+                </li>
+                <li>
+                    <strong>Funkció-kapcsolók</strong>: Bizonyos funkciók (pl.
+                    események, hírek) mostantól egyetlen kattintással
+                    kikapcsolhatóak a beállításaokban, ha nincs rájuk szükség.
+                </li>
+                <li>
+                    <strong>Rendszertakarítás</strong>: A belső kódstruktúra
+                    optimalizálva lett a gyorsabb és megbízhatóbb működés
+                    érdekében.
+                </li>
+                <li>Helyreigazított automatikus tesztelési folyamat.</li>
+            </ul>
+        </details>
+
+        <details class="faq-item">
             <summary>v1.0.0 - 2026. március 1.</summary>
             <ul>
                 <li>Teljes újraindítás - a Székely Gugel él és virul!</li>

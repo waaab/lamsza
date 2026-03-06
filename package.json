@@ -8,6 +8,7 @@
 		"build": "vite build",
 		"build:extension": "npm run build && node scripts/extract-inline-scripts.js && rm -rf extension && cp -r dist extension && cp manifest.json extension/ && cp static/icon.png extension/",
 		"preview": "vite preview",
+		"restart": "./scripts/restart_all.sh",
 		"prepare": "svelte-kit sync || echo ''"
 	},
 	"devDependencies": {

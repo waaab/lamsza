@@ -1,0 +1,75 @@
+package config
+
+import (
+	"bufio"
+	"os"
+	"strings"
+)
+
+type Config struct {
+	DatabaseURL string
+	Port        string
+	Features    struct {
+		Weather    bool
+		Events     bool
+		News       bool
+		Mondasok   bool
+		QuickLinks bool
+		Search     bool
+	}
+}
+
+var AppConfig Config
+
+func Load() {
+	// Try to load .env from parent directory or current directory
+	if _, err := os.Stat("../.env"); err == nil {
+		loadEnvFile("../.env")
+	} else if _, err := os.Stat(".env"); err == nil {
+		loadEnvFile(".env")
+	}
+
+	AppConfig.DatabaseURL = getEnv("DATABASE_URL", "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable")
+	AppConfig.Port = getEnv("PORT", "3000")
+
+	AppConfig.Features.Weather = getBoolEnv("FEATURE_WEATHER", true)
+	AppConfig.Features.Events = getBoolEnv("FEATURE_EVENTS", true)
+	AppConfig.Features.News = getBoolEnv("FEATURE_NEWS", true)
+	AppConfig.Features.Mondasok = getBoolEnv("FEATURE_MONDASOK", true)
+	AppConfig.Features.QuickLinks = getBoolEnv("FEATURE_QUICKLINKS", true)
+	AppConfig.Features.Search = getBoolEnv("FEATURE_SEARCH", true)
+}
+
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
+
+func getBoolEnv(key string, fallback bool) bool {
+	if value, ok := os.LookupEnv(key); ok {
+		return strings.ToLower(value) == "true"
+	}
+	return fallback
+}
+
+func loadEnvFile(filename string) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) == 2 {
+			os.Setenv(strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]))
+		}
+	}
+}

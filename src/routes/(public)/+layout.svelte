@@ -25,7 +25,11 @@
 
 <header class="toolbar">
     <div class="nav">
-        <a href="/" class="nav-btn" title="Vissza a főoldalra">
+        <a
+            href="/"
+            class="nav-btn {$page.url.pathname === '/' ? 'active' : ''}"
+            title="Vissza a főoldalra"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -42,7 +46,13 @@
             >
             <span>Lámsza</span>
         </a>
-        <a href="/hirek" class="nav-btn" title="Hírek">
+        <a
+            href="/hirek"
+            class="nav-btn {$page.url.pathname.startsWith('/hirek')
+                ? 'active'
+                : ''}"
+            title="Hírek"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -61,7 +71,13 @@
             >
             <span>Hírek</span>
         </a>
-        <a href="/index" class="nav-btn" title="Index">
+        <a
+            href="/index"
+            class="nav-btn {$page.url.pathname.startsWith('/index')
+                ? 'active'
+                : ''}"
+            title="Index"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -82,7 +98,14 @@
             </svg>
             <span>Index</span>
         </a>
-        <a href="/megyek" class="nav-btn" title="Székelyföldi Megyék">
+        <a
+            href="/megyek"
+            class="nav-btn {$page.url.pathname === '/megyek' ||
+            $page.url.pathname.includes('-megye')
+                ? 'active'
+                : ''}"
+            title="Székelyföldi Megyék"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -98,7 +121,14 @@
             </svg>
             <span>Megyék</span>
         </a>
-        <a href="/varosok" class="nav-btn" title="Székelyföldi Városok">
+        <a
+            href="/varosok"
+            class="nav-btn {$page.url.pathname === '/varosok' ||
+            $page.url.pathname.startsWith('/varos/')
+                ? 'active'
+                : ''}"
+            title="Székelyföldi Városok"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -120,7 +150,14 @@
             </svg>
             <span>Városok</span>
         </a>
-        <a href="/falvak" class="nav-btn" title="Székelyföldi Falvak">
+        <a
+            href="/falvak"
+            class="nav-btn {$page.url.pathname === '/falvak' ||
+            $page.url.pathname.startsWith('/falu/')
+                ? 'active'
+                : ''}"
+            title="Székelyföldi Falvak"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -139,7 +176,13 @@
             </svg>
             <span>Falvak</span>
         </a>
-        <a href="/esemenyek" class="nav-btn" title="Események">
+        <a
+            href="/esemenyek"
+            class="nav-btn {$page.url.pathname.startsWith('/esemenyek')
+                ? 'active'
+                : ''}"
+            title="Események"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -160,7 +203,13 @@
         </a>
     </div>
     <div class="nav">
-        <a href="/admin" class="nav-btn" title="Belépés az admin panelbe">
+        <a
+            href="/admin"
+            class="nav-btn {$page.url.pathname.startsWith('/admin')
+                ? 'active'
+                : ''}"
+            title="Belépés az admin panelbe"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -179,7 +228,13 @@
             >
             <span>Bélépés</span>
         </a>
-        <a href="/valtozasnaplo" class="nav-btn" title="Változásnapló">
+        <a
+            href="/valtozasnaplo"
+            class="nav-btn {$page.url.pathname === '/valtozasnaplo'
+                ? 'active'
+                : ''}"
+            title="Változásnapló"
+        >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"

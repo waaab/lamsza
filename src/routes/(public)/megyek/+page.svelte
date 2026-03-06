@@ -1,25 +1,22 @@
 <script>
     import { onMount } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
+    import { apiFetch } from "$lib/api";
 
     let locations = [];
     let loading = true;
 
     onMount(async () => {
         try {
-            const apiBase =
-                import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-            const res = await fetch(`${apiBase}/api/locations`);
-            if (res.ok) {
-                const all = await res.json();
-                locations = all
-                    .filter((l) => l.type.toLowerCase() === "megye")
-                    .sort((a, b) => a.name.localeCompare(b.name));
-            }
+            const all = await apiFetch("/api/locations");
+            locations = all
+                .filter((l) => l.type.toLowerCase() === "megye")
+                .sort((a, b) => a.name.localeCompare(b.name));
         } catch (e) {
             console.error(e);
+        } finally {
+            loading = false;
         }
-        loading = false;
     });
 </script>
 
@@ -27,27 +24,22 @@
     <title>Székelyföldi Megyék - Lámsza Index</title>
 </svelte:head>
 
-<div class="container main-container">
-    <Breadcrumbs label="Székelyföldi Megyék" />
-    <h1 class="page-title">Székelyföldi Megyék</h1>
+<Breadcrumbs label="Székelyföldi Megyék" />
+<h1 class="page-title">Székelyföldi Megyék</h1>
 
-    <div class="page-inner">
-        {#if loading}
-            <div class="skeleton skeleton-text skeleton-badge"></div>
-        {:else}
-            {#each locations as loc}
-                <a href="/{loc.slug}-megye" class="badge county-badge">
-                    {loc.name}
-                </a>
-            {/each}
-        {/if}
-    </div>
+<div class="page-inner">
+    {#if loading}
+        <div class="skeleton-badge skeleton"></div>
+    {:else}
+        {#each locations as loc}
+            <a href="/{loc.slug}-megye" class="badge county-badge">
+                {loc.name}
+            </a>
+        {/each}
+    {/if}
 </div>
 
 <style>
-    .main-container {
-        min-height: calc(100vh - 120px);
-    }
     .skeleton-badge {
         width: 100px;
         height: 30px;

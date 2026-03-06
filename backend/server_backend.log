@@ -1,4 +1,597 @@
-2026/03/04 07:12:15 Connected to PostgreSQL
-2026/03/04 07:12:15 Backend API active on port 3000
-2026/03/04 07:12:15 listen tcp :3000: bind: address already in use
-exit status 1
+2026/03/06 12:58:56 Database connection established
+2026/03/06 12:58:56 Module [Weather] enabled
+2026/03/06 12:58:56 Module [Events] enabled
+2026/03/06 12:58:56 Module [News] enabled
+2026/03/06 12:58:56 Module [Mondasok] enabled
+2026/03/06 12:58:56 Module [QuickLinks] enabled
+2026/03/06 12:58:56 Module [Search] enabled
+2026/03/06 12:58:56 Backend API active on port 3000
+2026/03/06 12:59:19 EntriesHandler: q="", normalizedQ=""
+2026/03/06 12:59:19 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 12:59:19 EntriesHandler params: [ csikszereda]
+2026/03/06 12:59:19 EntriesHandler found 9 entries
+2026/03/06 12:59:28 EntriesHandler: q="", normalizedQ=""
+2026/03/06 12:59:28 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 12:59:28 EntriesHandler params: [ gelence]
+2026/03/06 12:59:28 EntriesHandler found 0 entries
+2026/03/06 12:59:32 EntriesHandler: q="", normalizedQ=""
+2026/03/06 12:59:32 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 12:59:32 EntriesHandler params: [ torja]
+2026/03/06 12:59:32 EntriesHandler found 0 entries
+2026/03/06 12:59:35 EntriesHandler: q="", normalizedQ=""
+2026/03/06 12:59:35 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 12:59:35 EntriesHandler params: [ szovata]
+2026/03/06 12:59:35 EntriesHandler found 0 entries
+2026/03/06 12:59:38 EntriesHandler: q="", normalizedQ=""
+2026/03/06 12:59:38 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 12:59:38 EntriesHandler params: [ kezdivasarhely]
+2026/03/06 12:59:38 EntriesHandler found 1 entries
+2026/03/06 13:00:34 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:00:34 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:00:34 EntriesHandler params: []
+2026/03/06 13:00:34 EntriesHandler found 16 entries
+2026/03/06 13:01:51 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:01:51 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:01:51 EntriesHandler params: []
+2026/03/06 13:01:51 EntriesHandler found 16 entries
+2026/03/06 13:03:09 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:03:09 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:03:09 EntriesHandler params: []
+2026/03/06 13:03:09 EntriesHandler found 16 entries
+2026/03/06 13:03:47 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:03:47 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:03:47 EntriesHandler params: []
+2026/03/06 13:03:47 EntriesHandler found 16 entries
+2026/03/06 13:05:40 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:05:40 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:05:40 EntriesHandler params: [ tusnadfurdo]
+2026/03/06 13:05:40 EntriesHandler found 0 entries
+2026/03/06 13:05:51 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:05:51 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:05:51 EntriesHandler params: [ csiksomlyo]
+2026/03/06 13:05:51 EntriesHandler found 0 entries
+2026/03/06 13:05:56 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:05:56 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:05:56 EntriesHandler params: [ csiksomlyo]
+2026/03/06 13:05:56 EntriesHandler found 0 entries
+2026/03/06 13:05:58 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:05:58 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:05:58 EntriesHandler params: []
+2026/03/06 13:05:58 EntriesHandler found 16 entries
+2026/03/06 13:06:04 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:04 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 AND l.slug = $2 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:04 EntriesHandler params: [ csikszereda]
+2026/03/06 13:06:04 EntriesHandler found 9 entries
+2026/03/06 13:06:30 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:30 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:30 EntriesHandler params: []
+2026/03/06 13:06:30 EntriesHandler found 16 entries
+2026/03/06 13:06:35 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:35 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:35 EntriesHandler params: []
+2026/03/06 13:06:35 EntriesHandler found 16 entries
+2026/03/06 13:06:48 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:48 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:48 EntriesHandler params: []
+2026/03/06 13:06:48 EntriesHandler found 16 entries
+2026/03/06 13:06:53 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:53 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:53 EntriesHandler params: []
+2026/03/06 13:06:53 EntriesHandler found 16 entries
+2026/03/06 13:06:58 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:58 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:58 EntriesHandler params: []
+2026/03/06 13:06:58 EntriesHandler found 16 entries
+2026/03/06 13:06:59 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:06:59 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:06:59 EntriesHandler params: []
+2026/03/06 13:06:59 EntriesHandler found 16 entries
+2026/03/06 13:07:00 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:07:00 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:07:00 EntriesHandler params: []
+2026/03/06 13:07:00 EntriesHandler found 16 entries
+2026/03/06 13:07:01 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:07:01 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:07:01 EntriesHandler params: []
+2026/03/06 13:07:01 EntriesHandler found 16 entries
+2026/03/06 13:07:01 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:07:01 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:07:01 EntriesHandler params: []
+2026/03/06 13:07:01 EntriesHandler found 16 entries
+2026/03/06 13:13:48 EntriesHandler: q="fuszulyka", normalizedQ="fuszulyka"
+2026/03/06 13:13:48 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC
+2026/03/06 13:13:48 EntriesHandler params: [fuszulyka fuszulyka]
+2026/03/06 13:13:48 EntriesHandler found 0 entries
+2026/03/06 13:14:16 EntriesHandler: q="dsdsds", normalizedQ="dsdsds"
+2026/03/06 13:14:16 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC
+2026/03/06 13:14:16 EntriesHandler params: [dsdsds dsdsds]
+2026/03/06 13:14:16 EntriesHandler found 0 entries
+2026/03/06 13:14:46 EntriesHandler: q="fog", normalizedQ="fog"
+2026/03/06 13:14:46 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC
+2026/03/06 13:14:46 EntriesHandler params: [fog fog]
+2026/03/06 13:14:46 EntriesHandler found 0 entries
+2026/03/06 13:14:49 EntriesHandler: q="fogaszat", normalizedQ="fogaszat"
+2026/03/06 13:14:49 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC
+2026/03/06 13:14:49 EntriesHandler params: [fogaszat fogaszat]
+2026/03/06 13:14:49 EntriesHandler found 0 entries
+2026/03/06 13:14:51 EntriesHandler: q="fogasz", normalizedQ="fogasz"
+2026/03/06 13:14:51 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC
+2026/03/06 13:14:51 EntriesHandler params: [fogasz fogasz]
+2026/03/06 13:14:51 EntriesHandler found 0 entries
+2026/03/06 13:14:54 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:14:54 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:14:54 EntriesHandler params: []
+2026/03/06 13:14:54 EntriesHandler found 16 entries
+2026/03/06 13:15:58 EntriesHandler: q="fogorvos", normalizedQ="fogorvos"
+2026/03/06 13:15:58 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC
+2026/03/06 13:15:58 EntriesHandler params: [fogorvos fogorvos]
+2026/03/06 13:15:58 EntriesHandler found 1 entries
+2026/03/06 13:16:46 EntriesHandler: q="", normalizedQ=""
+2026/03/06 13:16:46 EntriesHandler query: 
+			SELECT 
+				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				l.name, l.slug, l.county, l.county_slug, l.type, 
+				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
+				e.languages, COALESCE(e.url, ''),
+				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
+				0 as rank
+			FROM entries e
+			JOIN locations l ON e.location_id = l.id
+			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_tags et ON e.id = et.entry_id
+			LEFT JOIN tags t ON et.tag_id = t.id
+			WHERE 1=1
+		 GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC
+2026/03/06 13:16:46 EntriesHandler params: []
+2026/03/06 13:16:46 EntriesHandler found 16 entries

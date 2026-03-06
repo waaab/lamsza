@@ -29,31 +29,26 @@
     <title>Székelyföldi Városok - Lámsza Index</title>
 </svelte:head>
 
-<div class="container main-container">
-    <Breadcrumbs label="Székelyföldi Városok" />
-    <h1 class="page-title">Székelyföldi Városok</h1>
+<Breadcrumbs label="Székelyföldi Városok" />
+<h1 class="page-title">Székelyföldi Városok</h1>
 
-    <div class="page-inner">
-        {#if loading}
-            <div class="skeleton skeleton-text skeleton-badge"></div>
-        {:else}
-            {#each locations as loc}
-                <a
-                    href="/{loc.county_slug}-megye/{loc.slug}"
-                    class="badge location-badge"
-                >
-                    {loc.name}
-                    <span class="location-county">{loc.county}</span>
-                </a>
-            {/each}
-        {/if}
-    </div>
+<div class="page-inner">
+    {#if loading}
+        <div class="skeleton skeleton-text skeleton-badge"></div>
+    {:else}
+        {#each locations as loc}
+            <a
+                href="/{loc.county_slug}-megye/{loc.slug}"
+                class="badge location-badge"
+            >
+                {loc.name}
+                <span class="location-county">{loc.county}</span>
+            </a>
+        {/each}
+    {/if}
 </div>
 
 <style>
-    .main-container {
-        min-height: calc(100vh - 120px);
-    }
     .skeleton-badge {
         width: 100px;
         height: 30px;

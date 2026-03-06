@@ -4,11 +4,37 @@
 
 Vite config loaded — allowedHosts: [ '.test', 'localhost', '127.0.0.1', '::1' ]
 
-  VITE v7.3.1  ready in 622 ms
+  VITE v7.3.1  ready in 697 ms
 
   ➜  Local:   http://localhost:5173/
   ➜  Network: use --host to expose
-  ➜  press h + enter to show help
+
+Google Chrome is requesting /.well-known/appspecific/com.chrome.devtools.json to automatically configure devtools project settings. To learn why, and how to prevent this message, see https://svelte.dev/docs/cli/devtools-json
+
+
+[1;31m[404] GET /sw.js[0m
+1:00:24 PM [vite] (client) hmr update /src/lib/components/EntryCard.svelte?svelte&type=style&lang.css
+1:00:24 PM [vite] (ssr) page reload src/lib/components/EntryCard.svelte
+1:00:58 PM [vite] (client) hmr update /src/lib/components/EntryCard.svelte, /src/lib/components/EntryCard.svelte?svelte&type=style&lang.css
+1:00:58 PM [vite] (ssr) page reload src/lib/components/EntryCard.svelte
+1:01:04 PM [vite] (client) hmr update /src/styles/global.css
+1:01:04 PM [vite] (ssr) page reload src/styles/global.css
+1:01:25 PM [vite] (client) hmr update /src/styles/global.css
+1:01:25 PM [vite] (ssr) page reload src/styles/global.css
+1:01:26 PM [vite] (client) hmr update /src/styles/global.css
+1:01:26 PM [vite] (ssr) page reload src/styles/global.css
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+1:03:39 PM [vite] (client) hmr update /src/styles/global.css
+1:03:39 PM [vite] (ssr) page reload src/styles/global.css
+1:04:10 PM [vite] (client) hmr update /src/styles/global.css
+1:04:10 PM [vite] (ssr) page reload src/styles/global.css
+1:04:30 PM [vite] (client) hmr update /src/styles/global.css
+1:04:30 PM [vite] (ssr) page reload src/styles/global.css
+1:05:56 PM [vite] (client) hmr update /src/routes/(public)/+layout.svelte
+1:05:56 PM [vite] (ssr) page reload src/routes/(public)/+layout.svelte
 
 [1;31m[404] GET /sw.js[0m
 
@@ -17,5 +43,23 @@ Vite config loaded — allowedHosts: [ '.test', 'localhost', '127.0.0.1', '::1' 
 [1;31m[404] GET /sw.js[0m
 
 [1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+1:14:13 PM [vite] (client) hmr update /src/lib/components/SearchEngine.svelte
+1:14:13 PM [vite] (ssr) page reload src/lib/components/SearchEngine.svelte
+1:14:32 PM [vite] (client) hmr update /src/lib/components/SearchEngine.svelte
+1:14:32 PM [vite] (ssr) page reload src/lib/components/SearchEngine.svelte
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+
+[1;31m[404] GET /sw.js[0m
+1:22:33 PM [vite] (client) hmr update /src/routes/admin/+page.svelte
+1:22:33 PM [vite] (ssr) page reload src/routes/admin/+page.svelte
+1:23:30 PM [vite] (client) hmr update /src/routes/admin/+page.svelte
+1:23:30 PM [vite] (ssr) page reload src/routes/admin/+page.svelte
+1:25:14 PM [vite] (client) hmr update /src/styles/global.css
+1:25:14 PM [vite] (ssr) page reload src/styles/global.css
 
 [1;31m[404] GET /sw.js[0m

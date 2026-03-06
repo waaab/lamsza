@@ -3,26 +3,16 @@
     import { browser } from "$app/environment";
     import { onMount } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
+    import EntryCard from "$lib/components/EntryCard.svelte";
+    import WeatherWidget from "$lib/components/WeatherWidget.svelte";
+    import NewsWidget from "$lib/components/NewsWidget.svelte";
+    import EventsWidget from "$lib/components/EventsWidget.svelte";
+    import { apiFetch } from "$lib/api";
 
-    let locType = ""; // Dynamically populated from locations API
-    let town = "";
-    let displayTown = "";
-    let displayTownRo = "";
-    let displayTownDe = "";
-    let countyName = "";
-    let displayZipCode = "";
-    let displayTownCoordinates = "";
-    let displayTownPopulation = "";
-    let displayTownArea = "";
-    let displayTownCrest = "";
-    let displayParentId = null;
-    let displayParentName = "";
-    let displayParentSlug = "";
-    let displayParentCountySlug = "";
-
-    let services = [];
-    let loadingServices = true;
-    let servicesError = null;
+    let settlementData = null;
+    let entries = [];
+    let loading = true;
+    let entriesError = null;
 
     let viewMode = "grid";
     let sortMode = "title";
@@ -36,284 +26,133 @@
         sortOpen = false;
     }
 
-    $: sortedServices = [...services].sort((a, b) => {
+    $: town = $page.params.slug;
+    $: sortedEntries = [...entries].sort((a, b) => {
         if (sortMode === "newest") return b.id - a.id;
         return a.name.localeCompare(b.name);
     });
-    $: totalCount = sortedServices.length;
-    $: displayItems = sortedServices.slice(0, visibleCount);
+    $: totalCount = sortedEntries.length;
+    $: displayItems = sortedEntries.slice(0, visibleCount);
 
     function loadMore() {
         visibleCount += 12;
     }
 
-    let weatherData = null;
-    let weatherLoading = true;
-
-    let newsItems = [];
-    let newsLoading = true;
-
-    let localEvents = [];
-    let eventsLoading = true;
-
-    $: if (browser && $page.params.slug) {
-        town = $page.params.slug.toLowerCase();
-        displayTown = town.charAt(0).toUpperCase() + town.slice(1);
-        displayTownRo = "";
-        displayTownDe = "";
-        fetchData();
-    }
+    onMount(async () => {
+        if (browser && town) {
+            fetchData();
+        }
+    });
 
     async function fetchData() {
-        loadingServices = true;
-        weatherLoading = true;
-        newsLoading = true;
-        eventsLoading = true;
-
-        const apiBase =
-            import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
-        // 1. Fetch Directory Services
+        loading = true;
         try {
-            const locRes = await fetch(`${apiBase}/api/locations`);
-            if (locRes.ok) {
-                const locations = await locRes.json();
-                const locData = locations.find((l) => l.slug === town);
-                if (locData) {
-                    displayTown = locData.name;
-                    displayTownRo = locData.name_ro;
-                    displayTownDe = locData.name_de;
-                    locType = locData.type || "";
-                    countyName = locData.county || "";
-                    displayZipCode = locData.post_code || "";
-                    displayTownCoordinates = locData.coordinates || "";
-                    displayTownPopulation = locData.population || "";
-                    displayTownArea = locData.area || "";
-                    displayTownCrest = locData.crest || "";
-                    displayParentId = locData.parent_id || null;
-                    if (displayParentId) {
-                        const parent = locations.find(
-                            (l) => l.id === displayParentId,
-                        );
-                        if (parent) {
-                            displayParentName = parent.name;
-                            displayParentSlug = parent.slug;
-                            displayParentCountySlug = parent.county_slug;
-                        }
+            // 1. Fetch Settlement Info
+            const locations = await apiFetch("/api/locations");
+            const locData = locations.find(
+                (l) => l.slug === town.toLowerCase(),
+            );
+            if (locData) {
+                settlementData = locData;
+                if (locData.parent_id) {
+                    const parent = locations.find(
+                        (l) => l.id === locData.parent_id,
+                    );
+                    if (parent) {
+                        settlementData.parent = parent;
                     }
                 }
             }
-            const res = await fetch(
-                `${apiBase}/api/directory?location_slug=${encodeURIComponent(town)}`,
+
+            // 2. Fetch Directory Entries
+            const res = await apiFetch(
+                `/api/directory?location_slug=${encodeURIComponent(town)}`,
             );
-            if (!res.ok) throw new Error("Hiba a címtár betöltésekor");
-            services = (await res.json()) || [];
+            entries = res || [];
         } catch (err) {
             console.error(err);
-            servicesError = "Nem sikerült betölteni az adatokat.";
+            entriesError = "Nem sikerült betölteni az adatokat.";
         } finally {
-            loadingServices = false;
+            loading = false;
         }
-
-        // 2. Fetch Weather
-        const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
-        if (API_KEY) {
-            try {
-                const wRes = await fetch(
-                    `${apiBase}/api/weather?slug=${encodeURIComponent(town)}&appid=${API_KEY}`,
-                );
-                if (wRes.ok) {
-                    const wData = await wRes.json();
-                    weatherData = {
-                        temp: Math.round(wData.main.temp),
-                        tempMin: Math.round(wData.main.temp_min),
-                        desc: wData.weather[0].description,
-                        icon: wData.weather[0].icon,
-                        timestamp: Date.now(),
-                    };
-                }
-            } catch (err) {
-                console.error("Weather fetch error:", err);
-            } finally {
-                weatherLoading = false;
-            }
-        } else {
-            weatherLoading = false;
-        }
-
-        // 3. Fetch News filtering by town
-        try {
-            const nRes = await fetch(`${apiBase}/api/admin/news_feeds`);
-            const dbFeeds = await nRes.json();
-            let allNews = [];
-
-            if (dbFeeds && dbFeeds.length > 0) {
-                for (const feed of dbFeeds) {
-                    if (!feed.feed_url) continue;
-                    try {
-                        const proxiedUrl =
-                            `${apiBase}/api/proxy?url=` +
-                            encodeURIComponent(feed.feed_url);
-                        const response = await fetch(proxiedUrl);
-                        const xmlText = await response.text();
-                        const parser = new DOMParser();
-                        const xmlDoc = parser.parseFromString(
-                            xmlText,
-                            "text/xml",
-                        );
-                        const nodes = Array.from(
-                            xmlDoc.querySelectorAll("item"),
-                        );
-
-                        nodes.forEach((node) => {
-                            const title =
-                                node.querySelector("title")?.textContent || "";
-                            const desc =
-                                node.querySelector("description")
-                                    ?.textContent || "";
-
-                            // Check if town is mentioned
-                            if (
-                                title.toLowerCase().includes(town) ||
-                                desc.toLowerCase().includes(town)
-                            ) {
-                                allNews.push({
-                                    title: title,
-                                    link:
-                                        node.querySelector("link")
-                                            ?.textContent || "#",
-                                    pubDate:
-                                        new Date(
-                                            node.querySelector(
-                                                "pubDate",
-                                            )?.textContent,
-                                        ).getTime() || 0,
-                                    source: feed.title || "Hír",
-                                });
-                            }
-                        });
-                    } catch (e) {
-                        console.error("RSS feed error:", feed.feed_url, e);
-                    }
-                }
-            }
-            allNews.sort((a, b) => b.pubDate - a.pubDate);
-            newsItems = allNews.slice(0, 6); // Top 6 news
-        } catch (err) {
-            console.error("News fetch error:", err);
-        } finally {
-            newsLoading = false;
-        }
-
-        // 4. Fetch Local Events
-        try {
-            const eRes = await fetch(
-                `${apiBase}/api/events?location_slug=${encodeURIComponent(town)}`,
-            );
-            if (eRes.ok) {
-                localEvents = await eRes.json();
-            }
-        } catch (err) {
-            console.error("Events fetch error:", err);
-        } finally {
-            eventsLoading = false;
-        }
-    }
-
-    function iconEmoji(code) {
-        const map = {
-            "01d": "☀️",
-            "01n": "🌙",
-            "02d": "⛅",
-            "02n": "☁️",
-            "03d": "☁️",
-            "03n": "☁️",
-            "04d": "☁️",
-            "04n": "☁️",
-            "09d": "🌧️",
-            "09n": "🌧️",
-            "10d": "🌦️",
-            "10n": "🌧️",
-            "11d": "⛈️",
-            "11n": "⛈️",
-            "13d": "❄️",
-            "13n": "❄️",
-            "50d": "🌫️",
-            "50n": "🌫️",
-        };
-        return map[code] || "🌡️";
     }
 </script>
 
 <svelte:head>
-    <title>{displayTown} - Index</title>
+    <title>{settlementData?.name || town} - Index</title>
 </svelte:head>
 
-<div class="container main-content">
+{#if settlementData}
     <Breadcrumbs
-        label={displayTown}
-        settlementType={locType}
-        {countyName}
+        label={settlementData.name}
+        settlementType={settlementData.type}
+        countyName={settlementData.county}
         countySlug={$page.params.countySlug}
     />
 
-    <h1 class="page-title">{displayTown} {locType} és környéke</h1>
+    <h1 class="page-title">
+        {settlementData.name}
+        {settlementData.type} és környéke
+    </h1>
     <p class="greeting no-top-margin">
-        Helyi hírek, időjárás és címtár {displayTown} területén.
+        Helyi hírek, időjárás és címtár {settlementData.name} területén.
     </p>
 
-    <!-- Widgets Row (Weather + News Preview) -->
     <div class="widgets-box">
         <!-- Settlement info -->
         <article id="attekintes">
             <h3 class="widget-title">Áttekintés</h3>
             <div class="more-info">
-                {#if displayTownRo}
-                    <span title="Román neve: {displayTownRo}"
-                        >Románul: {displayTownRo}</span
+                {#if settlementData.name_ro}<span
+                        >Románul: {settlementData.name_ro}</span
+                    >{/if}
+                {#if settlementData.name_de}<span
+                        >Németül: {settlementData.name_de}</span
+                    >{/if}
+                <span
+                    >Irányítószám: <span>{settlementData.post_code || "–"}</span
+                    ></span
+                >
+                <span
+                    >Koordináták: <span
+                        >{settlementData.coordinates || "–"}</span
+                    ></span
+                >
+                <span
+                    >Lakosság: <span>{settlementData.population || "–"} fő</span
+                    ></span
+                >
+                <span
+                    >Terület: <span>{settlementData.area || "–"} km²</span
+                    ></span
+                >
+                <span
+                    >Közigazgatási forma: <span class="capitalize"
+                        >{settlementData.type || "–"}</span
+                    ></span
+                >
+                {#if settlementData.parent}
+                    <span
+                        >Kapcsolódó település: <a
+                            href="/{settlementData.parent
+                                .county_slug}-megye/{settlementData.parent
+                                .slug}"
+                            class="parent-city-link"
+                            >{settlementData.parent.name}</a
+                        ></span
                     >
-                {/if}
-                {#if displayTownDe}
-                    <span title="Német neve: {displayTownDe}"
-                        >Németül: {displayTownDe}</span
-                    >
-                {/if}
-                <span title="Posta kód">
-                    Irányítószám: <span>{displayZipCode || "–"}</span>
-                </span>
-                <span title="Koordináták">
-                    Koordináták: <span>{displayTownCoordinates || "–"}</span>
-                </span>
-                <span title="Lakosság">
-                    Lakosság: <span>{displayTownPopulation || "–"} fő</span>
-                </span>
-                <span title="Terület (négyzetkilométer)">
-                    Terület: <span>{displayTownArea || "–"} km²</span>
-                </span>
-                <span title="Közigazgatási forma">
-                    Közigazgatási forma: <span class="capitalize"
-                        >{locType || "–"}</span
-                    >
-                </span>
-                {#if displayParentId && displayParentName}
-                    <span title="Kapcsolódó település:">
-                        Kapcsolódó település: <a
-                            href="/{displayParentCountySlug}-megye/{displayParentSlug}"
-                            class="parent-city-link">{displayParentName}</a
-                        >
-                    </span>
                 {/if}
             </div>
         </article>
 
         <!-- Coat of Arms -->
         <article id="cimer" class="crest-card">
-            <h3 class="widget-title">{displayTown} címere</h3>
+            <h3 class="widget-title">{settlementData.name} címere</h3>
             <div class="crest-container">
-                {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
+                {#if settlementData.crest && settlementData.crest !== "–" && settlementData.crest.length > 5}
                     <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
-                        alt="{displayTown} címere"
+                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(settlementData.crest)}`}
+                        alt="{settlementData.name} címere"
                         class="crest-img"
                     />
                 {:else}
@@ -322,169 +161,19 @@
             </div>
         </article>
 
-        <!-- Weather Widget -->
-        <article id="idojaras" class="weather-card">
-            {#if weatherLoading}
-                <div class="weather-left">
-                    <span class="widget-title">Időjárás</span>
-                    <div class="weather-temp-row">
-                        <div class="skeleton weather-skeleton-temp"></div>
-                    </div>
-                    <div class="weather-desc">
-                        <div class="skeleton weather-skeleton-desc"></div>
-                    </div>
-                    <div class="weather-footer">
-                        <div class="skeleton skeleton-footer-1"></div>
-                        <div class="skeleton skeleton-footer-2"></div>
-                    </div>
-                </div>
-                <div class="weather-right">
-                    <span class="weather-icon">⛅</span>
-                </div>
-            {:else if weatherData}
-                <div class="weather-left">
-                    <span class="widget-title">Időjárás</span>
-                    <div class="weather-temp-row">
-                        <span class="weather-temp">{weatherData.temp}</span
-                        ><span class="weather-temp-unit">°C</span>
-                        {#if weatherData.tempMin != null}
-                            <span class="weather-temp-min"
-                                >/ {weatherData.tempMin}°C</span
-                            >
-                        {/if}
-                    </div>
-                    <div class="weather-desc capitalize">
-                        {weatherData.desc}
-                    </div>
-                    <div class="weather-footer">
-                        {#if weatherData.timestamp}
-                            <small class="weather-timestamp"
-                                >Utoljára frissítve: {new Date(
-                                    weatherData.timestamp,
-                                ).toLocaleTimeString("hu-HU", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                })}</small
-                            >
-                        {/if}
-                        <small class="weather-source"
-                            >Forrás: OpenWeatherMap</small
-                        >
-                    </div>
-                </div>
-                <div class="weather-right">
-                    <span class="weather-icon"
-                        >{iconEmoji(weatherData.icon)}</span
-                    >
-                </div>
-            {:else}
-                <div class="weather-left">
-                    <span class="widget-title">Időjárás</span>
-                    <p class="weather-error">Időjárás adat nem elérhető.</p>
-                </div>
-                <div class="weather-right">
-                    <span class="weather-icon">⛅</span>
-                </div>
-            {/if}
-        </article>
+        <WeatherWidget settlementSlug={town} />
 
-        <!-- Events Widget -->
-        <article id="esemenyek" class="event-widget">
-            <h3 class="widget-title">Események</h3>
-            {#if eventsLoading}
-                <div class="skeleton-box">
-                    <div class="skeleton skeleton-text skeleton-full"></div>
-                    <div class="skeleton skeleton-text skeleton-60"></div>
-                </div>
-            {:else if localEvents.length > 0}
-                <ul class="mini-event-list">
-                    {#each localEvents.slice(0, 3) as event}
-                        <li>
-                            <div class="mini-event-date">
-                                {new Date(event.start_date).toLocaleDateString(
-                                    "hu-HU",
-                                    { month: "short", day: "numeric" },
-                                )}
-                            </div>
-                            <div class="mini-event-info">
-                                <span class="mini-event-title"
-                                    >{event.title}</span
-                                >
-                                <span class="mini-event-time">
-                                    {#if event.start_time}{event.start_time.slice(
-                                            0,
-                                            5,
-                                        )}{/if}
-                                    {#if event.end_date && event.end_date !== event.start_date}
-                                        - {new Date(
-                                            event.end_date,
-                                        ).toLocaleDateString("hu-HU", {
-                                            month: "short",
-                                            day: "numeric",
-                                        })}
-                                        {#if event.end_time}
-                                            {event.end_time.slice(0, 5)}{/if}
-                                    {:else if event.end_time}
-                                        - {event.end_time.slice(0, 5)}
-                                    {/if}
-                                </span>
-                            </div>
-                        </li>
-                    {/each}
-                </ul>
-                <a href="/esemenyek" class="widget-more-link"
-                    >Összes esemény →</a
-                >
-            {:else}
-                <span class="info-box">
-                    <p>Nincsenek közeli események.</p>
-                </span>
-            {/if}
-        </article>
+        <EventsWidget settlementSlug={town} />
 
-        <!-- Local News Widget -->
-        <article id="hirek" class="news news-widget">
-            <h3 class="widget-title">Helyi hírek</h3>
-            {#if newsLoading}
-                <div class="news-loading-box">
-                    <div class="skeleton skeleton-text skeleton-full"></div>
-                    <div class="skeleton skeleton-text skeleton-80"></div>
-                </div>
-            {:else if newsItems.length > 0}
-                <ul class="news-list">
-                    {#each newsItems.slice(0, 4) as item}
-                        <li>
-                            <a
-                                href={item.link}
-                                target="_blank"
-                                rel="nofollow noopener"
-                                class="news-title"
-                            >
-                                📰 {item.title}
-                            </a>
-                            <div class="news-meta">
-                                {item.source} - {new Date(
-                                    item.pubDate,
-                                ).toLocaleDateString("hu-HU")}
-                            </div>
-                        </li>
-                    {/each}
-                </ul>
-            {:else}
-                <span class="info-box"><p>Helyi hírek nem elérhetőek.</p></span>
-            {/if}
-        </article>
+        <NewsWidget settlementSlug={town} />
     </div>
 
-    <!-- Directory Section -->
-    <h2>
-        {displayTown}i cimtár - Helyi Index
-    </h2>
+    <h2>{settlementData.name}i címtár - Helyi Index</h2>
 
-    {#if loadingServices}
+    {#if loading}
         <div class="list grid">
             {#each Array(6) as _}
-                <article class="card service--skeleton">
+                <article class="card entry--skeleton">
                     <div class="skeleton skeleton-text skeleton-30"></div>
                     <div class="skeleton skeleton-text skeleton-80-top"></div>
                     <div
@@ -493,11 +182,11 @@
                 </article>
             {/each}
         </div>
-    {:else if servicesError}
-        <div class="note error">{servicesError}</div>
-    {:else if services.length === 0}
+    {:else if entriesError}
+        <div class="note error">{entriesError}</div>
+    {:else if entries.length === 0}
         <div class="note error">
-            Nincs megjeleníthető bejegyzés {displayTown} területén.
+            Nincs megjeleníthető bejegyzés {settlementData.name} területén.
         </div>
     {:else}
         <div class="filter-actions">
@@ -507,7 +196,6 @@
             </div>
 
             <div class="view-mode-toggle">
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                 <div class="sort-toggle">
                     <button
                         class="btn btn-sm"
@@ -536,6 +224,7 @@
                         <span>{sortLabels[sortMode]}</span>
                     </button>
                     {#if sortOpen}
+                        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                         <div class="sort-toggle-menu" on:click|stopPropagation>
                             <button
                                 class:active={sortMode === "title"}
@@ -609,47 +298,22 @@
         </div>
 
         <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-            {#each displayItems as service}
-                <article class="card service">
-                    <span class="badge">{service.category}</span>
-                    <h3 class="service-name">
-                        <a href="/bejegyzes/{service.slug}">{service.name}</a>
-                    </h3>
-                    {#if service.url}
-                        <div class="service-info service-info-url">
-                            <span>🔗</span>
-                            <a
-                                href={service.url}
-                                target="_blank"
-                                rel="nofollow noopener">{service.url}</a
-                            >
-                        </div>
-                    {/if}
-                    <div class="service-info">
-                        📍 {service.location} - {service.address}
-                    </div>
-                    <div class="service-info">📞 {service.phone}</div>
-                    {#if service.notes}
-                        <div class="service-notes">{service.notes}</div>
-                    {/if}
-                </article>
+            {#each displayItems as entry}
+                <EntryCard {entry} showBadge={false} />
             {/each}
         </div>
 
         {#if visibleCount < totalCount}
             <div class="load-more">
-                <button class="nav-btn" on:click={loadMore}>
-                    Több betöltése ↓
-                </button>
+                <button class="nav-btn" on:click={loadMore}
+                    >Több betöltése ↓</button
+                >
             </div>
         {/if}
     {/if}
-</div>
+{/if}
 
 <style>
-    .main-content {
-        min-height: calc(100vh - 120px);
-    }
     .no-top-margin {
         margin-top: 0;
     }
@@ -661,55 +325,28 @@
     .capitalize {
         text-transform: capitalize;
     }
-    .skeleton-footer-1 {
-        width: 120px;
-        height: 0.75rem;
+
+    .widgets-box {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+        margin-bottom: 2rem;
     }
-    .skeleton-footer-2 {
-        width: 90px;
-        height: 0.75rem;
+    :global(.news-widget),
+    :global(.event-widget) {
+        grid-column: span 3;
     }
-    .weather-error {
-        color: var(--text-faint);
-        margin: 0.5rem 0 0;
+    @media (max-width: 992px) {
+        .widgets-box {
+            grid-template-columns: 1fr;
+        }
+        :global(.news-widget),
+        :global(.event-widget) {
+            grid-column: span 1;
+        }
     }
-    .news-widget {
-        display: flex;
-        flex-direction: column;
-    }
-    .news-loading-box {
-        padding: 1rem 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .skeleton-full {
-        height: 1.2rem;
-    }
-    .skeleton-80 {
-        height: 1.2rem;
-        width: 80%;
-    }
-    .news-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .news-title {
-        text-decoration: none;
-        color: inherit;
-        font-weight: 500;
-        font-size: 1.05rem;
-    }
-    .news-meta {
-        font-size: 0.8em;
-        color: var(--text-faint);
-        margin-top: 0.2rem;
-    }
-    .service--skeleton {
+
+    .entry--skeleton {
         height: 150px;
         display: flex;
         flex-direction: column;
@@ -727,118 +364,5 @@
     .skeleton-60-bottom {
         width: 60%;
         margin-top: auto;
-    }
-    .service-name a {
-        color: inherit;
-    }
-    .service-info-url {
-        margin-bottom: 0.5rem;
-    }
-    .service-info-url span {
-        color: var(--text-faint);
-        margin-right: 0.3rem;
-    }
-    .service-info-url a {
-        color: var(--primary-color);
-    }
-
-    .widgets-box {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 2rem;
-        margin-bottom: 2rem;
-    }
-    .news-widget,
-    .event-widget {
-        grid-column: span 3;
-    }
-    @media (max-width: 992px) {
-        .widgets-box {
-            grid-template-columns: 1fr;
-        }
-        .news-widget,
-        .event-widget {
-            grid-column: span 1;
-        }
-    }
-    .weather-card {
-        display: flex;
-        align-items: flex-start;
-        justify-content: flex-end;
-        background: none;
-        border-radius: 0;
-        padding: 0;
-        box-shadow: none;
-        gap: 1rem;
-    }
-    .crest-card {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    /* Event widget */
-    .event-widget {
-        display: flex;
-        flex-direction: column;
-    }
-    .mini-event-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.6rem;
-    }
-    .mini-event-list li {
-        display: flex;
-        gap: 1rem;
-        align-items: center;
-        font-size: 0.9rem;
-    }
-    .mini-event-date {
-        background: var(--primary-color);
-        color: var(--text-color);
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.8rem;
-        min-width: 3.5rem;
-        text-align: center;
-    }
-    .mini-event-info {
-        display: flex;
-        flex-direction: column;
-    }
-    .mini-event-title {
-        font-weight: 500;
-        color: var(--text-color);
-    }
-    .mini-event-time {
-        font-size: 0.8rem;
-        color: var(--text-faint);
-    }
-    .widget-more-link {
-        font-size: 0.85rem;
-        color: var(--primary-color);
-        text-decoration: none;
-        margin-top: auto;
-        font-weight: 500;
-    }
-    .widget-more-link:hover {
-        text-decoration: underline;
-    }
-    /* Crest card */
-    .crest-container {
-        min-height: 120px;
-    }
-    .crest-img {
-        max-width: 100%;
-        max-height: 180px;
-        object-fit: contain;
-    }
-    .no-crest {
-        color: var(--text-faint);
-        font-size: 0.9rem;
-        font-style: italic;
     }
 </style>

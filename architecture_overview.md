@@ -1,136 +1,99 @@
 # Lamsza Platform: Definitive Architecture Overview
 
-This document serves as the single source of truth for the Lamsza platform architecture. It details the data model, backend API, administrative capabilities, and the public frontend user journey.
+This document serves as the single source of truth for the Lamsza platform architecture. It details the data model, backend API, administrative capabilities, and the public user journey.
 
 ---
 
 ## 1. Database Architecture (PostgreSQL)
 
-The system revolves around a central directory of entries (services/businesses) linked to a robust location and classification system.
+The system revolves around a central directory of **entries** linked to a robust location and classification system.
 
 ### 1.1 Data Schema & Relationships
 
-The database utilizes a strict relational schema to maintain platform-wide alignment.
+The database utilizes a strict relational schema with advanced search capabilities.
 
-**Database Schema & Relationship Map:**
+**Core Directory Schema (Entries, Locations, Events):**
 
 ```mermaid
 erDiagram
-    %% Core Entities - Linked by IDs
-    LOCATIONS ||--o{ ENTRIES : "hosts (location_id)"
-    ENTRY_CATEGORIES ||--o{ ENTRIES : "classifies (category_id)"
-    ENTRY_TYPES ||--o{ ENTRIES : "defines (type_id)"
+    %% Core Directory
+    LOCATIONS ||--o{ ENTRIES : "hosts"
+    LOCATIONS ||--o{ EVENTS : "holds"
+    LOCATIONS ||--o{ LOCATIONS : "hierarchical"
+    ENTRY_CATEGORIES ||--o{ ENTRIES : "classifies"
+    ENTRY_TYPES ||--o{ ENTRIES : "defines"
     
     %% Tagging Logic
-    TAGS ||--o{ ENTRY_TAGS : "labels (tag_id)"
-    ENTRIES ||--o{ ENTRY_TAGS : "mapped_to (entry_id)"
-    
-    %% Portal Support
-    MONDASOK }|--|| ADMIN : "content"
-    QUICK_LINKS }|--|| PORTAL : "shortcuts"
-    NEWS_FEEDS }|--|| PROXY : "rss_feeds"
+    TAGS ||--o{ ENTRY_TAG_MAP : "labels"
+    ENTRIES ||--o{ ENTRY_TAG_MAP : "mapped_to"
 
     ENTRIES {
-        int id PK "Unique ID"
-        int location_id FK "Settlement Reference"
-        int category_id FK "Industry Reference"
-        int type_id FK "Niche Reference"
-        varchar name "Entry Name (HU)"
-        varchar slug "URL Slug (Permanent)"
-        varchar url "Website Link"
-        varchar phone "Contact #"
-        text address "Postal Address"
-        text notes "Description"
-        varchar[] languages "Supported Langs"
+        int id PK
+        int location_id FK
+        int category_id FK
+        int type_id FK
+        varchar name
+        varchar slug
+        varchar url
+        varchar phone
+        text address
+        varchar[] languages
+        tsvector search_vector
     }
 
     LOCATIONS {
-        int id PK "Unique ID"
-        varchar name "Name (HU)"
-        varchar slug "Link"
-        varchar name_ro "Name (RO)"
-        varchar name_de "Name (DE)"
-        varchar county "Region"
-        varchar county_slug "Region Link"
-        varchar type "város / falu"
-    }
-
-    ENTRY_CATEGORIES {
-        int id PK "Unique ID"
-        varchar name "Category Name"
-        varchar slug "Link identifier"
-    }
-
-    ENTRY_TYPES {
-        int id PK "Unique ID"
-        varchar name "Sub-type Name"
-    }
-
-    TAGS {
-        int id PK "Unique ID"
-        varchar name "Search Keyword"
+        int id PK
+        varchar name
+        varchar slug
+        varchar county
+        varchar type
+        int parent_id FK
     }
 ```
 
-### 1.2 Supporting Tables
-- **`mondasok`**: Daily sayings for the homepage (`id`, `text`, `category`).
-- **`quick_links`**: Actionable tiles on the homepage with custom `bg_color` and `url`.
-- **`news_feeds`**: RSS sources (`id`, `title`, `feed_url`, `bg_color`) used for the aggregator.
+### 1.2 Advanced Search (Full-Text Search)
+The platform implements a high-performance search engine using PostgreSQL Full-Text Search:
+- **Weighted Relevance**: Results are ranked using `ts_rank_cd` with the following priority:
+  - **Weight A (Highest)**: Entry Name.
+  - **Weight B**: Location Name (and aliases name_ro, name_de).
+  - **Weight C**: Entry Category and Tags.
+  - **Weight D (Lowest)**: Entry Notes and Address.
+- **GIN Index**: A Generalized Inverted Index on the `search_vector` column enables sub-millisecond lookups.
+- **Normalization**: Backend `slugify` logic ensures search queries are diacritic-neutral.
 
 ---
 
 ## 2. Backend Infrastructure (Golang)
 
-The backend acts as a high-performance proxy and data-integrity layer. It handles slug generation, diacritic normalization, and external API orchestration.
+The backend is built with Go using a modular, package-based architecture.
 
-### 2.1 Core API & Lookup Logic
-- **Auto-Slugification**: The backend uses a centralized `slugify` function to strip diacritics and normalize names into URL-safe strings. Slugs are automatically managed to ensure absolute routing consistency.
-- **Multilingual Search Aliases**: The directory search engine supports **Hungarian, Romanian, and German** location names. A query for "Miercurea Ciuc" (RO) or "Szeklerburg" (DE) will resolve to "Csíkszereda" records at the SQL level via name-aliasing logic.
-- **Weather Resolution**: The `/api/weather` endpoint resolves settlement slugs to geographical names to ensure provider compatibility (OpenWeatherMap).
+### 2.1 Package-Based Architecture
+- **`internal/config`**: Centralized configuration and `.env` loading.
+- **`internal/db`**: Database connection pool and lifecycle.
+- **Feature Modules**: `internal/news`, `internal/events`, `internal/weather`, `internal/mondasok`, `internal/links`, `internal/search`.
 
-### 2.2 Endpoint Registry
-
-| Endpoint | Method | Interaction | Description |
-| :--- | :--- | :--- | :--- |
-| `/api/directory` | GET | SELECT + JOIN | Primary engine for search. Supports multilingual name aliases and diacritic-insensitive lookups. |
-| `/api/service` | GET | SELECT WHERE slug| Detailed view for individual businesses including tags and metadata. |
-| `/api/locations` | GET | SELECT * | Returns settlement lists used for navigation. |
-| `/api/weather` | GET | Proxy | Fetches real-time weather using database-to-API name resolution. |
-| `/api/county_news` | GET | Logic | Regional news aggregator. Resolves location slugs to filter and prioritize local content. |
-| `/api/proxy` | GET | RSS Fetcher | Bypasses CORS and normalizes external news data. |
+### 2.2 Service Management
+The platform uses a standardized process-based management system:
+- **`scripts/restart_all.sh`**: Orchestrates a full restart of the Database (Docker), Backend (Go), and Frontend (Vite).
+- **Process Isolation**: Backend and Frontend run as separate background processes with dedicated logging (`server_backend.log`, `server_frontend.log`) and PID tracking.
 
 ---
 
-## 3. Admin Panel (UX & Control)
+## 3. Public Frontend (SvelteKit)
 
-The Admin panel is a unified management suite designed for speed and safety.
+The frontend follows a strict component-based architecture.
 
-### 3.1 Unified UX Patterns
-- **Modal-Based Editing**: All administrative edits occur within high-focus modals. Row-inline editing has been eliminated.
-- **Protected Actions**: Every "Edit" and "Delete" action is protected by the `showConfirm` dialog.
-- **Style Consistency**: The UI uses standardized CSS utility classes for layout instead of inline styles.
+### 3.1 Component-Based Architecture
+UI components located in `$lib/components/`:
+- **Widget Library**: `WeatherWidget`, `NewsWidget`, `EventsWidget`, `MondasWidget`.
+- **Core UI**: `EntryCard` (standardized entry rendering), `SearchEngine`.
 
----
-
-## 4. Public Frontend (User Journey)
-
-The frontend is a SvelteKit SPA designed for maximum visibility (SEO) and user engagement.
-
-### 4.1 Navigation Hierarchy
-- **Breadcrumbs**: Standardized navigation trail (Home → [County] → [Settlement] → [Entry]). Uses `settlementType` (város, falu) for accurate final labels.
-- **Regional Hubs**: Settlement pages serve as regional news and weather hubs, dynamically fetching content based on the location slug.
-
-### 4.2 Key Features
-- **Weather Sync**: Displays real-time conditions on settlement pages.
-- **Saying of the Day**: Randomized or category-specific insights fetched from `mondasok`.
-- **Smart Directory**: Filters results by settlement, category, and tags in real-time.
+### 3.2 Active Navigation States
+The header toolbar dynamically highlights the active route using SvelteKit's `$page` store, applying an `.active` class to the current navigation button and its sub-pages.
 
 ---
 
-## 5. System Alignment (Symmetry Fixes)
-
-The platform is optimized for **Zero Misalignment**:
-1.  **DB => Backend**: Auto-slugification ensures identifiers always match.
-2.  **Multilingual Aliasing**: Supports search in HU, RO, and DE seamlessly.
-3.  **Regional Logic**: News and Weather respond to the geographical context of the active slug.
-4.  **Admin Protection**: Human error is minimized via unified modals and confirmation dialogs.
+## 4. System Alignment (Zero Misalignment)
+1. **Universal Naming**: "Entry" is the standard nomenclature across Backend, Frontend, and Database layers.
+2. **Multilingual Aliasing**: Search supports HU, RO, and DE seamlessly.
+3. **Environment Reliability**: Robust `.env` loading allows execution from any subdirectory.

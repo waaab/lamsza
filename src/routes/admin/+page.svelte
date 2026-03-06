@@ -47,7 +47,7 @@
         phone: "",
         address: "",
         notes: "",
-        type: "service",
+        type: "entry",
         languages: ["HU"],
         tags: "",
     };
@@ -75,7 +75,7 @@
         phone: "",
         address: "",
         notes: "",
-        type: "service",
+        type: "entry",
         languages: ["HU"],
         tags: "",
     };
@@ -387,7 +387,7 @@
                 phone: "",
                 address: "",
                 notes: "",
-                type: "service",
+                type: "entry",
                 languages: ["HU"],
                 tags: "",
             };
@@ -575,7 +575,7 @@
                     phone: "",
                     address: "",
                     notes: "",
-                    type: "service",
+                    type: "entry",
                     languages: ["HU"],
                     tags: "",
                 }),
@@ -723,11 +723,11 @@
             </button>
 
             <button
-                class="admin-sidebar-btn {activeTab === 'service_categories'
+                class="admin-sidebar-btn {activeTab === 'entry_categories'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "service_categories")}
-                title="Szolgáltatás Kategóriák"
+                on:click={() => (activeTab = "entry_categories")}
+                title="Bejegyzés Kategóriák"
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -746,23 +746,7 @@
                     <line x1="3" y1="18" x2="3.01" y2="18"></line>
                 </svg>
             </button>
-            <button
-                class="admin-sidebar-btn {activeTab === 'entries'
-                    ? 'active'
-                    : ''}"
-                on:click={() => (activeTab = "entries")}
-                title="Index"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><rect x="3" y="3" width="7" height="7"></rect><rect
-                        x="14"
-                        y="3"
-                        width="7"
-                        height="7"
-                    ></rect><rect x="14" y="14" width="7" height="7"
-                    ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
-                >
-            </button>
+
             <button
                 class="admin-sidebar-btn {activeTab === 'entry_types'
                     ? 'active'
@@ -784,6 +768,23 @@
                     <polyline points="2 12 12 17 22 12"></polyline>
                 </svg>
             </button>
+            <button
+                class="admin-sidebar-btn {activeTab === 'entries'
+                    ? 'active'
+                    : ''}"
+                on:click={() => (activeTab = "entries")}
+                title="Index"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                    ><rect x="3" y="3" width="7" height="7"></rect><rect
+                        x="14"
+                        y="3"
+                        width="7"
+                        height="7"
+                    ></rect><rect x="14" y="14" width="7" height="7"
+                    ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
+                >
+            </button>
         </aside>
 
         <main class="admin-main">
@@ -793,9 +794,9 @@
                     {#if activeTab === "quicklinks"}Gyorslinkek Kezelése{/if}
                     {#if activeTab === "newsfeeds"}Hírfolyamok Kezelése{/if}
                     {#if activeTab === "locations"}Települések Kezelése{/if}
-                    {#if activeTab === "service_categories"}Index Kategóriák
+                    {#if activeTab === "entry_categories"}Bejegyzés Kategóriák
                         Kezelése{/if}
-                    {#if activeTab === "entries"}Index Bejegyzések Kezelése{/if}
+                    {#if activeTab === "entries"}Bejegyzések Kezelése{/if}
                     {#if activeTab === "entry_types"}Bejegyzés Típusok Kezelése{/if}
                 </h2>
                 <button class="btn-logout" on:click={logout}
@@ -1427,8 +1428,8 @@
                     </div>
                 {/if}
 
-                <!-- Service Categories Tab -->
-                {#if activeTab === "service_categories"}
+                <!-- Entry Categories Tab -->
+                {#if activeTab === "entry_categories"}
                     <h3>Új Kategória</h3>
                     <form class="admin-form" on:submit={submitEntryCategory}>
                         <label for="cat_name">Kategória neve</label>
@@ -1621,7 +1622,7 @@
                                         <td>{s.name}</td>
                                         <td
                                             ><span class="badge"
-                                                >{s.type || "service"}</span
+                                                >{s.type || "entry"}</span
                                             ></td
                                         >
                                         <td>{s.url ? s.url : "-"}</td>
@@ -1681,7 +1682,7 @@
                             type="text"
                             bind:value={newEntryType.name}
                             required
-                            placeholder="pl. service, business..."
+                            placeholder="pl. entry, business..."
                         />
                         <button type="submit" class="admin-submit-btn"
                             >Hozzáadás</button

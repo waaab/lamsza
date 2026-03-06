@@ -3,6 +3,7 @@
     import { browser } from "$app/environment";
     import { onMount } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
+    import EntryCard from "$lib/components/EntryCard.svelte";
 
     const locType = "megye"; // Hardcoded type for this route
     let town = "";
@@ -17,9 +18,9 @@
     let displayTownCrest = "";
 
     let childSettlements = [];
-    let services = [];
-    let loadingServices = true;
-    let servicesError = null;
+    let entries = [];
+    let loadingEntries = true;
+    let entriesError = null;
 
     let viewMode = "grid";
     let sortMode = "title";
@@ -33,12 +34,12 @@
         sortOpen = false;
     }
 
-    $: sortedServices = [...services].sort((a, b) => {
+    $: sortedEntries = [...entries].sort((a, b) => {
         if (sortMode === "newest") return b.id - a.id;
         return a.name.localeCompare(b.name);
     });
-    $: totalCount = sortedServices.length;
-    $: displayItems = sortedServices.slice(0, visibleCount);
+    $: totalCount = sortedEntries.length;
+    $: displayItems = sortedEntries.slice(0, visibleCount);
 
     function loadMore() {
         visibleCount += 12;
@@ -62,7 +63,7 @@
     }
 
     async function fetchData() {
-        loadingServices = true;
+        loadingEntries = true;
         weatherLoading = true;
         newsLoading = true;
         eventsLoading = true;
@@ -70,7 +71,7 @@
         const apiBase =
             import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
-        // 1. Fetch Directory Services
+        // 1. Fetch Directory Entries
         try {
             const locRes = await fetch(
                 `${apiBase}/api/locations?type=${encodeURIComponent(locType)}`,
@@ -101,12 +102,12 @@
                 `${apiBase}/api/directory?slug=${encodeURIComponent(town)}&type=megye`,
             );
             if (!res.ok) throw new Error("Hiba a címtár betöltésekor");
-            services = (await res.json()) || [];
+            entries = (await res.json()) || [];
         } catch (err) {
             console.error(err);
-            servicesError = "Nem sikerült betölteni az adatokat.";
+            entriesError = "Nem sikerült betölteni az adatokat.";
         } finally {
-            loadingServices = false;
+            loadingEntries = false;
         }
 
         // 2. Fetch Weather
@@ -206,406 +207,369 @@
     <title>{displayTown} Megye - Index</title>
 </svelte:head>
 
-<div class="container main-content">
-    <Breadcrumbs label={displayTown} type="Megye" />
+<Breadcrumbs label={displayTown} type="Megye" />
 
-    <h1 class="page-title">{displayTown} Megye</h1>
-    <p class="greeting no-top-margin">
-        Helyi hírek, időjárás és címtár {displayTown} megye területén.
-    </p>
+<h1 class="page-title">{displayTown} Megye</h1>
+<p class="greeting no-top-margin">
+    Helyi hírek, időjárás és címtár {displayTown} megye területén.
+</p>
 
-    <!-- Widgets Row (Weather + News Preview) -->
-    <div class="widgets-box">
-        <!-- Settlement info -->
-        <article id="attekintes">
-            <h3 class="widget-title">Áttekintés</h3>
-            <div class="more-info">
-                {#if displayTownRo}
-                    <span title="Román neve: {displayTownRo}"
-                        >Románul: {displayTownRo}</span
-                    >
-                {/if}
-                {#if displayTownDe}
-                    <span title="Német neve: {displayTownDe}"
-                        >Németül: {displayTownDe}</span
-                    >
-                {/if}
-                <span title="Posta kód">
-                    Irányítószám: <span>{displayZipCode || "–"}</span>
-                </span>
-                <span title="Koordináták">
-                    Koordináták: <span>{displayTownCoordinates || "–"}</span>
-                </span>
-                <span title="Lakosság">
-                    Lakosság: <span>{displayTownPopulation || "–"} fő</span>
-                </span>
-                <span title="Terület (négyzetkilométer)">
-                    Terület: <span>{displayTownArea || "–"} km²</span>
-                </span>
-                <span title="Közigazgatási forma">
-                    Közigazgatási forma: <span class="capitalize"
-                        >{displayTownType || "–"}</span
-                    >
-                </span>
-            </div>
-        </article>
+<!-- Widgets Row (Weather + News Preview) -->
+<div class="widgets-box">
+    <!-- Settlement info -->
+    <article id="attekintes">
+        <h3 class="widget-title">Áttekintés</h3>
+        <div class="more-info">
+            {#if displayTownRo}
+                <span title="Román neve: {displayTownRo}"
+                    >Románul: {displayTownRo}</span
+                >
+            {/if}
+            {#if displayTownDe}
+                <span title="Német neve: {displayTownDe}"
+                    >Németül: {displayTownDe}</span
+                >
+            {/if}
+            <span title="Posta kód">
+                Irányítószám: <span>{displayZipCode || "–"}</span>
+            </span>
+            <span title="Koordináták">
+                Koordináták: <span>{displayTownCoordinates || "–"}</span>
+            </span>
+            <span title="Lakosság">
+                Lakosság: <span>{displayTownPopulation || "–"} fő</span>
+            </span>
+            <span title="Terület (négyzetkilométer)">
+                Terület: <span>{displayTownArea || "–"} km²</span>
+            </span>
+            <span title="Közigazgatási forma">
+                Közigazgatási forma: <span class="capitalize"
+                    >{displayTownType || "–"}</span
+                >
+            </span>
+        </div>
+    </article>
 
-        <!-- Coat of Arms -->
-        <article id="cimer" class="crest-card">
-            <h3 class="widget-title">{displayTown} címere</h3>
-            <div class="crest-container">
-                {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
-                    <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
-                        alt="{displayTown} címere"
-                        class="crest-img"
-                    />
-                {:else}
-                    <span class="no-crest">Nincs elérhető címer</span>
-                {/if}
-            </div>
-        </article>
+    <!-- Coat of Arms -->
+    <article id="cimer" class="crest-card">
+        <h3 class="widget-title">{displayTown} címere</h3>
+        <div class="crest-container">
+            {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
+                <img
+                    src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
+                    alt="{displayTown} címere"
+                    class="crest-img"
+                />
+            {:else}
+                <span class="no-crest">Nincs elérhető címer</span>
+            {/if}
+        </div>
+    </article>
 
-        <!-- Weather Widget -->
-        <article id="idojaras" class="weather-card">
-            {#if weatherLoading}
-                <div class="weather-left">
-                    <span class="widget-title">Időjárás</span>
-                    <div class="weather-temp-row">
-                        <div class="skeleton weather-skeleton-temp"></div>
-                    </div>
-                    <div class="weather-desc">
-                        <div class="skeleton weather-skeleton-desc"></div>
-                    </div>
-                    <div class="weather-footer">
-                        <div class="skeleton skeleton-footer-1"></div>
-                        <div class="skeleton skeleton-footer-2"></div>
-                    </div>
+    <!-- Weather Widget -->
+    <article id="idojaras" class="weather-card">
+        {#if weatherLoading}
+            <div class="weather-left">
+                <span class="widget-title">Időjárás</span>
+                <div class="weather-temp-row">
+                    <div class="skeleton weather-skeleton-temp"></div>
                 </div>
-                <div class="weather-right">
-                    <span class="weather-icon">⛅</span>
+                <div class="weather-desc">
+                    <div class="skeleton weather-skeleton-desc"></div>
                 </div>
-            {:else if weatherData}
-                <div class="weather-left">
-                    <span class="widget-title">Időjárás</span>
-                    <div class="weather-temp-row">
-                        <span class="weather-temp">{weatherData.temp}</span
-                        ><span class="weather-temp-unit">°C</span>
-                        {#if weatherData.tempMin != null}
-                            <span class="weather-temp-min"
-                                >/ {weatherData.tempMin}°C</span
-                            >
-                        {/if}
-                    </div>
-                    <div class="weather-desc capitalize">
-                        {weatherData.desc}
-                    </div>
-                    <div class="weather-footer">
-                        {#if weatherData.timestamp}
-                            <small class="weather-timestamp"
-                                >Utoljára frissítve: {new Date(
-                                    weatherData.timestamp,
-                                ).toLocaleTimeString("hu-HU", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                })}</small
-                            >
-                        {/if}
-                        <small class="weather-source"
-                            >Forrás: OpenWeatherMap</small
+                <div class="weather-footer">
+                    <div class="skeleton skeleton-footer-1"></div>
+                    <div class="skeleton skeleton-footer-2"></div>
+                </div>
+            </div>
+            <div class="weather-right">
+                <span class="weather-icon">⛅</span>
+            </div>
+        {:else if weatherData}
+            <div class="weather-left">
+                <span class="widget-title">Időjárás</span>
+                <div class="weather-temp-row">
+                    <span class="weather-temp">{weatherData.temp}</span><span
+                        class="weather-temp-unit">°C</span
+                    >
+                    {#if weatherData.tempMin != null}
+                        <span class="weather-temp-min"
+                            >/ {weatherData.tempMin}°C</span
                         >
-                    </div>
+                    {/if}
                 </div>
-                <div class="weather-right">
-                    <span class="weather-icon"
-                        >{iconEmoji(weatherData.icon)}</span
-                    >
+                <div class="weather-desc capitalize">
+                    {weatherData.desc}
                 </div>
-            {:else}
-                <div class="weather-left">
-                    <span class="widget-title">Időjárás</span>
-                    <p class="weather-error">Időjárás adat nem elérhető.</p>
-                </div>
-                <div class="weather-right">
-                    <span class="weather-icon">⛅</span>
-                </div>
-            {/if}
-        </article>
-
-        <!-- Events Widget -->
-        <article id="esemenyek" class="event-widget">
-            <h3 class="widget-title">Események</h3>
-            {#if eventsLoading}
-                <div class="skeleton-box">
-                    <div class="skeleton skeleton-text skeleton-full"></div>
-                    <div class="skeleton skeleton-text skeleton-60"></div>
-                </div>
-            {:else if localEvents.length > 0}
-                <ul class="mini-event-list">
-                    {#each localEvents.slice(0, 3) as event}
-                        <li>
-                            <div class="mini-event-date">
-                                {new Date(event.event_date).toLocaleDateString(
-                                    "hu-HU",
-                                    { month: "short", day: "numeric" },
-                                )}
-                            </div>
-                            <div class="mini-event-info">
-                                <span class="mini-event-title"
-                                    >{event.title}</span
-                                >
-                                <a
-                                    href="/{event.county_slug}-megye/{event.location_slug}"
-                                    class="mini-event-location"
-                                    >{event.location_name}</a
-                                >
-                            </div>
-                        </li>
-                    {/each}
-                </ul>
-                <a href="/esemenyek" class="widget-more-link"
-                    >Összes esemény →</a
-                >
-            {:else}
-                <span class="info-box">
-                    <p>Nincsenek közeli események.</p>
-                </span>
-            {/if}
-        </article>
-
-        <!-- Local News Widget -->
-        <article id="hirek" class="news-widget">
-            <h3 class="widget-title">Helyi hírek</h3>
-            {#if newsLoading}
-                <div class="news-loading-box">
-                    <div class="skeleton skeleton-text skeleton-full"></div>
-                    <div class="skeleton skeleton-text skeleton-80"></div>
-                </div>
-            {:else if newsItems.length > 0}
-                <ul class="news-list">
-                    {#each newsItems.slice(0, 4) as item}
-                        <li>
-                            <a
-                                href={item.link}
-                                target="_blank"
-                                rel="nofollow noopener"
-                                class="news-title"
-                            >
-                                📰 {item.title}
-                            </a>
-                            <div class="news-meta">
-                                {item.source} - {new Date(
-                                    item.pubDate,
-                                ).toLocaleDateString("hu-HU")}
-                            </div>
-                        </li>
-                    {/each}
-                </ul>
-            {:else}
-                <span class="info-box"><p>Helyi hírek nem elérhetőek.</p></span>
-            {/if}
-        </article>
-    </div>
-
-    <!-- County Settlements Aside -->
-    {#if childSettlements.length > 0}
-        <aside class="settlements-aside">
-            <h2 class="aside-title">
-                Települések {displayTown} megyében
-            </h2>
-            <div class="settlements-grid">
-                {#each childSettlements as child (child.id)}
-                    <a
-                        href="/{$page.params.countySlug}-megye/{child.slug}"
-                        class="badge settlement-badge"
-                    >
-                        {child.name}
-                    </a>
-                {/each}
-            </div>
-        </aside>
-    {/if}
-
-    <!-- Directory Section -->
-    <h2>
-        {displayTown} megyei címtár - Helyi Index
-    </h2>
-
-    {#if loadingServices}
-        <div class="list grid">
-            {#each Array(6) as _}
-                <article class="card service--skeleton">
-                    <div class="skeleton skeleton-text skeleton-30"></div>
-                    <div class="skeleton skeleton-text skeleton-80-top"></div>
-                    <div
-                        class="skeleton skeleton-text skeleton-60-bottom"
-                    ></div>
-                </article>
-            {/each}
-        </div>
-    {:else if servicesError}
-        <div class="note error">{servicesError}</div>
-    {:else if services.length === 0}
-        <div class="note error">
-            Nincs megjeleníthető bejegyzés {displayTown} megye területén.
-        </div>
-    {:else}
-        <div class="filter-actions">
-            <div class="info-box">
-                <p>💡 Összesen:</p>
-                <p><span>({displayItems.length}/{totalCount})</span></p>
-            </div>
-
-            <div class="view-mode-toggle">
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                <div class="sort-toggle">
-                    <button
-                        class="btn bnt-sm"
-                        on:click={() => (sortOpen = !sortOpen)}
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            ><line x1="4" y1="6" x2="16" y2="6"></line><line
-                                x1="4"
-                                y1="12"
-                                x2="12"
-                                y2="12"
-                            ></line><line x1="4" y1="18" x2="8" y2="18"
-                            ></line><polyline points="15 15 18 18 21 15"
-                            ></polyline><line x1="18" y1="10" x2="18" y2="18"
-                            ></line></svg
+                <div class="weather-footer">
+                    {#if weatherData.timestamp}
+                        <small class="weather-timestamp"
+                            >Utoljára frissítve: {new Date(
+                                weatherData.timestamp,
+                            ).toLocaleTimeString("hu-HU", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                            })}</small
                         >
-                        <span>{sortLabels[sortMode]}</span>
-                    </button>
-                    {#if sortOpen}
-                        <div class="sort-toggle-menu" on:click|stopPropagation>
-                            <button
-                                class:active={sortMode === "title"}
-                                on:click={() => setSortMode("title")}
-                                >Név (A→Z)</button
-                            >
-                            <button
-                                class:active={sortMode === "newest"}
-                                on:click={() => setSortMode("newest")}
-                                >Legújabb</button
-                            >
-                        </div>
                     {/if}
+                    <small class="weather-source">Forrás: OpenWeatherMap</small>
                 </div>
-
-                <button
-                    class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
-                    on:click={() => (viewMode = "grid")}
-                    title="Rács nézet"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        ><rect x="3" y="3" width="7" height="7"></rect><rect
-                            x="14"
-                            y="3"
-                            width="7"
-                            height="7"
-                        ></rect><rect x="14" y="14" width="7" height="7"
-                        ></rect><rect x="3" y="14" width="7" height="7"
-                        ></rect></svg
-                    >
-                    <span>Rács</span>
-                </button>
-                <button
-                    class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
-                    on:click={() => (viewMode = "flex")}
-                    title="Lista nézet"
-                >
-                    <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        ><line x1="8" y1="6" x2="21" y2="6"></line><line
-                            x1="8"
-                            y1="12"
-                            x2="21"
-                            y2="12"
-                        ></line><line x1="8" y1="18" x2="21" y2="18"
-                        ></line><line x1="3" y1="6" x2="3.01" y2="6"
-                        ></line><line x1="3" y1="12" x2="3.01" y2="12"
-                        ></line><line x1="3" y1="18" x2="3.01" y2="18"
-                        ></line></svg
-                    >
-                    <span>Lista</span>
-                </button>
             </div>
-        </div>
-
-        <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-            {#each displayItems as service}
-                <article class="card service">
-                    <span class="badge">{service.category}</span>
-                    <h3 class="service-name">
-                        <a href="/bejegyzes/{service.slug}">{service.name}</a>
-                    </h3>
-                    {#if service.url}
-                        <div class="service-info service-info-url">
-                            <span>🔗</span>
-                            <a
-                                href={service.url}
-                                target="_blank"
-                                rel="nofollow noopener">{service.url}</a
-                            >
-                        </div>
-                    {/if}
-                    <div class="service-info">
-                        📍 {[
-                            service.location,
-                            service.location_ro,
-                            service.location_de,
-                        ]
-                            .filter(Boolean)
-                            .join(" | ")} - {service.address}
-                    </div>
-                    <div class="service-info">📞 {service.phone}</div>
-                    {#if service.notes}
-                        <div class="service-notes">{service.notes}</div>
-                    {/if}
-                </article>
-            {/each}
-        </div>
-
-        {#if visibleCount < totalCount}
-            <div class="load-more">
-                <button class="nav-btn" on:click={loadMore}>
-                    Több betöltése ↓
-                </button>
+            <div class="weather-right">
+                <span class="weather-icon">{iconEmoji(weatherData.icon)}</span>
+            </div>
+        {:else}
+            <div class="weather-left">
+                <span class="widget-title">Időjárás</span>
+                <p class="weather-error">Időjárás adat nem elérhető.</p>
+            </div>
+            <div class="weather-right">
+                <span class="weather-icon">⛅</span>
             </div>
         {/if}
-    {/if}
+    </article>
+
+    <!-- Events Widget -->
+    <article id="esemenyek" class="event-widget">
+        <h3 class="widget-title">Események</h3>
+        {#if eventsLoading}
+            <div class="skeleton-box">
+                <div class="skeleton skeleton-text skeleton-full"></div>
+                <div class="skeleton skeleton-text skeleton-60"></div>
+            </div>
+        {:else if localEvents.length > 0}
+            <ul class="mini-event-list">
+                {#each localEvents.slice(0, 3) as event}
+                    <li>
+                        <div class="mini-event-date">
+                            {new Date(event.event_date).toLocaleDateString(
+                                "hu-HU",
+                                { month: "short", day: "numeric" },
+                            )}
+                        </div>
+                        <div class="mini-event-info">
+                            <span class="mini-event-title">{event.title}</span>
+                            <a
+                                href="/{event.county_slug}-megye/{event.location_slug}"
+                                class="mini-event-location"
+                                >{event.location_name}</a
+                            >
+                        </div>
+                    </li>
+                {/each}
+            </ul>
+            <a href="/esemenyek" class="widget-more-link">Összes esemény →</a>
+        {:else}
+            <span class="info-box">
+                <p>Nincsenek közeli események.</p>
+            </span>
+        {/if}
+    </article>
+
+    <!-- Local News Widget -->
+    <article id="hirek" class="news-widget">
+        <h3 class="widget-title">Helyi hírek</h3>
+        {#if newsLoading}
+            <div class="news-loading-box">
+                <div class="skeleton skeleton-text skeleton-full"></div>
+                <div class="skeleton skeleton-text skeleton-80"></div>
+            </div>
+        {:else if newsItems.length > 0}
+            <ul class="news-list">
+                {#each newsItems.slice(0, 4) as item}
+                    <li>
+                        <a
+                            href={item.link}
+                            target="_blank"
+                            rel="nofollow noopener"
+                            class="news-title"
+                        >
+                            📰 {item.title}
+                        </a>
+                        <div class="news-meta">
+                            {item.source} - {new Date(
+                                item.pubDate,
+                            ).toLocaleDateString("hu-HU")}
+                        </div>
+                    </li>
+                {/each}
+            </ul>
+        {:else}
+            <span class="info-box"><p>Helyi hírek nem elérhetőek.</p></span>
+        {/if}
+    </article>
 </div>
 
+<!-- County Settlements Aside -->
+{#if childSettlements.length > 0}
+    <aside class="settlements-aside">
+        <h2 class="aside-title">
+            Települések {displayTown} megyében
+        </h2>
+        <div class="settlements-grid">
+            {#each childSettlements as child (child.id)}
+                <a
+                    href="/{$page.params.countySlug}-megye/{child.slug}"
+                    class="badge settlement-badge"
+                >
+                    {child.name}
+                </a>
+            {/each}
+        </div>
+    </aside>
+{/if}
+
+<!-- Directory Section -->
+<h2>
+    {displayTown} megyei címtár - Helyi Index
+</h2>
+
+{#if loadingEntries}
+    <div class="list grid">
+        {#each Array(6) as _}
+            <article class="card entry--skeleton">
+                <div class="skeleton skeleton-text skeleton-30"></div>
+                <div class="skeleton skeleton-text skeleton-80-top"></div>
+                <div class="skeleton skeleton-text skeleton-60-bottom"></div>
+            </article>
+        {/each}
+    </div>
+{:else if entriesError}
+    <div class="note error">{entriesError}</div>
+{:else if entries.length === 0}
+    <div class="note error">
+        Nincs megjeleníthető bejegyzés {displayTown} megye területén.
+    </div>
+{:else}
+    <div class="filter-actions">
+        <div class="info-box">
+            <p>💡 Összesen:</p>
+            <p><span>({displayItems.length}/{totalCount})</span></p>
+        </div>
+
+        <div class="view-mode-toggle">
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+            <div class="sort-toggle">
+                <button
+                    class="btn bnt-sm"
+                    on:click={() => (sortOpen = !sortOpen)}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><line x1="4" y1="6" x2="16" y2="6"></line><line
+                            x1="4"
+                            y1="12"
+                            x2="12"
+                            y2="12"
+                        ></line><line x1="4" y1="18" x2="8" y2="18"
+                        ></line><polyline points="15 15 18 18 21 15"
+                        ></polyline><line x1="18" y1="10" x2="18" y2="18"
+                        ></line></svg
+                    >
+                    <span>{sortLabels[sortMode]}</span>
+                </button>
+                {#if sortOpen}
+                    <div class="sort-toggle-menu" on:click|stopPropagation>
+                        <button
+                            class:active={sortMode === "title"}
+                            on:click={() => setSortMode("title")}
+                            >Név (A→Z)</button
+                        >
+                        <button
+                            class:active={sortMode === "newest"}
+                            on:click={() => setSortMode("newest")}
+                            >Legújabb</button
+                        >
+                    </div>
+                {/if}
+            </div>
+
+            <button
+                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
+                on:click={() => (viewMode = "grid")}
+                title="Rács nézet"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><rect x="3" y="3" width="7" height="7"></rect><rect
+                        x="14"
+                        y="3"
+                        width="7"
+                        height="7"
+                    ></rect><rect x="14" y="14" width="7" height="7"
+                    ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
+                >
+                <span>Rács</span>
+            </button>
+            <button
+                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
+                on:click={() => (viewMode = "flex")}
+                title="Lista nézet"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="8" y1="6" x2="21" y2="6"></line><line
+                        x1="8"
+                        y1="12"
+                        x2="21"
+                        y2="12"
+                    ></line><line x1="8" y1="18" x2="21" y2="18"></line><line
+                        x1="3"
+                        y1="6"
+                        x2="3.01"
+                        y2="6"
+                    ></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line
+                        x1="3"
+                        y1="18"
+                        x2="3.01"
+                        y2="18"
+                    ></line></svg
+                >
+                <span>Lista</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
+        {#each displayItems as entry}
+            <EntryCard {entry} />
+        {/each}
+    </div>
+
+    {#if visibleCount < totalCount}
+        <div class="load-more">
+            <button class="nav-btn" on:click={loadMore}>
+                Több betöltése ↓
+            </button>
+        </div>
+    {/if}
+{/if}
+
 <style>
-    .main-content {
-        min-height: calc(100vh - 120px);
-    }
     .no-top-margin {
         margin-top: 0;
     }
@@ -691,7 +655,7 @@
         padding: 0.5rem 1rem;
         border: 1px solid var(--border-color);
     }
-    .service--skeleton {
+    .entry--skeleton {
         height: 150px;
         display: flex;
         flex-direction: column;
@@ -709,19 +673,6 @@
     .skeleton-60-bottom {
         width: 60%;
         margin-top: auto;
-    }
-    .service-name a {
-        color: inherit;
-    }
-    .service-info-url {
-        margin-bottom: 0.5rem;
-    }
-    .service-info-url span {
-        color: var(--text-faint);
-        margin-right: 0.3rem;
-    }
-    .service-info-url a {
-        color: var(--primary-color);
     }
 
     .widgets-box {

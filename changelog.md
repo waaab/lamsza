@@ -5,6 +5,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] - 2026-03-06
+
+### Added
+- **Advanced Search Relevance**: Implemented weighted Full-Text Search using PostgreSQL GIN indexes and `ts_rank_cd`. Results are prioritized by Name, Location (Multilingual), Category, and tags.
+- **Service Management Workflow**: Standardized scripts (`scripts/restart_all.sh`) and agent workflows for starting, stopping, and restarting services with background PID tracking and logging.
+- **Active Navigation State**: Header toolbar now dynamically highlights the active button and its sub-pages using SvelteKit's `$page` store.
+- **Nomenclature Standardization**: Completed a system-wide transition from "Service" to "Entry" across Database, API, and Frontend layers.
+- **Improved Reliability**: Robust `.env` loader ensuring configuration consistency regardless of the execution directory.
+
+### Changed
+- Refactored frontend pages to use centralized `$lib/api.js` and extracted reusable UI components.
+- Simplified CSS by consolidating component-local styles into `global.css`.
+
+---
+
 ## [1.0.0] - 2026-03-01
 
 ### Added

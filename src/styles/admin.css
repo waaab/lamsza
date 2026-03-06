@@ -42,7 +42,7 @@
 }
 
 .admin-sidebar-btn.active {
-    background: var(--service-category-bg);
+    background: var(--entry-category-bg);
 }
 
 .admin-sidebar-btn svg {

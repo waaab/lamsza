@@ -1,11 +1,11 @@
 <script>
     import { onMount } from "svelte";
 
-    let services = [];
+    let entries = [];
     let loading = true;
     let error = null;
 
-    // Filter to retain explicit Service categories
+    // Filter to retain explicit Entry categories
     const retainedCategories = [
         "mesteremberek",
         "egészségügy",
@@ -20,17 +20,17 @@
             const res = await fetch(`${apiBase}/api/directory`);
             if (!res.ok) throw new Error("Hiba a címtár betöltésekor");
 
-            const allServices = (await res.json()) || [];
+            const allEntries = (await res.json()) || [];
 
-            // Filter down exclusively to the legacy services
-            services = allServices.filter(
+            // Filter down exclusively to the legacy entries
+            entries = allEntries.filter(
                 (s) =>
                     s.category &&
                     retainedCategories.includes(s.category.toLowerCase()),
             );
         } catch (err) {
             console.error(err);
-            error = "Nem sikerült betölteni a szolgáltatásokat.";
+            error = "Nem sikerült betölteni a bejegyzéseket.";
         } finally {
             loading = false;
         }
@@ -38,129 +38,119 @@
 </script>
 
 <svelte:head>
-    <title>Szolgáltatások - Index</title>
+    <title>Bejegyzések - Index</title>
 </svelte:head>
 
-<div class="container main-container">
-    <div class="breadcrumbs">
-        <a href="/">Főoldal</a> &rsaquo;
-        <a href="/index">Index</a> &rsaquo;
-        <span class="active">Kiemelt Szolgáltatások</span>
-    </div>
-
-    <h1 class="page-title">Szolgáltatások</h1>
-    <p class="greeting">
-        Kiemelt helyi szolgáltatások, mesteremberek és egészségügyi intézmények
-        indexe.
-    </p>
-
-    {#if loading}
-        <div class="list grid">
-            {#each Array(6) as _}
-                <article class="card service--skeleton">
-                    <div class="skeleton skeleton-text skeleton-cat"></div>
-                    <div class="skeleton skeleton-text skeleton-title"></div>
-                    <div class="skeleton skeleton-text skeleton-loc"></div>
-                </article>
-            {/each}
-        </div>
-    {:else if error}
-        <div class="note error">{error}</div>
-    {:else if services.length === 0}
-        <div class="note error">
-            Jelenleg nincs listázott szolgáltatás ebben a kategóriában.
-        </div>
-    {:else}
-        <div class="list grid">
-            {#each services as service}
-                <article class="card service service-card">
-                    <span class="badge service-badge">{service.category}</span>
-                    <h3 class="service-name">
-                        <a href="/bejegyzes/{service.slug}" class="service-link"
-                            >{service.name}</a
-                        >
-                    </h3>
-                    {#if service.url}
-                        <div class="service-info service-url-wrap">
-                            <span class="service-url-icon">🔗</span>
-                            <a
-                                href={service.url}
-                                target="_blank"
-                                rel="nofollow noopener"
-                                class="service-url-link">{service.url}</a
-                            >
-                        </div>
-                    {/if}
-                    <div class="service-info">
-                        📍 {[
-                            service.location,
-                            service.location_ro,
-                            service.location_de,
-                        ]
-                            .filter(Boolean)
-                            .join(" | ")} - {service.address}
-                    </div>
-                    {#if service.phone}
-                        <div class="service-info service-phone">
-                            📞 {service.phone}
-                        </div>
-                    {/if}
-                </article>
-            {/each}
-        </div>
-    {/if}
-
-    <section class="faq">
-        <h2 class="faq-title">Gyakori kérdések</h2>
-        <div class="faq-list">
-            <details class="faq-item" open>
-                <summary>Honnan származnak az adatok?</summary>
-                <p>
-                    Az adatok a helyi szakemberektől és intézményektől
-                    származnak, akiket a rendszerünk folyamatosan indexel, hogy
-                    a legfrissebb elérhetőségeket biztosítsa.
-                </p>
-            </details>
-            <details class="faq-item" open>
-                <summary>Hogyan kerülhet be valaki a címtárba?</summary>
-                <p>
-                    A beküldési folyamat hamarosan elérhető lesz az oldalon.
-                    Addig is, ha ismersz olyan szolgáltatót, aki még nem
-                    szerepel nálunk, keress minket bizalommal.
-                </p>
-            </details>
-            <details class="faq-item" open>
-                <summary>Ingyenes-e a megjelenés?</summary>
-                <p>
-                    Igen, az alapvető megjelenés és az adatok listázása teljesen
-                    ingyenes minden helyi szolgáltató, mesterember és intézmény
-                    számára.
-                </p>
-            </details>
-            <details class="faq-item" open>
-                <summary>Hogyan működik a keresés?</summary>
-                <p>
-                    A keresőnk kulcsszavak, kategóriák és települések alapján
-                    szűri a találatokat. A kereső prioritást ad a közvetlen név-
-                    és kategória-egyezéseknek, de a leírásokban is keres.
-                </p>
-            </details>
-        </div>
-    </section>
-
-    <div class="note info">
-        A lamsza.com indexe egy ingyenes információs szolgáltatás. Az adatok
-        pontosságáért és a szolgáltatások minőségéért a lamsza.com nem vállal
-        felelősséget. Kérjük, minden esetben ellenőrizze az adatokat a
-        szolgáltatóval való kapcsolatfelvétel előtt.
-    </div>
+<div class="breadcrumbs">
+    <a href="/">Főoldal</a> &rsaquo;
+    <a href="/index">Index</a> &rsaquo;
+    <span class="active">Kiemelt Bejegyzések</span>
 </div>
 
+<h1 class="page-title">Bejegyzések</h1>
+<p class="greeting">
+    Kiemelt helyi bejegyzések, mesteremberek és egészségügyi intézmények indexe.
+</p>
+
+{#if loading}
+    <div class="list grid">
+        {#each Array(6) as _}
+            <article class="card entry--skeleton">
+                <div class="skeleton skeleton-text skeleton-cat"></div>
+                <div class="skeleton skeleton-text skeleton-title"></div>
+                <div class="skeleton skeleton-text skeleton-loc"></div>
+            </article>
+        {/each}
+    </div>
+{:else if error}
+    <div class="note error">{error}</div>
+{:else if entries.length === 0}
+    <div class="note error">
+        Jelenleg nincs listázott bejegyzés ebben a kategóriában.
+    </div>
+{:else}
+    <div class="list grid">
+        {#each entries as entry}
+            <article class="card entry entry-card">
+                <span class="badge entry-badge">{entry.category}</span>
+                <h3 class="entry-name">
+                    <a href="/bejegyzes/{entry.slug}" class="entry-link"
+                        >{entry.name}</a
+                    >
+                </h3>
+                {#if entry.url}
+                    <div class="entry-info entry-url-wrap">
+                        <span class="entry-url-icon">🔗</span>
+                        <a
+                            href={entry.url}
+                            target="_blank"
+                            rel="nofollow noopener"
+                            class="entry-url-link">{entry.url}</a
+                        >
+                    </div>
+                {/if}
+                <div class="entry-info">
+                    📍 {[entry.location, entry.location_ro, entry.location_de]
+                        .filter(Boolean)
+                        .join(" | ")} - {entry.address}
+                </div>
+                {#if entry.phone}
+                    <div class="entry-info entry-phone">
+                        📞 {entry.phone}
+                    </div>
+                {/if}
+            </article>
+        {/each}
+    </div>
+{/if}
+
+<section class="faq" id="gyik">
+    <h2 class="faq-title">Gyakori kérdések</h2>
+    <div class="faq-list">
+        <details class="faq-item" open>
+            <summary>Honnan származnak az adatok?</summary>
+            <p>
+                Az adatok a helyi szakemberektől és intézményektől származnak,
+                akiket a rendszerünk folyamatosan indexel, hogy a legfrissebb
+                elérhetőségeket biztosítsa.
+            </p>
+        </details>
+        <details class="faq-item" open>
+            <summary>Hogyan kerülhet be valaki a címtárba?</summary>
+            <p>
+                A beküldési folyamat hamarosan elérhető lesz az oldalon. Addig
+                is, ha ismersz olyan szolgáltatót, aki még nem szerepel nálunk,
+                keress minket bizalommal.
+            </p>
+        </details>
+        <details class="faq-item" open>
+            <summary>Ingyenes-e a megjelenés?</summary>
+            <p>
+                Igen, az alapvető megjelenés és az adatok listázása teljesen
+                ingyenes minden helyi szolgáltató, mesterember és intézmény
+                számára.
+            </p>
+        </details>
+        <details class="faq-item" open>
+            <summary>Hogyan működik a keresés?</summary>
+            <p>
+                A keresőnk kulcsszavak, kategóriák és települések alapján szűri
+                a találatokat. A kereső prioritást ad a közvetlen név- és
+                kategória-egyezéseknek, de a leírásokban is keres.
+            </p>
+        </details>
+    </div>
+</section>
+
+<section class="note info" id="disclaimer">
+    A lamsza.com indexe egy ingyenes információs szolgáltatás. Az adatok
+    pontosságáért és a szolgáltatások minőségéért a lamsza.com nem vállal
+    felelősséget. Kérjük, minden esetben ellenőrizze az adatokat a
+    szolgáltatóval való kapcsolatfelvétel előtt.
+</section>
+
 <style>
-    .main-container {
-        min-height: calc(100vh - 120px);
-    }
-    .service--skeleton {
+    .entry--skeleton {
         height: 150px;
         display: flex;
         flex-direction: column;
@@ -179,32 +169,32 @@
         width: 60%;
         margin-top: auto;
     }
-    .service-card {
+    .entry-card {
         cursor: pointer;
         transition:
             transform 0.2s,
             box-shadow 0.2s;
     }
-    .service-badge {
+    .entry-badge {
         margin-bottom: 0.5rem;
         display: inline-block;
     }
-    .service-link {
+    .entry-link {
         color: inherit;
         text-decoration: none;
     }
-    .service-url-wrap {
+    .entry-url-wrap {
         margin-bottom: 0.5rem;
     }
-    .service-url-icon {
+    .entry-url-icon {
         color: var(--text-faint);
         margin-right: 0.3rem;
     }
-    .service-url-link {
+    .entry-url-link {
         color: var(--primary-color);
         text-decoration: none;
     }
-    .service-phone {
+    .entry-phone {
         color: var(--text-faint);
         margin-top: 0.25rem;
     }

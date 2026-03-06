@@ -62,97 +62,92 @@
     <title>Esemény Naptár - Székely Gugel</title>
 </svelte:head>
 
-<main class="container">
-    <h1 class="page-title">Esemény Naptár</h1>
-    <p class="greeting">Válogass a legfrissebb székelyföldi események közül.</p>
+<h1 class="page-title">Esemény Naptár</h1>
+<p class="greeting">Válogass a legfrissebb székelyföldi események közül.</p>
 
-    {#if loading}
-        <span class="info-box"><p>Betöltés...</p></span>
-    {:else if error}
-        <span class="info-box"><p>{error}</p></span>
-    {:else if events.length === 0}
-        <span class="info-box"
-            ><p>Jelenleg nincsenek meghirdetett események.</p></span
-        >
-    {:else}
-        <div class="events-grid">
-            {#each events as event}
-                <article class="event-card">
-                    <div class="badge event">
-                        {EVENT_TYPE_LABELS[event.event_type] ||
-                            event.event_type}
+{#if loading}
+    <span class="info-box"><p>Betöltés...</p></span>
+{:else if error}
+    <span class="info-box"><p>{error}</p></span>
+{:else if events.length === 0}
+    <span class="info-box"
+        ><p>Jelenleg nincsenek meghirdetett események.</p></span
+    >
+{:else}
+    <div class="events-grid">
+        {#each events as event}
+            <article class="event-card">
+                <div class="badge event">
+                    {EVENT_TYPE_LABELS[event.event_type] || event.event_type}
+                </div>
+                <h2 class="event-title">{event.title}</h2>
+
+                <div class="event-meta">
+                    <span class="event-date">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            ><rect
+                                x="3"
+                                y="4"
+                                width="18"
+                                height="18"
+                                rx="2"
+                                ry="2"
+                            ></rect><line x1="16" y1="2" x2="16" y2="6"
+                            ></line><line x1="8" y1="2" x2="8" y2="6"
+                            ></line><line x1="3" y1="10" x2="21" y2="10"
+                            ></line></svg
+                        >
+                        {formatEventDateTime(event)}
+                    </span>
+
+                    <span class="event-location">
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            ><path
+                                d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
+                            ></path><circle cx="12" cy="10" r="3"></circle></svg
+                        >
+                        <a
+                            href="/{event.county_slug}-megye/{event.location_slug}"
+                            >{event.location_name}</a
+                        >,
+                        <a href="/{event.county_slug}-megye" class="county-link"
+                            >{event.county} megye</a
+                        >
+                    </span>
+                </div>
+
+                {#if event.description}
+                    <p class="event-description">{event.description}</p>
+                {/if}
+
+                {#if event.organizer}
+                    <div class="event-organizer">
+                        <strong>Szervező:</strong>
+                        {event.organizer}
                     </div>
-                    <h2 class="event-title">{event.title}</h2>
-
-                    <div class="event-meta">
-                        <span class="event-date">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                ><rect
-                                    x="3"
-                                    y="4"
-                                    width="18"
-                                    height="18"
-                                    rx="2"
-                                    ry="2"
-                                ></rect><line x1="16" y1="2" x2="16" y2="6"
-                                ></line><line x1="8" y1="2" x2="8" y2="6"
-                                ></line><line x1="3" y1="10" x2="21" y2="10"
-                                ></line></svg
-                            >
-                            {formatEventDateTime(event)}
-                        </span>
-
-                        <span class="event-location">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                ><path
-                                    d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
-                                ></path><circle cx="12" cy="10" r="3"
-                                ></circle></svg
-                            >
-                            <a
-                                href="/{event.county_slug}-megye/{event.location_slug}"
-                                >{event.location_name}</a
-                            >,
-                            <a
-                                href="/{event.county_slug}-megye"
-                                class="county-link">{event.county} megye</a
-                            >
-                        </span>
-                    </div>
-
-                    {#if event.description}
-                        <p class="event-description">{event.description}</p>
-                    {/if}
-
-                    {#if event.organizer}
-                        <div class="event-organizer">
-                            <strong>Szervező:</strong>
-                            {event.organizer}
-                        </div>
-                    {/if}
-                </article>
-            {/each}
-        </div>
-    {/if}
-</main>
+                {/if}
+            </article>
+        {/each}
+    </div>
+{/if}
 
 <style>
     .events-grid {

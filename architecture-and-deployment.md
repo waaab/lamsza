@@ -13,6 +13,7 @@ The application relies on a `.env` file at the root of the project. This file is
 - `DATABASE_URL`: The PostgreSQL connection string. (e.g. `postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable`)
 - `VITE_API_BASE_URL`: The base URL for the backend API used by SvelteKit (e.g. `http://localhost:3000`).
 - `VITE_WEATHER_API_KEY`: OpenWeatherMap API key for weather data.
+- `FEATURE_[WEATHER|EVENTS|NEWS|MONDASOK|QUICKLINKS|SEARCH]`: Toggles for optional modules (default: `true`).
 
 ## Continuous Integration (CI)
 We use GitHub Actions for continuous integration.

@@ -1,42 +1,31 @@
-# sv
+# Lamsza Platform
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A high-performance, culturally authentic startpage and directory for the Szekely region.
 
-## Creating a project
+## Overview
+Lamsza is a full-stack platform featuring a local service directory with advanced bilingual search, real-time weather, news aggregation, and a random quote ("mondás") system.
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Tech Stack
+- **Frontend**: SvelteKit (Vanilla CSS & JS)
+- **Backend**: Go (Gin, PostgreSQL)
+- **Database**: PostgreSQL (with Full-Text Search)
+- **Deployment**: Docker Compose
 
-```sh
-# create a new project
-npx sv create my-app
-```
+## Quick Start
+1. Configure your `.env` file (see `.env.example` if available).
+2. Use the standardized service management workflow:
+   ```bash
+   npm run restart
+   ```
+   *This will start the Database, Backend, and Frontend in separate manageable processes.*
 
-To recreate this project with the same configuration:
+## Development
+- **Start All**: `./scripts/restart_all.sh`
+- **Stop All**: `pkill -f vite && pkill -f "go run main.go" && docker compose down`
+- **View Logs**:
+  - `tail -f backend/server_backend.log`
+  - `tail -f server_frontend.log`
 
-```sh
-# recreate this project
-npx sv@0.12.4 create --template minimal --no-types --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## Architecture
+See [architecture_overview.md](architecture_overview.md) for a detailed breakdown.
+鼓

@@ -1,31 +1,29 @@
 <script>
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
+    import { onMount } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
+    import { apiFetch } from "$lib/api";
 
-    let slug = "";
     let entry = null;
     let loading = true;
     let error = null;
 
-    $: if (browser && $page.params.slug) {
-        slug = $page.params.slug;
-        fetchEntry();
-    }
+    $: slug = $page.params.slug;
+
+    onMount(async () => {
+        if (browser && slug) {
+            fetchEntry();
+        }
+    });
 
     async function fetchEntry() {
         loading = true;
         error = null;
-        const apiBase =
-            import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
         try {
-            const res = await fetch(
-                `${apiBase}/api/service?slug=${encodeURIComponent(slug)}`,
+            const data = await apiFetch(
+                `/api/entry?slug=${encodeURIComponent(slug)}`,
             );
-            if (!res.ok) throw new Error("Hiba az adat lekérésekor");
-
-            const data = await res.json();
             if (!data || !data.name) {
                 error = "A bejegyzés nem található.";
             } else {
@@ -41,116 +39,100 @@
 </script>
 
 <svelte:head>
-    {#if entry}
-        <title>{entry.name} - Index</title>
-    {:else}
-        <title>Bejegyzés - Index</title>
-    {/if}
+    <title>{entry ? entry.name : "Bejegyzés"} - Index</title>
 </svelte:head>
 
-<div class="container main-content">
-    {#if loading}
-        <div class="skeleton skeleton-text skeleton-title-loader"></div>
-    {:else if error}
-        <div class="note error">{error}</div>
-        <a href="/" class="btn back-to-home">Vissza a főoldalra</a>
-    {:else if entry}
-        <Breadcrumbs
-            label={entry.name}
-            countySlug={entry.county_slug}
-            countyName={entry.county}
-            settlementSlug={entry.location_slug}
-            settlementName={entry.location}
-            settlementType={entry.location_type}
-        />
+{#if loading}
+    <div class="skeleton skeleton-text skeleton-title-loader"></div>
+{:else if error}
+    <div class="note error">{error}</div>
+    <a href="/" class="btn back-to-home">Vissza a főoldalra</a>
+{:else if entry}
+    <Breadcrumbs
+        label={entry.name}
+        countySlug={entry.county_slug}
+        countyName={entry.county}
+        settlementSlug={entry.location_slug}
+        settlementName={entry.location}
+        settlementType={entry.location_type}
+    />
 
-        <div class="entry-content">
-            <!-- Remodeled Full-Width Profile -->
-            <div class="entry-header">
-                <div class="badge">Index: {entry.category}</div>
-                <h1 class="entry-title">{entry.name}</h1>
+    <div class="entry-content">
+        <div class="entry-header">
+            <div class="badge">Index: {entry.category}</div>
+            <h1 class="entry-title">{entry.name}</h1>
 
-                {#if entry.url}
-                    <div class="entry-url-row">
-                        <span class="entry-url-label">🔗 Weboldal:</span>
-                        <a
-                            href={entry.url}
-                            target="_blank"
-                            rel="nofollow noopener"
-                            class="entry-url-link"
-                        >
-                            {entry.url}
-                        </a>
-                    </div>
-                {/if}
-            </div>
-
-            <!-- Distinct Contact Block -->
-            <div class="contact-card">
-                <h3 class="contact-title">Kapcsolat</h3>
-                <div class="contact-grid">
-                    {#if entry.location || entry.address}
-                        <div class="contact-item">
-                            <span class="contact-icon">📍</span>
-                            <div>
-                                {#if entry.location || entry.location_ro || entry.location_de}
-                                    <strong
-                                        >{[
-                                            entry.location,
-                                            entry.location_ro,
-                                            entry.location_de,
-                                        ]
-                                            .filter(Boolean)
-                                            .join(" | ")}</strong
-                                    >
-                                {/if}
-                                {#if (entry.location || entry.location_ro || entry.location_de) && entry.address}
-                                    -
-                                {/if}
-                                {#if entry.address}{entry.address}{/if}
-                            </div>
-                        </div>
-                    {/if}
-
-                    {#if entry.phone}
-                        <div class="contact-item-center">
-                            <span class="contact-icon">📞</span>
-                            <a
-                                href={`tel:${entry.phone.replace(/[^0-9+]/g, "")}`}
-                                class="contact-link">{entry.phone}</a
-                            >
-                        </div>
-                    {/if}
+            {#if entry.url}
+                <div class="entry-url-row">
+                    <span class="entry-url-label">🔗 Weboldal:</span>
+                    <a
+                        href={entry.url}
+                        target="_blank"
+                        rel="nofollow noopener"
+                        class="entry-url-link">{entry.url}</a
+                    >
                 </div>
-            </div>
+            {/if}
+        </div>
 
-            <!-- Details Block -->
-            <div class="details-section">
-                <h3 class="details-title">Részletek & Megjegyzések</h3>
-                {#if entry.notes}
-                    <div class="service-notes entry-notes">
-                        {entry.notes}
+        <div class="contact-card">
+            <h3 class="contact-title">Kapcsolat</h3>
+            <div class="contact-grid">
+                {#if entry.location || entry.address}
+                    <div class="contact-item">
+                        <span class="contact-icon">📍</span>
+                        <div>
+                            {#if entry.location || entry.location_ro || entry.location_de}
+                                <strong
+                                    >{[
+                                        entry.location,
+                                        entry.location_ro,
+                                        entry.location_de,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(" | ")}</strong
+                                >
+                            {/if}
+                            {#if (entry.location || entry.location_ro || entry.location_de) && entry.address}
+                                -
+                            {/if}
+                            {#if entry.address}{entry.address}{/if}
+                        </div>
                     </div>
                 {/if}
 
-                {#if entry.tags && entry.tags.length > 0}
-                    <div class="service-tags">
-                        {#each entry.tags as t}
-                            <span class="service-tag tag-padded"
-                                >{t.startsWith("#") ? t : "#" + t}</span
-                            >
-                        {/each}
+                {#if entry.phone}
+                    <div class="contact-item-center">
+                        <span class="contact-icon">📞</span>
+                        <a
+                            href={`tel:${entry.phone.replace(/[^0-9+]/g, "")}`}
+                            class="contact-link">{entry.phone}</a
+                        >
                     </div>
                 {/if}
             </div>
         </div>
-    {/if}
-</div>
+
+        <div class="details-section">
+            <h3 class="details-title">Részletek & Megjegyzések</h3>
+            {#if entry.notes}
+                <div class="entry-notes">{entry.notes}</div>
+            {/if}
+
+            {#if entry.tags && entry.tags.length > 0}
+                <div class="entry-tags">
+                    {#each entry.tags as t}
+                        <span class="entry-tag tag-padded"
+                            >{t.startsWith("#") ? t : "#" + t}</span
+                        >
+                    {/each}
+                </div>
+            {/if}
+        </div>
+    </div>
+{/if}
 
 <style>
-    .main-content {
-        min-height: calc(100vh - 120px);
-    }
     .skeleton-title-loader {
         width: 40%;
         height: 2rem;
@@ -182,6 +164,7 @@
         text-decoration: none;
         font-weight: 500;
     }
+
     .contact-card {
         padding: 1.5rem;
         background: var(--card-bg);
@@ -218,6 +201,7 @@
         color: var(--text-color);
         text-decoration: none;
     }
+
     .details-section {
         margin-bottom: 2rem;
     }

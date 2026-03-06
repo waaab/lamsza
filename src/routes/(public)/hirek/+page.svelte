@@ -515,7 +515,7 @@
                 {/if}
 
                 <button
-                    class="clear-filters btn btn-sm"
+                    class="clear-filters btn btn-xs"
                     aria-label="Szűrők törlése"
                     title="Szűrők törlése"
                     on:click={() => {
@@ -839,7 +839,7 @@
                 {/if}
 
                 <button
-                    class="clear-filters btn btn-sm"
+                    class="clear-filters btn btn-xs"
                     aria-label="Szűrők törlése"
                     title="Szűrők törlése"
                     on:click={() => {
@@ -989,7 +989,7 @@
     </div>
 {/if}
 
-<section class="faq">
+<section class="faq" id="gyik">
     <h2 class="faq-title">Hogyan működik ez az oldal?</h2>
     <div class="faq-list">
         <details class="faq-item" open>
@@ -1053,13 +1053,13 @@
     </div>
 </section>
 
-<div class="note info">
+<section class="note info" id="disclaimer">
     A lamsza.com hírlvasó egy ingyenes hírgyűjtő és szűrő szolgáltatás. A hírek
     tartalma és a hozzájuk tartozó képek az eredeti hírforrások szerzői jogi
     védelme alatt állnak. A lamsza.com nem vállal felelősséget ezen források
     tartalmáért. Az oldalon megjelenő időpont vagy dátum azt az időpillanatot
     jelöli, amikor a hírt a rendszerünk indexelte.
-</div>
+</section>
 
 <style>
     .news-word-count {

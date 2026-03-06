@@ -1,0 +1,1 @@
+const e="http://localhost:3000";async function c(t,a={}){const o=t.startsWith("http")?t:`${e}${t}`;try{const r=await fetch(o,a);if(!r.ok){const s=await r.text();throw new Error(s||`API Error: ${r.status}`)}return await r.json()}catch(r){throw console.error(`Fetch error for ${o}:`,r),r}}export{c as a};
