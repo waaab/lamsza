@@ -33,6 +33,8 @@
 
     let tickerIndex = 0;
     let tickerInterval = null;
+    let tickerResumeTimeout = null;
+    const TICKER_RESUME_DELAY_MS = 4000;
 
     let pageStart = 0;
 
@@ -76,6 +78,23 @@
             clearInterval(tickerInterval);
             tickerInterval = null;
         }
+        if (tickerResumeTimeout) {
+            clearTimeout(tickerResumeTimeout);
+            tickerResumeTimeout = null;
+        }
+    }
+
+    function stopTickerAndResumeLater() {
+        stopTicker();
+        tickerResumeTimeout = setTimeout(() => {
+            tickerResumeTimeout = null;
+            startTicker();
+        }, TICKER_RESUME_DELAY_MS);
+    }
+
+    function handleArrowClick(delta) {
+        tickerIndex = (tickerIndex + delta + filteredItems.length) % filteredItems.length;
+        stopTickerAndResumeLater();
     }
 
     onDestroy(() => {
@@ -231,8 +250,8 @@
                     {/key}
                     <div class="widget-nav">
                         <div class="arrows-container">
-                            <button class="scroll-arrow left" on:click={() => { tickerIndex = (tickerIndex - 1 + filteredItems.length) % filteredItems.length; }} aria-label="Előző esemény">&#8249;</button>
-                            <button class="scroll-arrow right" on:click={() => { tickerIndex = (tickerIndex + 1) % filteredItems.length; }} aria-label="Következő esemény">&#8250;</button>
+                            <button class="scroll-arrow left" on:click={() => handleArrowClick(-1)} aria-label="Előző esemény">&#8249;</button>
+                            <button class="scroll-arrow right" on:click={() => handleArrowClick(1)} aria-label="Következő esemény">&#8250;</button>
                         </div>
                         <a href="/esemenyek" class="nav-btn">Összes esemény</a>
                     </div>

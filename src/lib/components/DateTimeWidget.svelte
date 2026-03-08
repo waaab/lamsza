@@ -39,7 +39,7 @@
 </script>
 
 <div id="datetime" class="datetime-card">
-    <span class="widget-title">Dátum és idő</span>
+    <h3 class="widget-title">Dátum és idő</h3>
 
     <div class="datetime-clocks">
         <!-- Analog clock -->
@@ -75,7 +75,6 @@
     .datetime-card {
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
     }
 
     .datetime-clocks {

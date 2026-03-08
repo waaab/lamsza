@@ -212,7 +212,7 @@
 <section id="home widgets" class="widgets-columns">
     <div class="widgets-box--three-col">
         <div id="gyorslinkek">
-                <span class="widget-title">Gyorslinkek</span>
+                <h3 class="widget-title">Gyorslinkek</h3>
                 <div
                     class="quick-links-wrapper"
                     class:can-left={showArrows && canScrollLeft}
