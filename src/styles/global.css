@@ -355,7 +355,6 @@ a:hover {
 }
 
 .search-discover-wrapper .discover-container {
-  width: 100%;
   max-width: none;
   margin: 0;
 }
@@ -381,7 +380,6 @@ a:hover {
 .search-input:hover,
 .search-input:focus {
   outline: none;
-  box-shadow: 0 4px 12px var(--shadow-md);
   border-color: var(--text-muted);
 }
 
