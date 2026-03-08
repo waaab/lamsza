@@ -29,7 +29,7 @@
 
 <div class="page-inner">
     {#if loading}
-        <div class="skeleton-badge skeleton"></div>
+        <span class="badge county-badge" style="opacity:0.5">adat betöltés...</span>
     {:else}
         {#each locations as loc}
             <a href="/{loc.slug}-megye" class="badge county-badge">
@@ -40,10 +40,6 @@
 </div>
 
 <style>
-    .skeleton-badge {
-        width: 100px;
-        height: 30px;
-    }
     .county-badge {
         text-decoration: none;
         color: var(--primary-color);

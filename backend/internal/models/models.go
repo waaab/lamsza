@@ -37,6 +37,7 @@ type Event struct {
 	EndTime      string `json:"end_time"`
 	EventType    string `json:"event_type"`
 	Organizer    string `json:"organizer"`
+	LocationType string `json:"location_type"`
 }
 
 type AdminEvent struct {
@@ -73,20 +74,21 @@ type NewsFeed struct {
 }
 
 type Location struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	NameRo      string `json:"name_ro"`
-	NameDe      string `json:"name_de"`
-	County      string `json:"county"`
-	CountySlug  string `json:"county_slug"`
-	Type        string `json:"type"`
-	Slug        string `json:"slug"`
-	PostCode    string `json:"post_code"`
-	Coordinates string `json:"coordinates"`
-	Population  string `json:"population"`
-	Area        string `json:"area"`
-	Crest       string `json:"crest"`
-	ParentID    *int   `json:"parent_id"`
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	NameRo       string `json:"name_ro"`
+	NameDe       string `json:"name_de"`
+	County       string `json:"county"`
+	CountySlug   string `json:"county_slug"`
+	Type         string `json:"type"`
+	Slug         string `json:"slug"`
+	PostCode     string `json:"post_code"`
+	Coordinates  string `json:"coordinates"`
+	Population   string `json:"population"`
+	Area         string `json:"area"`
+	Crest        string `json:"crest"`
+	ParentID     *int   `json:"parent_id"`
+	IsCountySeat bool   `json:"is_county_seat"`
 }
 
 type AdminEntry struct {

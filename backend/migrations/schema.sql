@@ -1,5 +1,7 @@
 -- backend/schema.sql
 
+-- Base schema for core entities used by the current application.
+
 CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -11,20 +13,24 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 CREATE TABLE IF NOT EXISTS entry_categories (
-CREATE TABLE IF NOT EXISTS locations (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    slug VARCHAR(120) UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS entry_types (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS services (
 CREATE TABLE IF NOT EXISTS entries (
-CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     location_id INTEGER REFERENCES locations(id),
     category_id INTEGER REFERENCES entry_categories(id),
-    type VARCHAR(50) NOT NULL DEFAULT 'service',
+    type VARCHAR(50) NOT NULL DEFAULT 'entry',
     category VARCHAR(100),
     name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255),
     url VARCHAR(255),
     phone VARCHAR(50),
     address TEXT,
@@ -34,7 +40,6 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 CREATE TABLE IF NOT EXISTS tags (
-CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL UNIQUE
 );
@@ -46,7 +51,6 @@ CREATE TABLE IF NOT EXISTS entry_tags (
 );
 
 CREATE TABLE IF NOT EXISTS mondasok (
-CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
     category VARCHAR(100),
@@ -54,7 +58,6 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 CREATE TABLE IF NOT EXISTS quick_links (
-CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     url VARCHAR(255) NOT NULL UNIQUE,
@@ -63,7 +66,6 @@ CREATE TABLE IF NOT EXISTS locations (
 );
 
 CREATE TABLE IF NOT EXISTS news_feeds (
-CREATE TABLE IF NOT EXISTS locations (
     id SERIAL PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
     feed_url VARCHAR(255) NOT NULL UNIQUE,
@@ -74,16 +76,6 @@ CREATE TABLE IF NOT EXISTS locations (
 INSERT INTO locations (id, name, county, type) VALUES 
 (1, 'Csíkszereda', 'Hargita', 'város'),
 (2, 'Székelyudvarhely', 'Hargita', 'város')
-ON CONFLICT DO NOTHING;
-
-INSERT INTO services (location_id, category, name, phone, address, notes, is_magyar_language) VALUES 
-(1, 'egeszsegugy', 'Csíkszeredai Megyei Sürgősségi Kórház', '0266 324 193', 'Vakáció u. 1-3.', 'Sürgősség éjjel-nappal nyitva.', true),
-(2, 'egeszsegugy', 'Dr. Papp Zoltán - Fogorvos', '0744 123 456', 'Kossuth Lajos u. 10.', 'Bejelentkezés szükséges.', true),
-(1, 'oktatas', 'Márton Áron Főgimnázium', '0266 311 294', 'Márton Áron u. 72.', 'Elit iskola.', true),
-(2, 'oktatas', 'Tamási Áron Gimnázium', '0266 218 194', 'Márton Áron tér 4.', 'Bentlakás van.', true),
-(1, 'mesteremberek', 'Nagy István - Villanyszerelő', '0755 987 654', 'Kiszállás megyeszerte', 'Gyors, megbízható.', true),
-(1, 'hivatalok', 'Csíkszereda Városháza', '0266 315 120', 'Vár tér 1.', 'Ügyfélfogadás hétköznap 8-14.', true),
-(1, 'egyeb', 'Góbé Termékek - Helyi bolt', '0722 000 111', 'Központ', 'Hagyományos ízek.', true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO quick_links (title, url, match_category) VALUES

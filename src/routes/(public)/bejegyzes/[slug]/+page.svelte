@@ -1,8 +1,8 @@
 <script>
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
-    import { onMount } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
+    import EventsWidget from "$lib/components/EventsWidget.svelte";
     import { apiFetch } from "$lib/api";
 
     let entry = null;
@@ -11,11 +11,9 @@
 
     $: slug = $page.params.slug;
 
-    onMount(async () => {
-        if (browser && slug) {
-            fetchEntry();
-        }
-    });
+    $: if (browser && slug) {
+        fetchEntry();
+    }
 
     async function fetchEntry() {
         loading = true;
@@ -43,9 +41,11 @@
 </svelte:head>
 
 {#if loading}
-    <div class="skeleton skeleton-text skeleton-title-loader"></div>
+    <p class="loading-placeholder">adat betöltés...</p>
 {:else if error}
-    <div class="note error">{error}</div>
+    <span class="info-box error">
+        <p>{error}</p>
+    </span>
     <a href="/" class="btn back-to-home">Vissza a főoldalra</a>
 {:else if entry}
     <Breadcrumbs
@@ -129,13 +129,14 @@
                 </div>
             {/if}
         </div>
+
+        <EventsWidget organizerName={entry.name} />
     </div>
 {/if}
 
 <style>
-    .skeleton-title-loader {
-        width: 40%;
-        height: 2rem;
+    .loading-placeholder {
+        color: var(--text-faint);
         margin-bottom: 2rem;
     }
     .back-to-home {
@@ -212,7 +213,7 @@
         margin-bottom: 1rem;
     }
     .entry-notes {
-        font-size: 1.05rem;
+        font-size: 1rem;
         line-height: 1.6;
         margin-bottom: 1.5rem;
         white-space: pre-wrap;

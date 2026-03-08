@@ -1,7 +1,6 @@
 <script>
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
-    import { onMount } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
@@ -38,11 +37,9 @@
         visibleCount += 12;
     }
 
-    onMount(async () => {
-        if (browser && town) {
-            fetchData();
-        }
-    });
+    $: if (browser && $page.params.slug) {
+        fetchData();
+    }
 
     async function fetchData() {
         loading = true;
@@ -99,101 +96,69 @@
     </p>
 
     <div class="widgets-box">
-        <!-- Settlement info -->
-        <article id="attekintes">
+        <div id="attekintes">
             <h3 class="widget-title">Áttekintés</h3>
             <div class="more-info">
-                {#if settlementData.name_ro}<span
-                        >Románul: {settlementData.name_ro}</span
-                    >{/if}
-                {#if settlementData.name_de}<span
-                        >Németül: {settlementData.name_de}</span
-                    >{/if}
-                <span
-                    >Irányítószám: <span>{settlementData.post_code || "–"}</span
-                    ></span
-                >
-                <span
-                    >Koordináták: <span
-                        >{settlementData.coordinates || "–"}</span
-                    ></span
-                >
-                <span
-                    >Lakosság: <span>{settlementData.population || "–"} fő</span
-                    ></span
-                >
-                <span
-                    >Terület: <span>{settlementData.area || "–"} km²</span
-                    ></span
-                >
-                <span
-                    >Közigazgatási forma: <span class="capitalize"
-                        >{settlementData.type || "–"}</span
-                    ></span
-                >
-                {#if settlementData.parent}
-                    <span
-                        >Kapcsolódó település: <a
-                            href="/{settlementData.parent
-                                .county_slug}-megye/{settlementData.parent
-                                .slug}"
-                            class="parent-city-link"
-                            >{settlementData.parent.name}</a
-                        ></span
-                    >
-                {/if}
+                <span>Románul: <span>{settlementData.name_ro || "-"}</span></span>
+                <span>Németül: <span>{settlementData.name_de || "-"}</span></span>
+                <span>Irányítószám: <span>{settlementData.post_code || "-"}</span></span>
+                <span>Koordináták: <span>{settlementData.coordinates || "-"}</span></span>
+                <span>Lakosság: <span>{settlementData.population ? settlementData.population + " fő" : "-"}</span></span>
+                <span>Terület: <span>{settlementData.area ? settlementData.area + " km²" : "-"}</span></span>
+                <span>Közigazgatási forma: <span class="capitalize">{settlementData.type || "-"}</span></span>
+                <span>Kapcsolódó település: <span>{#if settlementData.parent}<a href="/{settlementData.parent.county_slug}-megye/{settlementData.parent.slug}" class="parent-city-link">{settlementData.parent.name}</a>{:else}-{/if}</span></span>
+                <span>Megye: <span>{#if settlementData.county}<a href="/{settlementData.county_slug}-megye" class="parent-city-link">{settlementData.county}</a>{:else}-{/if}</span></span>
             </div>
-        </article>
+        </div>
 
-        <!-- Coat of Arms -->
-        <article id="cimer" class="crest-card">
-            <h3 class="widget-title">{settlementData.name} címere</h3>
-            <div class="crest-container">
-                {#if settlementData.crest && settlementData.crest !== "–" && settlementData.crest.length > 5}
+        <div id="cimer" class="crest-card">
+            {#if settlementData.crest && settlementData.crest !== "–" && settlementData.crest.length > 5}
+                <h3 class="widget-title">{settlementData.name} címere</h3>
+                <div class="crest-container">
                     <img
                         src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(settlementData.crest)}`}
                         alt="{settlementData.name} címere"
                         class="crest-img"
                     />
-                {:else}
-                    <span class="no-crest">Nincs elérhető címer</span>
-                {/if}
-            </div>
-        </article>
+                </div>
+            {/if}
+        </div>
 
-        <WeatherWidget settlementSlug={town} />
-
-        <EventsWidget settlementSlug={town} />
-
-        <NewsWidget settlementSlug={town} />
+        <WeatherWidget settlementSlug={town} advanced={true} />
     </div>
+
+    <EventsWidget settlementSlug={town} locationName={settlementData.name} />
+
+    <NewsWidget settlementSlug={town} ticker={true} />
 
     <h2>{settlementData.name}i címtár - Helyi Index</h2>
 
     {#if loading}
         <div class="list grid">
             {#each Array(6) as _}
-                <article class="card entry--skeleton">
-                    <div class="skeleton skeleton-text skeleton-30"></div>
-                    <div class="skeleton skeleton-text skeleton-80-top"></div>
-                    <div
-                        class="skeleton skeleton-text skeleton-60-bottom"
-                    ></div>
+                <article class="card entry-placeholder">
+                    <span class="entry-placeholder-cat">adat betöltés...</span>
+                    <span class="entry-placeholder-title">adat betöltés...</span>
+                    <span class="entry-placeholder-loc">adat betöltés...</span>
                 </article>
             {/each}
         </div>
     {:else if entriesError}
-        <div class="note error">{entriesError}</div>
+        <span class="info-box error">
+            <p>{entriesError}</p>
+        </span>
     {:else if entries.length === 0}
-        <div class="note error">
-            Nincs megjeleníthető bejegyzés {settlementData.name} területén.
-        </div>
+        <span class="info-box error">
+            <p>
+                Nincs megjeleníthető bejegyzés {settlementData.name} területén.
+            </p>
+        </span>
     {:else}
         <div class="filter-actions">
-            <div class="info-box">
+            <span class="info-box">
                 <p>💡 Összesen:</p>
                 <p><span>({displayItems.length}/{totalCount})</span></p>
-            </div>
+            </span>
 
             <div class="view-mode-toggle">
                 <div class="sort-toggle">
@@ -346,23 +311,20 @@
         }
     }
 
-    .entry--skeleton {
-        height: 150px;
+    .entry-placeholder {
         display: flex;
         flex-direction: column;
         padding: 1rem;
         gap: 0.5rem;
     }
-    .skeleton-30 {
-        width: 30%;
+    .entry-placeholder-cat,
+    .entry-placeholder-loc {
+        font-size: 0.75rem;
+        color: var(--text-faint);
     }
-    .skeleton-80-top {
-        width: 80%;
+    .entry-placeholder-title {
+        font-size: 0.95rem;
+        color: var(--text-faint);
         margin-top: 0.5rem;
-        height: 1.2rem;
-    }
-    .skeleton-60-bottom {
-        width: 60%;
-        margin-top: auto;
     }
 </style>

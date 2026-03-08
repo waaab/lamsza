@@ -55,19 +55,21 @@
 {#if loading}
     <div class="list grid">
         {#each Array(6) as _}
-            <article class="card entry--skeleton">
-                <div class="skeleton skeleton-text skeleton-cat"></div>
-                <div class="skeleton skeleton-text skeleton-title"></div>
-                <div class="skeleton skeleton-text skeleton-loc"></div>
+            <article class="card entry-placeholder">
+                <span class="entry-placeholder-cat">adat betöltés...</span>
+                <span class="entry-placeholder-title">adat betöltés...</span>
+                <span class="entry-placeholder-loc">adat betöltés...</span>
             </article>
         {/each}
     </div>
 {:else if error}
-    <div class="note error">{error}</div>
+    <span class="info-box error">
+        <p>{error}</p>
+    </span>
 {:else if entries.length === 0}
-    <div class="note error">
-        Jelenleg nincs listázott bejegyzés ebben a kategóriában.
-    </div>
+    <span class="info-box error">
+        <p>Jelenleg nincs listázott bejegyzés ebben a kategóriában.</p>
+    </span>
 {:else}
     <div class="list grid">
         {#each entries as entry}
@@ -89,10 +91,12 @@
                         >
                     </div>
                 {/if}
-                <div class="entry-info">
-                    📍 {[entry.location, entry.location_ro, entry.location_de]
+                <div class="entry-info">📍 
+                <a href="/{entry.county_slug}-megye/{entry.location_slug}" class="entry-link">
+                    {[entry.location, entry.location_ro, entry.location_de]
                         .filter(Boolean)
                         .join(" | ")} - {entry.address}
+                </a>
                 </div>
                 {#if entry.phone}
                     <div class="entry-info entry-phone">
@@ -142,32 +146,31 @@
     </div>
 </section>
 
-<section class="note info" id="disclaimer">
-    A lamsza.com indexe egy ingyenes információs szolgáltatás. Az adatok
-    pontosságáért és a szolgáltatások minőségéért a lamsza.com nem vállal
-    felelősséget. Kérjük, minden esetben ellenőrizze az adatokat a
-    szolgáltatóval való kapcsolatfelvétel előtt.
+<section id="disclaimer">
+    <span class="note info">
+        <p>A lamsza.com indexe egy ingyenes információs szolgáltatás. Az adatok
+        pontosságáért és a szolgáltatások minőségéért a lamsza.com nem vállal
+        felelősséget. Kérjük, minden esetben ellenőrizze az adatokat a
+        szolgáltatóval való kapcsolatfelvétel előtt.</p>
+    </span>
 </section>
 
 <style>
-    .entry--skeleton {
-        height: 150px;
+    .entry-placeholder {
         display: flex;
         flex-direction: column;
         padding: 1rem;
         gap: 0.5rem;
     }
-    .skeleton-cat {
-        width: 30%;
+    .entry-placeholder-cat,
+    .entry-placeholder-loc {
+        font-size: 0.75rem;
+        color: var(--text-faint);
     }
-    .skeleton-title {
-        width: 80%;
+    .entry-placeholder-title {
+        font-size: 0.95rem;
+        color: var(--text-faint);
         margin-top: 0.5rem;
-        height: 1.2rem;
-    }
-    .skeleton-loc {
-        width: 60%;
-        margin-top: auto;
     }
     .entry-card {
         cursor: pointer;

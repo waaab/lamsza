@@ -1,1 +1,0 @@
-import{N as y,O as u,as as _,at as o,h as t,W as g,af as i,U as l,K as d,V as p,M as m}from"./B2TRmGIV.js";function C(n,r){let a=null,f=t;var s;if(t){a=p;for(var e=m(document.head);e!==null&&(e.nodeType!==g||e.data!==n);)e=i(e);if(e===null)l(!1);else{var E=i(e);e.remove(),d(E)}}t||(s=document.head.appendChild(y()));try{u(()=>r(s),_|o)}finally{f&&(l(!0),d(a))}}export{C as h};

@@ -1,10 +1,16 @@
 <script>
+    import { onMount } from "svelte";
     import { page } from "$app/stores";
+    import { auth } from "$lib/stores/auth";
     import { theme, cycleTheme, LABELS } from "$lib/stores/theme";
     import { fade } from "svelte/transition";
 
     let settingsOpen = false;
     let scrollY = 0;
+
+    onMount(() => {
+        auth.init();
+    });
 
     function toggleSettings() {
         settingsOpen = !settingsOpen;
@@ -19,6 +25,13 @@
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
     }
+
+    function logout() {
+        auth.logout();
+        if (page.url.pathname.startsWith("/admin")) {
+            window.location.href = "/";
+        }
+    }
 </script>
 
 <svelte:window bind:scrollY on:click={closeSettings} />
@@ -28,7 +41,7 @@
         <a
             href="/"
             class="nav-btn {$page.url.pathname === '/' ? 'active' : ''}"
-            title="Vissza a főoldalra"
+            title="Vissza a főódalra"
         >
             <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -45,31 +58,6 @@
                 /><polyline points="9 22 9 12 15 12 15 22" /></svg
             >
             <span>Lámsza</span>
-        </a>
-        <a
-            href="/hirek"
-            class="nav-btn {$page.url.pathname.startsWith('/hirek')
-                ? 'active'
-                : ''}"
-            title="Hírek"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path
-                    d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6"
-                /><path d="M18 14h-8" /><path d="M15 18h-5" /><path
-                    d="M10 6h8v4h-8V6Z"
-                /></svg
-            >
-            <span>Hírek</span>
         </a>
         <a
             href="/index"
@@ -96,7 +84,32 @@
                 <path d="M4 10h2" />
                 <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
             </svg>
-            <span>Index</span>
+            <span>Indexelünk</span>
+        </a>
+        <a
+            href="/hirek"
+            class="nav-btn {$page.url.pathname.startsWith('/hirek')
+                ? 'active'
+                : ''}"
+            title="Hírek"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><path
+                    d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6"
+                /><path d="M18 14h-8" /><path d="M15 18h-5" /><path
+                    d="M10 6h8v4h-8V6Z"
+                /></svg
+            >
+            <span>Erdélyi Hírek</span>
         </a>
         <a
             href="/megyek"
@@ -119,7 +132,8 @@
             >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
-            <span>Megyék</span>
+            <span class="nav-btn-label">A megyétől</span>
+            <span class="sr-only nav-btn-label-lang szekely-hungarian">Megyék</span>
         </a>
         <a
             href="/varosok"
@@ -148,7 +162,7 @@
                 <path d="M17 13h0" />
                 <path d="M17 17h0" />
             </svg>
-            <span>Városok</span>
+            <span>Városiak</span>
         </a>
         <a
             href="/falvak"
@@ -174,7 +188,7 @@
                 <path d="M17 20h4v-7l-4-3"></path>
                 <path d="M3 20h18"></path>
             </svg>
-            <span>Falvak</span>
+            <span>Falusiak</span>
         </a>
         <a
             href="/esemenyek"
@@ -199,58 +213,66 @@
                 <rect width="18" height="18" x="3" y="4" rx="2" />
                 <path d="M3 10h18" />
             </svg>
-            <span>Események</span>
+            <span>Kik verekettek?</span>
         </a>
     </div>
     <div class="nav">
-        <a
-            href="/admin"
-            class="nav-btn {$page.url.pathname.startsWith('/admin')
-                ? 'active'
-                : ''}"
-            title="Belépés az admin panelbe"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle
-                    cx="12"
-                    cy="7"
-                    r="4"
-                /></svg
+        {#if $auth.loggedIn}
+            <span class="nav-admin-user" title="Bejelentkezve">{$auth.user}</span>
+            <button
+                type="button"
+                class="nav-btn"
+                on:click={logout}
+                title="Kijelentkezés"
             >
-            <span>Bélépés</span>
-        </a>
-        <a
-            href="/valtozasnaplo"
-            class="nav-btn {$page.url.pathname === '/valtozasnaplo'
-                ? 'active'
-                : ''}"
-            title="Változásnapló"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path d="M11 15h2" /><path d="M11 9h2" /><path
-                    d="M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"
-                /><path d="M9 12h6" /></svg
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg
+                >
+                <span>Kijelentkezés</span>
+            </button>
+            <a
+                href="/admin"
+                class="nav-btn {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
+                title="Admin panel"
             >
-            <span>Változások</span>
-        </a>
+                <span>Admin</span>
+            </a>
+        {:else}
+            <a
+                href="/admin"
+                class="nav-btn {$page.url.pathname.startsWith('/admin')
+                    ? 'active'
+                    : ''}"
+                title="Belépés az admin panelbe"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle
+                        cx="12"
+                        cy="7"
+                        r="4"
+                    /></svg
+                >
+                <span>Belépés</span>
+            </a>
+        {/if}
 
         <div class="settings-container">
             <button

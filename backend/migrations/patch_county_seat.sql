@@ -1,0 +1,1 @@
+ALTER TABLE locations ADD COLUMN IF NOT EXISTS is_county_seat BOOLEAN DEFAULT false;

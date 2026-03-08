@@ -37,8 +37,10 @@
         </div>
     {/if}
 
-    <div class="entry-info">
-        📍 {entry.location}
+    <div class="entry-info">📍 
+    <a href="/{entry.county_slug}-megye/{entry.location_slug}" class="entry-link">
+        {entry.location}
+    </a>
         {#if entry.address}- {entry.address}{/if}
     </div>
 

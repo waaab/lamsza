@@ -1,9 +1,11 @@
 <script>
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
+    import EventsWidget from "$lib/components/EventsWidget.svelte";
+    import WeatherIcon from "$lib/components/WeatherIcon.svelte";
 
     const locType = "megye"; // Hardcoded type for this route
     let town = "";
@@ -45,14 +47,18 @@
         visibleCount += 12;
     }
 
-    let weatherData = null;
+    let countyWeather = [];
     let weatherLoading = true;
+    let weatherUpdatedAt = null;
 
     let newsItems = [];
     let newsLoading = true;
+    let newsTickerIndex = 0;
+    let newsTickerInterval = null;
+    /** "emoji" | "svg" from admin setting */
+    let weatherIconStyle = "emoji";
 
-    let localEvents = [];
-    let eventsLoading = true;
+    $: countySeat = childSettlements.find((s) => s.is_county_seat);
 
     $: if (browser && $page.params.countySlug) {
         town = $page.params.countySlug.toLowerCase();
@@ -66,10 +72,19 @@
         loadingEntries = true;
         weatherLoading = true;
         newsLoading = true;
-        eventsLoading = true;
 
         const apiBase =
             import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+
+        // 0. Public config (weather icon style)
+        try {
+            const configRes = await fetch(`${apiBase}/api/config/public`);
+            if (configRes.ok) {
+                const config = await configRes.json();
+                if (config.weather_icon_style === "svg") weatherIconStyle = "svg";
+                else weatherIconStyle = "emoji";
+            }
+        } catch (_) {}
 
         // 1. Fetch Directory Entries
         try {
@@ -110,50 +125,26 @@
             loadingEntries = false;
         }
 
-        // 2. Fetch Weather
-        const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
-        if (API_KEY) {
-            try {
-                const wRes = await fetch(
-                    `${apiBase}/api/weather?slug=${encodeURIComponent(town)}&appid=${API_KEY}`,
-                );
-                if (wRes.ok) {
-                    const wData = await wRes.json();
-                    weatherData = {
-                        temp: Math.round(wData.main.temp),
-                        tempMin: Math.round(wData.main.temp_min),
-                        desc: wData.weather[0].description,
-                        icon: wData.weather[0].icon,
-                        timestamp: Date.now(),
-                    };
-                }
-            } catch (err) {
-                console.error("Weather fetch error:", err);
-            } finally {
-                weatherLoading = false;
+        // 2. Fetch Weather for all major cities in the county
+        try {
+            const wRes = await fetch(
+                `${apiBase}/api/weather/county?slug=${encodeURIComponent(town)}`,
+            );
+            if (wRes.ok) {
+                countyWeather = await wRes.json();
+                weatherUpdatedAt = new Date();
             }
-        } else {
+        } catch (err) {
+            console.error("Weather fetch error:", err);
+        } finally {
             weatherLoading = false;
         }
 
-        // 3. Fetch News filtering by town/county (Backend Aggregated)
+        // 3. Fetch News
         try {
-            const nRes = await fetch(
-                `${apiBase}/api/county_news?slug=${encodeURIComponent(town)}`,
-            );
+            const nRes = await fetch(`${apiBase}/api/news?limit=10`);
             if (nRes.ok) {
-                const aggregatedNews = await nRes.json();
-
-                // Ensure date parsing works for Svelte template
-                newsItems = aggregatedNews
-                    .map((item) => {
-                        return {
-                            ...item,
-                            pubDate: new Date(item.pubDate).getTime() || 0,
-                        };
-                    })
-                    .sort((a, b) => b.pubDate - a.pubDate)
-                    .slice(0, 6);
+                newsItems = (await nRes.json()).slice(0, 6);
             } else {
                 newsItems = [];
             }
@@ -161,46 +152,23 @@
             console.error("News fetch error:", err);
         } finally {
             newsLoading = false;
+            startNewsTicker();
         }
 
-        // 4. Fetch Local Events (County level)
-        try {
-            const eRes = await fetch(
-                `${apiBase}/api/events?county_slug=${encodeURIComponent(town)}`,
-            );
-            if (eRes.ok) {
-                localEvents = await eRes.json();
-            }
-        } catch (err) {
-            console.error("Events fetch error:", err);
-        } finally {
-            eventsLoading = false;
-        }
     }
 
-    function iconEmoji(code) {
-        const map = {
-            "01d": "☀️",
-            "01n": "🌙",
-            "02d": "⛅",
-            "02n": "☁️",
-            "03d": "☁️",
-            "03n": "☁️",
-            "04d": "☁️",
-            "04n": "☁️",
-            "09d": "🌧️",
-            "09n": "🌧️",
-            "10d": "🌦️",
-            "10n": "🌧️",
-            "11d": "⛈️",
-            "11n": "⛈️",
-            "13d": "❄️",
-            "13n": "❄️",
-            "50d": "🌫️",
-            "50n": "🌫️",
-        };
-        return map[code] || "🌡️";
+    function startNewsTicker() {
+        if (newsTickerInterval) clearInterval(newsTickerInterval);
+        newsTickerIndex = 0;
+        if (newsItems.length <= 1) return;
+        newsTickerInterval = setInterval(() => {
+            newsTickerIndex = (newsTickerIndex + 1) % newsItems.length;
+        }, 5000);
     }
+
+    onDestroy(() => {
+        if (newsTickerInterval) clearInterval(newsTickerInterval);
+    });
 </script>
 
 <svelte:head>
@@ -214,186 +182,122 @@
     Helyi hírek, időjárás és címtár {displayTown} megye területén.
 </p>
 
-<!-- Widgets Row (Weather + News Preview) -->
-<div class="widgets-box">
-    <!-- Settlement info -->
-    <article id="attekintes">
+<!-- Widgets: 3-column top grid (Áttekintés | Címer | Időjárás), then Events + News full width -->
+<div class="widgets-box" id="hasznos-informaciok">
+    <div id="attekintes">
         <h3 class="widget-title">Áttekintés</h3>
         <div class="more-info">
-            {#if displayTownRo}
-                <span title="Román neve: {displayTownRo}"
-                    >Románul: {displayTownRo}</span
-                >
-            {/if}
-            {#if displayTownDe}
-                <span title="Német neve: {displayTownDe}"
-                    >Németül: {displayTownDe}</span
-                >
-            {/if}
-            <span title="Posta kód">
-                Irányítószám: <span>{displayZipCode || "–"}</span>
-            </span>
-            <span title="Koordináták">
-                Koordináták: <span>{displayTownCoordinates || "–"}</span>
-            </span>
-            <span title="Lakosság">
-                Lakosság: <span>{displayTownPopulation || "–"} fő</span>
-            </span>
-            <span title="Terület (négyzetkilométer)">
-                Terület: <span>{displayTownArea || "–"} km²</span>
-            </span>
-            <span title="Közigazgatási forma">
-                Közigazgatási forma: <span class="capitalize"
-                    >{displayTownType || "–"}</span
-                >
-            </span>
+            <span title="Román neve">Románul: <span>{displayTownRo || "-"}</span></span>
+            <span title="Német neve">Németül: <span>{displayTownDe || "-"}</span></span>
+            <span title="Irányítószám">Irányítószám: <span>{displayZipCode || "-"}</span></span>
+            <span title="Koordináták">Koordináták: <span>{displayTownCoordinates || "-"}</span></span>
+            <span title="Lakosság">Lakosság: <span>{displayTownPopulation ? displayTownPopulation + " fő" : "-"}</span></span>
+            <span title="Terület (négyzetkilométer)">Terület: <span>{displayTownArea ? displayTownArea + " km²" : "-"}</span></span>
+            <span title="Közigazgatási forma">Közigazgatási forma: <span class="capitalize">{displayTownType || "-"}</span></span>
+            <span title="Megyeszékhely">Megyeszékhely: <span>{#if countySeat}<a href="/{town}-megye/{countySeat.slug}" class="parent-city-link">{countySeat.name}</a>{:else}-{/if}</span></span>
         </div>
-    </article>
+    </div>
 
-    <!-- Coat of Arms -->
-    <article id="cimer" class="crest-card">
-        <h3 class="widget-title">{displayTown} címere</h3>
-        <div class="crest-container">
-            {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
+    <div id="cimer" class="crest-card">
+        {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
+            <h3 class="widget-title">{displayTown} címere</h3>
+            <div class="crest-container">
                 <img
                     src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
                     alt="{displayTown} címere"
                     class="crest-img"
                 />
+            </div>
+        {/if}
+    </div>
+
+    <!-- Weather = 3rd grid element (same card structure as homepage) -->
+    <div id="idojaras" class="weather-card simple">
+        <span class="widget-title">Időjárás a megyében</span>
+        <div class="widget-content">
+            {#if weatherLoading}
+                <div class="weather-left">
+                    <div class="county-weather-flex">
+                        {#each Array(3) as _}
+                            <div class="card sm">
+                                <span class="cw-name">adat betöltés...</span>
+                                <span class="cw-temp-row">
+                                    <span class="cw-temp">...°C</span>
+                                    <span class="cw-temp-min">/ ...°C</span>
+                                </span>
+                                <span class="cw-desc">adat betöltés...</span>
+                            </div>
+                        {/each}
+                    </div>
+                </div>
+                <div class="weather-right"></div>
+            {:else if countyWeather.length > 0}
+                <div class="weather-left">
+                    <div class="county-weather-flex">
+                        {#each countyWeather as cw}
+                            <a href="/{town}-megye/{cw.slug}" class="card sm">
+                                <span class="cw-name">{cw.city}</span>
+                                <span class="cw-temp-row">
+                                    <span class="cw-temp">{Math.round(cw.temp)}°C</span>
+                                    <span class="cw-temp-min">/ {Math.round(cw.temp_min)}°C</span>
+                                    <span class="cw-icon" aria-hidden="true"><WeatherIcon code={cw.icon} style={weatherIconStyle} /></span>
+                                </span>
+                                <span class="cw-desc capitalize">{cw.desc}</span>
+                            </a>
+                        {/each}
+                    </div>
+                </div>
+                <div class="weather-right"></div>
             {:else}
-                <span class="no-crest">Nincs elérhető címer</span>
+                <div class="weather-left">
+                    <p class="weather-error">Időjárás adat nem elérhető.</p>
+                </div>
+                <div class="weather-right"></div>
             {/if}
         </div>
-    </article>
+        <div class="weather-footer">
+            {#if weatherUpdatedAt}
+                <small class="weather-source">Utoljára frissítve: {weatherUpdatedAt.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}</small>
+            {/if}
+            <small class="weather-source" title="Forrás: OpenWeatherMap">OpenWeatherMap</small>
+        </div>
+    </div>
 
-    <!-- Weather Widget -->
-    <article id="idojaras" class="weather-card">
-        {#if weatherLoading}
-            <div class="weather-left">
-                <span class="widget-title">Időjárás</span>
-                <div class="weather-temp-row">
-                    <div class="skeleton weather-skeleton-temp"></div>
-                </div>
-                <div class="weather-desc">
-                    <div class="skeleton weather-skeleton-desc"></div>
-                </div>
-                <div class="weather-footer">
-                    <div class="skeleton skeleton-footer-1"></div>
-                    <div class="skeleton skeleton-footer-2"></div>
-                </div>
-            </div>
-            <div class="weather-right">
-                <span class="weather-icon">⛅</span>
-            </div>
-        {:else if weatherData}
-            <div class="weather-left">
-                <span class="widget-title">Időjárás</span>
-                <div class="weather-temp-row">
-                    <span class="weather-temp">{weatherData.temp}</span><span
-                        class="weather-temp-unit">°C</span
-                    >
-                    {#if weatherData.tempMin != null}
-                        <span class="weather-temp-min"
-                            >/ {weatherData.tempMin}°C</span
-                        >
-                    {/if}
-                </div>
-                <div class="weather-desc capitalize">
-                    {weatherData.desc}
-                </div>
-                <div class="weather-footer">
-                    {#if weatherData.timestamp}
-                        <small class="weather-timestamp"
-                            >Utoljára frissítve: {new Date(
-                                weatherData.timestamp,
-                            ).toLocaleTimeString("hu-HU", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                            })}</small
-                        >
-                    {/if}
-                    <small class="weather-source">Forrás: OpenWeatherMap</small>
-                </div>
-            </div>
-            <div class="weather-right">
-                <span class="weather-icon">{iconEmoji(weatherData.icon)}</span>
-            </div>
-        {:else}
-            <div class="weather-left">
-                <span class="widget-title">Időjárás</span>
-                <p class="weather-error">Időjárás adat nem elérhető.</p>
-            </div>
-            <div class="weather-right">
-                <span class="weather-icon">⛅</span>
-            </div>
-        {/if}
-    </article>
+    <EventsWidget countySlug={town} locationName={displayTown} />
 
-    <!-- Events Widget -->
-    <article id="esemenyek" class="event-widget">
-        <h3 class="widget-title">Események</h3>
-        {#if eventsLoading}
-            <div class="skeleton-box">
-                <div class="skeleton skeleton-text skeleton-full"></div>
-                <div class="skeleton skeleton-text skeleton-60"></div>
-            </div>
-        {:else if localEvents.length > 0}
-            <ul class="mini-event-list">
-                {#each localEvents.slice(0, 3) as event}
-                    <li>
-                        <div class="mini-event-date">
-                            {new Date(event.event_date).toLocaleDateString(
-                                "hu-HU",
-                                { month: "short", day: "numeric" },
-                            )}
-                        </div>
-                        <div class="mini-event-info">
-                            <span class="mini-event-title">{event.title}</span>
-                            <a
-                                href="/{event.county_slug}-megye/{event.location_slug}"
-                                class="mini-event-location"
-                                >{event.location_name}</a
-                            >
-                        </div>
-                    </li>
-                {/each}
-            </ul>
-            <a href="/esemenyek" class="widget-more-link">Összes esemény →</a>
-        {:else}
-            <span class="info-box">
-                <p>Nincsenek közeli események.</p>
-            </span>
-        {/if}
-    </article>
-
-    <!-- Local News Widget -->
-    <article id="hirek" class="news-widget">
+    <article id="hirek" class="news-widget component-box">
         <h3 class="widget-title">Helyi hírek</h3>
         {#if newsLoading}
-            <div class="news-loading-box">
-                <div class="skeleton skeleton-text skeleton-full"></div>
-                <div class="skeleton skeleton-text skeleton-80"></div>
+            <div class="news-loading-placeholder">
+                <span class="news-title">adat betöltés...</span>
+                <div class="news-meta">adat betöltés...</div>
             </div>
         {:else if newsItems.length > 0}
-            <ul class="news-list">
-                {#each newsItems.slice(0, 4) as item}
-                    <li>
-                        <a
-                            href={item.link}
-                            target="_blank"
-                            rel="nofollow noopener"
-                            class="news-title"
-                        >
-                            📰 {item.title}
-                        </a>
-                        <div class="news-meta">
-                            {item.source} - {new Date(
-                                item.pubDate,
-                            ).toLocaleDateString("hu-HU")}
+            <div class="news-ticker">
+                {#key newsTickerIndex}
+                    {@const item = newsItems[newsTickerIndex]}
+                    {#if item}
+                        <div class="news-ticker-item">
+                            <a
+                                href={item.link}
+                                target="_blank"
+                                rel="nofollow noopener"
+                                class="news-title"
+                            >
+                                📰 {item.title}
+                            </a>
+                            <div class="news-meta">
+                                {item.source} - {new Date(item.pubDate).toLocaleDateString("hu-HU")}
+                            </div>
                         </div>
-                    </li>
-                {/each}
-            </ul>
+                    {/if}
+                {/key}
+                <div class="news-ticker-nav">
+                    <button class="scroll-arrow left" on:click={() => { newsTickerIndex = (newsTickerIndex - 1 + newsItems.length) % newsItems.length; }} aria-label="Előző hír">&#8249;</button>
+                    <button class="scroll-arrow right" on:click={() => { newsTickerIndex = (newsTickerIndex + 1) % newsItems.length; }} aria-label="Következő hír">&#8250;</button>
+                    <a href="/hirek" class="nav-btn">Összes hír</a>
+                </div>
+            </div>
         {:else}
             <span class="info-box"><p>Helyi hírek nem elérhetőek.</p></span>
         {/if}
@@ -402,7 +306,7 @@
 
 <!-- County Settlements Aside -->
 {#if childSettlements.length > 0}
-    <aside class="settlements-aside">
+    <aside class="settlements-aside component-box">
         <h2 class="aside-title">
             Települések {displayTown} megyében
         </h2>
@@ -427,25 +331,29 @@
 {#if loadingEntries}
     <div class="list grid">
         {#each Array(6) as _}
-            <article class="card entry--skeleton">
-                <div class="skeleton skeleton-text skeleton-30"></div>
-                <div class="skeleton skeleton-text skeleton-80-top"></div>
-                <div class="skeleton skeleton-text skeleton-60-bottom"></div>
+            <article class="card entry-placeholder">
+                <span class="entry-placeholder-cat">adat betöltés...</span>
+                <span class="entry-placeholder-title">adat betöltés...</span>
+                <span class="entry-placeholder-loc">adat betöltés...</span>
             </article>
         {/each}
     </div>
 {:else if entriesError}
-    <div class="note error">{entriesError}</div>
+    <span class="info-box error">
+        <p>{entriesError}</p>
+    </span>
 {:else if entries.length === 0}
-    <div class="note error">
+    <span class="info-box error">
+    <p>
         Nincs megjeleníthető bejegyzés {displayTown} megye területén.
-    </div>
+    </p>
+    </span>
 {:else}
     <div class="filter-actions">
-        <div class="info-box">
+        <span class="info-box">
             <p>💡 Összesen:</p>
             <p><span>({displayItems.length}/{totalCount})</span></p>
-        </div>
+        </span>
 
         <div class="view-mode-toggle">
             <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -581,14 +489,6 @@
     .capitalize {
         text-transform: capitalize;
     }
-    .skeleton-footer-1 {
-        width: 120px;
-        height: 0.75rem;
-    }
-    .skeleton-footer-2 {
-        width: 90px;
-        height: 0.75rem;
-    }
     .weather-error {
         color: var(--text-faint);
         margin: 0.5rem 0 0;
@@ -597,47 +497,57 @@
         display: flex;
         flex-direction: column;
     }
-    .news-loading-box {
-        padding: 1rem 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .skeleton-full {
-        height: 1.2rem;
-    }
-    .skeleton-80 {
-        height: 1.2rem;
-        width: 80%;
+    .news-loading-placeholder {
+        padding: 0.5rem 0;
     }
     .news-widget {
         grid-column: span 3;
     }
-    .news-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
+    .news-ticker {
         display: flex;
-        flex-direction: column;
+        justify-content: space-between;
         gap: 0.5rem;
+    }
+    .news-ticker-item {
+        animation: ticker-slide-in 0.35s ease-out;
+    }
+    .news-ticker-item a:hover {
+        color: var(--szekely-red);
+    }
+    @keyframes ticker-slide-in {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .news-ticker-nav {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+    }
+    .news-ticker-nav :global(.scroll-arrow) {
+        position: static;
+        transform: none;
+        opacity: 1;
+        pointer-events: auto;
     }
     .news-title {
         text-decoration: none;
         color: inherit;
         font-weight: 500;
-        font-size: 1.05rem;
+        font-size: 1rem;
     }
     .news-meta {
         font-size: 0.8em;
         color: var(--text-faint);
         margin-top: 0.2rem;
     }
-    .settlements-aside {
-        margin-bottom: 2rem;
+    .component-box {
         padding: 1.5rem;
         background: var(--card-bg);
         border-radius: 12px;
         border: 1px solid var(--border-color);
+    }
+    .settlements-aside {
+        margin-bottom: 2rem;
     }
     .aside-title {
         margin-top: 0;
@@ -655,55 +565,79 @@
         padding: 0.5rem 1rem;
         border: 1px solid var(--border-color);
     }
-    .entry--skeleton {
-        height: 150px;
-        display: flex;
-        flex-direction: column;
-        padding: 1rem;
-        gap: 0.5rem;
-    }
-    .skeleton-30 {
-        width: 30%;
-    }
-    .skeleton-80-top {
-        width: 80%;
-        margin-top: 0.5rem;
-        height: 1.2rem;
-    }
-    .skeleton-60-bottom {
-        width: 60%;
-        margin-top: auto;
-    }
-
     .widgets-box {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 2rem;
         margin-bottom: 2rem;
     }
-    .news-widget,
-    .event-widget {
+    :global(.news-widget),
+    :global(.event-widget) {
         grid-column: span 3;
     }
     @media (max-width: 992px) {
         .widgets-box {
             grid-template-columns: 1fr;
         }
-        .news-widget,
-        .event-widget {
+        :global(.news-widget),
+        :global(.event-widget) {
             grid-column: span 1;
         }
     }
-    .weather-card {
+
+    .entry-placeholder {
         display: flex;
-        align-items: flex-start;
-        justify-content: flex-end;
-        background: none;
-        border-radius: 0;
-        padding: 0;
-        box-shadow: none;
-        gap: 1rem;
+        flex-direction: column;
+        padding: 1rem;
+        gap: 0.5rem;
     }
+    .entry-placeholder-cat,
+    .entry-placeholder-loc {
+        font-size: 0.75rem;
+        color: var(--text-faint);
+    }
+    .entry-placeholder-title {
+        font-size: 0.95rem;
+        color: var(--text-faint);
+        margin-top: 0.5rem;
+    }
+
+    .county-weather-flex {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.5rem;
+    }
+    .cw-name {
+        font-size: 0.9rem;
+        line-height: 1.2;
+    }
+    .cw-temp-row {
+        display: flex;
+        gap: 0.15rem;
+        margin: 0.2rem 0;
+        align-items: flex-end;
+    }
+    .cw-temp {
+        font-size: 1.15rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .cw-temp-min {
+        font-size: 0.75rem;
+        color: var(--text-faint, #999);
+        font-weight: 400;
+    }
+    .cw-icon {
+        font-size: 1.4rem;
+        line-height: 1;
+        margin-left: auto;
+    }
+    .cw-desc {
+        font-size: 0.75rem;
+        color: var(--text-faint, #666);
+        font-style: italic;
+    }
+
     .crest-card {
         display: flex;
         flex-direction: column;
@@ -716,65 +650,5 @@
         max-width: 100%;
         max-height: 180px;
         object-fit: contain;
-    }
-    .no-crest {
-        color: var(--text-faint);
-        font-size: 0.9rem;
-        font-style: italic;
-    }
-    /* Event widget */
-    .event-widget {
-        display: flex;
-        flex-direction: column;
-    }
-    .mini-event-list {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.6rem;
-    }
-    .mini-event-list li {
-        display: flex;
-        gap: 1rem;
-        align-items: center;
-        font-size: 0.9rem;
-    }
-    .mini-event-date {
-        background: var(--primary-color);
-        color: var(--text-color);
-        padding: 0.2rem 0.5rem;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.8rem;
-        min-width: 3.5rem;
-        text-align: center;
-    }
-    .mini-event-info {
-        display: flex;
-        flex-direction: column;
-    }
-    .mini-event-title {
-        font-weight: 500;
-        color: var(--text-color);
-    }
-    .mini-event-location {
-        font-size: 0.8rem;
-        color: var(--primary-color);
-        text-decoration: none;
-    }
-    .mini-event-location:hover {
-        text-decoration: underline;
-    }
-    .widget-more-link {
-        font-size: 0.85rem;
-        color: var(--primary-color);
-        text-decoration: none;
-        margin-top: auto;
-        font-weight: 500;
-    }
-    .widget-more-link:hover {
-        text-decoration: underline;
     }
 </style>

@@ -106,6 +106,12 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	for name, values := range resp.Header {
+		lower := strings.ToLower(name)
+		if lower == "access-control-allow-origin" ||
+			lower == "access-control-allow-methods" ||
+			lower == "access-control-allow-headers" {
+			continue
+		}
 		for _, value := range values {
 			w.Header().Add(name, value)
 		}

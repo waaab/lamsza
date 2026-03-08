@@ -10,6 +10,7 @@
     let error = false;
 
     onMount(async () => {
+        localStorage.removeItem(MONDAS_CACHE_KEY);
         const cached = localStorage.getItem(MONDAS_CACHE_KEY);
         if (cached) {
             try {
@@ -47,10 +48,10 @@
     <section id="szekely-mondasok">
         <div class="mondas-inner">
             <div class="mondas-label-row">
-                <span class="heading-label">Napi Székely Mondás</span>
+                <span class="heading-label">Napi Székely Mondás: Aszongya, hogy...</span>
             </div>
             {#if loading}
-                <div class="skeleton mondas-skeleton"></div>
+                <blockquote class="mondas-quote" style="opacity:0.5">adat betöltés...</blockquote>
             {:else if error}
                 <p class="mondas-quote">A mondás jelenleg nem elérhető.</p>
             {:else}

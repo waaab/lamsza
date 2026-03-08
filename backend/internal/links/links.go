@@ -3,8 +3,12 @@ package links
 import (
 	"backend/internal/db"
 	"backend/internal/models"
+	"backend/internal/settings"
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	"github.com/lib/pq"
 )
 
 func HandleAdminQuickLinks(w http.ResponseWriter, r *http.Request) {
@@ -36,9 +40,15 @@ func HandleAdminQuickLinks(w http.ResponseWriter, r *http.Request) {
 		}
 		err := db.DB.QueryRow("INSERT INTO quick_links (title, url, bg_color) VALUES ($1, $2, $3) RETURNING id", ql.Title, ql.URL, ql.BgColor).Scan(&ql.ID)
 		if err != nil {
+			var pgErr *pq.Error
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				http.Error(w, "Ez az URL már szerepel a gyorslinkek között.", 400)
+				return
+			}
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		settings.IncrementQuickLinksVersion()
 		json.NewEncoder(w).Encode(ql)
 
 	case "PUT":
@@ -53,12 +63,14 @@ func HandleAdminQuickLinks(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		settings.IncrementQuickLinksVersion()
 		w.WriteHeader(http.StatusOK)
 
 	case "DELETE":
 		id := r.URL.Query().Get("id")
 		if id != "" {
 			db.DB.Exec("DELETE FROM quick_links WHERE id = $1", id)
+			settings.IncrementQuickLinksVersion()
 		}
 		w.WriteHeader(http.StatusOK)
 	}

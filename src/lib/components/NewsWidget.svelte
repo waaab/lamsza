@@ -1,10 +1,11 @@
 <script>
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import { apiFetch } from "$lib/api";
     import { formatDate } from "$lib/utils";
 
-    export let settlementSlug = null; // Optional: filter by settlement
-    export let limit = 6;
+    export let settlementSlug = null;
+    export let limit = 20;
+    export let ticker = false;
 
     const NEWS_CACHE_KEY =
         "news_cache" + (settlementSlug ? `_${settlementSlug}` : "");
@@ -14,24 +15,9 @@
     let loading = true;
     let error = false;
 
-    // Helper to extract items from RSS XML
-    function parseRSS(xmlText, sourceName, bgColor) {
-        const parser = new DOMParser();
-        const xmlDoc = parser.parseFromString(xmlText, "text/xml");
-        const nodes = Array.from(xmlDoc.querySelectorAll("item")).slice(0, 10);
-
-        return nodes.map((node) => ({
-            title: node.querySelector("title")?.textContent || "Cím nélkül",
-            link: node.querySelector("link")?.textContent || "#",
-            description: node.querySelector("description")?.textContent || "",
-            pubDate:
-                new Date(
-                    node.querySelector("pubDate")?.textContent,
-                ).getTime() || 0,
-            source: sourceName,
-            bgColor: bgColor,
-        }));
-    }
+    let tickerIndex = 0;
+    let tickerInterval = null;
+    let tickerDirection = 1;
 
     onMount(async () => {
         const cached = localStorage.getItem(NEWS_CACHE_KEY);
@@ -41,57 +27,23 @@
                 if (Date.now() - data.timestamp < NEWS_TTL) {
                     items = data.items;
                     loading = false;
+                    startTicker();
                     return;
                 }
             } catch (e) {}
         }
 
         try {
-            const dbFeeds = await apiFetch("/api/admin/news_feeds");
-            if (!dbFeeds || dbFeeds.length === 0) {
-                error = true;
-                loading = false;
-                return;
+            let allItems = await apiFetch(`/api/news?limit=${limit}`);
+
+            if (settlementSlug) {
+                const slug = settlementSlug.toLowerCase();
+                allItems = allItems.filter(
+                    (i) => i.title.toLowerCase().includes(slug),
+                );
             }
 
-            let allItems = [];
-            for (const feed of dbFeeds) {
-                try {
-                    const xmlText = await apiFetch(
-                        `/api/proxy?url=${encodeURIComponent(feed.feed_url)}`,
-                        { responseType: "text" },
-                    );
-                    // Note: apiFetch needs to handle text responses, or we use a separate helper.
-                    // For now, let's assume apiFetch handles it or we use a raw fetch for text.
-                    const response = await fetch(
-                        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(feed.feed_url)}`,
-                    );
-                    const text = await response.text();
-
-                    const parsed = parseRSS(text, feed.title, feed.bg_color);
-
-                    if (settlementSlug) {
-                        allItems.push(
-                            ...parsed.filter(
-                                (i) =>
-                                    i.title
-                                        .toLowerCase()
-                                        .includes(settlementSlug) ||
-                                    i.description
-                                        .toLowerCase()
-                                        .includes(settlementSlug),
-                            ),
-                        );
-                    } else {
-                        allItems.push(...parsed);
-                    }
-                } catch (e) {
-                    console.error("RSS feed error:", feed.feed_url, e);
-                }
-            }
-
-            allItems.sort((a, b) => b.pubDate - a.pubDate);
-            items = allItems.slice(0, limit);
+            items = allItems;
 
             localStorage.setItem(
                 NEWS_CACHE_KEY,
@@ -104,10 +56,30 @@
             error = true;
         } finally {
             loading = false;
+            startTicker();
         }
     });
 
-    // Teaser logic (2 per source) for homepage
+    function startTicker() {
+        if (!ticker || tickerInterval) return;
+        tickerInterval = setInterval(() => {
+            const list = displayItems;
+            if (list.length <= 1) return;
+            tickerIndex = (tickerIndex + 1) % list.length;
+        }, 5000);
+    }
+
+    function stopTicker() {
+        if (tickerInterval) {
+            clearInterval(tickerInterval);
+            tickerInterval = null;
+        }
+    }
+
+    onDestroy(() => {
+        stopTicker();
+    });
+
     $: teaserItems = (() => {
         if (settlementSlug) return items;
         const counts = {};
@@ -116,17 +88,19 @@
             return counts[item.source] <= 2;
         });
     })();
+
+    $: displayItems = settlementSlug ? items : teaserItems;
 </script>
 
-<article id="hirek" class="news news-widget">
+<article class="news news-widget component-box">
     <h3 class="widget-title">
         {settlementSlug ? "Helyi hírek" : "Friss hírek"}
     </h3>
 
     {#if loading}
-        <div class="news-loading-box">
-            <div class="skeleton skeleton-text skeleton-full"></div>
-            <div class="skeleton skeleton-text skeleton-80"></div>
+        <div class="news-loading-placeholder">
+            <span class="news-title">adat betöltés...</span>
+            <div class="news-meta">adat betöltés...</div>
         </div>
     {:else if error || items.length === 0}
         <span class="info-box"
@@ -136,9 +110,43 @@
                     : "A hírek jelenleg nem elérhetők."}
             </p></span
         >
+    {:else if ticker}
+        <div class="news-ticker">
+            {#key tickerIndex}
+                {@const item = displayItems[tickerIndex]}
+                {#if item}
+                    <div
+                        class="news-ticker-item"
+                        role="region"
+                        aria-label="Hír megállítása rámutatással"
+                        on:mouseenter={stopTicker}
+                        on:mouseleave={startTicker}
+                    >
+                        <a
+                            href={item.link}
+                            target="_blank"
+                            rel="nofollow noopener"
+                            class="news-title"
+                        >
+                            📰 {item.title}
+                        </a>
+                        <div class="news-meta">
+                            {item.source} - {formatDate(item.pubDate)}
+                        </div>
+                    </div>
+                {/if}
+            {/key}
+            <div class="widget-nav">
+                <div class="arrows-container">
+                    <button class="scroll-arrow left" on:click={() => { tickerIndex = (tickerIndex - 1 + displayItems.length) % displayItems.length; }} aria-label="Előző hír">&#8249;</button>
+                    <button class="scroll-arrow right" on:click={() => { tickerIndex = (tickerIndex + 1) % displayItems.length; }} aria-label="Következő hír">&#8250;</button>
+                </div>
+                <a href="/hirek" class="nav-btn">Összes hír</a>
+            </div>
+        </div>
     {:else}
         <ul class="news-list">
-            {#each settlementSlug ? items : teaserItems as item}
+            {#each displayItems as item}
                 <li>
                     <a
                         href={item.link}
@@ -161,19 +169,17 @@
     .news-widget {
         display: flex;
         flex-direction: column;
+        grid-column: span 3;
     }
-    .news-loading-box {
-        padding: 1rem 0;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
+
+    .component-box {
+        padding: 1.5rem;
+        background: var(--card-bg);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
     }
-    .skeleton-full {
-        height: 1.2rem;
-    }
-    .skeleton-80 {
-        height: 1.2rem;
-        width: 80%;
+    .news-loading-placeholder {
+        padding: 0.5rem 0;
     }
 
     .news-list {
@@ -182,17 +188,38 @@
         margin: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.5rem;
+        gap: 1rem;
     }
     .news-title {
         text-decoration: none;
         color: inherit;
         font-weight: 500;
-        font-size: 1.05rem;
+        font-size: 1rem;
     }
     .news-meta {
         font-size: 0.8em;
         color: var(--text-faint);
         margin-top: 0.2rem;
+    }
+    .news-ticker {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .news-ticker-item {
+        animation: ticker-slide-in 0.35s ease-out;
+    }
+    .news-ticker-item a:hover, .news-list a:hover {
+        color: var(--szekely-red);
+    }
+    @keyframes ticker-slide-in {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 </style>

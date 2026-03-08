@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { auth } from "$lib/stores/auth";
 
     const getBase = () =>
         import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
@@ -91,6 +92,72 @@
     let editingNews = null;
     let editingEvent = null;
 
+    let orgQuery = "";
+    let orgEditQuery = "";
+    let orgSuggestions = [];
+    let orgEditSuggestions = [];
+    let orgDropdownOpen = false;
+    let orgEditDropdownOpen = false;
+
+    // Site settings (weather providers, cache)
+    let siteSettings = {};
+    let settingsSaving = false;
+    let settingsCacheClearing = false;
+
+    // Weather description translations (multi-language)
+    let weatherTranslations = [];
+    let newWeatherTrans = { source_text: "", lang: "hu", translated_text: "" };
+    let editingWeatherTrans = null;
+    const WEATHER_TRANS_LANGS = [
+        { value: "hu", label: "Magyar" },
+        { value: "ro", label: "Română" },
+        { value: "de", label: "Deutsch" },
+    ];
+
+    // Pages (policy pages editor)
+    let adminPages = [];
+    let editingPage = null;
+    let pageSaving = false;
+
+    function filterOrganizers(query, target) {
+        if (!query || query.length < 2) return [];
+        const q = query.toLowerCase();
+        return entries
+            .filter((e) => e.name.toLowerCase().includes(q))
+            .slice(0, 8);
+    }
+
+    function onOrgInput(isEdit = false) {
+        const q = isEdit ? orgEditQuery : orgQuery;
+        const results = filterOrganizers(q);
+        if (isEdit) {
+            orgEditSuggestions = results;
+            orgEditDropdownOpen = results.length > 0;
+        } else {
+            orgSuggestions = results;
+            orgDropdownOpen = results.length > 0;
+        }
+    }
+
+    function selectOrganizer(name, isEdit = false) {
+        if (isEdit) {
+            editingEvent.organizer = name;
+            orgEditQuery = name;
+            orgEditDropdownOpen = false;
+        } else {
+            newEvent.organizer = name;
+            orgQuery = name;
+            orgDropdownOpen = false;
+        }
+    }
+
+    function handleOrgBlur(isEdit = false) {
+        setTimeout(() => {
+            if (isEdit) orgEditDropdownOpen = false;
+            else orgDropdownOpen = false;
+        }, 200);
+    }
+
     const LANGUAGES = ["HU", "RO", "DE", "EN"];
     const COUNTIES = ["Hargita", "Kovászna", "Maros"];
     const LOCATION_TYPES = ["város", "község", "falu", "megye", "municípium"];
@@ -129,6 +196,7 @@
     }
 
     onMount(() => {
+        auth.init();
         if (localStorage.getItem("admin_auth") === "true") {
             authenticated = true;
             fetchAll();
@@ -146,7 +214,7 @@
         e.preventDefault();
         if (password === "szekely123") {
             authenticated = true;
-            localStorage.setItem("admin_auth", "true");
+            auth.login();
             fetchAll();
         } else {
             alert("Na de kicsibarátom, ez nem a jó jelszó!");
@@ -157,6 +225,7 @@
         authenticated = false;
         password = "";
         localStorage.removeItem("admin_auth");
+        localStorage.removeItem("admin_user");
     }
 
     async function fetchAll() {
@@ -168,6 +237,161 @@
         fetchEntryCategories();
         fetchEntryTypes();
         fetchEvents();
+        fetchSettings();
+        fetchWeatherTranslations();
+        fetchPages();
+    }
+
+    async function fetchWeatherTranslations() {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/weather_translations`);
+            if (res.ok) weatherTranslations = await res.json();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function saveWeatherTranslation(e) {
+        e?.preventDefault();
+        if (editingWeatherTrans) {
+            const res = await fetch(`${getBase()}/api/admin/weather_translations`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(editingWeatherTrans),
+            });
+            if (res.ok) {
+                fetchWeatherTranslations();
+                editingWeatherTrans = null;
+            } else {
+                showAlert("Hiba: " + (await res.text()));
+            }
+        } else {
+            const res = await fetch(`${getBase()}/api/admin/weather_translations`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newWeatherTrans),
+            });
+            if (res.ok) {
+                fetchWeatherTranslations();
+                newWeatherTrans = { source_text: "", lang: "hu", translated_text: "" };
+            } else {
+                showAlert("Hiba: " + (await res.text()));
+            }
+        }
+    }
+
+    function startEditWeatherTrans(t) {
+        editingWeatherTrans = { ...t };
+    }
+
+    function cancelEditWeatherTrans() {
+        editingWeatherTrans = null;
+    }
+
+    async function deleteWeatherTranslation(id) {
+        const ok = await showConfirm("Biztosan törölni szeretnéd ezt a fordítást?");
+        if (!ok) return;
+        const res = await fetch(`${getBase()}/api/admin/weather_translations?id=${id}`, { method: "DELETE" });
+        if (res.ok) fetchWeatherTranslations();
+        else showAlert("Hiba: " + (await res.text()));
+    }
+
+    async function fetchSettings() {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/settings`);
+            if (res.ok) {
+                const data = await res.json();
+                siteSettings = {
+                    weather_cache_ttl_minutes: data.weather_cache_ttl_minutes ?? "15",
+                    weather_cache_version: data.weather_cache_version ?? "1",
+                    weather_icon_style: data.weather_icon_style ?? "emoji",
+                    weather_active_users_estimate: data.weather_active_users_estimate ?? "10000",
+                    weather_provider_default: data.weather_provider_default ?? "open_meteo",
+                    weather_provider_open_meteo_enabled: data.weather_provider_open_meteo_enabled ?? "true",
+                    weather_provider_weatherapi_enabled: data.weather_provider_weatherapi_enabled ?? "true",
+                    weather_provider_openweathermap_enabled: data.weather_provider_openweathermap_enabled ?? "true",
+                    my_location_slug: data.my_location_slug ?? "csikszereda",
+                    ...data,
+                };
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function saveSettings() {
+        settingsSaving = true;
+        try {
+            const payload = Object.fromEntries(
+                Object.entries(siteSettings).map(([k, v]) => [k, v != null ? String(v) : ""])
+            );
+            const res = await fetch(`${getBase()}/api/admin/settings`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) await showAlert("Beállítások mentve.");
+            else await showAlert("Hiba: " + (await res.text()));
+        } catch (e) {
+            await showAlert("Hiba: " + e.message);
+        } finally {
+            settingsSaving = false;
+        }
+    }
+
+    async function clearWeatherCache() {
+        settingsCacheClearing = true;
+        try {
+            const res = await fetch(`${getBase()}/api/admin/settings/clear-weather-cache`, { method: "POST" });
+            if (res.ok) {
+                await showAlert("Időjárás cache verzió növelve – látogatók friss adatot fognak kapni.");
+                fetchSettings();
+            } else await showAlert("Hiba: " + (await res.text()));
+        } catch (e) {
+            await showAlert("Hiba: " + e.message);
+        } finally {
+            settingsCacheClearing = false;
+        }
+    }
+
+    async function fetchPages() {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/pages`);
+            if (res.ok) adminPages = await res.json();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    function startEditPage(page) {
+        editingPage = { ...page };
+    }
+
+    function cancelEditPage() {
+        editingPage = null;
+    }
+
+    async function savePage() {
+        if (!editingPage) return;
+        pageSaving = true;
+        try {
+            const res = await fetch(`${getBase()}/api/admin/pages`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(editingPage),
+            });
+            if (res.ok) {
+                await showAlert("Oldal mentve.");
+                editingPage = null;
+                fetchPages();
+            } else {
+                await showAlert("Hiba: " + (await res.text()));
+            }
+        } catch (e) {
+            await showAlert("Hiba: " + e.message);
+        } finally {
+            pageSaving = false;
+        }
     }
 
     // generic fetch helper
@@ -192,6 +416,23 @@
     }
     function fetchLocations() {
         loadData("locations", (d) => (locations = d));
+    }
+
+    async function setCountySeat(locationId) {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/county_seat`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ location_id: locationId }),
+            });
+            if (res.ok) {
+                fetchLocations();
+            } else {
+                console.error("Failed to set county seat:", await res.text());
+            }
+        } catch (e) {
+            console.error("Error setting county seat:", e);
+        }
     }
     function fetchEntries() {
         loadData("entries", (d) => (entries = d));
@@ -377,6 +618,7 @@
         };
         createRecord("entries", payload, fetchEntries, () => {
             newEvent.organizer = newOrganizerEntry.name;
+            orgQuery = newOrganizerEntry.name;
             newOrganizerModalVisible = false;
             newOrganizerEntry = {
                 location_id: "",
@@ -521,6 +763,7 @@
         const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
         if (!ok) return;
         editingEvent = { ...ev };
+        orgEditQuery = ev.organizer || "";
     }
     function cancelEditEvent() {
         editingEvent = null;
@@ -639,7 +882,7 @@
 {:else}
     <div class="admin-layout">
         <aside class="admin-sidebar">
-            <a href="/" class="admin-sidebar-btn" title="Vissza a Gugelbe">
+            <a href="/" target="_blank" class="admin-sidebar-btn" title="Vissza a Lámsza-ra">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                     ><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
                     ></path><polyline points="9 22 9 12 15 12 15 22"
@@ -723,6 +966,19 @@
             </button>
 
             <button
+                class="admin-sidebar-btn {activeTab === 'counties'
+                    ? 'active'
+                    : ''}"
+                on:click={() => (activeTab = "counties")}
+                title="Megyék"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                    ><path d="M3 21V3h18v18H3zm2-2h14V5H5v14zm2-2h10v-2H7v2zm0-4h10v-2H7v2z"
+                    ></path></svg
+                >
+            </button>
+
+            <button
                 class="admin-sidebar-btn {activeTab === 'entry_categories'
                     ? 'active'
                     : ''}"
@@ -785,6 +1041,34 @@
                     ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
                 >
             </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'settings'
+                    ? 'active'
+                    : ''}"
+                on:click={() => { activeTab = "settings"; fetchSettings(); }}
+                title="Beállítások"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    ><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg
+                >
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'weather_translations' ? 'active' : ''}"
+                on:click={() => { activeTab = 'weather_translations'; fetchWeatherTranslations(); }}
+                title="Időjárás fordítások"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"></path><path d="M4 14l6-6 2-3"></path><path d="M2 5h12"></path><path d="M7 2h3l2 2 2 4-3 1"></path><path d="M22 22l-5-10-5 10"></path><path d="M14 18h6"></path></svg>
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'pages' ? 'active' : ''}"
+                on:click={() => { activeTab = 'pages'; fetchPages(); }}
+                title="Oldalak"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </button>
         </aside>
 
         <main class="admin-main">
@@ -798,6 +1082,10 @@
                         Kezelése{/if}
                     {#if activeTab === "entries"}Bejegyzések Kezelése{/if}
                     {#if activeTab === "entry_types"}Bejegyzés Típusok Kezelése{/if}
+                    {#if activeTab === "counties"}Megyék Kezelése{/if}
+                    {#if activeTab === "settings"}Beállítások{/if}
+                    {#if activeTab === "weather_translations"}Időjárás fordítások{/if}
+                    {#if activeTab === "pages"}Oldalak{/if}
                 </h2>
                 <button class="btn-logout" on:click={logout}
                     >Kijelentkezés</button
@@ -1337,29 +1625,44 @@
                         </select>
 
                         <label for="event_org">Szervező</label>
-                        <div class="flex gap-sm items-center">
-                            <input
-                                id="event_org"
-                                type="text"
-                                bind:value={newEvent.organizer}
-                                list="organizers_list"
-                                autocomplete="off"
-                                class="flex-1"
-                            />
-                            <datalist id="organizers_list">
-                                {#each entries as e}
-                                    <option value={e.name}></option>
-                                {/each}
-                            </datalist>
-                            <button
-                                type="button"
-                                class="btn-update"
-                                style="margin-bottom:0"
-                                on:click={() =>
-                                    (newOrganizerModalVisible = true)}
-                            >
-                                Új szervező
-                            </button>
+                        <div class="org-autosuggest-wrapper">
+                            <div class="org-autosuggest-row">
+                                <input
+                                    id="event_org"
+                                    type="text"
+                                    bind:value={orgQuery}
+                                    on:input={() => {
+                                        newEvent.organizer = orgQuery;
+                                        onOrgInput(false);
+                                    }}
+                                    on:focus={() => onOrgInput(false)}
+                                    on:blur={() => handleOrgBlur(false)}
+                                    autocomplete="off"
+                                    placeholder="Keresés szervező neve..."
+                                    class="flex-1"
+                                />
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    style="margin-bottom:0"
+                                    on:click={() =>
+                                        (newOrganizerModalVisible = true)}
+                                >
+                                    Új szervező
+                                </button>
+                            </div>
+                            {#if orgDropdownOpen && orgSuggestions.length > 0}
+                                <ul class="org-suggestions">
+                                    {#each orgSuggestions as s}
+                                        <li>
+                                            <button type="button" on:click={() => selectOrganizer(s.name, false)}>
+                                                <strong>{s.name}</strong>
+                                                {#if s.location}<span class="org-sug-meta">{s.location}</span>{/if}
+                                            </button>
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
                         </div>
 
                         <button type="submit" class="admin-submit-btn"
@@ -1372,7 +1675,9 @@
                             <thead>
                                 <tr>
                                     <th>Cím</th>
-                                    <th>Dátum és Idő</th>
+                                    <th>Kezdés</th>
+                                    <th>Befejezés</th>
+                                    <th>Típus</th>
                                     <th>Helyszín</th>
                                     <th>Szervező</th>
                                     <th>Szerk.</th>
@@ -1388,13 +1693,21 @@
                                                 e.start_date,
                                             ).toLocaleDateString("hu-HU")}
                                             {#if e.start_time}
-                                                - {e.start_time.slice(
-                                                    0,
-                                                    5,
-                                                )}{/if}
+                                                {e.start_time.slice(0, 5)}{/if}
                                         </td>
-                                        <td>{getLocationName(e.location_id)}</td
-                                        >
+                                        <td>
+                                            {#if e.end_date}
+                                                {new Date(
+                                                    e.end_date,
+                                                ).toLocaleDateString("hu-HU")}
+                                                {#if e.end_time}
+                                                    {e.end_time.slice(0, 5)}{/if}
+                                            {:else}
+                                                -
+                                            {/if}
+                                        </td>
+                                        <td>{({cultural: "Kulturális", sports: "Sport", festival: "Fesztivál", religious: "Vallási", other: "Egyéb"})[e.event_type] || e.event_type}</td>
+                                        <td>{getLocationName(e.location_id)}</td>
                                         <td>{e.organizer || "-"}</td>
                                         <td>
                                             <button
@@ -1418,7 +1731,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="6"
+                                        ><td colspan="8"
                                             >Nincsenek események.</td
                                         ></tr
                                     >
@@ -1672,6 +1985,187 @@
                     </div>
                 {/if}
 
+                <!-- Beállítások (Settings) Tab -->
+                {#if activeTab === "settings"}
+                    <section class="admin-form-section">
+                        <h3>Alapértelmezett település (MyLocation)</h3>
+                        <p class="admin-hint">A kezdőlap időjárás widgetje és az események szűrése ezt a települést használja alapértelmezettként.</p>
+                        <div class="admin-form" style="max-width: 32rem;">
+                            <label for="my_location_slug">Település</label>
+                            <select id="my_location_slug" bind:value={siteSettings.my_location_slug}>
+                                {#each locations as loc}
+                                    <option value={loc.slug}>{loc.name}{loc.county ? ` (${loc.county})` : ''}{loc.type ? ` – ${loc.type}` : ''}</option>
+                                {/each}
+                            </select>
+                            <div class="flex gap-md mt-md">
+                                <button type="button" class="admin-submit-btn" on:click={saveSettings} disabled={settingsSaving}>
+                                    {settingsSaving ? 'Mentés…' : 'Mentés'}
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="admin-form-section">
+                        <h3>Időjárás (Weather)</h3>
+                        <div class="admin-form" style="max-width: 32rem;">
+                            <label for="weather_provider_default">Alapértelmezett szolgáltató</label>
+                            <select id="weather_provider_default" bind:value={siteSettings.weather_provider_default}>
+                                <option value="open_meteo">Open-Meteo</option>
+                                <option value="weatherapi_com">WeatherAPI.com</option>
+                                <option value="openweathermap">OpenWeatherMap</option>
+                            </select>
+
+                            <span class="form-group-label">Szolgáltatók engedélyezése</span>
+                            <div class="flex gap-lg flex-wrap mb-lg">
+                                <label class="flex items-center gap-xs font-normal">
+                                    <input type="checkbox" checked={siteSettings.weather_provider_open_meteo_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_open_meteo_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
+                                    Open-Meteo
+                                </label>
+                                <label class="flex items-center gap-xs font-normal">
+                                    <input type="checkbox" checked={siteSettings.weather_provider_weatherapi_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_weatherapi_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
+                                    WeatherAPI.com
+                                </label>
+                                <label class="flex items-center gap-xs font-normal">
+                                    <input type="checkbox" checked={siteSettings.weather_provider_openweathermap_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_openweathermap_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
+                                    OpenWeatherMap
+                                </label>
+                            </div>
+
+                            <label for="weather_icon_style">Időjárás ikon stílus</label>
+                            <select id="weather_icon_style" bind:value={siteSettings.weather_icon_style}>
+                                <option value="emoji">Emoji</option>
+                                <option value="svg">SVG (saját ikonok)</option>
+                            </select>
+
+                            <label for="weather_cache_ttl">Időjárás cache TTL (perc)</label>
+                            <input id="weather_cache_ttl" type="number" min="1" max="1440" bind:value={siteSettings.weather_cache_ttl_minutes} />
+
+                            <label for="weather_active_users">Aktív felhasználók becslése</label>
+                            <input id="weather_active_users" type="number" min="1" bind:value={siteSettings.weather_active_users_estimate} />
+
+                            <div class="flex gap-md mt-md flex-wrap">
+                                <button type="button" class="admin-submit-btn" on:click={saveSettings} disabled={settingsSaving}>
+                                    {settingsSaving ? 'Mentés…' : 'Mentés'}
+                                </button>
+                                <button type="button" class="btn-update" on:click={clearWeatherCache} disabled={settingsCacheClearing}>
+                                    {settingsCacheClearing ? '…' : 'Időjárás cache törlése'}
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                {/if}
+
+                <!-- Időjárás fordítások (Weather translations) Tab -->
+                {#if activeTab === "weather_translations"}
+                    <p class="admin-hint">Ha nincs admin fordítás, a rendszer az alapértelmezett magyar szöveget jeleníti meg. Több nyelv támogatása (hu, ro, de) készen áll.</p>
+                    {#if editingWeatherTrans}
+                        <h3>Fordítás szerkesztése</h3>
+                        <form class="admin-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
+                            <label for="wet_src">Eredeti szöveg (pl. API angol)</label>
+                            <input id="wet_src" type="text" bind:value={editingWeatherTrans.source_text} required />
+                            <label for="wet_lang">Nyelv</label>
+                            <select id="wet_lang" bind:value={editingWeatherTrans.lang}>
+                                {#each WEATHER_TRANS_LANGS as opt}
+                                    <option value={opt.value}>{opt.label}</option>
+                                {/each}
+                            </select>
+                            <label for="wet_txt">Lefordított szöveg</label>
+                            <input id="wet_txt" type="text" bind:value={editingWeatherTrans.translated_text} required />
+                            <div class="flex gap-md mt-md">
+                                <button type="submit" class="admin-submit-btn">Mentés</button>
+                                <button type="button" class="btn-update" on:click={cancelEditWeatherTrans}>Mégse</button>
+                            </div>
+                        </form>
+                    {:else}
+                        <h3>Új fordítás</h3>
+                        <form class="admin-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
+                            <label for="wt_src">Eredeti szöveg (pl. overcast, partly cloudy)</label>
+                            <input id="wt_src" type="text" bind:value={newWeatherTrans.source_text} required placeholder="pl. overcast" />
+                            <label for="wt_lang">Nyelv</label>
+                            <select id="wt_lang" bind:value={newWeatherTrans.lang}>
+                                {#each WEATHER_TRANS_LANGS as opt}
+                                    <option value={opt.value}>{opt.label}</option>
+                                {/each}
+                            </select>
+                            <label for="wt_txt">Lefordított szöveg</label>
+                            <input id="wt_txt" type="text" bind:value={newWeatherTrans.translated_text} required placeholder="pl. borult" />
+                            <button type="submit" class="admin-submit-btn">Hozzáadás</button>
+                        </form>
+                    {/if}
+                    <div class="admin-table-wrapper mt-lg">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Eredeti</th>
+                                    <th>Nyelv</th>
+                                    <th>Fordítás</th>
+                                    <th>Szerk.</th>
+                                    <th>Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each weatherTranslations as wt}
+                                    <tr>
+                                        <td>{wt.source_text}</td>
+                                        <td>{wt.lang}</td>
+                                        <td>{wt.translated_text}</td>
+                                        <td><button type="button" class="btn-update" on:click={() => startEditWeatherTrans(wt)}>Szerk.</button></td>
+                                        <td><button type="button" class="btn-delete" on:click={() => deleteWeatherTranslation(wt.id)}>Törlés</button></td>
+                                    </tr>
+                                {:else}
+                                    <tr><td colspan="5">Nincs egyéni fordítás. Az alapértelmezett magyar szavak érvényesek.</td></tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+
+                <!-- Oldalak (Pages) Tab -->
+                {#if activeTab === "pages"}
+                    {#if editingPage}
+                        <h3>Oldal szerkesztése: {editingPage.title}</h3>
+                        <form class="admin-form" on:submit|preventDefault={savePage} style="max-width: 48rem;">
+                            <label for="page_title">Cím</label>
+                            <input id="page_title" type="text" bind:value={editingPage.title} required />
+
+                            <label for="page_content">Tartalom (HTML)</label>
+                            <textarea id="page_content" bind:value={editingPage.content} rows="20" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+
+                            <div class="flex gap-md mt-md">
+                                <button type="submit" class="admin-submit-btn" disabled={pageSaving}>
+                                    {pageSaving ? 'Mentés…' : 'Mentés'}
+                                </button>
+                                <button type="button" class="btn-update" on:click={cancelEditPage}>Mégse</button>
+                            </div>
+                        </form>
+                    {:else}
+                        <div class="admin-table-wrapper">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Slug</th>
+                                        <th>Cím</th>
+                                        <th>Utolsó módosítás</th>
+                                        <th>Szerk.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {#each adminPages as pg}
+                                        <tr>
+                                            <td><a href="/{pg.slug}" target="_blank">/{pg.slug}</a></td>
+                                            <td>{pg.title}</td>
+                                            <td>{pg.updated_at ? pg.updated_at.slice(0, 19) : ''}</td>
+                                            <td><button type="button" class="btn-update" on:click={() => startEditPage(pg)}>Szerk.</button></td>
+                                        </tr>
+                                    {:else}
+                                        <tr><td colspan="4">Nincsenek oldalak.</td></tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+                    {/if}
+                {/if}
+
                 <!-- Entry Types Tab -->
                 {#if activeTab === "entry_types"}
                     <h3>Új Típus</h3>
@@ -1732,6 +2226,53 @@
                                 {/each}
                             </tbody>
                         </table>
+                    </div>
+                {/if}
+
+                <!-- Counties Tab -->
+                {#if activeTab === "counties"}
+                    <p class="admin-info">Válaszd ki minden megye székhelyét. A kiválasztott település lesz a megyeszékhely.</p>
+                    <div class="counties-grid">
+                        {#each COUNTIES as county}
+                            {@const countySlug = county.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "")}
+                            {@const countyLocations = locations
+                                .filter(l => l.county === county && l.type !== "megye")
+                                .sort((a, b) => {
+                                    if (a.is_county_seat && !b.is_county_seat) return -1;
+                                    if (!a.is_county_seat && b.is_county_seat) return 1;
+                                    const typeOrder = {"municípium": 0, "város": 1, "község": 2, "falu": 3};
+                                    const ta = typeOrder[a.type] ?? 9;
+                                    const tb = typeOrder[b.type] ?? 9;
+                                    if (ta !== tb) return ta - tb;
+                                    return a.name.localeCompare(b.name);
+                                })}
+                            {@const currentSeat = countyLocations.find(l => l.is_county_seat)}
+                            <div class="county-card">
+                                <h3 class="county-card-title">{county} megye</h3>
+                                <p class="county-card-subtitle">
+                                    Megyeszékhely: <strong>{currentSeat ? currentSeat.name : "Nincs beállítva"}</strong>
+                                </p>
+                                <div class="county-seat-list">
+                                    {#each countyLocations as loc}
+                                        <label class="county-seat-row" class:is-seat={loc.is_county_seat}>
+                                            <input
+                                                type="radio"
+                                                name="seat_{countySlug}"
+                                                checked={loc.is_county_seat}
+                                                on:change={() => setCountySeat(loc.id)}
+                                            />
+                                            <span class="county-seat-name">{loc.name}</span>
+                                            <span class="county-seat-type">{loc.type}</span>
+                                            {#if loc.name_ro}
+                                                <span class="county-seat-ro">({loc.name_ro})</span>
+                                            {/if}
+                                        </label>
+                                    {:else}
+                                        <p>Nincsenek települések ebben a megyében.</p>
+                                    {/each}
+                                </div>
+                            </div>
+                        {/each}
                     </div>
                 {/if}
             </div>
@@ -2348,23 +2889,43 @@
                     </select>
 
                     <label for="edit_ev_org">Szervező</label>
-                    <div class="flex gap-sm items-center">
-                        <input
-                            id="edit_ev_org"
-                            type="text"
-                            bind:value={editingEvent.organizer}
-                            list="organizers_list"
-                            autocomplete="off"
-                            class="flex-1"
-                        />
-                        <button
-                            type="button"
-                            class="btn-update"
-                            style="margin-bottom:0"
-                            on:click={() => (newOrganizerModalVisible = true)}
-                        >
-                            Új szervező
-                        </button>
+                    <div class="org-autosuggest-wrapper">
+                        <div class="org-autosuggest-row">
+                            <input
+                                id="edit_ev_org"
+                                type="text"
+                                bind:value={orgEditQuery}
+                                on:input={() => {
+                                    editingEvent.organizer = orgEditQuery;
+                                    onOrgInput(true);
+                                }}
+                                on:focus={() => onOrgInput(true)}
+                                on:blur={() => handleOrgBlur(true)}
+                                autocomplete="off"
+                                placeholder="Keresés szervező neve..."
+                                class="flex-1"
+                            />
+                            <button
+                                type="button"
+                                class="btn-update"
+                                style="margin-bottom:0"
+                                on:click={() => (newOrganizerModalVisible = true)}
+                            >
+                                Új szervező
+                            </button>
+                        </div>
+                        {#if orgEditDropdownOpen && orgEditSuggestions.length > 0}
+                            <ul class="org-suggestions">
+                                {#each orgEditSuggestions as s}
+                                    <li>
+                                        <button type="button" on:click={() => selectOrganizer(s.name, true)}>
+                                            <strong>{s.name}</strong>
+                                            {#if s.location}<span class="org-sug-meta">{s.location}</span>{/if}
+                                        </button>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
                     </div>
 
                     <div class="modal-actions">
@@ -2582,5 +3143,108 @@
     }
     .mb-lg {
         margin-bottom: 1rem;
+    }
+    .admin-info {
+        color: var(--text-faint, #666);
+        margin-bottom: 1rem;
+    }
+    .counties-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+        gap: 1.5rem;
+    }
+    .county-card {
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 8px;
+        padding: 1.25rem;
+        background: var(--card-bg, #fff);
+    }
+    .county-card-title {
+        margin: 0 0 0.25rem;
+        font-size: 1.15rem;
+    }
+    .county-card-subtitle {
+        margin: 0 0 1rem;
+        font-size: 0.9rem;
+        color: var(--text-faint, #666);
+    }
+    .county-seat-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .county-seat-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.1s;
+    }
+    .county-seat-row:hover {
+        background: var(--hover-bg, #f3f4f6);
+    }
+    .county-seat-row.is-seat {
+        background: var(--accent-bg, #e0f2fe);
+        font-weight: 600;
+    }
+    .county-seat-name {
+        flex: 1;
+    }
+    .county-seat-type {
+        font-size: 0.8rem;
+        color: var(--text-faint, #999);
+    }
+    .county-seat-ro {
+        font-size: 0.8rem;
+        color: var(--text-faint, #999);
+    }
+
+    .org-autosuggest-wrapper {
+        position: relative;
+    }
+    .org-autosuggest-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+    .org-suggestions {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        background: var(--card-bg, #1e1e2e);
+        border: 1px solid var(--border-color, #444);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        max-height: 240px;
+        overflow-y: auto;
+    }
+    .org-suggestions li button {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: none;
+        background: none;
+        color: var(--text-color, #ccc);
+        cursor: pointer;
+        font-size: 0.9rem;
+        text-align: left;
+    }
+    .org-suggestions li button:hover {
+        background: var(--accent-bg, #2a2a3e);
+    }
+    .org-sug-meta {
+        font-size: 0.8rem;
+        color: var(--text-faint, #888);
     }
 </style>

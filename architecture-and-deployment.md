@@ -1,7 +1,7 @@
 # Architecture & Deployment Guide
 
 ## Core Architecture
-- **Frontend**: SvelteKit, compiled to a Node.js adapter build.
+- **Frontend**: SvelteKit, statically pre-rendered with `@sveltejs/adapter-static` into the `dist` directory.
 - **Backend**: Go (1.25.7) compiling to a single binary `sz-gugel-bin`.
 - **Database**: PostgreSQL.
 

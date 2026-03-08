@@ -12,13 +12,18 @@ import (
 	"backend/internal/middleware"
 	"backend/internal/mondasok"
 	"backend/internal/news"
+	"backend/internal/pages"
 	"backend/internal/search"
+	"backend/internal/settings"
 	"backend/internal/weather"
 )
 
 func main() {
 	config.Load()
 	db.InitDB()
+	settings.MigrateSiteSettings()
+	weather.MigrateWeatherTranslations()
+	pages.MigratePages()
 
 	mux := http.DefaultServeMux
 
@@ -31,21 +36,34 @@ func main() {
 	mux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	mux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
 	mux.HandleFunc("/api/admin/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	mux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
+
+	// Public config (weather cache TTL, version) + admin settings
+	mux.HandleFunc("/api/config/public", middleware.ApplyCORS(settings.HandlePublicConfig))
+	mux.HandleFunc("/api/admin/settings", middleware.ApplyCORS(settings.HandleAdminSettings))
+	mux.HandleFunc("/api/admin/settings/clear-weather-cache", middleware.ApplyCORS(settings.ClearWeatherCache))
+
+	// Pages (public + admin)
+	mux.HandleFunc("/api/pages", middleware.ApplyCORS(pages.HandlePublicPage))
+	mux.HandleFunc("/api/admin/pages", middleware.ApplyCORS(pages.HandleAdminPages))
 
 	// Optional Modules
 	if config.AppConfig.Features.Weather {
 		mux.HandleFunc("/api/weather", middleware.ApplyCORS(weather.HandleWeather))
+		mux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
+		mux.HandleFunc("/api/admin/weather_translations", middleware.ApplyCORS(weather.HandleAdminWeatherTranslations))
 		log.Println("Module [Weather] enabled")
 	}
 
 	if config.AppConfig.Features.Events {
 		mux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
+		mux.HandleFunc("/api/events/detail", middleware.ApplyCORS(events.HandleEventDetail))
 		mux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
 		log.Println("Module [Events] enabled")
 	}
 
 	if config.AppConfig.Features.News {
-		mux.HandleFunc("/api/county_news", middleware.ApplyCORS(news.HandleCountyNews))
+		mux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 		mux.HandleFunc("/api/admin/news_feeds", middleware.ApplyCORS(news.HandleAdminNewsFeeds))
 		log.Println("Module [News] enabled")
 	}
@@ -61,6 +79,7 @@ func main() {
 	}
 
 	if config.AppConfig.Features.Search {
+		mux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
 		mux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 		mux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
 		log.Println("Module [Search] enabled")

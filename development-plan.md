@@ -3,7 +3,7 @@
 ## Strict Rules (repeat in every major prompt)
 - Use only SvelteKit + vanilla CSS + vanilla JavaScript
 - No Tailwind, no UnoCSS, no third-party CSS/JS libraries
-- All CSS must be in global.css (or imported from it) – NEVER duplicate styles in components
+- All CSS must be in shared global stylesheets (e.g. `global.css` and `admin.css`, or files imported from them) – NEVER duplicate styles in components
 - Reuse shared JS utilities from global.js when possible
 - Keep bundle small, optimize for low server cost
 - Mobile-first responsive design
@@ -22,8 +22,8 @@
 5. Ensure full responsiveness
 
 ### Phase 2 – Data & Search (Postgres + Admin foundation) (done)
-6. Set up PostgreSQL schema (tables for services, service_categories, mondasok, quick_links, news_feeds)
-7. Implement Go API endpoints (CRUD for all tables, joined queries for public services)
+6. Set up PostgreSQL schema (tables for entries, entry_categories, entry_types, mondasok, quick_links, news_feeds, tags, entry_tags)
+7. Implement Go API endpoints (CRUD for all tables, joined queries for public entries)
 8. Create admin panel (/admin) with CRUD for all tables, unified styling, and news refresh
 9. Update homepage search to fetch from local DB, integrate weather/news
 10. Wire external buttons to open new tabs with custom background colors
@@ -34,7 +34,7 @@
 11. Quick links grid
 
 ### Phase 4 – Directory Page & Unified Search (done)
-12. Create /szolgaltatasok route with dynamic category tabs and URLs
+12. Create directory routes with dynamic category tabs and URLs (e.g. `/index`, `/index/[category]`, `/index/szolgaltatasok`)
 13. Implement real search on homepage → local DB first, weather/news integration
 14. Results highlighted by type (green/directory, blue/weather, orange/news)
 15. No directory matches → fallback message + external buttons

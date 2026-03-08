@@ -7,7 +7,7 @@ Lamsza is a full-stack platform featuring a local service directory with advance
 
 ## Tech Stack
 - **Frontend**: SvelteKit (Vanilla CSS & JS)
-- **Backend**: Go (Gin, PostgreSQL)
+- **Backend**: Go (net/http, PostgreSQL)
 - **Database**: PostgreSQL (with Full-Text Search)
 - **Deployment**: Docker Compose
 

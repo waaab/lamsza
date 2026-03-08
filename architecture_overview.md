@@ -21,17 +21,17 @@ erDiagram
     LOCATIONS ||--o{ EVENTS : "holds"
     LOCATIONS ||--o{ LOCATIONS : "hierarchical"
     ENTRY_CATEGORIES ||--o{ ENTRIES : "classifies"
-    ENTRY_TYPES ||--o{ ENTRIES : "defines"
+    ENTRY_TYPES ||--o{ ENTRIES : "categorizes_type"
     
     %% Tagging Logic
-    TAGS ||--o{ ENTRY_TAG_MAP : "labels"
-    ENTRIES ||--o{ ENTRY_TAG_MAP : "mapped_to"
+    TAGS ||--o{ ENTRY_TAGS : "labels"
+    ENTRIES ||--o{ ENTRY_TAGS : "mapped_to"
 
     ENTRIES {
         int id PK
         int location_id FK
         int category_id FK
-        int type_id FK
+        varchar type
         varchar name
         varchar slug
         varchar url

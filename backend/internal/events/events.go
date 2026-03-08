@@ -5,40 +5,86 @@ import (
 	"backend/internal/models"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 )
+
+type paginatedResponse struct {
+	Events []models.Event `json:"events"`
+	Total  int            `json:"total"`
+}
 
 func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	locationSlug := r.URL.Query().Get("location_slug")
 	countySlug := r.URL.Query().Get("county_slug")
+	organizer := r.URL.Query().Get("organizer")
+	locationType := r.URL.Query().Get("location_type")
 
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 0
+	offset := 0
+	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 {
+		limit = v
+	}
+	if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+		offset = v
+	}
+
+	var total int
 	var rows *sql.Rows
 	var err error
 
-	if locationSlug != "" {
-		rows, err = db.DB.Query(`
-			SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description, 
-			       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
-			FROM events e
-			JOIN locations l ON e.location_id = l.id
-			WHERE l.slug = $1
-			ORDER BY e.start_date ASC`, locationSlug)
+	baseSelect := `SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description,
+		e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer, COALESCE(l.type, '')
+		FROM events e
+		JOIN locations l ON e.location_id = l.id`
+
+	baseCount := `SELECT COUNT(*) FROM events e JOIN locations l ON e.location_id = l.id`
+
+	var conditions []string
+	var args []interface{}
+	argIdx := 1
+
+	conditions = append(conditions, "e.end_date >= CURRENT_DATE")
+
+	if organizer != "" {
+		conditions = append(conditions, fmt.Sprintf("e.organizer = $%d", argIdx))
+		args = append(args, organizer)
+		argIdx++
+	} else if locationSlug != "" {
+		conditions = append(conditions, fmt.Sprintf("(l.slug = $%d OR l.parent_id = (SELECT id FROM locations WHERE slug = $%d))", argIdx, argIdx))
+		args = append(args, locationSlug)
+		argIdx++
 	} else if countySlug != "" {
-		rows, err = db.DB.Query(`
-			SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description, 
-			       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
-			FROM events e
-			JOIN locations l ON e.location_id = l.id
-			WHERE l.county_slug = $1
-			ORDER BY e.start_date ASC`, countySlug)
-	} else {
-		rows, err = db.DB.Query(`
-			SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description, 
-			       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
-			FROM events e
-			JOIN locations l ON e.location_id = l.id
-			ORDER BY e.start_date ASC`)
+		conditions = append(conditions, fmt.Sprintf("l.county_slug = $%d", argIdx))
+		args = append(args, countySlug)
+		argIdx++
 	}
+
+	if locationType != "" {
+		conditions = append(conditions, fmt.Sprintf("l.type = $%d", argIdx))
+		args = append(args, locationType)
+		argIdx++
+	}
+
+	where := " WHERE " + strings.Join(conditions, " AND ")
+
+	err = db.DB.QueryRow(baseCount+where, args...).Scan(&total)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
+	query := baseSelect + where + " ORDER BY e.start_date ASC"
+	if limit > 0 {
+		query += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
+		args = append(args, limit, offset)
+	}
+	rows, err = db.DB.Query(query, args...)
 
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -49,11 +95,42 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	events := []models.Event{}
 	for rows.Next() {
 		var ev models.Event
-		if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer); err == nil {
+		if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer, &ev.LocationType); err == nil {
 			events = append(events, ev)
 		}
 	}
-	json.NewEncoder(w).Encode(events)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(paginatedResponse{Events: events, Total: total})
+}
+
+func HandleEventDetail(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		http.Error(w, "Missing id parameter", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "Invalid id", http.StatusBadRequest)
+		return
+	}
+
+	var ev models.Event
+	err = db.DB.QueryRow(`
+		SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description,
+		       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer, COALESCE(l.type, '')
+		FROM events e
+		JOIN locations l ON e.location_id = l.id
+		WHERE e.id = $1`, id).Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer, &ev.LocationType)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Event not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	json.NewEncoder(w).Encode(ev)
 }
 
 func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {

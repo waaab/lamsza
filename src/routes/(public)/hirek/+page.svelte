@@ -1,5 +1,5 @@
 <script>
-    import { onMount, onDestroy } from "svelte";
+    import { onMount } from "svelte";
 
     let allNewsItems = [];
     let visibleCount = 9;
@@ -183,28 +183,6 @@
     const DEFAULT_IMAGE =
         "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='225' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%232f4f4f'/%3E%3Ctext x='200' y='113' text-anchor='middle' dominant-baseline='middle' fill='%23a0c0b0' font-size='15' font-family='system-ui'%3E%F0%9F%93%B0 Sz%C3%A9kely Gugel%3C%2Ftext%3E%3C%2Fsvg%3E";
 
-    function extractImage(node) {
-        // 1. <enclosure> with image type
-        const enc = node.querySelector("enclosure");
-        if (
-            enc?.getAttribute("url") &&
-            enc.getAttribute("type")?.startsWith("image")
-        ) {
-            return enc.getAttribute("url");
-        }
-        // 2. <media:content> or <media:thumbnail> (namespace-agnostic query)
-        const mc =
-            node.querySelector("content") || node.querySelector("thumbnail");
-        if (mc?.getAttribute("url")) return mc.getAttribute("url");
-
-        // 3. <img> inside <description>
-        const desc = node.querySelector("description")?.textContent || "";
-        const m = desc.match(/<img[^>]+src=["']([^"']+)["']/i);
-        if (m) return m[1];
-
-        return null;
-    }
-
     function formatDate(ts) {
         return new Date(ts).toLocaleString("hu-HU", {
             year: "numeric",
@@ -227,130 +205,63 @@
         const isMobile = window.innerWidth < 768;
         sourcesOpen = !isMobile;
 
-        const NEWS_CACHE_KEY = "news_cache";
+        const NEWS_CACHE_KEY = "hirek_cache";
         const NEWS_TTL = 30 * 60 * 1000;
 
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL;
-            if (!apiBase)
-                console.warn(
-                    "VITE_API_BASE_URL is not set. Falling back to http://localhost:3000",
-                );
-            const baseUrl = apiBase || "http://localhost:3000";
-
-            const feedsRes = await fetch(`${baseUrl}/api/admin/news_feeds`);
-            let dbFeeds = [];
-            if (feedsRes.ok) {
-                dbFeeds = await feedsRes.json();
-            } else {
-                throw new Error(`News feeds API hiba: ${feedsRes.status}`);
-            }
-            sources = dbFeeds || [];
-
-            if (!dbFeeds || dbFeeds.length === 0) {
-                error = true;
-                loading = false;
-                return;
-            }
+            const apiBase =
+                import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
             // Try cache first
             const cached = localStorage.getItem(NEWS_CACHE_KEY);
             if (cached) {
-                const { items, timestamp } = JSON.parse(cached);
+                const { items, feedSources, timestamp } = JSON.parse(cached);
                 if (Date.now() - timestamp < NEWS_TTL && items?.length > 0) {
                     allNewsItems = items;
+                    sources = feedSources || [];
                     cacheTimestamp = timestamp;
                     loading = false;
                     return;
                 }
             }
 
-            // Fetch all feeds
-            const allItems = [];
-            const tsObj = JSON.parse(
-                localStorage.getItem("news_feed_timestamps") || "{}",
-            );
-
-            for (const feedObj of dbFeeds) {
-                const feedUrl = feedObj.feed_url;
-                try {
-                    const proxiedUrl =
-                        `${baseUrl}/api/proxy?url=` +
-                        encodeURIComponent(feedUrl);
-                    const response = await fetch(proxiedUrl);
-                    const text = await response.text();
-                    const parser = new DOMParser();
-                    const xml = parser.parseFromString(text, "text/xml");
-                    const nodes = Array.from(
-                        xml.querySelectorAll("item"),
-                    ).slice(0, 20);
-
-                    tsObj[feedUrl] = Date.now();
-
-                    nodes.forEach((node) => {
-                        try {
-                            allItems.push({
-                                title:
-                                    node.querySelector("title")?.textContent ||
-                                    "Cím nélkül",
-                                link:
-                                    node.querySelector("link")?.textContent ||
-                                    "#",
-                                pubDate:
-                                    new Date(
-                                        node.querySelector(
-                                            "pubDate",
-                                        )?.textContent,
-                                    ).getTime() || 0,
-                                source: feedObj.title || "Ismeretlen",
-                                bgColor: feedObj.bg_color || "#222",
-                                image: extractImage(node),
-                            });
-                        } catch (e) {
-                            console.error("RSS elem hiba:", e);
-                        }
-                    });
-                } catch (e) {
-                    console.error("RSS forrás hiba:", feedUrl, e);
-                }
+            // Fetch sources list for sidebar
+            const feedsRes = await fetch(`${apiBase}/api/admin/news_feeds`);
+            if (feedsRes.ok) {
+                sources = (await feedsRes.json()) || [];
             }
 
-            localStorage.setItem("news_feed_timestamps", JSON.stringify(tsObj));
+            // Fetch parsed news from backend
+            const newsRes = await fetch(`${apiBase}/api/news?limit=100`);
+            if (!newsRes.ok) throw new Error(`News API: ${newsRes.status}`);
+            const allItems = await newsRes.json();
 
             if (allItems.length > 0) {
-                allItems.sort((a, b) => b.pubDate - a.pubDate);
                 allNewsItems = allItems;
                 const now = Date.now();
                 cacheTimestamp = now;
                 localStorage.setItem(
                     NEWS_CACHE_KEY,
-                    JSON.stringify({ items: allItems, timestamp: now }),
+                    JSON.stringify({
+                        items: allItems,
+                        feedSources: sources,
+                        timestamp: now,
+                    }),
                 );
             } else {
                 error = true;
             }
         } catch (err) {
-            console.error("Teljes RSS lekérési hiba:", err);
-            // Stale cache fallback — show old news rather than an error
+            console.error("News fetch error:", err);
             const staleNews = localStorage.getItem(NEWS_CACHE_KEY);
             if (staleNews) {
                 try {
-                    const { items, timestamp } = JSON.parse(staleNews);
+                    const { items, feedSources, timestamp } =
+                        JSON.parse(staleNews);
                     if (items && items.length > 0) {
                         allNewsItems = items;
+                        sources = feedSources || [];
                         cacheTimestamp = timestamp ?? null;
-                        // Rebuild sources list from cached items
-                        const seen = new Set();
-                        sources = items
-                            .filter((i) => {
-                                if (seen.has(i.source)) return false;
-                                seen.add(i.source);
-                                return true;
-                            })
-                            .map((i) => ({
-                                title: i.source,
-                                bg_color: i.bgColor,
-                            }));
                         loading = false;
                         return;
                     }
@@ -457,9 +368,7 @@
         <span class="header-tabs-label">Leggyakoribb témák:</span>
         <div class="chips-scroll-wrapper">
             <div class="chips-list">
-                {#each Array(6) as _}
-                    <div class="btn-skeleton"></div>
-                {/each}
+                <span class="btn btn-md" style="opacity:0.5">adat betöltés...</span>
             </div>
         </div>
     </div>
@@ -502,7 +411,7 @@
 
 {#if selectedSource || selectedWord}
     <div class="filter-actions">
-        <div class="info-box">
+        <span class="info-box">
             <p>
                 {#if selectedSource && selectedWord}
                     💡 Leszűrve:<span class="active"
@@ -530,7 +439,7 @@
             <p>
                 <span>({displayItems.length}/{totalCount})</span>
             </p>
-        </div>
+        </span>
 
         <div class="view-mode-toggle">
             <button
@@ -594,14 +503,14 @@
     </div>
 {:else}
     <div class="filter-actions">
-        <div class="info-box">
+        <span class="info-box">
             <p>
                 💡 Leszűrve: <span class="active">Összes</span>
             </p>
             <p>
                 <span>({displayItems.length}/{totalCount})</span>
             </p>
-        </div>
+        </span>
 
         <div class="view-mode-toggle">
             <button
@@ -672,7 +581,7 @@
             <div class="list grid">
                 {#each Array(9) as _}
                     <div class="card news--skeleton">
-                        <div class="news-img-wrap skeleton"></div>
+                        <div class="img-wrap skeleton"></div>
                         <div class="news-body">
                             <div class="skeleton skeleton-text"></div>
                             <div
@@ -683,9 +592,9 @@
                 {/each}
             </div>
         {:else if error}
-            <div class="note error">
-                Hírek jelenleg nem elérhetők. Próbáld újra hamarosan.
-            </div>
+            <span class="info-box error">
+                <p>Hírek jelenleg nem elérhetők. Próbáld újra hamarosan.</p>
+            </span>
         {:else}
             <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
                 {#each displayItems as item}
@@ -696,7 +605,7 @@
                             rel="nofollow noopener"
                             class="news-link"
                         >
-                            <div class="news-img-wrap">
+                            <div class="img-wrap">
                                 <img
                                     src={item.image || DEFAULT_IMAGE}
                                     alt={item.title}
@@ -749,22 +658,14 @@
                 {#if loading}
                     <ul class="news-sidebar-sources">
                         {#each Array(5) as _}
-                            <div
-                                class="news-sidebar-source-item sidebar-loader-item"
-                            >
-                                <span class="news-source-dot skeleton"></span>
-                                <span
-                                    class="skeleton skeleton-text sidebar-loader-text"
-                                ></span>
+                            <div class="news-sidebar-source-item sidebar-loader-item">
+                                <span class="news-source-dot" style:background="var(--border-color)"></span>
+                                <span>adat betöltés...</span>
                             </div>
                         {/each}
                     </ul>
-                    <small
-                        class="news-cache-timestamp sidebar-cache-timestamp-loading"
-                    >
-                        &#128336; Utoljára frissítve: <span
-                            class="skeleton skeleton-text sidebar-loader-ts-skeleton"
-                        ></span>
+                    <small class="news-cache-timestamp" style="opacity:0.5">
+                        &#128336; Utoljára frissítve: ...
                     </small>
                 {:else if sources.length > 0}
                     <ul class="news-sidebar-sources">
@@ -801,9 +702,9 @@
                         {/each}
                     </ul>
                 {:else}
-                    <div class="note warn">
-                        Nincsenek elérhető hírforrások. Szerver lekérési hiba.
-                    </div>
+                    <span class="info-box warn">
+                        <p>Nincsenek elérhető hírforrások. Szerver lekérési hiba.</p>
+                    </span>
                 {/if}
                 {#if !loading && cacheTimestamp}
                     <small class="news-cache-timestamp">
@@ -826,7 +727,7 @@
 
 {#if selectedSource || selectedWord}
     <div class="filter-actions">
-        <div class="info-box">
+        <span class="info-box">
             <p>
                 {#if selectedSource && selectedWord}
                     💡 Leszűrve:<span class="active"
@@ -854,7 +755,7 @@
             <p>
                 <span>({displayItems.length}/{totalCount})</span>
             </p>
-        </div>
+        </span>
 
         <div class="view-mode-toggle">
             <button
@@ -1008,9 +909,9 @@
         <details class="faq-item" open>
             <summary>Milyen sűrűn frissülnek a hírek?</summary>
             <p>
-                A hírek 30 percenként töltődnek be újra a szerverről. Az első
+                A hírek 30 percenként töltődnek be újra a források szerveréről. Az első
                 látogatás után a böngésző gyorsítótár (localStorage) tárolja az
-                adatokat, így a következő 23:30 percen belül történő látogatás
+                adatokat, így a következő 30 percen belül történő látogatás
                 azonnali.
             </p>
         </details>
@@ -1053,14 +954,15 @@
     </div>
 </section>
 
-<section class="note info" id="disclaimer">
-    A lamsza.com hírlvasó egy ingyenes hírgyűjtő és szűrő szolgáltatás. A hírek
-    tartalma és a hozzájuk tartozó képek az eredeti hírforrások szerzői jogi
-    védelme alatt állnak. A lamsza.com nem vállal felelősséget ezen források
-    tartalmáért. Az oldalon megjelenő időpont vagy dátum azt az időpillanatot
-    jelöli, amikor a hírt a rendszerünk indexelte.
+<section id="disclaimer">
+    <span class="note info">
+        <p>A lamsza.com hírlvasó egy ingyenes hírgyűjtő és szűrő szolgáltatás. A hírek
+        tartalma és a hozzájuk tartozó képek az eredeti hírforrások szerzői jogi
+        védelme alatt állnak. A lamsza.com nem vállal felelősséget ezen források
+        tartalmáért. Az oldalon megjelenő időpont vagy dátum azt az időpillanatot
+        jelöli, amikor a hírt a rendszerünk indexelte.</p>
+    </span>
 </section>
-
 <style>
     .news-word-count {
         opacity: 0.6;
@@ -1069,21 +971,6 @@
     }
     .sidebar-loader-item {
         pointer-events: none;
-    }
-    .sidebar-loader-text {
-        width: 70%;
-        height: 0.75rem;
-        margin: 0;
-    }
-    .sidebar-cache-timestamp-loading {
-        opacity: 0.45;
-    }
-    .sidebar-loader-ts-skeleton {
-        display: inline-block;
-        width: 4rem;
-        height: 0.65rem;
-        vertical-align: middle;
-        margin: 0;
     }
     .dot-all-sources {
         background: var(--border-color);

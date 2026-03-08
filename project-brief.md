@@ -12,7 +12,7 @@ Primary use case: every new browser tab + browsing local entries.
 - Fast, simple, reliable
 - Minimal server costs
 - 100% vanilla CSS + vanilla JavaScript (no Tailwind, no libraries)
-- All styling in one global.css file – no component-local CSS duplication
+- All styling centralized in shared stylesheets (`global.css` for the public app, `admin.css` for the admin shell) – no component-local CSS duplication
 - Reuse global.js utilities when possible
 - Robust Modularization: Package-based backend (Go) and component-based frontend (Svelte) with strict separation of concerns.
 - Component-Based UI: Reusable widgets and UI elements extracted into `$lib/components/` for 100% DRY (Don't Repeat Yourself) code.
@@ -73,7 +73,6 @@ Primary use case: every new browser tab + browsing local entries.
 **Non-Goals for v1.0**
 - Google Sign-In / user accounts (defer to v1.2)
 - Custom user links / saved favorites
-- Dark mode toggle (defer to v1.2)
 
 **Success Criteria for v1.0**
 - Extension overrides new tab correctly

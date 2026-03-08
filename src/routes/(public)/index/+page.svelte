@@ -79,9 +79,7 @@
 <div class="header-tabs">
     <span class="header-tabs-label">Kiemelt Kategóriák:</span>
     {#if loading}
-        {#each Array(6) as _}
-            <div class="btn-skeleton"></div>
-        {/each}
+        <span class="btn btn-md" style="opacity:0.5">adat betöltés...</span>
     {:else}
         {#each dynamicCategories as cat}
             <button
@@ -93,7 +91,7 @@
 </div>
 
 <div class="filter-actions">
-    <div class="info-box">
+    <span class="info-box">
         <p>
             {#if currentCategory === "osszes"}
                 💡 Leszűrve: <span class="active">Összes</span>
@@ -109,7 +107,7 @@
             {/if}
         </p>
         <p><span>({displayItems.length}/{totalCount})</span></p>
-    </div>
+    </span>
 
     <div class="view-mode-toggle">
         <div class="sort-toggle">
@@ -137,7 +135,8 @@
                 <span>{sortLabels[sortMode]}</span>
             </button>
             {#if sortOpen}
-                <div class="sort-toggle-menu">
+                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                <div class="sort-toggle-menu" on:click|stopPropagation>
                     <button
                         class:active={sortMode === "title"}
                         on:click={() => setSortMode("title")}>Név (A→Z)</button
@@ -149,14 +148,70 @@
                 </div>
             {/if}
         </div>
+
         <button
             class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
-            on:click={() => (viewMode = "grid")}>Rács</button
+            on:click={() => (viewMode = "grid")}
+            title="Rács nézet"
         >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><rect x="3" y="3" width="7" height="7"></rect><rect
+                    x="14"
+                    y="3"
+                    width="7"
+                    height="7"
+                ></rect><rect x="14" y="14" width="7" height="7"></rect><rect
+                    x="3"
+                    y="14"
+                    width="7"
+                    height="7"
+                ></rect></svg
+            >
+            <span>Rács</span>
+        </button>
         <button
             class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
-            on:click={() => (viewMode = "flex")}>Lista</button
+            on:click={() => (viewMode = "flex")}
+            title="Lista nézet"
         >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><line x1="8" y1="6" x2="21" y2="6"></line><line
+                    x1="8"
+                    y1="12"
+                    x2="21"
+                    y2="12"
+                ></line><line x1="8" y1="18" x2="21" y2="18"></line><line
+                    x1="3"
+                    y1="6"
+                    x2="3.01"
+                    y2="6"
+                ></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line
+                    x1="3"
+                    y1="18"
+                    x2="3.01"
+                    y2="18"
+                ></line></svg
+            >
+            <span>Lista</span>
+        </button>
     </div>
 </div>
 
@@ -171,9 +226,11 @@
         {/each}
     </div>
 {:else if error}
-    <div class="note error">{error}</div>
+    <span class="info-box error">
+        <p>{error}</p>
+    </span>
 {:else if displayItems.length === 0}
-    <div class="note info">Nincs megjeleníthető bejegyzés.</div>
+    <span class="info-box info"><p>Nincs megjeleníthető bejegyzés.</p></span>
 {:else}
     <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
         {#each displayItems as entry}
@@ -187,25 +244,3 @@
         </div>
     {/if}
 {/if}
-
-<style>
-    .entry--skeleton {
-        height: 150px;
-        display: flex;
-        flex-direction: column;
-        padding: 1rem;
-        gap: 0.5rem;
-    }
-    .skeleton-cat {
-        width: 30%;
-    }
-    .skeleton-title {
-        width: 80%;
-        margin-top: 0.5rem;
-        height: 1.2rem;
-    }
-    .skeleton-loc {
-        width: 60%;
-        margin-top: auto;
-    }
-</style>

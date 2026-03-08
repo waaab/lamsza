@@ -54,64 +54,78 @@
     });
 </script>
 
-<article id="idojaras" class="weather-card">
+<div id="idojaras" class="weather-card simple">
     {#if loading}
-        <div class="weather-left">
-            <span class="widget-title">Időjárás</span>
-            <div class="weather-temp-row">
-                <div class="skeleton weather-skeleton-temp"></div>
+        <span class="widget-title">Időjárás</span>
+        <div class="widget-content">
+            <div class="weather-left">
+                <div class="weather-temp-row">
+                    <div class="skeleton weather-skeleton-temp"></div>
+                </div>
+
+                {#if loading}
+                    <span class="weather-desc capitalize">adat betöltés...</span>
+                {/if}
+                {#if weatherData}
+                    <span class="weather-desc capitalize">
+                        {weatherData.desc || 'nincs adat'}
+                    </span>
+                {/if}
+                <div class="weather-desc">
+                    <div class="skeleton weather-skeleton-desc"></div>
+                </div>
             </div>
-            <div class="weather-desc">
-                <div class="skeleton weather-skeleton-desc"></div>
-            </div>
-            <div class="weather-footer">
-                <div class="skeleton skeleton-footer-1"></div>
-                <div class="skeleton skeleton-footer-2"></div>
+            <div class="weather-right">
+                <span class="weather-icon">⛅</span>
             </div>
         </div>
-        <div class="weather-right">
-            <span class="weather-icon">⛅</span>
+        <div class="weather-footer">
+            <div class="skeleton skeleton-footer-1"></div>
+            <div class="skeleton skeleton-footer-2"></div>
         </div>
     {:else if error}
-        <div class="weather-left">
-            <span class="widget-title">Időjárás</span>
-            <p class="weather-error">Időjárás adat nem elérhető.</p>
-        </div>
-        <div class="weather-right">
-            <span class="weather-icon">⛅</span>
-        </div>
+        <span class="widget-title">Időjárás</span>
+        <div class="widget-content">
+            <div class="weather-left">
+                <p class="weather-error">Időjárás adat nem elérhető.</p>
+            </div>
+            <div class="weather-right">
+                <span class="weather-icon">⛅</span>
+            </div>
+        </div>        
     {:else if weatherData}
-        <div class="weather-left">
-            <span class="widget-title">Időjárás</span>
-            <div class="weather-temp-row">
-                <span class="weather-temp">{weatherData.temp}</span><span
-                    class="weather-temp-unit">°C</span
-                >
-                {#if weatherData.tempMin != null}
-                    <span class="weather-temp-min"
-                        >/ {weatherData.tempMin}°C</span
-                    >
-                {/if}
+        <span class="widget-title">Időjárás</span>
+        <div class="widget-content">
+            <div class="weather-left">
+                <div class="weather-temp-row">
+                    <span class="weather-temp">{weatherData.temp}</span>
+                    <span class="weather-temp-unit">°C</span>
+                    {#if weatherData.tempMin != null}
+                        <span class="weather-temp-min">/ {weatherData.tempMin}°C</span>
+                    {/if}
+                </div>
+                <div class="weather-desc capitalize">
+                    {weatherData.desc}
+                </div>
             </div>
-            <div class="weather-desc capitalize">
-                {weatherData.desc}
-            </div>
-            <div class="weather-footer">
-                <small class="weather-timestamp"
-                    >Utoljára frissítve: {formatTime(
-                        weatherData.timestamp,
-                    )}</small
-                >
-                <small class="weather-source">Forrás: OpenWeatherMap</small>
+            <div class="weather-right">
+                <span class="weather-icon">{weatherIconEmoji(weatherData.icon)}</span>
             </div>
         </div>
-        <div class="weather-right">
-            <span class="weather-icon"
-                >{weatherIconEmoji(weatherData.icon)}</span
+        <div class="weather-footer">
+            <small class="weather-timestamp"
+                >Utoljára frissítve: {formatTime(
+                    weatherData.timestamp,
+                )}</small
             >
+            {#if weatherData.source}
+                <small class="weather-source" title="Forrás: {weatherData.source}">Forrás: {weatherData.source}</small>
+            {:else}
+                <small class="weather-source" title="Időjárás adat">—</small>
+            {/if}
         </div>
     {/if}
-</article>
+</div>
 
 <style>
     .capitalize {
@@ -129,5 +143,15 @@
     .skeleton-footer-2 {
         width: 90px;
         height: 0.75rem;
+    }
+
+    .widget-content{
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "left right"
+            "footer footer";
+        column-gap: 0.5rem;
+        justify-items: start;
     }
 </style>

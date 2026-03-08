@@ -7,9 +7,11 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	Port        string
-	Features    struct {
+	DatabaseURL       string
+	Port              string
+	WeatherAPIKey     string
+	WeatherAPIComKey  string
+	Features          struct {
 		Weather    bool
 		Events     bool
 		News       bool
@@ -31,6 +33,8 @@ func Load() {
 
 	AppConfig.DatabaseURL = getEnv("DATABASE_URL", "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable")
 	AppConfig.Port = getEnv("PORT", "3000")
+	AppConfig.WeatherAPIKey = getEnv("WEATHER_API_KEY", "")
+	AppConfig.WeatherAPIComKey = getEnv("WEATHER_API_COM_KEY", "")
 
 	AppConfig.Features.Weather = getBoolEnv("FEATURE_WEATHER", true)
 	AppConfig.Features.Events = getBoolEnv("FEATURE_EVENTS", true)

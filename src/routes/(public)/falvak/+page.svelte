@@ -34,7 +34,7 @@
 
 <div class="page-inner">
     {#if loading}
-        <div class="skeleton skeleton-text skeleton-badge"></div>
+        <span class="badge location-badge" style="opacity:0.5">adat betöltés...</span>
     {:else}
         {#each locations as loc}
             <a
@@ -49,10 +49,6 @@
 </div>
 
 <style>
-    .skeleton-badge {
-        width: 100px;
-        height: 30px;
-    }
     .location-badge {
         text-decoration: none;
         color: var(--primary-color);
