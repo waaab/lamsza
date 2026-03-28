@@ -2,7 +2,7 @@
 
 **Purpose:** Ordered, actionable steps after the settlements, counties, geo locations, and attractions work landed in code. Items are sequenced so dependencies run first; parallelizable items are noted.
 
-**Related docs:** [PLAN_SETTLEMENTS_LOCATIONS_ATTRACTIONS.md](PLAN_SETTLEMENTS_LOCATIONS_ATTRACTIONS.md), [SETTLEMENTS_AND_LOCATIONS.md](SETTLEMENTS_AND_LOCATIONS.md) (needs sync with current schema).
+**Related docs:** [PLAN_SETTLEMENTS_LOCATIONS_ATTRACTIONS.md](PLAN_SETTLEMENTS_LOCATIONS_ATTRACTIONS.md), [SETTLEMENTS_AND_LOCATIONS.md](SETTLEMENTS_AND_LOCATIONS.md).
 
 ---
 
@@ -20,78 +20,67 @@
 
 ---
 
-## P1 – Unified search includes látnivalók
+## P1 – Unified search includes látnivalók ✅ (implemented March 2026)
 
 ### P1.1 – Backend: search attractions
 
-- **Do:** Extend `backend/internal/search/unified.go` to query `attractions` joined with `counties` (name fields, slug, county slug). Respect the same `LIMIT` / relevance patterns as other entity searches. Add a new JSON field on the unified response, e.g. `attractions: []` (define a small struct or reuse `handlers.Attraction`-shaped subset).
-- **Done when:** `GET /api/search?q=...` (or the unified search endpoint in use) returns matching attractions for a known query; empty array when none.
+- **Done:** `backend/internal/search/unified.go` returns `attractions` and `historical_seats` arrays on `GET /api/search?q=...`.
 
 ### P1.2 – Frontend: render attraction results
 
-- **Do:** In `SearchEngine.svelte` (and any shared types/helpers), add a section for látnivalók with title, link pattern `/{countySlug}-megye/{slug}`, and distinct styling (reuse existing result-type patterns: directory / weather / news).
-- **Done when:** Homepage search shows attraction hits with working links; no console errors.
+- **Done:** `SearchEngine.svelte` sections for látnivalók and történelmi székek with correct links.
 
 ### P1.3 – Optional: include historical seats in search
 
-- **Do:** If product agrees, add `historical_seats` ILIKE search and a small result section linking to future szék routes (or hide until P2 exists).
-- **Done when:** Documented as skipped or implemented with links.
+- **Done:** Included in unified search and autosuggest (`search.go`).
 
 ---
 
-## P2 – Public historical seat (szék) pages
+## P2 – Public historical seat (szék) pages ✅
 
 ### P2.1 – Route and data loading
 
-- **Do:** Add a public route (e.g. `/[szekSlug]-szek` or `/szek/[slug]` — align with PLAN URL table). Load content from `GET /api/historical_seats` or a dedicated `GET /api/historical_seats?slug=` if list-only is inefficient.
-- **Done when:** Each szék in DB has a readable page (title, RO/DE names if present, Markdown `content`).
+- **Done:** `/szekek` index, `/szekek/{slug}` detail; legacy `/{slug}-szek` and `/szek/…` → 301; `GET /api/historical_seats?slug=` for single seat.
 
 ### P2.2 – Navigation entry
 
-- **Do:** Link székek from a sensible place (footer, `/megyek`, or a new “Székely székek” index listing from API).
-- **Done when:** Users can reach szék pages without typing URLs.
+- **Done:** Header link “Székek”, `/megyek` link to `/szekek`.
 
 ---
 
-## P3 – Látnivalók context on settlement pages
+## P3 – Látnivalók context on settlement pages ✅ (MVP)
 
 ### P3.1 – Same-county list (MVP)
 
-- **Do:** On `[countySlug]-megye/[slug]/+page.svelte`, when the page is a **settlement** (not attraction), fetch `GET /api/attractions?county_slug=...` and show a compact “Látnivalók a megyében” block (reuse card styling from county page where possible).
-- **Done when:** Settlement pages list attractions in the same county; links go to attraction detail URLs.
+- **Done:** Settlement page loads `/api/attractions?county_slug=...` and shows “Látnivalók … megyében” when non-empty.
 
 ### P3.2 – Hybrid overrides (optional, from PLAN)
 
-- **Do:** Add `attraction_settlements` junction migration; admin UI to attach/detach; filter settlement page list: show junction-linked first, then county default, or hide per rules you define.
-- **Done when:** Documented behavior matches admin controls; migration applied.
+- **Status:** Not implemented; add `attraction_settlements` + admin when needed.
 
 ---
 
-## P4 – Admin and content parity
+## P4 – Admin and content parity ✅
 
 ### P4.1 – Counties and historical seats in admin
 
-- **Do:** Ensure admin can edit `counties.content` and `historical_seats.content` (Markdown) if not already complete; list views where helpful.
-- **Done when:** Content saved in DB appears on public county and szék pages.
+- **Done:** Megyék tab: Markdown textareas + `PUT /api/admin/counties` and `PUT /api/admin/historical_seats`.
 
 ### P4.2 – Markdown preview consistency
 
-- **Do:** Reuse `Markdown.svelte` for county and szék bodies where applicable; match attraction styling tokens if needed.
-- **Done when:** No raw Markdown leakage; headings accessible.
+- **Done:** County public page renders `counties.content` via `Markdown.svelte`; szék pages render `historical_seats.content`.
 
 ---
 
-## P5 – Documentation
+## P5 – Documentation ✅
 
 ### P5.1 – Update SETTLEMENTS_AND_LOCATIONS.md
 
-- **Do:** Replace single-table `locations` description with: `locations` view, `settlements`, `counties`, `geo_locations`, `attractions`, FKs from entries/events to `settlements`.
-- **Done when:** New developer can follow data flow without reading migrations first.
+- **Done:** “Current architecture” section at top; legacy sections retained with note.
 
 ### P5.2 – Update PLAN closing section
 
-- **Do:** Replace stale “Next step: Phase 1…” with pointer to this backlog or a short “Implemented / In progress” summary.
-- **Done when:** PLAN no longer contradicts repo state.
+- **Done:** Section 12 in PLAN points here.
 
 ---
 
@@ -108,14 +97,8 @@
 
 ## Suggested execution order
 
-1. P0.1 → P0.2  
-2. P1.1 → P1.2 → (P1.3 optional)  
-3. P2.1 → P2.2  
-4. P3.1 → (P3.2 if needed)  
-5. P4.1 → P4.2  
-6. P5.1 → P5.2  
-
-P6 items are independent; schedule when priorities allow.
+1. P0.1 → P0.2 (operator / QA)  
+2. P6 as needed  
 
 ---
 

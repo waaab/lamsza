@@ -92,36 +92,63 @@
     $: displayItems = settlementSlug ? items : teaserItems;
 </script>
 
-<article class="news news-widget component-box widget">
-    <h3 class="widget-title">
-        {settlementSlug ? "Helyi hírek" : "Friss hírek erdélyből"}
-    </h3>
+<section id="hirek">
+    <article class="news news-widget component-box widget">
+        <h3 class="widget-title">
+            {settlementSlug ? "Helyi hírek" : "Friss hírek erdélyből"}
+        </h3>
 
-    {#if loading}
-        <div class="news-loading-placeholder">
-            <span class="news-title">adat betöltés...</span>
-            <div class="news-meta">adat betöltés...</div>
-        </div>
-    {:else if error || items.length === 0}
-        <span class="info-box"
-            ><p>
-                {settlementSlug
-                    ? "Helyi hírek nem elérhetőek."
-                    : "A hírek jelenleg nem elérhetők."}
-            </p></span
-        >
-    {:else if ticker}
-        <div class="news-ticker">
-            {#key tickerIndex}
-                {@const item = displayItems[tickerIndex]}
-                {#if item}
-                    <div
-                        class="news-ticker-item"
-                        role="region"
-                        aria-label="Hír megállítása rámutatással"
-                        on:mouseenter={stopTicker}
-                        on:mouseleave={startTicker}
-                    >
+        {#if loading}
+            <div class="news-loading-placeholder">
+                <span class="news-title">adat betöltés...</span>
+                <div class="news-meta">adat betöltés...</div>
+            </div>
+        {:else if error || items.length === 0}
+            <span class="info-box"
+                ><p>
+                    {settlementSlug
+                        ? "Helyi hírek nem elérhetőek."
+                        : "A hírek jelenleg nem elérhetők."}
+                </p></span
+            >
+        {:else if ticker}
+            <div class="news-ticker">
+                {#key tickerIndex}
+                    {@const item = displayItems[tickerIndex]}
+                    {#if item}
+                        <div
+                            class="news-ticker-item"
+                            role="region"
+                            aria-label="Hír megállítása rámutatással"
+                            on:mouseenter={stopTicker}
+                            on:mouseleave={startTicker}
+                        >
+                            <a
+                                href={item.link}
+                                target="_blank"
+                                rel="nofollow noopener"
+                                class="news-title"
+                            >
+                                📰 {item.title}
+                            </a>
+                            <div class="news-meta">
+                                {item.source} - {formatDate(item.pubDate)}
+                            </div>
+                        </div>
+                    {/if}
+                {/key}
+                <div class="widget-nav">
+                    <div class="arrows-container">
+                        <button class="scroll-arrow left" on:click={() => { tickerIndex = (tickerIndex - 1 + displayItems.length) % displayItems.length; }} aria-label="Előző hír">&#8249;</button>
+                        <button class="scroll-arrow right" on:click={() => { tickerIndex = (tickerIndex + 1) % displayItems.length; }} aria-label="Következő hír">&#8250;</button>
+                    </div>
+                    <a href="/hirek" class="nav-btn">Összes hír</a>
+                </div>
+            </div>
+        {:else}
+            <ul class="news-list">
+                {#each displayItems as item}
+                    <li>
                         <a
                             href={item.link}
                             target="_blank"
@@ -133,37 +160,12 @@
                         <div class="news-meta">
                             {item.source} - {formatDate(item.pubDate)}
                         </div>
-                    </div>
-                {/if}
-            {/key}
-            <div class="widget-nav">
-                <div class="arrows-container">
-                    <button class="scroll-arrow left" on:click={() => { tickerIndex = (tickerIndex - 1 + displayItems.length) % displayItems.length; }} aria-label="Előző hír">&#8249;</button>
-                    <button class="scroll-arrow right" on:click={() => { tickerIndex = (tickerIndex + 1) % displayItems.length; }} aria-label="Következő hír">&#8250;</button>
-                </div>
-                <a href="/hirek" class="nav-btn">Összes hír</a>
-            </div>
-        </div>
-    {:else}
-        <ul class="news-list">
-            {#each displayItems as item}
-                <li>
-                    <a
-                        href={item.link}
-                        target="_blank"
-                        rel="nofollow noopener"
-                        class="news-title"
-                    >
-                        📰 {item.title}
-                    </a>
-                    <div class="news-meta">
-                        {item.source} - {formatDate(item.pubDate)}
-                    </div>
-                </li>
-            {/each}
-        </ul>
-    {/if}
-</article>
+                    </li>
+                {/each}
+            </ul>
+        {/if}
+    </article>
+</section>
 
 <style>
     .news-widget {

@@ -15,11 +15,30 @@ import (
 	"github.com/lib/pq"
 )
 
+// AttractionSearchHit is a lightweight shape for unified search JSON.
+type AttractionSearchHit struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	CountySlug  string `json:"county_slug"`
+	CountyName  string `json:"county_name"`
+	Description string `json:"description,omitempty"`
+}
+
+// HistoricalSeatSearchHit is a lightweight shape for unified search JSON.
+type HistoricalSeatSearchHit struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
 type UnifiedSearchResult struct {
-	Locations []models.Location `json:"locations"`
-	Entries   []models.Entry    `json:"entries"`
-	Events    []models.Event    `json:"events"`
-	News      []newsSearchItem  `json:"news"`
+	Locations         []models.Location         `json:"locations"`
+	Entries           []models.Entry            `json:"entries"`
+	Events            []models.Event            `json:"events"`
+	News              []newsSearchItem          `json:"news"`
+	Attractions       []AttractionSearchHit     `json:"attractions"`
+	HistoricalSeats   []HistoricalSeatSearchHit `json:"historical_seats"`
 }
 
 type newsSearchItem struct {
@@ -35,10 +54,12 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if q == "" {
 		json.NewEncoder(w).Encode(UnifiedSearchResult{
-			Locations: []models.Location{},
-			Entries:   []models.Entry{},
-			Events:    []models.Event{},
-			News:      []newsSearchItem{},
+			Locations:       []models.Location{},
+			Entries:         []models.Entry{},
+			Events:          []models.Event{},
+			News:            []newsSearchItem{},
+			Attractions:     []AttractionSearchHit{},
+			HistoricalSeats: []HistoricalSeatSearchHit{},
 		})
 		return
 	}
@@ -51,6 +72,8 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	var entries []models.Entry
 	var events []models.Event
 	var newsItems []newsSearchItem
+	var attractionHits []AttractionSearchHit
+	var seatHits []HistoricalSeatSearchHit
 
 	// Search locations (ILIKE on name, name_ro, name_de, county)
 	wg.Add(1)
@@ -78,6 +101,60 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			var loc models.Location
 			if err := rows.Scan(&loc.ID, &loc.Name, &loc.NameRo, &loc.NameDe, &loc.County, &loc.CountySlug, &loc.Type, &loc.Slug, &loc.PostCode, &loc.Coordinates, &loc.Population, &loc.Area, &loc.Crest, &loc.ParentID, &loc.IsCountySeat); err == nil {
 				locations = append(locations, loc)
+			}
+		}
+	}()
+
+	// Search attractions (látnivalók)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rows, err := db.DB.Query(`
+			SELECT a.id, a.name, a.slug, c.slug, c.name, COALESCE(a.description,'')
+			FROM attractions a
+			JOIN counties c ON a.county_id = c.id
+			WHERE unaccent(LOWER(a.name)) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(a.name_ro,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(a.name_de,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(a.description,''))) ILIKE unaccent($1)
+			ORDER BY a.name ASC
+			LIMIT 12
+		`, pattern)
+		if err != nil {
+			log.Printf("UnifiedSearch attractions error: %v", err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var h AttractionSearchHit
+			if err := rows.Scan(&h.ID, &h.Name, &h.Slug, &h.CountySlug, &h.CountyName, &h.Description); err == nil {
+				attractionHits = append(attractionHits, h)
+			}
+		}
+	}()
+
+	// Search historical seats (székek)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rows, err := db.DB.Query(`
+			SELECT id, name, slug
+			FROM historical_seats
+			WHERE unaccent(LOWER(name)) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(name_ro,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(name_de,''))) ILIKE unaccent($1)
+			ORDER BY name ASC
+			LIMIT 8
+		`, pattern)
+		if err != nil {
+			log.Printf("UnifiedSearch historical_seats error: %v", err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var h HistoricalSeatSearchHit
+			if err := rows.Scan(&h.ID, &h.Name, &h.Slug); err == nil {
+				seatHits = append(seatHits, h)
 			}
 		}
 	}()
@@ -199,12 +276,20 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	if newsItems == nil {
 		newsItems = []newsSearchItem{}
 	}
+	if attractionHits == nil {
+		attractionHits = []AttractionSearchHit{}
+	}
+	if seatHits == nil {
+		seatHits = []HistoricalSeatSearchHit{}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(UnifiedSearchResult{
-		Locations: locations,
-		Entries:   entries,
-		Events:    events,
-		News:      newsItems,
+		Locations:       locations,
+		Entries:         entries,
+		Events:          events,
+		News:            newsItems,
+		Attractions:     attractionHits,
+		HistoricalSeats: seatHits,
 	})
 }

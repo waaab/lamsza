@@ -1,20 +1,42 @@
 # Settlements & Locations – Technical Documentation (Draft)
 
-This document describes how locations (settlements, cities, towns, villages, counties) are governed across the Lámsza application: database, backend API, admin interface, and frontend.
+This document describes how locations (settlements, cities, towns, villages, counties), counties, geo points, attractions, and historical seats are governed across the Lámsza application: database, backend API, admin interface, and frontend.
+
+---
+
+## Current architecture (post–migration)
+
+After `backend/migrations/migration_settlements_attractions.sql` (and prerequisites), the database uses normalized tables:
+
+| Object | Table / view | Role |
+|--------|----------------|------|
+| Geographic point | `geo_locations` | `latitude`, `longitude`, optional `address` |
+| County | `counties` | Hargita, Kovászna, Maros; optional `content` (Markdown), `location_id` |
+| Settlement | `settlements` | Belongs to `counties`; `location_id`, `slug`, types (város, falu, …), `parent_id`, `content` |
+| Attraction | `attractions` | Belongs to county; `location_id`, `slug`, gallery via `attraction_images` |
+| Historical seat (szék) | `historical_seats` | e.g. Csíkszék; `content` (Markdown); linked to counties via `county_historical_seats` |
+| Legacy compatibility | `locations` **view** | `UNION` of county rows + settlement rows so existing `/api/locations` consumers keep working |
+| Legacy table | `locations_legacy` | Renamed from the old `locations` table after data migration |
+
+**Foreign keys:** `entries.location_id` and `events.location_id` reference **`settlements(id)`** (column name kept as `location_id` for historical reasons).
+
+**Public URLs:** counties `/{countySlug}-megye`, settlements and attractions `/{countySlug}-megye/{slug}` (settlement resolved first, then attraction). Historical seats: `/szekek` (index), `/szekek/{slug}` (detail). Legacy `/{slug}-szek` and `/szek/…` redirect (301) to `/szekek/…`. See [BACKLOG.md](BACKLOG.md) for feature status.
 
 ---
 
 ## 1. Location Types (Hungarian Terminology)
 
-The app uses a single `locations` table for all geographic entities. The `type` column distinguishes:
+The public **`locations` view** (and admin/API) still exposes a **`type`** column so the UI can distinguish:
 
 | Type (HU)   | English      | Description                          |
 |-------------|--------------|--------------------------------------|
-| **megye**   | county       | Top-level administrative unit        |
+| **megye**   | county       | Top-level administrative unit (row sourced from `counties` via the view) |
 | **város**   | city/town    | Urban settlement                     |
 | **municípium** | municipality | Special urban status (e.g. county seat) |
 | **község**  | commune      | Rural administrative unit             |
 | **falu**    | village      | Smallest settlement unit             |
+
+**Note:** Sections below that reference a physical `locations` table describe the **legacy** schema and migrations that feed the pipeline; migrated DBs use `settlements`, `counties`, and the `locations` **view** as in the **Current architecture** section above.
 
 **Counties in scope (Székelyföld):** Hargita, Kovászna, Maros
 

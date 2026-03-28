@@ -21,6 +21,7 @@ import (
 func main() {
 	config.Load()
 	db.InitDB()
+	db.SeedHistoricalSeatsContent()
 	settings.MigrateSiteSettings()
 	weather.MigrateWeatherTranslations()
 	pages.MigratePages()
@@ -40,6 +41,8 @@ func main() {
 	mux.HandleFunc("/api/attractions", middleware.ApplyCORS(handlers.HandleAttractions))
 	mux.HandleFunc("/api/historical_seats", middleware.ApplyCORS(handlers.HandleHistoricalSeats))
 	mux.HandleFunc("/api/counties", middleware.ApplyCORS(handlers.HandleCounties))
+	mux.HandleFunc("/api/admin/counties", middleware.ApplyCORS(handlers.HandleAdminCounties))
+	mux.HandleFunc("/api/admin/historical_seats", middleware.ApplyCORS(handlers.HandleAdminHistoricalSeats))
 	mux.HandleFunc("/api/admin/attractions", middleware.ApplyCORS(handlers.HandleAdminAttractions))
 
 	// Public config (weather cache TTL, version) + admin settings

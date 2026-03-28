@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/internal/db"
 	"backend/internal/utils"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -124,6 +125,25 @@ func HandleHistoricalSeats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	slug := strings.TrimSpace(strings.ToLower(r.URL.Query().Get("slug")))
+	if slug != "" {
+		var h HistoricalSeat
+		err := db.DB.QueryRow(
+			`SELECT id, name, COALESCE(name_ro,''), COALESCE(name_de,''), slug, COALESCE(content,'') FROM historical_seats WHERE LOWER(slug) = $1`,
+			slug,
+		).Scan(&h.ID, &h.Name, &h.NameRo, &h.NameDe, &h.Slug, &h.Content)
+		if err == sql.ErrNoRows {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(h)
+		return
+	}
 	rows, err := db.DB.Query("SELECT id, name, COALESCE(name_ro,''), COALESCE(name_de,''), slug, COALESCE(content,'') FROM historical_seats ORDER BY name ASC")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -140,7 +160,72 @@ func HandleHistoricalSeats(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []HistoricalSeat{}
 	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
+}
+
+// HandleAdminCounties updates county markdown content (PUT JSON: id, content).
+func HandleAdminCounties(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		ID      int    `json:"id"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.ID == 0 {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+	res, err := db.DB.Exec("UPDATE counties SET content = $1 WHERE id = $2", body.Content, body.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+// HandleAdminHistoricalSeats updates historical seat markdown content (PUT JSON: id, content).
+func HandleAdminHistoricalSeats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		ID      int    `json:"id"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if body.ID == 0 {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+	res, err := db.DB.Exec("UPDATE historical_seats SET content = $1 WHERE id = $2", body.Content, body.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
 func HandleCounties(w http.ResponseWriter, r *http.Request) {
@@ -164,6 +249,7 @@ func HandleCounties(w http.ResponseWriter, r *http.Request) {
 	if list == nil {
 		list = []County{}
 	}
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
 }
 

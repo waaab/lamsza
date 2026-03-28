@@ -9,7 +9,7 @@
     let showDiscover = false;
 
     let searchInputValue = "";
-    let searchResults = null; // { locations, entries, events, news }
+    let searchResults = null; // { locations, entries, events, news, attractions, historical_seats }
     let suggestions = [];
     let loading = false;
     let searchInputEl;
@@ -18,13 +18,17 @@
         (searchResults.locations && searchResults.locations.length > 0) ||
         (searchResults.entries && searchResults.entries.length > 0) ||
         (searchResults.events && searchResults.events.length > 0) ||
-        (searchResults.news && searchResults.news.length > 0)
+        (searchResults.news && searchResults.news.length > 0) ||
+        (searchResults.attractions && searchResults.attractions.length > 0) ||
+        (searchResults.historical_seats && searchResults.historical_seats.length > 0)
     );
     $: totalCount = searchResults
         ? (searchResults.locations?.length || 0) +
           (searchResults.entries?.length || 0) +
           (searchResults.events?.length || 0) +
-          (searchResults.news?.length || 0)
+          (searchResults.news?.length || 0) +
+          (searchResults.attractions?.length || 0) +
+          (searchResults.historical_seats?.length || 0)
         : 0;
 
     async function executeSearch() {
@@ -44,7 +48,14 @@
             suggestions = suggestionsData || [];
         } catch (err) {
             console.error("Search error:", err);
-            searchResults = { locations: [], entries: [], events: [], news: [] };
+            searchResults = {
+                locations: [],
+                entries: [],
+                events: [],
+                news: [],
+                attractions: [],
+                historical_seats: [],
+            };
         } finally {
             loading = false;
         }
@@ -220,6 +231,39 @@
                                             {formatDateShort(ev.start_date)}
                                             {#if ev.location_name} · {ev.location_name}{/if}
                                         </span>
+                                    </a>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if searchResults.attractions?.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title discover-section-title--attractions">🏔 Látnivalók</h4>
+                            <div class="discover-attraction-list">
+                                {#each searchResults.attractions as att}
+                                    <a
+                                        href="/{att.county_slug}-megye/{att.slug}"
+                                        class="discover-attraction-card"
+                                    >
+                                        <span class="discover-attraction-title">{att.name}</span>
+                                        <span class="discover-attraction-meta">{att.county_name}</span>
+                                        {#if att.description}
+                                            <span class="discover-attraction-desc">{att.description}</span>
+                                        {/if}
+                                    </a>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if searchResults.historical_seats?.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title discover-section-title--szek">⚜ Történelmi székek</h4>
+                            <div class="discover-szek-list">
+                                {#each searchResults.historical_seats as seat}
+                                    <a href="/szekek/{seat.slug}" class="discover-szek-card">
+                                        <span class="discover-szek-title">{seat.name}</span>
                                     </a>
                                 {/each}
                             </div>
@@ -424,5 +468,70 @@
 .discover-news-source {
     font-size: 0.85rem;
     color: var(--text-faint);
+}
+
+.discover-section-title--attractions {
+    color: var(--szekely-brown, #6d4c41);
+}
+.discover-attraction-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+.discover-attraction-card {
+    display: block;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-body);
+    border-radius: 8px;
+    border: 1px solid var(--szekely-brown, #8d6e63);
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+.discover-attraction-card:hover {
+    background: var(--tab-hover-bg);
+    border-color: var(--text-muted);
+}
+.discover-attraction-title {
+    display: block;
+    font-weight: 500;
+}
+.discover-attraction-meta {
+    font-size: 0.85rem;
+    color: var(--text-faint);
+}
+.discover-attraction-desc {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.discover-section-title--szek {
+    color: var(--szekely-blue, #1565c0);
+}
+.discover-szek-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+.discover-szek-card {
+    padding: 0.5rem 0.85rem;
+    background: var(--bg-body);
+    border-radius: 8px;
+    border: 1px solid var(--szekely-blue, #42a5f5);
+    color: var(--text-primary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+.discover-szek-card:hover {
+    background: var(--tab-hover-bg);
+}
+.discover-szek-title {
+    font-size: 0.95rem;
 }
 </style>

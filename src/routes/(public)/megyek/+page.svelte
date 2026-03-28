@@ -35,9 +35,20 @@
             </a>
         {/each}
     {/if}
+    <p class="megyek-szek-link">
+        <a href="/szekek">Történelmi székek (Csíkszék, Háromszék, …)</a>
+    </p>
 </div>
 
 <style>
+    .megyek-szek-link {
+        margin-top: 1.5rem;
+        width: 100%;
+        flex-basis: 100%;
+    }
+    .megyek-szek-link a {
+        color: var(--szekely-blue, #1565c0);
+    }
     .county-badge {
         text-decoration: none;
         color: var(--primary-color);

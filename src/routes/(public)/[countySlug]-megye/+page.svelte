@@ -6,6 +6,7 @@
     import EntryCard from "$lib/components/EntryCard.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
+    import Markdown from "$lib/components/Markdown.svelte";
 
     const locType = "megye"; // Hardcoded type for this route
     let town = "";
@@ -21,6 +22,8 @@
 
     let childSettlements = [];
     let attractions = [];
+    /** Rich text from `counties.content` (Markdown) */
+    let countyRecord = null;
     let entries = [];
     let loadingEntries = true;
     let entriesError = null;
@@ -126,6 +129,19 @@
             if (attRes.ok) {
                 attractions = (await attRes.json()) || [];
             }
+            try {
+                const cRes = await fetch(`${apiBase}/api/counties`);
+                if (cRes.ok) {
+                    const all = await cRes.json();
+                    countyRecord = Array.isArray(all)
+                        ? all.find((c) => c.slug === town) || null
+                        : null;
+                } else {
+                    countyRecord = null;
+                }
+            } catch {
+                countyRecord = null;
+            }
         } catch (err) {
             console.error(err);
             entriesError = "Nem sikerült betölteni az adatokat.";
@@ -189,6 +205,12 @@
 <p class="greeting">
     Helyi hírek, időjárás és címtár {displayTown} megye területén.
 </p>
+
+{#if countyRecord?.content?.trim()}
+    <div class="county-markdown markdown-region">
+        <Markdown source={countyRecord.content} />
+    </div>
+{/if}
 
 <!-- Widgets: 3-column top grid (Áttekintés | Címer | Időjárás), then Events + News full width -->
 <div class="widgets-box" id="hasznos-informaciok">
@@ -628,6 +650,11 @@
         font-size: 0.95rem;
         color: var(--text-faint);
         margin-top: 0.5rem;
+    }
+
+    .county-markdown {
+        margin-bottom: 1.5rem;
+        max-width: 52rem;
     }
 
     .county-weather-flex {

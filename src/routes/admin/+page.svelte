@@ -14,6 +14,8 @@
     let newsFeeds = [];
     let locations = [];
     let attractions = [];
+    let countiesFromAPI = [];
+    let historicalSeatsFromAPI = [];
     let entries = [];
     let entryCategories = [];
     let entryTypes = [];
@@ -256,6 +258,7 @@
         fetchSettings();
         fetchWeatherTranslations();
         fetchPages();
+        fetchCountyRegions();
     }
 
     async function fetchWeatherTranslations() {
@@ -466,6 +469,59 @@
     }
     function fetchAttractions() {
         loadData("attractions", (d) => (attractions = d));
+    }
+
+    async function fetchCountyRegions() {
+        try {
+            const r1 = await fetch(`${getBase()}/api/counties`);
+            if (r1.ok) countiesFromAPI = await r1.json();
+            const r2 = await fetch(`${getBase()}/api/historical_seats`);
+            if (r2.ok) historicalSeatsFromAPI = await r2.json();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function saveCountyContent(c) {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/counties`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: c.id,
+                    content: c.content ?? "",
+                }),
+            });
+            if (res.ok) {
+                await showAlert("Megye szöveg mentve: " + c.name);
+                fetchCountyRegions();
+            } else {
+                await showAlert("Hiba: " + (await res.text()));
+            }
+        } catch (e) {
+            await showAlert("Hiba: " + e.message);
+        }
+    }
+
+    async function saveHistoricalSeatContent(h) {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/historical_seats`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: h.id,
+                    content: h.content ?? "",
+                }),
+            });
+            if (res.ok) {
+                await showAlert("Szék szöveg mentve: " + h.name);
+                fetchCountyRegions();
+            } else {
+                await showAlert("Hiba: " + (await res.text()));
+            }
+        } catch (e) {
+            await showAlert("Hiba: " + e.message);
+        }
     }
 
     // generic create
@@ -1044,7 +1100,10 @@
                 class="admin-sidebar-btn {activeTab === 'counties'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "counties")}
+                on:click={() => {
+                    activeTab = "counties";
+                    fetchCountyRegions();
+                }}
                 title="Megyék"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -2460,6 +2519,52 @@
                             </div>
                         {/each}
                     </div>
+
+                    <h3 class="admin-region-heading">Megye bemutatkozás (Markdown)</h3>
+                    <p class="admin-info">
+                        A nyilvános megye-oldalon jelenik meg (pl. Hargita megye).
+                    </p>
+                    {#each countiesFromAPI as c (c.id)}
+                        <div class="admin-region-block">
+                            <h4 class="admin-region-title">{c.name}</h4>
+                            <textarea
+                                class="admin-region-textarea"
+                                rows="8"
+                                bind:value={c.content}
+                                placeholder="## Bevezető&#10;..."
+                            ></textarea>
+                            <button
+                                type="button"
+                                class="admin-submit-btn"
+                                on:click={() => saveCountyContent(c)}
+                            >Mentés — {c.name}</button>
+                        </div>
+                    {:else}
+                        <p class="admin-info">Megyei adatok betöltése…</p>
+                    {/each}
+
+                    <h3 class="admin-region-heading">Történelmi székek (Markdown)</h3>
+                    <p class="admin-info">
+                        A <a href="/szekek" target="_blank" rel="noopener">/szekek</a> listán és a <code>/szekek/…</code> oldalakon.
+                    </p>
+                    {#each historicalSeatsFromAPI as h (h.id)}
+                        <div class="admin-region-block">
+                            <h4 class="admin-region-title">{h.name}</h4>
+                            <textarea
+                                class="admin-region-textarea"
+                                rows="8"
+                                bind:value={h.content}
+                                placeholder="## Történet&#10;..."
+                            ></textarea>
+                            <button
+                                type="button"
+                                class="admin-submit-btn"
+                                on:click={() => saveHistoricalSeatContent(h)}
+                            >Mentés — {h.name}</button>
+                        </div>
+                    {:else}
+                        <p class="admin-info">Szék-adatok betöltése…</p>
+                    {/each}
                 {/if}
             </div>
         </main>
@@ -3378,6 +3483,28 @@
         color: var(--text-faint, #666);
         margin-bottom: 1rem;
     }
+    .admin-region-heading {
+        margin-top: 2.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+    .admin-region-block {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px dashed var(--border-color, #ccc);
+    }
+    .admin-region-title {
+        margin: 0 0 0.5rem 0;
+        font-size: 1rem;
+    }
+    .admin-region-textarea {
+        width: 100%;
+        max-width: 48rem;
+        font-family: ui-monospace, monospace;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+
     .counties-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));

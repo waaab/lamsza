@@ -11,6 +11,7 @@
 
     let settlementData = null;
     let attractionData = null;
+    let countyAttractions = [];
     let entries = [];
     let loading = true;
     let entriesError = null;
@@ -50,6 +51,7 @@
         loading = true;
         settlementData = null;
         attractionData = null;
+        countyAttractions = [];
         entries = [];
         entriesError = null;
         try {
@@ -71,6 +73,14 @@
                     `/api/directory?location_slug=${encodeURIComponent(slug)}`,
                 );
                 entries = res || [];
+                try {
+                    countyAttractions = await apiFetch(
+                        `/api/attractions?county_slug=${encodeURIComponent(countySlug)}`,
+                    );
+                    if (!Array.isArray(countyAttractions)) countyAttractions = [];
+                } catch {
+                    countyAttractions = [];
+                }
             } else {
                 // 2. Try attraction
                 const att = await apiFetch(
@@ -226,6 +236,24 @@
     <EventsWidget settlementSlug={town} locationName={settlementData.name} />
 
     <NewsWidget settlementSlug={town} ticker={true} />
+
+    {#if countyAttractions.length > 0}
+        <aside class="settlements-aside component-box">
+            <h2 class="aside-title">
+                Látnivalók {settlementData.county} megyében
+            </h2>
+            <div class="settlements-grid">
+                {#each countyAttractions as att (att.id)}
+                    <a
+                        href="/{$page.params.countySlug}-megye/{att.slug}"
+                        class="badge settlement-badge"
+                    >
+                        {att.name}
+                    </a>
+                {/each}
+            </div>
+        </aside>
+    {/if}
 
     <h2>{settlementData.name}i címtár - Helyi Index</h2>
 
@@ -453,5 +481,33 @@
         height: 120px;
         object-fit: cover;
         border-radius: 0.25rem;
+    }
+
+    .component-box {
+        padding: 1.5rem;
+        background: var(--card-bg);
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+    .settlements-aside {
+        margin-bottom: 2rem;
+    }
+    .aside-title {
+        margin-top: 0;
+        font-size: 1.25rem;
+    }
+    .settlements-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+    }
+    .settlement-badge {
+        text-decoration: none;
+        color: var(--primary-color);
+        background: var(--bg-body);
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
     }
 </style>

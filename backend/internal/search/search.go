@@ -31,6 +31,10 @@ func HandleAutosuggest(w http.ResponseWriter, r *http.Request) {
 				SELECT name_ro as word, 3 as priority FROM locations WHERE name_ro IS NOT NULL
 				UNION ALL
 				SELECT name_de as word, 3 as priority FROM locations WHERE name_de IS NOT NULL
+				UNION ALL
+				SELECT name as word, 4 as priority FROM attractions
+				UNION ALL
+				SELECT name as word, 4 as priority FROM historical_seats
 			) raw
 			WHERE word != '' 
 			  AND (

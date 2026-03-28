@@ -203,7 +203,7 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 | County | `/{countySlug}-megye` | `/hargita-megye` |
 | Settlement | `/{countySlug}-megye/{slug}` | `/hargita-megye/csikszereda` |
 | Attraction | `/{countySlug}-megye/{slug}` | `/hargita-megye/szent-anna-to` |
-| Historical seat | `/{slug}-szek` or `/szek/{slug}` | `/csikszek` |
+| Historical seat | `/{slug}-szek` (legacy) or `/szekek/{slug}` | `/szekek/csikszek` |
 
 **Settlements and attractions share** `/{countySlug}-megye/{slug}`. Resolution: look up slug in settlements for that county first, then in attractions. **Slug uniqueness:** enforce unique (slug, county_id) within settlements and within attractions; no overlap between settlement and attraction slugs in the same county (admin responsibility or DB constraint).
 
@@ -303,4 +303,8 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 
 ---
 
-*Next step: Break Phase 1 into concrete tasks and begin implementation.*
+## 12. Implementation status (March 2026)
+
+Foundation migration, attractions, county/settlement public pages, unified search (including látnivalók and székek), `/szekek` and `/szekek/{slug}` pages, settlement-side látnivalók list, admin Markdown for counties and historical seats, and doc updates are tracked in [BACKLOG.md](BACKLOG.md). Optional follow-ups (e.g. `attraction_settlements` junction, multi-provider weather) remain in that backlog or [weather-and-widgets-plan.md](../weather-and-widgets-plan.md).
+
+*Next steps: see [BACKLOG.md](BACKLOG.md) (P6 and manual verification items).*
