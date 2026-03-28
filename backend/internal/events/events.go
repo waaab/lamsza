@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,8 +39,8 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	var rows *sql.Rows
 	var err error
 
-	baseSelect := `SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, e.description,
-		e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer, COALESCE(s.type, '')
+	baseSelect := `SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, COALESCE(e.description, ''),
+		e.start_date::text, COALESCE(e.start_time::text, ''), e.end_date::text, COALESCE(e.end_time::text, ''), e.event_type, COALESCE(e.organizer, ''), COALESCE(s.type, '')
 		FROM events e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id`
@@ -146,9 +147,29 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 		events := []models.AdminEvent{}
 		for rows.Next() {
 			var ev models.AdminEvent
-			if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer); err == nil {
-				events = append(events, ev)
+			var locID sql.NullInt64
+			var desc, st, et, org sql.NullString
+			if err := rows.Scan(&ev.ID, &locID, &ev.Title, &desc, &ev.StartDate, &st, &ev.EndDate, &et, &ev.EventType, &org); err != nil {
+				log.Printf("handleAdminEvents rows.Scan: %v", err)
+				continue
 			}
+			if locID.Valid {
+				v := int(locID.Int64)
+				ev.LocationID = &v
+			}
+			if desc.Valid {
+				ev.Description = desc.String
+			}
+			if st.Valid {
+				ev.StartTime = st.String
+			}
+			if et.Valid {
+				ev.EndTime = et.String
+			}
+			if org.Valid {
+				ev.Organizer = org.String
+			}
+			events = append(events, ev)
 		}
 		json.NewEncoder(w).Encode(events)
 

@@ -136,8 +136,11 @@
 
     // Pages (policy pages editor)
     let adminPages = [];
+    let pageFaqSections = [];
     let editingPage = null;
     let pageSaving = false;
+    let editingPageFaq = null;
+    let pageFaqSaving = false;
 
     function filterOrganizers(query, target) {
         if (!query || query.length < 2) return [];
@@ -380,12 +383,15 @@
         try {
             const res = await fetch(`${getBase()}/api/admin/pages`);
             if (res.ok) adminPages = await res.json();
+            const r2 = await fetch(`${getBase()}/api/admin/page_faq`);
+            if (r2.ok) pageFaqSections = await r2.json();
         } catch (e) {
             console.error(e);
         }
     }
 
     function startEditPage(page) {
+        editingPageFaq = null;
         editingPage = { ...page };
     }
 
@@ -413,6 +419,65 @@
             await showAlert("Hiba: " + e.message);
         } finally {
             pageSaving = false;
+        }
+    }
+
+    function startEditPageFaq(row) {
+        editingPage = null;
+        const items = Array.isArray(row.faq_items)
+            ? row.faq_items.map((x) => ({
+                  question: x.question ?? "",
+                  answer: x.answer ?? "",
+              }))
+            : [];
+        editingPageFaq = { ...row, faq_items: items };
+    }
+
+    function cancelEditPageFaq() {
+        editingPageFaq = null;
+    }
+
+    function addFaqItem() {
+        if (!editingPageFaq) return;
+        editingPageFaq.faq_items = [
+            ...(editingPageFaq.faq_items || []),
+            { question: "", answer: "" },
+        ];
+    }
+
+    function removeFaqItem(index) {
+        if (!editingPageFaq?.faq_items) return;
+        editingPageFaq.faq_items = editingPageFaq.faq_items.filter(
+            (_, i) => i !== index,
+        );
+    }
+
+    async function savePageFaq() {
+        if (!editingPageFaq) return;
+        pageFaqSaving = true;
+        try {
+            const res = await fetch(`${getBase()}/api/admin/page_faq`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id: editingPageFaq.id,
+                    label_hu: editingPageFaq.label_hu ?? "",
+                    faq_title: editingPageFaq.faq_title ?? "",
+                    faq_items: editingPageFaq.faq_items ?? [],
+                    disclaimer_markdown: editingPageFaq.disclaimer_markdown ?? "",
+                }),
+            });
+            if (res.ok) {
+                await showAlert("GYIK / disclaimer mentve.");
+                editingPageFaq = null;
+                fetchPages();
+            } else {
+                await showAlert("Hiba: " + (await res.text()));
+            }
+        } catch (e) {
+            await showAlert("Hiba: " + e.message);
+        } finally {
+            pageFaqSaving = false;
         }
     }
 
@@ -953,6 +1018,7 @@
         return (arr || []).map((t) => "#" + t).join(" ");
     }
     function getLocationName(id) {
+        if (id == null || id === "") return "—";
         const l = locations.find((loc) => loc.id === id);
         return l ? `${l.name}${l.county ? " (" + l.county + ")" : ""}` : id;
     }
@@ -1229,7 +1295,10 @@
                 class="admin-sidebar-btn {activeTab === 'events'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "events")}
+                on:click={() => {
+                    activeTab = "events";
+                    fetchEvents();
+                }}
                 title="Események"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -2404,7 +2473,70 @@
                                 <button type="button" class="btn-update" on:click={cancelEditPage}>Mégse</button>
                             </div>
                         </form>
+                    {:else if editingPageFaq}
+                        <h3>GYIK / disclaimer: {editingPageFaq.label_hu || editingPageFaq.section_key}</h3>
+                        <p class="admin-info">
+                            Kulcs: <code>{editingPageFaq.section_key}</code> — a nyilvános oldalon a
+                            <code>PageFaqDisclaimer</code> ugyanazt a HTML-struktúrát használja (<code>.faq</code>,
+                            <code>details.faq-item</code>, <code>#disclaimer</code>, <code>.note.info</code>). Minden
+                            blokk egy külön kérdés / válasz pár.
+                        </p>
+                        <form class="admin-form" on:submit|preventDefault={savePageFaq} style="max-width: 52rem;">
+                            <label for="pfaq_label">Megjelenített név (admin)</label>
+                            <input id="pfaq_label" type="text" bind:value={editingPageFaq.label_hu} />
+
+                            <label for="pfaq_title">GYIK szekció címe (H2)</label>
+                            <input id="pfaq_title" type="text" bind:value={editingPageFaq.faq_title} placeholder="pl. Hogyan működik ez az oldal?" />
+
+                            <div class="admin-faq-toolbar">
+                                <span class="admin-faq-toolbar-label">Kérdések és válaszok</span>
+                                <button type="button" class="btn-update btn-sm" on:click={addFaqItem}
+                                    >+ Új kérdés</button
+                                >
+                            </div>
+
+                            {#each editingPageFaq.faq_items || [] as item, i (i)}
+                                <details class="admin-faq-pair" open>
+                                    <summary>Kérdés {i + 1}</summary>
+                                    <div class="admin-faq-pair-fields">
+                                        <label for={"pfaq_q_" + i}>Kérdés (summary)</label>
+                                        <input
+                                            id={"pfaq_q_" + i}
+                                            type="text"
+                                            bind:value={editingPageFaq.faq_items[i].question}
+                                            placeholder="Rövid kérdés"
+                                        />
+                                        <label for={"pfaq_a_" + i}>Válasz (Markdown)</label>
+                                        <textarea
+                                            id={"pfaq_a_" + i}
+                                            bind:value={editingPageFaq.faq_items[i].answer}
+                                            rows="5"
+                                            style="font-family: monospace; font-size: 0.85rem;"
+                                            placeholder="Válasz szövege…"
+                                        ></textarea>
+                                        <button
+                                            type="button"
+                                            class="btn-delete btn-sm"
+                                            on:click={() => removeFaqItem(i)}>Kérdés törlése</button
+                                        >
+                                    </div>
+                                </details>
+                            {:else}
+                                <p class="admin-info">Még nincs kérdés — kattints az „Új kérdés” gombra.</p>
+                            {/each}
+
+                            <label for="pfaq_disc">Disclaimer (Markdown)</label>
+                            <textarea id="pfaq_disc" bind:value={editingPageFaq.disclaimer_markdown} rows="8" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+
+                            <div class="flex gap-md mt-md">
+                                <button type="submit" class="admin-submit-btn" disabled={pageFaqSaving}>
+                                    {pageFaqSaving ? 'Mentés…' : 'Mentés'}
+                                </button>
+                                <button type="button" class="btn-update" on:click={cancelEditPageFaq}>Mégse</button>
+                            </div>
+                        </form>
                     {:else}
+                        <h3 class="admin-subtab-heading">Irányelvek és statikus oldalak</h3>
                         <div class="admin-table-wrapper">
                             <table class="admin-table">
                                 <thead>
@@ -2425,6 +2557,41 @@
                                         </tr>
                                     {:else}
                                         <tr><td colspan="4">Nincsenek oldalak.</td></tr>
+                                    {/each}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3 class="admin-subtab-heading">GYIK és felelősségkizárások (oldalanként)</h3>
+                        <p class="admin-info">
+                            Ugyanaz a kinézet, mint a <code>/hirek</code> oldalon: <code>.faq</code>,
+                            <code>.faq-title</code>, <code>.faq-list</code>, <code>.faq-item</code>, <code>#disclaimer</code>,
+                            <code>.note.info</code>.
+                        </p>
+                        <div class="admin-table-wrapper">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Kulcs</th>
+                                        <th>Megjelenített név</th>
+                                        <th>GYIK cím</th>
+                                        <th>Kérdések</th>
+                                        <th>Utolsó módosítás</th>
+                                        <th>Szerk.</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {#each pageFaqSections as row}
+                                        <tr>
+                                            <td><code>{row.section_key}</code></td>
+                                            <td>{row.label_hu}</td>
+                                            <td class="admin-table-cell-preview" title={row.faq_title || ''}>{row.faq_title || "—"}</td>
+                                            <td>{(row.faq_items || []).length}</td>
+                                            <td>{row.updated_at ? row.updated_at.slice(0, 19) : ''}</td>
+                                            <td><button type="button" class="btn-update" on:click={() => startEditPageFaq(row)}>Szerk.</button></td>
+                                        </tr>
+                                    {:else}
+                                        <tr><td colspan="6">Nincs GYIK rekord (futtasd a backend migrációt).</td></tr>
                                     {/each}
                                 </tbody>
                             </table>
@@ -3680,6 +3847,15 @@
         margin-bottom: 0.5rem;
         font-size: 1.1rem;
     }
+    .admin-subtab-heading {
+        margin-top: 1.75rem;
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    .admin-subtab-heading:first-of-type {
+        margin-top: 0;
+    }
 
     .admin-table-cell-preview {
         max-width: 16rem;
@@ -3737,6 +3913,40 @@
         display: flex;
         gap: 0.5rem;
         flex-wrap: wrap;
+    }
+
+    .admin-faq-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin: 1rem 0 0.5rem;
+        flex-wrap: wrap;
+    }
+    .admin-faq-toolbar-label {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .admin-faq-pair {
+        margin-bottom: 0.75rem;
+        border: 1px solid var(--border-color, #e5e7eb);
+        border-radius: 8px;
+        padding: 0.35rem 0.75rem 0.75rem;
+        background: var(--card-bg, #fff);
+    }
+    .admin-faq-pair summary {
+        cursor: pointer;
+        font-weight: 600;
+        padding: 0.35rem 0;
+    }
+    .admin-faq-pair-fields {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.35rem;
+    }
+    .admin-faq-pair-fields label {
+        font-size: 0.85rem;
     }
 
     .org-autosuggest-wrapper {

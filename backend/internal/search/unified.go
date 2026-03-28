@@ -208,8 +208,8 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 			rows, err := db.DB.Query(`
 				SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug,
-					e.title, e.description, e.start_date::text, e.start_time::text,
-					e.end_date::text, e.end_time::text, e.event_type, e.organizer
+					e.title, COALESCE(e.description, ''), e.start_date::text, COALESCE(e.start_time::text, ''),
+					e.end_date::text, COALESCE(e.end_time::text, ''), e.event_type, COALESCE(e.organizer, '')
 				FROM events e
 				JOIN settlements s ON e.location_id = s.id
 				JOIN counties c ON s.county_id = c.id

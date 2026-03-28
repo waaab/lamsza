@@ -2,6 +2,10 @@
     import { onMount } from "svelte";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
+    import PageFaqDisclaimer from "$lib/components/PageFaqDisclaimer.svelte";
+    import { deriveFaqSectionKey } from "$lib/pageFaqSection.js";
+
+    $: faqSectionKey = deriveFaqSectionKey($page.url.pathname);
     import { auth } from "$lib/stores/auth";
     import { theme, cycleTheme, LABELS } from "$lib/stores/theme";
     import { fade } from "svelte/transition";
@@ -391,6 +395,10 @@
 
 <main class="container">
     <slot />
+    <!-- /valtozasnaplo keeps its own version changelog as FAQ-shaped content -->
+    {#if $page.url.pathname !== "/valtozasnaplo"}
+        <PageFaqDisclaimer sectionKey={faqSectionKey} />
+    {/if}
 </main>
 
 <footer>

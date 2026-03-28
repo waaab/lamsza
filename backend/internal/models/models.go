@@ -42,7 +42,7 @@ type Event struct {
 
 type AdminEvent struct {
 	ID          int    `json:"id"`
-	LocationID  int    `json:"location_id"`
+	LocationID  *int   `json:"location_id"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	StartDate   string `json:"start_date"`
@@ -94,7 +94,7 @@ type Location struct {
 type AdminEntry struct {
 	ID         int      `json:"id"`
 	Type       string   `json:"type"`
-	LocationID int      `json:"location_id"`
+	LocationID *int     `json:"location_id"`
 	CategoryID *int     `json:"category_id"`
 	Category   string   `json:"category"`
 	Name       string   `json:"name"`

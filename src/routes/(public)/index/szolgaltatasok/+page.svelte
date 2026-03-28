@@ -108,53 +108,6 @@
     </div>
 {/if}
 
-<section class="faq" id="gyik">
-    <h2 class="faq-title">Gyakori kérdések</h2>
-    <div class="faq-list">
-        <details class="faq-item" open>
-            <summary>Honnan származnak az adatok?</summary>
-            <p>
-                Az adatok a helyi szakemberektől és intézményektől származnak,
-                akiket a rendszerünk folyamatosan indexel, hogy a legfrissebb
-                elérhetőségeket biztosítsa.
-            </p>
-        </details>
-        <details class="faq-item" open>
-            <summary>Hogyan kerülhet be valaki a címtárba?</summary>
-            <p>
-                A beküldési folyamat hamarosan elérhető lesz az oldalon. Addig
-                is, ha ismersz olyan szolgáltatót, aki még nem szerepel nálunk,
-                keress minket bizalommal.
-            </p>
-        </details>
-        <details class="faq-item" open>
-            <summary>Ingyenes-e a megjelenés?</summary>
-            <p>
-                Igen, az alapvető megjelenés és az adatok listázása teljesen
-                ingyenes minden helyi szolgáltató, mesterember és intézmény
-                számára.
-            </p>
-        </details>
-        <details class="faq-item" open>
-            <summary>Hogyan működik a keresés?</summary>
-            <p>
-                A keresőnk kulcsszavak, kategóriák és települések alapján szűri
-                a találatokat. A kereső prioritást ad a közvetlen név- és
-                kategória-egyezéseknek, de a leírásokban is keres.
-            </p>
-        </details>
-    </div>
-</section>
-
-<section id="disclaimer">
-    <span class="note info">
-        <p>A lamsza.com indexe egy ingyenes információs szolgáltatás. Az adatok
-        pontosságáért és a szolgáltatások minőségéért a lamsza.com nem vállal
-        felelősséget. Kérjük, minden esetben ellenőrizze az adatokat a
-        szolgáltatóval való kapcsolatfelvétel előtt.</p>
-    </span>
-</section>
-
 <style>
     .entry-placeholder {
         display: flex;

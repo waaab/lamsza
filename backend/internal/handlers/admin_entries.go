@@ -4,6 +4,7 @@ import (
 	"backend/internal/db"
 	"backend/internal/models"
 	"backend/internal/utils"
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -39,7 +40,12 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 			var s models.AdminEntry
 			var pqLanguages []string
 			var pqTags []string
-			if err := rows.Scan(&s.ID, &s.Type, &s.LocationID, &s.CategoryID, &s.Category, &s.Name, &s.Slug, &s.URL, &s.Phone, &s.Address, &s.Notes, pq.Array(&pqLanguages), pq.Array(&pqTags)); err == nil {
+			var locID sql.NullInt64
+			if err := rows.Scan(&s.ID, &s.Type, &locID, &s.CategoryID, &s.Category, &s.Name, &s.Slug, &s.URL, &s.Phone, &s.Address, &s.Notes, pq.Array(&pqLanguages), pq.Array(&pqTags)); err == nil {
+				if locID.Valid {
+					v := int(locID.Int64)
+					s.LocationID = &v
+				}
 				s.Languages = pqLanguages
 				s.Tags = pqTags
 				res = append(res, s)

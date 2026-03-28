@@ -24,10 +24,12 @@ type Config struct {
 var AppConfig Config
 
 func Load() {
-	// Try to load .env from parent directory or current directory
+	// Load optional parent .env first, then cwd .env so the project always wins
+	// (Previously ../.env alone could shadow ./.env when the server was started from repo root.)
 	if _, err := os.Stat("../.env"); err == nil {
 		loadEnvFile("../.env")
-	} else if _, err := os.Stat(".env"); err == nil {
+	}
+	if _, err := os.Stat(".env"); err == nil {
 		loadEnvFile(".env")
 	}
 

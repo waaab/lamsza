@@ -7,7 +7,7 @@
  * - During SSR/prerender (no `window`), fall back to a direct backend URL unless
  *   `VITE_API_BASE_URL` is set.
  */
-function getApiBase() {
+export function getApiBase() {
     const env = import.meta.env.VITE_API_BASE_URL;
     if (env) return String(env).replace(/\/$/, "");
     if (typeof window !== "undefined") return "";

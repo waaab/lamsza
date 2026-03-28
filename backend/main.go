@@ -12,6 +12,7 @@ import (
 	"backend/internal/middleware"
 	"backend/internal/mondasok"
 	"backend/internal/news"
+	"backend/internal/pagefaq"
 	"backend/internal/pages"
 	"backend/internal/search"
 	"backend/internal/settings"
@@ -25,6 +26,7 @@ func main() {
 	settings.MigrateSiteSettings()
 	weather.MigrateWeatherTranslations()
 	pages.MigratePages()
+	pagefaq.Migrate()
 
 	mux := http.DefaultServeMux
 
@@ -53,6 +55,8 @@ func main() {
 	// Pages (public + admin)
 	mux.HandleFunc("/api/pages", middleware.ApplyCORS(pages.HandlePublicPage))
 	mux.HandleFunc("/api/admin/pages", middleware.ApplyCORS(pages.HandleAdminPages))
+	mux.HandleFunc("/api/page_faq", middleware.ApplyCORS(pagefaq.HandlePublic))
+	mux.HandleFunc("/api/admin/page_faq", middleware.ApplyCORS(pagefaq.HandleAdmin))
 
 	// Optional Modules
 	if config.AppConfig.Features.Weather {
