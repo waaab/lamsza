@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { auth } from "$lib/stores/auth";
     import { apiFetch } from "$lib/api";
     import SearchEngine from "$lib/components/SearchEngine.svelte";
     import MondasWidget from "$lib/components/MondasWidget.svelte";
@@ -203,7 +204,7 @@
 </script>
 
 <section id="home main" class="home-main">
-    <h1 class="page-title">Székely Gugel</h1>
+    <h1 class="page-title">{$auth.loggedIn ? `Szerussz, ${$auth.user}!` : "Na Lámsza!"}</h1>
     <p class="greeting">Erdélyi magyar startlap és kereső. Az internet székely kapuja.</p>
 
     <SearchEngine />
@@ -211,8 +212,10 @@
 
 <section id="home widgets" class="widgets-columns">
     <div class="widgets-box--three-col">
-        <div id="gyorslinkek">
+        <div id="gyorslinkek" class="widget">
+            <div class="widget-header">
                 <h3 class="widget-title">Gyorslinkek</h3>
+            </div>
                 <div
                     class="quick-links-wrapper"
                     class:can-left={showArrows && canScrollLeft}

@@ -37,6 +37,10 @@ func main() {
 	mux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
 	mux.HandleFunc("/api/admin/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
 	mux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
+	mux.HandleFunc("/api/attractions", middleware.ApplyCORS(handlers.HandleAttractions))
+	mux.HandleFunc("/api/historical_seats", middleware.ApplyCORS(handlers.HandleHistoricalSeats))
+	mux.HandleFunc("/api/counties", middleware.ApplyCORS(handlers.HandleCounties))
+	mux.HandleFunc("/api/admin/attractions", middleware.ApplyCORS(handlers.HandleAdminAttractions))
 
 	// Public config (weather cache TTL, version) + admin settings
 	mux.HandleFunc("/api/config/public", middleware.ApplyCORS(settings.HandlePublicConfig))

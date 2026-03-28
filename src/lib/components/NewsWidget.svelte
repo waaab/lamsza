@@ -92,9 +92,9 @@
     $: displayItems = settlementSlug ? items : teaserItems;
 </script>
 
-<article class="news news-widget component-box">
+<article class="news news-widget component-box widget">
     <h3 class="widget-title">
-        {settlementSlug ? "Helyi hírek" : "Friss hírek"}
+        {settlementSlug ? "Helyi hírek" : "Friss hírek erdélyből"}
     </h3>
 
     {#if loading}
@@ -167,8 +167,6 @@
 
 <style>
     .news-widget {
-        display: flex;
-        flex-direction: column;
         grid-column: span 3;
     }
 

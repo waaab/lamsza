@@ -353,7 +353,7 @@
 </script>
 
 <svelte:head>
-    <title>Friss hírek erdélyi forrásból - Székely Gugel</title>
+    <title>Friss hírek erdélyi forrásból - Lámsza</title>
     <meta
         name="description"
         content="Friss hírek erdélyi forrásból - helyi hírcsatornák legfrissebb hírei időrendben."

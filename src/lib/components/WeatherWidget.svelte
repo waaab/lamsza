@@ -5,6 +5,9 @@
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
 
     export let settlementSlug = "csikszereda";
+    /** When set, fetch weather by coordinates (e.g. for attractions) */
+    export let lat = undefined;
+    export let lon = undefined;
     /** When true, show precipitation, humidity, wind in .weather-details */
     export let advanced = false;
 
@@ -17,8 +20,9 @@
     let weatherIconStyle = "emoji";
 
     async function fetchWeather() {
-        if (!settlementSlug) return;
-        const cacheKey = "weather_cache_" + settlementSlug;
+        const useCoords = lat != null && lon != null && !isNaN(lat) && !isNaN(lon);
+        if (!settlementSlug && !useCoords) return;
+        const cacheKey = useCoords ? `weather_cache_${lat}_${lon}` : "weather_cache_" + settlementSlug;
         loading = true;
         error = false;
         let ttlMs = DEFAULT_TTL_MS;
@@ -64,9 +68,10 @@
         }
 
         try {
-            const data = await apiFetch(
-                `/api/weather?slug=${encodeURIComponent(settlementSlug)}`,
-            );
+            const url = useCoords
+                ? `/api/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
+                : `/api/weather?slug=${encodeURIComponent(settlementSlug)}`;
+            const data = await apiFetch(url);
 
             const ts = data.fetched_at ? data.fetched_at * 1000 : Date.now();
             weatherData = {
@@ -105,13 +110,16 @@
         }
     }
 
-    $: if (browser && settlementSlug) {
+    $: canFetch = browser && (settlementSlug || (lat != null && lon != null));
+    $: if (canFetch) {
         fetchWeather();
     }
 </script>
 
-<div id="idojaras" class="weather-card {advanced ? 'complex' : 'simple'}">
-    <h3 class="widget-title">Időjárás</h3>
+<div id="idojaras" class="weather-card {advanced ? 'complex' : 'simple'} widget">
+    <div class="widget-header">
+        <h3 class="widget-title">Időjárás</h3>
+    </div>
     <div class="widget-content">
         <div class="weather-left">
             {#if error}

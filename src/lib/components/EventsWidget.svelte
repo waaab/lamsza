@@ -148,7 +148,7 @@
 </script>
 
 <section id="esemenyek">
-    <div class="event-widget component-box">
+    <div class="event-widget component-box widget">
         <div class="widget-header">
             <h3 class="widget-title">Események{#if !loading} <span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel} <span class="type-label">· {typeLabel}</span>{/if}</h3>
             {#if !loading && (availableTypes.length > 1 || availableLocTypes.length > 1)}
@@ -313,6 +313,7 @@
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 0.75rem;
+        margin-bottom: 0.5rem;
     }
     .event-card-date {
         font-size: 0.75rem;
@@ -332,19 +333,16 @@
         color: var(--text-faint);
     }
 
-    @media (max-width: 600px) {
-        .event-cards-row {
-            grid-template-columns: 1fr;
-        }
+    .event-ticker {
+        display: flex;
+        justify-content: space-between;
     }
 
-    .event-ticker, .widget-content {
-        display: flex;
-        flex-direction: row;
-        gap: 0.5rem;
-        justify-content: space-between;
-        align-items: flex-end;
-        flex: 1;
+    @media (max-width: 992px) {
+        .event-ticker {
+            flex-direction: column;
+            justify-content: flex-start;
+        }
     }
     .event-ticker-item {
         display: flex;
@@ -383,7 +381,6 @@
     .event-type-badges {
         display: flex;
         gap: 0.4rem;
-        flex-wrap: wrap;
     }
     .event-type-badge {
         padding: 0.15rem 0.5rem;
@@ -405,7 +402,7 @@
     }
     .event-type-badge--clear {
         padding: 0.15rem 0.35rem;
-        font-size: 0.65rem;
+        font-size: 0.4rem;
     }
     .badge-separator {
         color: var(--text-faint);
@@ -423,5 +420,22 @@
         letter-spacing: 0.03em;
         color: var(--szekely-red, #c0392b);
         margin-right: 0.3rem;
+    }
+
+    @media (max-width: 992px) {
+        .event-type-badges {
+            gap: 0.2rem;
+        }
+        .event-type-badge {
+            width: 100%;
+        }
+        .event-loc-badge {
+            width: 100%;
+        }
+
+        .event-cards-row {
+            grid-template-columns: 1fr;
+        }
+        
     }
 </style>

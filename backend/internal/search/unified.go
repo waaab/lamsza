@@ -91,19 +91,20 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		rows, err := db.DB.Query(`
 			SELECT e.id, COALESCE(e.type,''), COALESCE(ec.name,''), e.name, e.slug,
-				l.name, l.slug, l.county, l.county_slug, l.type,
-				COALESCE(l.name_ro,''), COALESCE(l.name_de,''),
+				s.name, s.slug, c.name, c.slug, s.type,
+				COALESCE(s.name_ro,''), COALESCE(s.name_de,''),
 				COALESCE(e.phone,''), COALESCE(e.address,''), COALESCE(e.notes,''),
 				e.languages, COALESCE(e.url,''),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
 			FROM entries e
-			JOIN locations l ON e.location_id = l.id
+			JOIN settlements s ON e.location_id = s.id
+			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
-			GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de
+			GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de
 			ORDER BY is_direct_match DESC, rank DESC, e.name ASC
 			LIMIT 20
 		`, q, normalizedQ)
@@ -129,17 +130,18 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		go func() {
 			defer wg.Done()
 			rows, err := db.DB.Query(`
-				SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug,
+				SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug,
 					e.title, e.description, e.start_date::text, e.start_time::text,
 					e.end_date::text, e.end_time::text, e.event_type, e.organizer
 				FROM events e
-				JOIN locations l ON e.location_id = l.id
+				JOIN settlements s ON e.location_id = s.id
+				JOIN counties c ON s.county_id = c.id
 				WHERE e.end_date >= CURRENT_DATE
 				  AND (
 					unaccent(LOWER(e.title)) ILIKE unaccent($1)
 					OR unaccent(LOWER(COALESCE(e.description,''))) ILIKE unaccent($1)
 					OR unaccent(LOWER(COALESCE(e.organizer,''))) ILIKE unaccent($1)
-					OR unaccent(LOWER(l.name)) ILIKE unaccent($1)
+					OR unaccent(LOWER(s.name)) ILIKE unaccent($1)
 				  )
 				ORDER BY e.start_date ASC
 				LIMIT 15

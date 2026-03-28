@@ -242,9 +242,9 @@
                 </div>
             {/if}
 
-            
-                <div class="external-search-links">{#if !loading && searchResults && totalCount === 0 && searchInputValue}
-                    <span class="ext-label">Kereshetsz máshol is:</span>
+                <div class="external-search-links">
+                    {#if !loading && searchResults && searchInputValue}
+                    <span class="ext-label">Rákereshetsz máshol is:</span>
                     <div class="btn-group">
                         <a class="btn btn-md google" href="https://www.google.com/search?q={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">Google</a>
                         <a class="btn btn-md bing" href="https://www.bing.com/search?q={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">Bing</a>
@@ -254,8 +254,8 @@
                     <div class="btn-group">
                         <a class="btn btn-md index" href="/index">Lámsza Index</a>
                     </div>
-               {/if}  </div>
-           
+                    {/if}
+                </div>
         {/if}
     </section>
 </div>
@@ -263,14 +263,12 @@
 <style>
 /* External search engine links inside results */
 .external-search-links {
-    margin-top: 1.5rem;
-    border-top: 1px solid var(--border-color);
     display: flex;
     flex-wrap: wrap;
     gap: 0 2rem;
     align-items: center;
     justify-content: space-between;
-    padding: 1rem;
+    padding: 1rem 1.5rem;
 }
 
 .external-search-links .ext-label {
@@ -278,22 +276,45 @@
     color: var(--text-muted);
     flex-basis: 100%;
     margin-bottom: 1rem;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 1rem;
 }
 
 .external-search-links a.google {
     border-color: var(--google-green);
+
+}
+.external-search-links a.google:hover {
+    background: var(--google-green);
+    color: var(--white);
 }
 .external-search-links a.bing {
     border-color: var(--bing-blue);
 }
+.external-search-links a.bing:hover {
+    background: var(--bing-blue);
+    color: var(--white);
+}
 .external-search-links a.duckduckgo {
     border-color: var(--duckduckgo-orange);
+}
+.external-search-links a.duckduckgo:hover {
+    background: var(--duckduckgo-orange);
+    color: var(--white);
 }
 .external-search-links a.yahoo {
     border-color: var(--yahoo-purple);
 }
+.external-search-links a.yahoo:hover {
+    background: var(--yahoo-purple);
+    color: var(--white);
+}
 .external-search-links a.index {
     border-color: var(--szekely-green);
+}
+.external-search-links a.index:hover {
+    background: var(--szekely-green);
+    color: var(--white);
 }
 
 .btn-group {
@@ -327,7 +348,7 @@
 .discover-container--visible {
     visibility: visible;
     opacity: 1;
-    max-height: 80vh;
+    max-height: 100vh;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     border-top: 0;

@@ -34,14 +34,15 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery = `
 			SELECT 
 				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
-				l.name, l.slug, l.county, l.county_slug, l.type, 
-				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				s.name, s.slug, c.name, c.slug, s.type, 
+				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
 			FROM entries e
-			JOIN locations l ON e.location_id = l.id
+			JOIN settlements s ON e.location_id = s.id
+			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
@@ -53,14 +54,15 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery = `
 			SELECT 
 				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
-				l.name, l.slug, l.county, l.county_slug, l.type, 
-				COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+				s.name, s.slug, c.name, c.slug, s.type, 
+				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				0 as rank
 			FROM entries e
-			JOIN locations l ON e.location_id = l.id
+			JOIN settlements s ON e.location_id = s.id
+			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
@@ -81,20 +83,20 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		paramIdx++
 	}
 	if locationSlug != "" {
-		sqlQuery += " AND l.slug = $" + fmt.Sprintf("%d", paramIdx)
+		sqlQuery += " AND s.slug = $" + fmt.Sprintf("%d", paramIdx)
 		params = append(params, locationSlug)
 		paramIdx++
 	}
 	if countySlug != "" {
-		sqlQuery += " AND l.county_slug = $" + fmt.Sprintf("%d", paramIdx)
+		sqlQuery += " AND c.slug = $" + fmt.Sprintf("%d", paramIdx)
 		params = append(params, countySlug)
 		paramIdx++
 	}
 
 	if q != "" && normalizedQ != "" {
-		sqlQuery += " GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
 	} else {
-		sqlQuery += " GROUP BY e.id, ec.name, l.name, l.slug, l.county, l.county_slug, l.type, l.name_ro, l.name_de ORDER BY is_direct_match DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de ORDER BY is_direct_match DESC, e.name ASC"
 	}
 
 	log.Printf("EntriesHandler query: %s", sqlQuery)
@@ -136,12 +138,13 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 	err := db.DB.QueryRow(`
 		SELECT 
 			e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
-			l.name, l.slug, l.county, l.county_slug, l.type, 
-			COALESCE(l.name_ro, ''), COALESCE(l.name_de, ''),
+			s.name, s.slug, c.name, c.slug, s.type, 
+			COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 			e.languages, COALESCE(e.url, '')
 		FROM entries e
-		JOIN locations l ON e.location_id = l.id
+		JOIN settlements s ON e.location_id = s.id
+		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
 		WHERE e.slug = $1`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL)
 

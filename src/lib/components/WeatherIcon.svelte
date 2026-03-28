@@ -155,8 +155,8 @@
     }
     .weather-icon-svg svg {
         display: block;
-        width: 5rem;
-        height: 5rem;
+        width: 24px;
+        height: 24px;
     }
     .weather-icon-emoji {
         display: inline-block;

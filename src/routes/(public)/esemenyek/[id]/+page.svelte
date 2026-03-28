@@ -61,7 +61,7 @@
 </script>
 
 <svelte:head>
-    <title>{event ? event.title : "Esemény"} - Székely Gugel</title>
+    <title>{event ? event.title : "Esemény"} - Na Lámsza!</title>
 </svelte:head>
 
 {#if loading}

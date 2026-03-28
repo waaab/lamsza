@@ -74,7 +74,7 @@ func HandlePublicConfig(w http.ResponseWriter, r *http.Request) {
 
 	var myLocName, myLocCounty, myLocCountySlug, myLocType string
 	_ = db.DB.QueryRow(
-		"SELECT COALESCE(name,''), COALESCE(county,''), COALESCE(county_slug,''), COALESCE(type,'') FROM locations WHERE slug = $1",
+		"SELECT COALESCE(s.name,''), COALESCE(c.name,''), COALESCE(c.slug,''), COALESCE(s.type,'') FROM settlements s JOIN counties c ON s.county_id = c.id WHERE s.slug = $1",
 		myLocSlug,
 	).Scan(&myLocName, &myLocCounty, &myLocCountySlug, &myLocType)
 

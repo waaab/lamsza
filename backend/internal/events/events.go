@@ -38,12 +38,13 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	var rows *sql.Rows
 	var err error
 
-	baseSelect := `SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description,
-		e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer, COALESCE(l.type, '')
+	baseSelect := `SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, e.description,
+		e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer, COALESCE(s.type, '')
 		FROM events e
-		JOIN locations l ON e.location_id = l.id`
+		JOIN settlements s ON e.location_id = s.id
+		JOIN counties c ON s.county_id = c.id`
 
-	baseCount := `SELECT COUNT(*) FROM events e JOIN locations l ON e.location_id = l.id`
+	baseCount := `SELECT COUNT(*) FROM events e JOIN settlements s ON e.location_id = s.id JOIN counties c ON s.county_id = c.id`
 
 	var conditions []string
 	var args []interface{}
@@ -56,17 +57,17 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 		args = append(args, organizer)
 		argIdx++
 	} else if locationSlug != "" {
-		conditions = append(conditions, fmt.Sprintf("(l.slug = $%d OR l.parent_id = (SELECT id FROM locations WHERE slug = $%d))", argIdx, argIdx))
+		conditions = append(conditions, fmt.Sprintf("(s.slug = $%d OR s.parent_id = (SELECT id FROM settlements WHERE slug = $%d))", argIdx, argIdx))
 		args = append(args, locationSlug)
 		argIdx++
 	} else if countySlug != "" {
-		conditions = append(conditions, fmt.Sprintf("l.county_slug = $%d", argIdx))
+		conditions = append(conditions, fmt.Sprintf("c.slug = $%d", argIdx))
 		args = append(args, countySlug)
 		argIdx++
 	}
 
 	if locationType != "" {
-		conditions = append(conditions, fmt.Sprintf("l.type = $%d", argIdx))
+		conditions = append(conditions, fmt.Sprintf("s.type = $%d", argIdx))
 		args = append(args, locationType)
 		argIdx++
 	}

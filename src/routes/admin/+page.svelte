@@ -13,6 +13,7 @@
     let quickLinks = [];
     let newsFeeds = [];
     let locations = [];
+    let attractions = [];
     let entries = [];
     let entryCategories = [];
     let entryTypes = [];
@@ -65,6 +66,19 @@
         event_type: "cultural",
         organizer: "",
     };
+    let newAttraction = {
+        county_slug: "hargita",
+        name: "",
+        name_ro: "",
+        name_de: "",
+        slug: "",
+        description: "",
+        latitude: "",
+        longitude: "",
+        featured_image: "",
+        content: "",
+        images: "",
+    };
 
     let newOrganizerModalVisible = false;
     let newOrganizerEntry = {
@@ -91,6 +105,7 @@
     let editingLink = null;
     let editingNews = null;
     let editingEvent = null;
+    let editingAttraction = null;
 
     let orgQuery = "";
     let orgEditQuery = "";
@@ -214,7 +229,7 @@
         e.preventDefault();
         if (password === "szekely123") {
             authenticated = true;
-            auth.login();
+            auth.login("Admin", true);
             fetchAll();
         } else {
             alert("Na de kicsibarátom, ez nem a jó jelszó!");
@@ -224,8 +239,8 @@
     function logout() {
         authenticated = false;
         password = "";
-        localStorage.removeItem("admin_auth");
-        localStorage.removeItem("admin_user");
+        auth.logout();
+        window.location.href = "/";
     }
 
     async function fetchAll() {
@@ -233,6 +248,7 @@
         fetchQuickLinks();
         fetchNewsFeeds();
         fetchLocations();
+        fetchAttractions();
         fetchEntries();
         fetchEntryCategories();
         fetchEntryTypes();
@@ -417,6 +433,8 @@
     function fetchLocations() {
         loadData("locations", (d) => (locations = d));
     }
+    // Entries/events use settlement_id; filter out counties (type=megye)
+    $: settlementsForSelect = locations.filter((l) => l.type !== "megye");
 
     async function setCountySeat(locationId) {
         try {
@@ -445,6 +463,9 @@
     }
     function fetchEvents() {
         loadData("events", (d) => (events = d));
+    }
+    function fetchAttractions() {
+        loadData("attractions", (d) => (attractions = d));
     }
 
     // generic create
@@ -854,10 +875,95 @@
         await updateRecord("entries", payload, fetchEntries);
         closeEdit();
     }
+
+    // --- Attractions ---
+    function submitNewAttraction(e) {
+        e.preventDefault();
+        const imgs = newAttraction.images
+            ? newAttraction.images.split("\n").map((s) => s.trim()).filter(Boolean)
+            : [];
+        createRecord(
+            "attractions",
+            {
+                county_slug: newAttraction.county_slug,
+                name: newAttraction.name,
+                name_ro: newAttraction.name_ro || "",
+                name_de: newAttraction.name_de || "",
+                slug: newAttraction.slug || "",
+                description: newAttraction.description || "",
+                latitude: parseFloat(newAttraction.latitude) || 0,
+                longitude: parseFloat(newAttraction.longitude) || 0,
+                featured_image: newAttraction.featured_image || "",
+                content: newAttraction.content || "",
+                images: imgs,
+            },
+            fetchAttractions,
+            () =>
+                (newAttraction = {
+                    county_slug: "hargita",
+                    name: "",
+                    name_ro: "",
+                    name_de: "",
+                    slug: "",
+                    description: "",
+                    latitude: "",
+                    longitude: "",
+                    featured_image: "",
+                    content: "",
+                    images: "",
+                }),
+        );
+    }
+    function openEditAttraction(att) {
+        editingAttraction = {
+            id: att.id,
+            county_slug: att.county_slug,
+            name: att.name,
+            name_ro: att.name_ro || "",
+            name_de: att.name_de || "",
+            slug: att.slug,
+            description: att.description || "",
+            latitude: att.latitude ? String(att.latitude) : "",
+            longitude: att.longitude ? String(att.longitude) : "",
+            featured_image: att.featured_image || "",
+            content: att.content || "",
+            images: (att.images || []).join("\n"),
+        };
+    }
+    function cancelEditAttraction() {
+        editingAttraction = null;
+    }
+    async function saveEditAttraction(e) {
+        e.preventDefault();
+        if (!editingAttraction) return;
+        const imgs = editingAttraction.images
+            ? editingAttraction.images.split("\n").map((s) => s.trim()).filter(Boolean)
+            : [];
+        await updateRecord(
+            "attractions",
+            {
+                ...editingAttraction,
+                latitude: parseFloat(editingAttraction.latitude) || 0,
+                longitude: parseFloat(editingAttraction.longitude) || 0,
+                images: imgs,
+            },
+            fetchAttractions,
+        );
+        cancelEditAttraction();
+    }
+    async function deleteAttraction(id) {
+        if (!confirm("Biztosan törölni szeretnéd ezt a látnivalót?")) return;
+        try {
+            const res = await fetch(`${getBase()}/api/admin/attractions?id=${id}`, { method: "DELETE" });
+            if (res.ok) fetchAttractions();
+        } catch (e) {
+            console.error(e);
+        }
+    }
 </script>
 
 <svelte:head>
-    <title>Székely Gugel - Adminisztráció</title>
+    <title>Lámsza - Adminisztráció</title>
 </svelte:head>
 
 {#if !authenticated}
@@ -935,6 +1041,19 @@
             </button>
 
             <button
+                class="admin-sidebar-btn {activeTab === 'counties'
+                    ? 'active'
+                    : ''}"
+                on:click={() => (activeTab = "counties")}
+                title="Megyék"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                    ><path d="M3 21V3h18v18H3zm2-2h14V5H5v14zm2-2h10v-2H7v2zm0-4h10v-2H7v2z"
+                    ></path></svg
+                >
+            </button>
+
+            <button
                 class="admin-sidebar-btn {activeTab === 'locations'
                     ? 'active'
                     : ''}"
@@ -945,6 +1064,16 @@
                     ><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
                     ></path><circle cx="12" cy="10" r="3"></circle></svg
                 >
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'attractions'
+                    ? 'active'
+                    : ''}"
+                on:click={() => { activeTab = "attractions"; fetchAttractions(); }}
+                title="Látnivalók"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </button>
 
             <button
@@ -962,19 +1091,6 @@
                         x2="8"
                         y2="6"
                     ></line><line x1="3" y1="10" x2="21" y2="10"></line></svg
-                >
-            </button>
-
-            <button
-                class="admin-sidebar-btn {activeTab === 'counties'
-                    ? 'active'
-                    : ''}"
-                on:click={() => (activeTab = "counties")}
-                title="Megyék"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path d="M3 21V3h18v18H3zm2-2h14V5H5v14zm2-2h10v-2H7v2zm0-4h10v-2H7v2z"
-                    ></path></svg
                 >
             </button>
 
@@ -1082,6 +1198,7 @@
                         Kezelése{/if}
                     {#if activeTab === "entries"}Bejegyzések Kezelése{/if}
                     {#if activeTab === "entry_types"}Bejegyzés Típusok Kezelése{/if}
+                    {#if activeTab === "attractions"}Látnivalók Kezelése{/if}
                     {#if activeTab === "counties"}Megyék Kezelése{/if}
                     {#if activeTab === "settings"}Beállítások{/if}
                     {#if activeTab === "weather_translations"}Időjárás fordítások{/if}
@@ -1444,7 +1561,7 @@
                             <option value={null}
                                 >Nincs (Önálló város/község)</option
                             >
-                            {#each locations as loc}
+                            {#each settlementsForSelect as loc}
                                 <option value={loc.id}
                                     >{loc.name} ({loc.county})</option
                                 >
@@ -1544,7 +1661,7 @@
                             required
                         >
                             <option value="">Válassz...</option>
-                            {#each locations as loc}
+                            {#each settlementsForSelect as loc}
                                 <option value={loc.id}
                                     >{loc.name} ({loc.county})</option
                                 >
@@ -1823,7 +1940,7 @@
                             required
                         >
                             <option value="">Válassz...</option>
-                            {#each locations as loc}
+                            {#each settlementsForSelect as loc}
                                 <option value={loc.id}
                                     >{loc.name} ({loc.county})</option
                                 >
@@ -1993,7 +2110,7 @@
                         <div class="admin-form" style="max-width: 32rem;">
                             <label for="my_location_slug">Település</label>
                             <select id="my_location_slug" bind:value={siteSettings.my_location_slug}>
-                                {#each locations as loc}
+                                {#each settlementsForSelect as loc}
                                     <option value={loc.slug}>{loc.name}{loc.county ? ` (${loc.county})` : ''}{loc.type ? ` – ${loc.type}` : ''}</option>
                                 {/each}
                             </select>
@@ -2229,6 +2346,75 @@
                     </div>
                 {/if}
 
+                <!-- Attractions Tab -->
+                {#if activeTab === "attractions"}
+                    <p class="admin-info">Látnivalók (pl. Szent Anna-tó) kezelése. Megye, név, koordináták, tartalom.</p>
+                    <form class="admin-form mb-lg" on:submit|preventDefault={submitNewAttraction}>
+                        <h4>Új látnivaló</h4>
+                        <div class="form-row">
+                            <label for="att_county">Megye</label>
+                            <select id="att_county" bind:value={newAttraction.county_slug}>
+                                <option value="hargita">Hargita</option>
+                                <option value="kovaszna">Kovászna</option>
+                                <option value="maros">Maros</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label for="att_name">Név</label>
+                            <input id="att_name" type="text" bind:value={newAttraction.name} required placeholder="pl. Szent Anna-tó" />
+                        </div>
+                        <div class="form-row">
+                            <label for="att_desc">Rövid leírás</label>
+                            <input id="att_desc" type="text" bind:value={newAttraction.description} placeholder="Közép-Európa egyetlen vulkanikus tava..." />
+                        </div>
+                        <div class="form-row">
+                            <label for="att_coords">Koordináták (lat, lon)</label>
+                            <input id="att_coords" type="text" bind:value={newAttraction.latitude} placeholder="46.1265" style="width:6rem" />
+                            <input type="text" bind:value={newAttraction.longitude} placeholder="25.8876" style="width:6rem" />
+                        </div>
+                        <div class="form-row">
+                            <label for="att_featured">Kiemelt kép URL</label>
+                            <input id="att_featured" type="url" bind:value={newAttraction.featured_image} placeholder="https://..." />
+                        </div>
+                        <div class="form-row">
+                            <label for="att_content">Tartalom (Markdown)</label>
+                            <textarea id="att_content" bind:value={newAttraction.content} rows="6" placeholder="## Cím&#10;Szöveg..."></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label for="att_images">Galéria URL-ek (soronként egy)</label>
+                            <textarea id="att_images" bind:value={newAttraction.images} rows="3" placeholder="https://kep1.jpg&#10;https://kep2.jpg"></textarea>
+                        </div>
+                        <button type="submit" class="admin-submit-btn">Hozzáadás</button>
+                    </form>
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Név</th>
+                                    <th>Megye</th>
+                                    <th>Slug</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each attractions as att}
+                                    <tr>
+                                        <td>{att.name}</td>
+                                        <td>{att.county_name}</td>
+                                        <td>{att.slug}</td>
+                                        <td>
+                                            <button type="button" class="btn-sm" on:click={() => openEditAttraction(att)}>Szerkesztés</button>
+                                            <button type="button" class="btn-delete btn-sm" on:click={() => deleteAttraction(att.id)}>Törlés</button>
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr><td colspan="4">Nincsenek látnivalók.</td></tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+
                 <!-- Counties Tab -->
                 {#if activeTab === "counties"}
                     <p class="admin-info">Válaszd ki minden megye székhelyét. A kiválasztott település lesz a megyeszékhely.</p>
@@ -2453,7 +2639,7 @@
                         bind:value={editingEntry.location_id}
                         required
                     >
-                        {#each locations as loc}
+                        {#each settlementsForSelect as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
                             >
@@ -2658,7 +2844,7 @@
                     >
                         <option value={null}>Nincs (Önálló város/község)</option
                         >
-                        {#each locations.filter((l) => l.id !== editingLocation.id) as loc}
+                        {#each settlementsForSelect.filter((l) => l.id !== editingLocation.id) as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
                             >
@@ -2758,6 +2944,50 @@
         </div>
     {/if}
 
+    <!-- Edit Attraction Modal -->
+    {#if editingAttraction}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditAttraction}
+            on:keydown={(e) => e.key === "Escape" && cancelEditAttraction()}
+        >
+            <div class="admin-modal">
+                <h3>Látnivaló szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditAttraction}
+                >
+                    <label for="eatt_county">Megye</label>
+                    <select id="eatt_county" bind:value={editingAttraction.county_slug}>
+                        <option value="hargita">Hargita</option>
+                        <option value="kovaszna">Kovászna</option>
+                        <option value="maros">Maros</option>
+                    </select>
+                    <label for="eatt_name">Név</label>
+                    <input id="eatt_name" type="text" bind:value={editingAttraction.name} required />
+                    <label for="eatt_desc">Rövid leírás</label>
+                    <input id="eatt_desc" type="text" bind:value={editingAttraction.description} />
+                    <label for="eatt_coords">Koordináták (lat, lon)</label>
+                    <input id="eatt_coords" type="text" bind:value={editingAttraction.latitude} style="width:6rem" />
+                    <input type="text" bind:value={editingAttraction.longitude} style="width:6rem" />
+                    <label for="eatt_featured">Kiemelt kép URL</label>
+                    <input id="eatt_featured" type="url" bind:value={editingAttraction.featured_image} />
+                    <label for="eatt_content">Tartalom (Markdown)</label>
+                    <textarea id="eatt_content" bind:value={editingAttraction.content} rows="6"></textarea>
+                    <label for="eatt_images">Galéria URL-ek (soronként egy)</label>
+                    <textarea id="eatt_images" bind:value={editingAttraction.images} rows="3"></textarea>
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn">Mentés</button>
+                        <button type="button" class="btn-delete" on:click={cancelEditAttraction}>Mégse</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
     <!-- Custom Dialog -->
     {#if dialogVisible}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -2805,7 +3035,7 @@
                         bind:value={editingEvent.location_id}
                         required
                     >
-                        {#each locations as loc}
+                        {#each settlementsForSelect as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
                             >
@@ -2964,7 +3194,7 @@
                         required
                     >
                         <option value="">Válassz...</option>
-                        {#each locations as loc}
+                        {#each settlementsForSelect as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
                             >

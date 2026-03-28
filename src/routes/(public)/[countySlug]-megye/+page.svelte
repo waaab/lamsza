@@ -20,6 +20,7 @@
     let displayTownCrest = "";
 
     let childSettlements = [];
+    let attractions = [];
     let entries = [];
     let loadingEntries = true;
     let entriesError = null;
@@ -89,7 +90,7 @@
         // 1. Fetch Directory Entries
         try {
             const locRes = await fetch(
-                `${apiBase}/api/locations?type=${encodeURIComponent(locType)}`,
+                `${apiBase}/api/locations?county_slug=${encodeURIComponent(town)}`,
             );
             if (locRes.ok) {
                 const locations = await locRes.json();
@@ -114,10 +115,17 @@
                     .sort((a, b) => a.name.localeCompare(b.name));
             }
             const res = await fetch(
-                `${apiBase}/api/directory?slug=${encodeURIComponent(town)}&type=megye`,
+                `${apiBase}/api/directory?county_slug=${encodeURIComponent(town)}`,
             );
             if (!res.ok) throw new Error("Hiba a címtár betöltésekor");
             entries = (await res.json()) || [];
+
+            const attRes = await fetch(
+                `${apiBase}/api/attractions?county_slug=${encodeURIComponent(town)}`,
+            );
+            if (attRes.ok) {
+                attractions = (await attRes.json()) || [];
+            }
         } catch (err) {
             console.error(err);
             entriesError = "Nem sikerült betölteni az adatokat.";
@@ -178,14 +186,16 @@
 <Breadcrumbs label={displayTown} type="Megye" />
 
 <h1 class="page-title">{displayTown} Megye</h1>
-<p class="greeting no-top-margin">
+<p class="greeting">
     Helyi hírek, időjárás és címtár {displayTown} megye területén.
 </p>
 
 <!-- Widgets: 3-column top grid (Áttekintés | Címer | Időjárás), then Events + News full width -->
 <div class="widgets-box" id="hasznos-informaciok">
-    <div id="attekintes">
-        <h3 class="widget-title">Áttekintés</h3>
+    <div id="attekintes" class="widget">
+        <div class="widget-header">
+            <h3 class="widget-title">Áttekintés</h3>
+        </div>
         <div class="more-info">
             <span title="Román neve">Románul: <span>{displayTownRo || "-"}</span></span>
             <span title="Német neve">Németül: <span>{displayTownDe || "-"}</span></span>
@@ -198,22 +208,26 @@
         </div>
     </div>
 
-    <div id="cimer" class="crest-card">
+    <div id="cimer" class="crest-card widget">
         {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
+        <div class="widget-header">
             <h3 class="widget-title">{displayTown} címere</h3>
-            <div class="crest-container">
-                <img
-                    src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
-                    alt="{displayTown} címere"
-                    class="crest-img"
-                />
-            </div>
+        </div>
+        <div class="crest-container">
+            <img
+                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
+                alt="{displayTown} címere"
+                class="crest-img"
+            />
+        </div>
         {/if}
     </div>
 
     <!-- Weather = 3rd grid element (same card structure as homepage) -->
-    <div id="idojaras" class="weather-card simple">
-        <h3 class="widget-title">Időjárás a megyében</h3>
+    <div id="idojaras" class="weather-card complex widget">
+        <div class="widget-header">
+            <h3 class="widget-title">Időjárás a megyében</h3>
+        </div>
         <div class="widget-content">
             {#if weatherLoading}
                 <div class="weather-left">
@@ -262,47 +276,49 @@
             <small class="weather-source" title="Forrás: OpenWeatherMap">OpenWeatherMap</small>
         </div>
     </div>
-
-    <EventsWidget countySlug={town} locationName={displayTown} />
-
-    <article id="hirek" class="news-widget component-box">
-        <h3 class="widget-title">Helyi hírek</h3>
-        {#if newsLoading}
-            <div class="news-loading-placeholder">
-                <span class="news-title">adat betöltés...</span>
-                <div class="news-meta">adat betöltés...</div>
-            </div>
-        {:else if newsItems.length > 0}
-            <div class="news-ticker">
-                {#key newsTickerIndex}
-                    {@const item = newsItems[newsTickerIndex]}
-                    {#if item}
-                        <div class="news-ticker-item">
-                            <a
-                                href={item.link}
-                                target="_blank"
-                                rel="nofollow noopener"
-                                class="news-title"
-                            >
-                                📰 {item.title}
-                            </a>
-                            <div class="news-meta">
-                                {item.source} - {new Date(item.pubDate).toLocaleDateString("hu-HU")}
-                            </div>
-                        </div>
-                    {/if}
-                {/key}
-                <div class="news-ticker-nav">
-                    <button class="scroll-arrow left" on:click={() => { newsTickerIndex = (newsTickerIndex - 1 + newsItems.length) % newsItems.length; }} aria-label="Előző hír">&#8249;</button>
-                    <button class="scroll-arrow right" on:click={() => { newsTickerIndex = (newsTickerIndex + 1) % newsItems.length; }} aria-label="Következő hír">&#8250;</button>
-                    <a href="/hirek" class="nav-btn">Összes hír</a>
-                </div>
-            </div>
-        {:else}
-            <span class="info-box"><p>Helyi hírek nem elérhetőek.</p></span>
-        {/if}
-    </article>
 </div>
+
+<EventsWidget countySlug={town} locationName={displayTown} />
+
+<section id="hirek" class="widget component-box">
+    <div class="widget-header">
+        <h3 class="widget-title">Helyi hírek</h3>
+    </div>
+    {#if newsLoading}
+        <div class="news-loading-placeholder">
+            <span class="news-title">adat betöltés...</span>
+            <div class="news-meta">adat betöltés...</div>
+        </div>
+    {:else if newsItems.length > 0}
+        <div class="news-ticker">
+            {#key newsTickerIndex}
+                {@const item = newsItems[newsTickerIndex]}
+                {#if item}
+                    <div class="news-ticker-item">
+                        <a
+                            href={item.link}
+                            target="_blank"
+                            rel="nofollow noopener"
+                            class="news-title"
+                        >
+                            📰 {item.title}
+                        </a>
+                        <div class="news-meta">
+                            {item.source} - {new Date(item.pubDate).toLocaleDateString("hu-HU")}
+                        </div>
+                    </div>
+                {/if}
+            {/key}
+            <div class="news-ticker-nav">
+                <button class="scroll-arrow left" on:click={() => { newsTickerIndex = (newsTickerIndex - 1 + newsItems.length) % newsItems.length; }} aria-label="Előző hír">&#8249;</button>
+                <button class="scroll-arrow right" on:click={() => { newsTickerIndex = (newsTickerIndex + 1) % newsItems.length; }} aria-label="Következő hír">&#8250;</button>
+                <a href="/hirek" class="nav-btn">Összes hír</a>
+            </div>
+        </div>
+    {:else}
+        <span class="info-box"><p>Helyi hírek nem elérhetőek.</p></span>
+    {/if}
+</section>
 
 <!-- County Settlements Aside -->
 {#if childSettlements.length > 0}
@@ -317,6 +333,25 @@
                     class="badge settlement-badge"
                 >
                     {child.name}
+                </a>
+            {/each}
+        </div>
+    </aside>
+{/if}
+
+<!-- County Attractions -->
+{#if attractions.length > 0}
+    <aside class="settlements-aside component-box">
+        <h2 class="aside-title">
+            Látnivalók {displayTown} megyében
+        </h2>
+        <div class="settlements-grid">
+            {#each attractions as att (att.id)}
+                <a
+                    href="/{$page.params.countySlug}-megye/{att.slug}"
+                    class="badge settlement-badge"
+                >
+                    {att.name}
                 </a>
             {/each}
         </div>
@@ -478,9 +513,6 @@
 {/if}
 
 <style>
-    .no-top-margin {
-        margin-top: 0;
-    }
     .more-info {
         display: flex;
         flex-direction: column;
@@ -493,14 +525,10 @@
         color: var(--text-faint);
         margin: 0.5rem 0 0;
     }
-    .news-widget {
-        display: flex;
-        flex-direction: column;
-    }
     .news-loading-placeholder {
         padding: 0.5rem 0;
     }
-    .news-widget {
+    #hirek.widget {
         grid-column: span 3;
     }
     .news-ticker {

@@ -11,8 +11,10 @@
 
 <div class="breadcrumbs">
     <a href="/">Főoldal</a>
-    &rsaquo;
-    <a href={parentUrl}>{parentLabel}</a>
+    {#if parentLabel && parentUrl}
+        &rsaquo;
+        <a href={parentUrl}>{parentLabel}</a>
+    {/if}
     &rsaquo;
     {#if countyName && countySlug}
         <a href="/{countySlug}-megye">{countyName}</a>

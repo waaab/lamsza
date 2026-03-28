@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import { auth } from "$lib/stores/auth";
     import { theme, cycleTheme, LABELS } from "$lib/stores/theme";
@@ -7,6 +8,11 @@
 
     let settingsOpen = false;
     let scrollY = 0;
+    let loginDialogOpen = false;
+    let loginPassword = "";
+    let loginError = "";
+
+    const ADMIN_PASSWORD = "szekely123";
 
     onMount(() => {
         auth.init();
@@ -28,13 +34,38 @@
 
     function logout() {
         auth.logout();
-        if (page.url.pathname.startsWith("/admin")) {
-            window.location.href = "/";
+    }
+
+    function openLoginDialog() {
+        loginDialogOpen = true;
+        loginPassword = "";
+        loginError = "";
+    }
+
+    function closeLoginDialog() {
+        loginDialogOpen = false;
+        loginPassword = "";
+        loginError = "";
+    }
+
+    function submitLogin(e) {
+        e.preventDefault();
+        loginError = "";
+        if (loginPassword === ADMIN_PASSWORD) {
+            auth.login("Admin", true);
+            closeLoginDialog();
+        } else {
+            loginError = "Na de kicsibarátom, ez nem a jó jelszó!";
         }
     }
+
 </script>
 
-<svelte:window bind:scrollY on:click={closeSettings} />
+<svelte:window
+    bind:scrollY
+    on:click={closeSettings}
+    on:keydown={(e) => loginDialogOpen && e.key === "Escape" && closeLoginDialog()}
+/>
 
 <header class="toolbar">
     <div class="nav">
@@ -218,7 +249,33 @@
     </div>
     <div class="nav">
         {#if $auth.loggedIn}
-            <span class="nav-admin-user" title="Bejelentkezve">{$auth.user}</span>
+            <span class="nav-admin-user" title="{$auth.user} bejelentkezve">{$auth.user}</span>
+            {#if $auth.isAdmin}
+            <button
+                type="button"
+                class="nav-btn {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
+                title="Admin panel"
+                on:click={() => goto('/admin')}
+            >
+                <span class="sr-only">Admin</span>
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle
+                        cx="12"
+                        cy="7"
+                        r="4"
+                    /></svg
+                >
+            </button>
+            {/if}
             <button
                 type="button"
                 class="nav-btn"
@@ -237,22 +294,14 @@
                     stroke-linejoin="round"
                     ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg
                 >
-                <span>Kijelentkezés</span>
+                <span class="sr-only">Kijelentkezés</span>
             </button>
-            <a
-                href="/admin"
-                class="nav-btn {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
-                title="Admin panel"
-            >
-                <span>Admin</span>
-            </a>
         {:else}
-            <a
-                href="/admin"
-                class="nav-btn {$page.url.pathname.startsWith('/admin')
-                    ? 'active'
-                    : ''}"
-                title="Belépés az admin panelbe"
+            <button
+                type="button"
+                class="nav-btn"
+                title="Belépés"
+                on:click={openLoginDialog}
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -264,14 +313,10 @@
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    ><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle
-                        cx="12"
-                        cy="7"
-                        r="4"
-                    /></svg
+                    ><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></svg
                 >
-                <span>Belépés</span>
-            </a>
+                <span class="sr-only">Belépés</span>
+            </button>
         {/if}
 
         <div class="settings-container">
@@ -295,7 +340,7 @@
                         d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
                     /></svg
                 >
-                <span>Béállítások</span>
+                <span class="sr-only">Béállítások</span>
             </button>
 
             {#if settingsOpen}
@@ -324,7 +369,7 @@
 </main>
 
 <footer>
-    <div class="footer-top">
+    <div class="copyright">
         Készítette sok ❤️-el <a
             href="https://bogozi.com"
             target="_blank"
@@ -338,8 +383,8 @@
             >v1.0.0 - Változásnapló</a
         >
     </div>
-    <div class="footer-bottom">
-        <div class="logo">Székely Gugel</div>
+    <div class="brand-info">
+        <div class="logo">Na Lámsza!</div>
         <div class="social-links">
             <a href="/" target="_blank" rel="noopener" title="Facebook"
                 >Facebook</a
@@ -352,7 +397,45 @@
             >
         </div>
     </div>
+    <div class="policy-links">
+        <a href="/iranyelvek" title="Irányelvek">Irányelvek</a>
+        <a href="/iranyelvek/feltetelek" title="Feltételek">Feltételek</a>
+        <a href="/iranyelvek/sutik" title="Sütik">Sütik</a>
+    </div>
 </footer>
+
+{#if loginDialogOpen}
+    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+        class="link-dialog-overlay"
+        role="dialog"
+        aria-labelledby="login-dialog-title"
+        tabindex="-1"
+        on:click|self={closeLoginDialog}
+    >
+        <div class="link-dialog" on:click|stopPropagation>
+            <h3 id="login-dialog-title">Belépés</h3>
+            <form class="link-dialog-form" on:submit|preventDefault={submitLogin}>
+                <label for="login_password">Jelszó</label>
+                <input
+                    id="login_password"
+                    type="password"
+                    bind:value={loginPassword}
+                    placeholder="Jelszó..."
+                    required
+                />
+                {#if loginError}
+                    <p class="login-error">{loginError}</p>
+                {/if}
+                <div class="link-dialog-actions">
+                    <button type="submit" class="link-dialog-submit">Belépés</button>
+                    <button type="button" class="link-dialog-cancel" on:click={closeLoginDialog}>Mégse</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{/if}
 
 {#if scrollY > 500}
     <button

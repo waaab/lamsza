@@ -7,8 +7,10 @@
     import NewsWidget from "$lib/components/NewsWidget.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import { apiFetch } from "$lib/api";
+    import Markdown from "$lib/components/Markdown.svelte";
 
     let settlementData = null;
+    let attractionData = null;
     let entries = [];
     let loading = true;
     let entriesError = null;
@@ -41,31 +43,43 @@
         fetchData();
     }
 
+    $: pageTitle = settlementData?.name || attractionData?.name || town;
+    $: isAttraction = !!attractionData;
+
     async function fetchData() {
         loading = true;
+        settlementData = null;
+        attractionData = null;
+        entries = [];
+        entriesError = null;
         try {
-            // 1. Fetch Settlement Info
-            const locations = await apiFetch("/api/locations");
-            const locData = locations.find(
-                (l) => l.slug === town.toLowerCase(),
+            const countySlug = $page.params.countySlug.toLowerCase();
+            const slug = town.toLowerCase();
+
+            // 1. Try settlement first (locations = counties + settlements)
+            const locations = await apiFetch(
+                `/api/locations?county_slug=${encodeURIComponent(countySlug)}`,
             );
+            const locData = locations.find((l) => l.slug === slug && l.type !== "megye");
             if (locData) {
                 settlementData = locData;
                 if (locData.parent_id) {
-                    const parent = locations.find(
-                        (l) => l.id === locData.parent_id,
-                    );
-                    if (parent) {
-                        settlementData.parent = parent;
-                    }
+                    const parent = locations.find((l) => l.id === locData.parent_id);
+                    if (parent) settlementData.parent = parent;
+                }
+                const res = await apiFetch(
+                    `/api/directory?location_slug=${encodeURIComponent(slug)}`,
+                );
+                entries = res || [];
+            } else {
+                // 2. Try attraction
+                const att = await apiFetch(
+                    `/api/attractions?county_slug=${encodeURIComponent(countySlug)}&slug=${encodeURIComponent(slug)}`,
+                );
+                if (att && att.id) {
+                    attractionData = att;
                 }
             }
-
-            // 2. Fetch Directory Entries
-            const res = await apiFetch(
-                `/api/directory?location_slug=${encodeURIComponent(town)}`,
-            );
-            entries = res || [];
         } catch (err) {
             console.error(err);
             entriesError = "Nem sikerült betölteni az adatokat.";
@@ -76,10 +90,88 @@
 </script>
 
 <svelte:head>
-    <title>{settlementData?.name || town} - Index</title>
+    <title>{pageTitle} - Index</title>
 </svelte:head>
 
-{#if settlementData}
+{#if attractionData}
+    <Breadcrumbs
+        label={attractionData.name}
+        parentLabel={attractionData.county_name}
+        parentUrl="/{$page.params.countySlug}-megye"
+        countyName={attractionData.county_name}
+        countySlug={$page.params.countySlug}
+    />
+
+    <h1 class="page-title">{attractionData.name}</h1>
+    <p class="greeting">
+        Látnivaló {attractionData.county_name} megyében.
+    </p>
+
+    <div class="widgets-box">
+        <div id="attekintes" class="widget">
+            <div class="widget-header">
+                <h3 class="widget-title">Áttekintés</h3>
+            </div>
+            <div class="more-info">
+                {#if attractionData.name_ro}
+                    <span>Románul: <span>{attractionData.name_ro}</span></span>
+                {/if}
+                {#if attractionData.name_de}
+                    <span>Németül: <span>{attractionData.name_de}</span></span>
+                {/if}
+                {#if attractionData.latitude && attractionData.longitude}
+                    <span>Koordináták: <span>{attractionData.latitude.toFixed(4)}, {attractionData.longitude.toFixed(4)}</span></span>
+                {/if}
+                <span>Megye: <span><a href="/{$page.params.countySlug}-megye" class="parent-city-link">{attractionData.county_name}</a></span></span>
+            </div>
+        </div>
+
+        <WeatherWidget
+            settlementSlug={attractionData.latitude && attractionData.longitude ? undefined : town}
+            lat={attractionData.latitude}
+            lon={attractionData.longitude}
+            advanced={true}
+        />
+    </div>
+
+    {#if attractionData.featured_image}
+        <div class="attraction-featured">
+            <img
+                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(attractionData.featured_image)}`}
+                alt={attractionData.name}
+            />
+        </div>
+    {/if}
+
+    {#if attractionData.description}
+        <p class="attraction-desc">{attractionData.description}</p>
+    {/if}
+
+    {#if attractionData.content}
+        <div class="attraction-content">
+            <Markdown source={attractionData.content} />
+        </div>
+    {/if}
+
+    {#if attractionData.images && attractionData.images.length > 0}
+        <h3 class="widget-title">Galéria</h3>
+        <div class="attraction-gallery">
+            {#each attractionData.images as url}
+                <a
+                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(url)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="gallery-item"
+                >
+                    <img
+                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(url)}`}
+                        alt=""
+                    />
+                </a>
+            {/each}
+        </div>
+    {/if}
+{:else if settlementData}
     <Breadcrumbs
         label={settlementData.name}
         settlementType={settlementData.type}
@@ -91,13 +183,15 @@
         {settlementData.name}
         {settlementData.type} és környéke
     </h1>
-    <p class="greeting no-top-margin">
+    <p class="greeting">
         Helyi hírek, időjárás és címtár {settlementData.name} területén.
     </p>
 
     <div class="widgets-box">
-        <div id="attekintes">
-            <h3 class="widget-title">Áttekintés</h3>
+        <div id="attekintes" class="widget">
+            <div class="widget-header">
+                <h3 class="widget-title">Áttekintés</h3>
+            </div>
             <div class="more-info">
                 <span>Románul: <span>{settlementData.name_ro || "-"}</span></span>
                 <span>Németül: <span>{settlementData.name_de || "-"}</span></span>
@@ -111,9 +205,11 @@
             </div>
         </div>
 
-        <div id="cimer" class="crest-card">
+        <div id="cimer" class="crest-card widget">
             {#if settlementData.crest && settlementData.crest !== "–" && settlementData.crest.length > 5}
-                <h3 class="widget-title">{settlementData.name} címere</h3>
+                <div class="widget-header">
+                    <h3 class="widget-title">{settlementData.name} címere</h3>
+                </div>
                 <div class="crest-container">
                     <img
                         src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(settlementData.crest)}`}
@@ -276,12 +372,13 @@
             </div>
         {/if}
     {/if}
+{:else if loading}
+    <p class="greeting">Betöltés...</p>
+{:else}
+    <p class="greeting">A keresett oldal nem található.</p>
 {/if}
 
 <style>
-    .no-top-margin {
-        margin-top: 0;
-    }
     .more-info {
         display: flex;
         flex-direction: column;
@@ -326,5 +423,35 @@
         font-size: 0.95rem;
         color: var(--text-faint);
         margin-top: 0.5rem;
+    }
+
+    .attraction-featured {
+        margin: 1.5rem 0;
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+    .attraction-featured img {
+        width: 100%;
+        max-height: 300px;
+        object-fit: cover;
+    }
+    .attraction-desc {
+        margin: 1rem 0;
+        color: var(--text-faint);
+    }
+    .attraction-content {
+        margin: 1.5rem 0;
+    }
+    .attraction-gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }
+    .attraction-gallery .gallery-item img {
+        width: 100%;
+        height: 120px;
+        object-fit: cover;
+        border-radius: 0.25rem;
     }
 </style>

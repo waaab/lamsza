@@ -38,8 +38,10 @@
     $: formatted = formatDateTime(now);
 </script>
 
-<div id="datetime" class="datetime-card">
-    <h3 class="widget-title">Dátum és idő</h3>
+<div id="datetime" class="datetime-card widget">
+    <div class="widget-header">
+        <h3 class="widget-title">Dátum és idő</h3>
+    </div>
 
     <div class="datetime-clocks">
         <!-- Analog clock -->

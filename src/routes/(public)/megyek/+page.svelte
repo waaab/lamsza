@@ -8,10 +8,8 @@
 
     onMount(async () => {
         try {
-            const all = await apiFetch("/api/locations");
-            locations = all
-                .filter((l) => l.type.toLowerCase() === "megye")
-                .sort((a, b) => a.name.localeCompare(b.name));
+            const all = await apiFetch("/api/locations?type=megye");
+            locations = all.sort((a, b) => a.name.localeCompare(b.name));
         } catch (e) {
             console.error(e);
         } finally {

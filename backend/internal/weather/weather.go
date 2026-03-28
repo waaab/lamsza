@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"backend/internal/db"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -125,6 +126,25 @@ func getSettingBool(key string, defaultVal bool) bool {
 
 func HandleWeather(w http.ResponseWriter, r *http.Request) {
 	slug := r.URL.Query().Get("slug")
+	latStr := r.URL.Query().Get("lat")
+	lonStr := r.URL.Query().Get("lon")
+
+	// Direct coordinates (e.g. for attractions): same provider order as slug-based
+	if latStr != "" && lonStr != "" {
+		if lat, err := strconv.ParseFloat(latStr, 64); err == nil {
+			if lon, err := strconv.ParseFloat(lonStr, 64); err == nil {
+				if out, prov, err := fetchWeatherByCoords(lat, lon); err == nil && out != nil {
+					out.FetchedAt = time.Now().Unix()
+					out.Source = providerDisplayName(prov)
+					out.Desc = translatedDesc(out.Desc, "hu")
+					w.Header().Set("Content-Type", "application/json")
+					json.NewEncoder(w).Encode(out)
+					return
+				}
+			}
+		}
+	}
+
 	if slug == "" {
 		http.Error(w, "Missing slug", http.StatusBadRequest)
 		return
@@ -133,9 +153,23 @@ func HandleWeather(w http.ResponseWriter, r *http.Request) {
 	var name, nameRo string
 	var parentID *int
 	err := db.DB.QueryRow(
-		"SELECT name, COALESCE(name_ro, ''), parent_id FROM locations WHERE slug = $1", slug,
+		"SELECT name, COALESCE(name_ro, ''), parent_id FROM settlements WHERE slug = $1", slug,
 	).Scan(&name, &nameRo, &parentID)
 	if err != nil {
+		// Try attraction
+		var lat, lon float64
+		if err := db.DB.QueryRow(
+			"SELECT gl.latitude, gl.longitude FROM attractions a JOIN geo_locations gl ON a.location_id = gl.id WHERE a.slug = $1", slug,
+		).Scan(&lat, &lon); err == nil {
+			if out, prov, err := fetchWeatherByCoords(lat, lon); err == nil && out != nil {
+				out.FetchedAt = time.Now().Unix()
+				out.Source = providerDisplayName(prov)
+				out.Desc = translatedDesc(out.Desc, "hu")
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(out)
+				return
+			}
+		}
 		log.Println("Weather slug resolution error:", err)
 		name = strings.Title(strings.ReplaceAll(slug, "-", " "))
 	}
@@ -174,7 +208,7 @@ func HandleWeather(w http.ResponseWriter, r *http.Request) {
 	if parentID != nil && out == nil {
 		var parentName, parentNameRo string
 		perr := db.DB.QueryRow(
-			"SELECT name, COALESCE(name_ro, '') FROM locations WHERE id = $1", *parentID,
+			"SELECT name, COALESCE(name_ro, '') FROM settlements WHERE id = $1", *parentID,
 		).Scan(&parentName, &parentNameRo)
 		if perr == nil {
 			parentSearch := parentName
@@ -220,42 +254,50 @@ func providerDisplayName(id string) string {
 	return id
 }
 
-// Open-Meteo: geocode then current weather
-func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
-	geoURL := "https://geocoding-api.open-meteo.com/v1/search?name=" + url.QueryEscape(city) + "&count=1"
-	resp, err := http.Get(geoURL)
+// fetchWeatherByCoords tries each enabled provider in order (same policy as slug-based requests).
+func fetchWeatherByCoords(lat, lon float64) (*UnifiedWeatherResponse, string, error) {
+	order := getProviderOrder()
+	var lastErr error
+	for _, prov := range order {
+		var out *UnifiedWeatherResponse
+		var err error
+		switch prov {
+		case providerOpenMeteo:
+			out, err = fetchOpenMeteoByCoords(lat, lon)
+		case providerWeatherAPICom:
+			out, err = fetchWeatherAPIComByCoords(lat, lon, config.AppConfig.WeatherAPIComKey)
+		case providerOpenWeatherMap:
+			out, err = fetchOpenWeatherMapByCoords(lat, lon, config.AppConfig.WeatherAPIKey)
+		default:
+			continue
+		}
+		if err == nil && out != nil {
+			return out, prov, nil
+		}
+		if err != nil {
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return nil, "", lastErr
+	}
+	return nil, "", fmt.Errorf("all weather providers failed for coordinates")
+}
+
+// fetchOpenMeteoByCoords fetches weather directly by coordinates (no geocoding)
+func fetchOpenMeteoByCoords(lat, lon float64) (*UnifiedWeatherResponse, error) {
+	forecastURL := "https://api.open-meteo.com/v1/forecast?latitude=" + strconv.FormatFloat(lat, 'f', -1, 64) +
+		"&longitude=" + strconv.FormatFloat(lon, 'f', -1, 64) +
+		"&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,precipitation"
+	resp, err := http.Get(forecastURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, fmt.Errorf("open-meteo forecast: HTTP %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
-	var geo struct {
-		Results []struct {
-			Latitude  float64 `json:"latitude"`
-			Longitude float64 `json:"longitude"`
-		} `json:"results"`
-	}
-	if err := json.Unmarshal(body, &geo); err != nil || len(geo.Results) == 0 {
-		return nil, err
-	}
-	lat := geo.Results[0].Latitude
-	lon := geo.Results[0].Longitude
-
-	forecastURL := "https://api.open-meteo.com/v1/forecast?latitude=" + strconv.FormatFloat(lat, 'f', -1, 64) +
-		"&longitude=" + strconv.FormatFloat(lon, 'f', -1, 64) +
-		"&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,precipitation"
-	resp2, err := http.Get(forecastURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp2.Body.Close()
-	if resp2.StatusCode != http.StatusOK {
-		return nil, err
-	}
-	body2, _ := io.ReadAll(resp2.Body)
 	var fm struct {
 		Current struct {
 			Temperature float64 `json:"temperature_2m"`
@@ -265,7 +307,7 @@ func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
 			Precip      float64 `json:"precipitation"`
 		} `json:"current"`
 	}
-	if err := json.Unmarshal(body2, &fm); err != nil {
+	if err := json.Unmarshal(body, &fm); err != nil {
 		return nil, err
 	}
 	temp := int(fm.Current.Temperature)
@@ -278,6 +320,36 @@ func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
 		Temp: temp, TempMin: &temp, Desc: desc, Icon: icon,
 		Humidity: &humidity, WindKph: &windKph, PrecipMm: &precipMm,
 	}, nil
+}
+
+// Open-Meteo: geocode then current weather
+func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
+	geoURL := "https://geocoding-api.open-meteo.com/v1/search?name=" + url.QueryEscape(city) + "&count=1"
+	resp, err := http.Get(geoURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("open-meteo geocode: HTTP %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var geo struct {
+		Results []struct {
+			Latitude  float64 `json:"latitude"`
+			Longitude float64 `json:"longitude"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal(body, &geo); err != nil {
+		return nil, err
+	}
+	if len(geo.Results) == 0 {
+		return nil, fmt.Errorf("open-meteo geocode: no results")
+	}
+	lat := geo.Results[0].Latitude
+	lon := geo.Results[0].Longitude
+
+	return fetchOpenMeteoByCoords(lat, lon)
 }
 
 func wmoToOwmIcon(code int) string {
@@ -338,9 +410,31 @@ func fetchWeatherAPICom(city, apiKey string) (*UnifiedWeatherResponse, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, fmt.Errorf("weatherapi.com: HTTP %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
+	return parseWeatherAPIComCurrentJSON(body)
+}
+
+func fetchWeatherAPIComByCoords(lat, lon float64, apiKey string) (*UnifiedWeatherResponse, error) {
+	if apiKey == "" {
+		return nil, nil
+	}
+	q := strconv.FormatFloat(lat, 'f', -1, 64) + "," + strconv.FormatFloat(lon, 'f', -1, 64)
+	u := "https://api.weatherapi.com/v1/current.json?key=" + url.QueryEscape(apiKey) + "&q=" + url.QueryEscape(q) + "&lang=hu"
+	resp, err := http.Get(u)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("weatherapi.com: HTTP %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return parseWeatherAPIComCurrentJSON(body)
+}
+
+func parseWeatherAPIComCurrentJSON(body []byte) (*UnifiedWeatherResponse, error) {
 	var wa struct {
 		Current struct {
 			TempC     float64 `json:"temp_c"`
@@ -408,9 +502,32 @@ func fetchOpenWeatherMap(city, apiKey string) (*UnifiedWeatherResponse, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, fmt.Errorf("openweathermap: HTTP %d", resp.StatusCode)
 	}
 	body, _ := io.ReadAll(resp.Body)
+	return parseOpenWeatherMapCurrentJSON(body)
+}
+
+func fetchOpenWeatherMapByCoords(lat, lon float64, apiKey string) (*UnifiedWeatherResponse, error) {
+	if apiKey == "" {
+		return nil, nil
+	}
+	weatherURL := "https://api.openweathermap.org/data/2.5/weather?lat=" +
+		strconv.FormatFloat(lat, 'f', -1, 64) + "&lon=" + strconv.FormatFloat(lon, 'f', -1, 64) +
+		"&appid=" + url.QueryEscape(apiKey) + "&units=metric&lang=hu"
+	resp, err := http.Get(weatherURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("openweathermap: HTTP %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return parseOpenWeatherMapCurrentJSON(body)
+}
+
+func parseOpenWeatherMapCurrentJSON(body []byte) (*UnifiedWeatherResponse, error) {
 	var owm struct {
 		Main struct {
 			Temp     float64 `json:"temp"`
@@ -470,9 +587,10 @@ func HandleCountyWeather(w http.ResponseWriter, r *http.Request) {
 	}
 
 	rows, err := db.DB.Query(
-		`SELECT slug, name, COALESCE(name_ro, ''), COALESCE(is_county_seat, false) FROM locations
-		 WHERE county_slug = $1 AND type IN ('város', 'municípium')
-		 ORDER BY name`, countySlug,
+		`SELECT s.slug, s.name, COALESCE(s.name_ro, ''), COALESCE(s.is_county_seat, false) FROM settlements s
+		 JOIN counties c ON s.county_id = c.id
+		 WHERE c.slug = $1 AND s.type IN ('város', 'municípium')
+		 ORDER BY s.name`, countySlug,
 	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -499,7 +617,6 @@ func HandleCountyWeather(w http.ResponseWriter, r *http.Request) {
 	}
 
 	order := getProviderOrder()
-	sourceName := providerDisplayName(order[0])
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -536,7 +653,7 @@ func HandleCountyWeather(w http.ResponseWriter, r *http.Request) {
 						Desc:         translatedDesc(out.Desc, "hu"),
 						Icon:         out.Icon,
 						IsCountySeat: c.isCountySeat,
-						Source:       sourceName,
+						Source:       providerDisplayName(prov),
 					})
 					mu.Unlock()
 					return

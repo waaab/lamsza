@@ -14,7 +14,7 @@
                 const all = await res.json();
                 locations = all
                     .filter((l) =>
-                        ["város", "municípium"].includes(l.type.toLowerCase()),
+                        ["város", "municípium"].includes(l.type?.toLowerCase() ?? ""),
                     )
                     .sort((a, b) => a.name.localeCompare(b.name));
             }

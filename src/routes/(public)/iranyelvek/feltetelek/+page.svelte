@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import { apiFetch } from "$lib/api";
 
     let page = null;
@@ -21,39 +22,36 @@
     <title>{page?.title || "Feltételek"} – Lámsza</title>
 </svelte:head>
 
+<Breadcrumbs label="Feltételek" parentLabel="Irányelvek" parentUrl="/iranyelvek" />
+
 <section class="page-section">
     <h1 class="page-title">{page?.title || "Feltételek"}</h1>
-
-    {#if loading}
-        <p class="info-box">Betöltés...</p>
-    {:else if error}
-        <p class="info-box">Az oldal nem elérhető.</p>
-    {:else if page?.content}
-        <div class="page-content">{@html page.content}</div>
-    {:else}
-        <p class="info-box">Az oldal tartalma még nem lett hozzáadva.</p>
-    {/if}
-
-    <nav class="policy-nav">
-        <a href="/iranyelvek">Irányelvek</a>
-        <a href="/iranyelvek/sutik">Sütik</a>
-    </nav>
+        <div class="page-inner">
+        {#if loading}
+            <span class="info-box">
+                <p>Betöltés...</p>
+            </span>
+        {:else if error}
+            <span class="info-box">
+                <p>Az oldal nem elérhető.</p>
+            </span>
+        {:else if page?.content}
+            <div class="page-content">{@html page.content}</div>
+        {:else}
+            <span class="info-box">
+                <p>Az oldal tartalma még nem lett hozzáadva.</p>
+            </span>
+        {/if}
+        <nav class="page-nav">
+            <a class="nav-btn" href="/iranyelvek">Irányelvek</a>
+            <a class="nav-btn" href="/iranyelvek/sutik">Sütik</a>
+        </nav>
+    </div>
 </section>
 
 <style>
-    .policy-nav {
+    .page-nav {
         display: flex;
-        gap: 1rem;
-        margin-top: 2rem;
-        padding-top: 1rem;
-        border-top: 1px solid var(--border-color, #ddd);
-    }
-    .policy-nav a {
-        color: var(--link-color, #2563eb);
-        text-decoration: none;
-        font-weight: 500;
-    }
-    .policy-nav a:hover {
-        text-decoration: underline;
+        gap: 0.5rem;
     }
 </style>
