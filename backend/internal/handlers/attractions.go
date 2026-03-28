@@ -164,7 +164,7 @@ func HandleHistoricalSeats(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(list)
 }
 
-// HandleAdminCounties updates county markdown content (PUT JSON: id, content).
+// HandleAdminCounties updates county fields (PUT JSON: id, name, name_ro, name_de, slug, content).
 func HandleAdminCounties(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "PUT" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -172,6 +172,10 @@ func HandleAdminCounties(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		ID      int    `json:"id"`
+		Name    string `json:"name"`
+		NameRo  string `json:"name_ro"`
+		NameDe  string `json:"name_de"`
+		Slug    string `json:"slug"`
 		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -182,7 +186,20 @@ func HandleAdminCounties(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "id required", http.StatusBadRequest)
 		return
 	}
-	res, err := db.DB.Exec("UPDATE counties SET content = $1 WHERE id = $2", body.Content, body.ID)
+	body.Slug = strings.TrimSpace(strings.ToLower(body.Slug))
+	if body.Slug == "" {
+		http.Error(w, "slug required", http.StatusBadRequest)
+		return
+	}
+	res, err := db.DB.Exec(
+		`UPDATE counties SET name = $1, name_ro = $2, name_de = $3, slug = $4, content = $5 WHERE id = $6`,
+		strings.TrimSpace(body.Name),
+		strings.TrimSpace(body.NameRo),
+		strings.TrimSpace(body.NameDe),
+		body.Slug,
+		body.Content,
+		body.ID,
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -196,7 +213,7 @@ func HandleAdminCounties(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-// HandleAdminHistoricalSeats updates historical seat markdown content (PUT JSON: id, content).
+// HandleAdminHistoricalSeats updates historical seat fields (PUT JSON: id, name, name_ro, name_de, slug, content).
 func HandleAdminHistoricalSeats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "PUT" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -204,6 +221,10 @@ func HandleAdminHistoricalSeats(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct {
 		ID      int    `json:"id"`
+		Name    string `json:"name"`
+		NameRo  string `json:"name_ro"`
+		NameDe  string `json:"name_de"`
+		Slug    string `json:"slug"`
 		Content string `json:"content"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -214,7 +235,20 @@ func HandleAdminHistoricalSeats(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "id required", http.StatusBadRequest)
 		return
 	}
-	res, err := db.DB.Exec("UPDATE historical_seats SET content = $1 WHERE id = $2", body.Content, body.ID)
+	body.Slug = strings.TrimSpace(strings.ToLower(body.Slug))
+	if body.Slug == "" {
+		http.Error(w, "slug required", http.StatusBadRequest)
+		return
+	}
+	res, err := db.DB.Exec(
+		`UPDATE historical_seats SET name = $1, name_ro = $2, name_de = $3, slug = $4, content = $5 WHERE id = $6`,
+		strings.TrimSpace(body.Name),
+		strings.TrimSpace(body.NameRo),
+		strings.TrimSpace(body.NameDe),
+		body.Slug,
+		body.Content,
+		body.ID,
+	)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

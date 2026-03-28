@@ -16,6 +16,9 @@
     let attractions = [];
     let countiesFromAPI = [];
     let historicalSeatsFromAPI = [];
+    /** Inline table edit state for Megyék / Történelmi székek tabs */
+    let editingCounty = null;
+    let editingHistoricalSeat = null;
     let entries = [];
     let entryCategories = [];
     let entryTypes = [];
@@ -439,6 +442,7 @@
     // Entries/events use settlement_id; filter out counties (type=megye)
     $: settlementsForSelect = locations.filter((l) => l.type !== "megye");
 
+    /** @returns {Promise<boolean>} */
     async function setCountySeat(locationId) {
         try {
             const res = await fetch(`${getBase()}/api/admin/county_seat`, {
@@ -448,11 +452,13 @@
             });
             if (res.ok) {
                 fetchLocations();
-            } else {
-                console.error("Failed to set county seat:", await res.text());
+                return true;
             }
+            console.error("Failed to set county seat:", await res.text());
+            return false;
         } catch (e) {
             console.error("Error setting county seat:", e);
+            return false;
         }
     }
     function fetchEntries() {
@@ -482,43 +488,127 @@
         }
     }
 
-    async function saveCountyContent(c) {
+    function contentPreview(text, maxLen = 96) {
+        if (!text || !String(text).trim()) return "—";
+        const t = String(text).replace(/\s+/g, " ").trim();
+        return t.length > maxLen ? t.slice(0, maxLen) + "…" : t;
+    }
+
+    function settlementsForCountyName(countyName) {
+        return locations
+            .filter((l) => l.county === countyName && l.type !== "megye")
+            .sort((a, b) => {
+                if (a.is_county_seat && !b.is_county_seat) return -1;
+                if (!a.is_county_seat && b.is_county_seat) return 1;
+                const typeOrder = { municípium: 0, város: 1, község: 2, falu: 3 };
+                const ta = typeOrder[a.type] ?? 9;
+                const tb = typeOrder[b.type] ?? 9;
+                if (ta !== tb) return ta - tb;
+                return a.name.localeCompare(b.name);
+            });
+    }
+
+    function countySeatDisplayName(c) {
+        const seat = locations.find(
+            (l) => l.county === c.name && l.type !== "megye" && l.is_county_seat,
+        );
+        return seat ? `${seat.name} (${seat.type})` : "—";
+    }
+
+    function startEditCounty(c) {
+        editingHistoricalSeat = null;
+        const seat = locations.find((l) => l.county === c.name && l.is_county_seat);
+        editingCounty = {
+            id: c.id,
+            name: c.name ?? "",
+            name_ro: c.name_ro ?? "",
+            name_de: c.name_de ?? "",
+            slug: c.slug ?? "",
+            content: c.content ?? "",
+            seat_location_id: seat ? String(seat.id) : "",
+        };
+    }
+
+    function cancelEditCounty() {
+        editingCounty = null;
+    }
+
+    async function saveEditingCounty() {
+        const ec = editingCounty;
+        if (!ec) return;
         try {
             const res = await fetch(`${getBase()}/api/admin/counties`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    id: c.id,
-                    content: c.content ?? "",
+                    id: ec.id,
+                    name: ec.name ?? "",
+                    name_ro: ec.name_ro ?? "",
+                    name_de: ec.name_de ?? "",
+                    slug: ec.slug ?? "",
+                    content: ec.content ?? "",
                 }),
             });
-            if (res.ok) {
-                await showAlert("Megye szöveg mentve: " + c.name);
-                fetchCountyRegions();
-            } else {
-                await showAlert("Hiba: " + (await res.text()));
+            if (!res.ok) {
+                await showAlert("Hiba (megye): " + (await res.text()));
+                return;
             }
+            if (ec.seat_location_id) {
+                const ok = await setCountySeat(Number(ec.seat_location_id));
+                if (!ok) {
+                    await showAlert(
+                        "A megye szövege mentve, de a megyeszékhely beállítása nem sikerült.",
+                    );
+                }
+            }
+            editingCounty = null;
+            await showAlert("Megye mentve: " + ec.name);
+            fetchCountyRegions();
+            fetchLocations();
         } catch (e) {
             await showAlert("Hiba: " + e.message);
         }
     }
 
-    async function saveHistoricalSeatContent(h) {
+    function startEditHistoricalSeat(h) {
+        editingCounty = null;
+        editingHistoricalSeat = {
+            id: h.id,
+            name: h.name ?? "",
+            name_ro: h.name_ro ?? "",
+            name_de: h.name_de ?? "",
+            slug: h.slug ?? "",
+            content: h.content ?? "",
+        };
+    }
+
+    function cancelEditHistoricalSeat() {
+        editingHistoricalSeat = null;
+    }
+
+    async function saveEditingHistoricalSeat() {
+        const h = editingHistoricalSeat;
+        if (!h) return;
         try {
             const res = await fetch(`${getBase()}/api/admin/historical_seats`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     id: h.id,
+                    name: h.name ?? "",
+                    name_ro: h.name_ro ?? "",
+                    name_de: h.name_de ?? "",
+                    slug: h.slug ?? "",
                     content: h.content ?? "",
                 }),
             });
-            if (res.ok) {
-                await showAlert("Szék szöveg mentve: " + h.name);
-                fetchCountyRegions();
-            } else {
-                await showAlert("Hiba: " + (await res.text()));
+            if (!res.ok) {
+                await showAlert("Hiba (szék): " + (await res.text()));
+                return;
             }
+            editingHistoricalSeat = null;
+            await showAlert("Szék mentve: " + h.name);
+            fetchCountyRegions();
         } catch (e) {
             await showAlert("Hiba: " + e.message);
         }
@@ -2476,95 +2566,197 @@
 
                 <!-- Counties Tab -->
                 {#if activeTab === "counties"}
-                    <p class="admin-info">Válaszd ki minden megye székhelyét. A kiválasztott település lesz a megyeszékhely.</p>
-                    <div class="counties-grid">
-                        {#each COUNTIES as county}
-                            {@const countySlug = county.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, "")}
-                            {@const countyLocations = locations
-                                .filter(l => l.county === county && l.type !== "megye")
-                                .sort((a, b) => {
-                                    if (a.is_county_seat && !b.is_county_seat) return -1;
-                                    if (!a.is_county_seat && b.is_county_seat) return 1;
-                                    const typeOrder = {"municípium": 0, "város": 1, "község": 2, "falu": 3};
-                                    const ta = typeOrder[a.type] ?? 9;
-                                    const tb = typeOrder[b.type] ?? 9;
-                                    if (ta !== tb) return ta - tb;
-                                    return a.name.localeCompare(b.name);
-                                })}
-                            {@const currentSeat = countyLocations.find(l => l.is_county_seat)}
-                            <div class="county-card">
-                                <h3 class="county-card-title">{county} megye</h3>
-                                <p class="county-card-subtitle">
-                                    Megyeszékhely: <strong>{currentSeat ? currentSeat.name : "Nincs beállítva"}</strong>
-                                </p>
-                                <div class="county-seat-list">
-                                    {#each countyLocations as loc}
-                                        <label class="county-seat-row" class:is-seat={loc.is_county_seat}>
-                                            <input
-                                                type="radio"
-                                                name="seat_{countySlug}"
-                                                checked={loc.is_county_seat}
-                                                on:change={() => setCountySeat(loc.id)}
-                                            />
-                                            <span class="county-seat-name">{loc.name}</span>
-                                            <span class="county-seat-type">{loc.type}</span>
-                                            {#if loc.name_ro}
-                                                <span class="county-seat-ro">({loc.name_ro})</span>
-                                            {/if}
-                                        </label>
+                    <p class="admin-info">
+                        Megyék: név, slug, megyeszékhely (település lista), bemutatkozó szöveg (Markdown). A
+                        megyeszékhely szerkesztésénél a települések legördülő listából választhatók.
+                    </p>
+
+                    <h3 class="admin-region-heading">Megyék</h3>
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Megye</th>
+                                    <th>Név (RO)</th>
+                                    <th>Név (DE)</th>
+                                    <th>Slug</th>
+                                    <th>Megyeszékhely</th>
+                                    <th>Tartalom (előnézet)</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each countiesFromAPI as c (c.id)}
+                                    {#if editingCounty?.id === c.id}
+                                        <tr class="admin-table-edit-row">
+                                            <td colspan="7">
+                                                <div class="admin-region-edit-panel">
+                                                    <div class="admin-region-edit-grid">
+                                                        <label>
+                                                            Megye (HU)
+                                                            <input type="text" bind:value={editingCounty.name} />
+                                                        </label>
+                                                        <label>
+                                                            Név (RO)
+                                                            <input type="text" bind:value={editingCounty.name_ro} />
+                                                        </label>
+                                                        <label>
+                                                            Név (DE)
+                                                            <input type="text" bind:value={editingCounty.name_de} />
+                                                        </label>
+                                                        <label>
+                                                            Slug (URL)
+                                                            <input type="text" bind:value={editingCounty.slug} placeholder="pl. hargita" />
+                                                        </label>
+                                                        <label class="admin-region-edit-span2">
+                                                            Megyeszékhely
+                                                            <select bind:value={editingCounty.seat_location_id}>
+                                                                <option value="">— válassz települést —</option>
+                                                                {#each settlementsForCountyName(c.name) as loc (loc.id)}
+                                                                    <option value={String(loc.id)}
+                                                                        >{loc.name} ({loc.type}){loc.name_ro ? " — " + loc.name_ro : ""}</option
+                                                                    >
+                                                                {/each}
+                                                            </select>
+                                                        </label>
+                                                    </div>
+                                                    <label class="admin-region-edit-full">
+                                                        Bemutatkozás (Markdown)
+                                                        <textarea
+                                                            rows="10"
+                                                            bind:value={editingCounty.content}
+                                                            placeholder="## Bevezető&#10;..."
+                                                        ></textarea>
+                                                    </label>
+                                                    <div class="admin-region-edit-actions">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={saveEditingCounty}>Mentés</button
+                                                        >
+                                                        <button
+                                                            type="button"
+                                                            class="btn-update"
+                                                            on:click={cancelEditCounty}>Mégse</button
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
                                     {:else}
-                                        <p>Nincsenek települések ebben a megyében.</p>
-                                    {/each}
-                                </div>
-                            </div>
-                        {/each}
+                                        <tr>
+                                            <td><strong>{c.name}</strong></td>
+                                            <td>{c.name_ro || "—"}</td>
+                                            <td>{c.name_de || "—"}</td>
+                                            <td><code>{c.slug}</code></td>
+                                            <td>{countySeatDisplayName(c)}</td>
+                                            <td class="admin-table-cell-preview" title={c.content || ""}
+                                                >{contentPreview(c.content)}</td
+                                            >
+                                            <td>
+                                                <button
+                                                    type="button"
+                                                    class="btn-update"
+                                                    on:click={() => startEditCounty(c)}>Szerkesztés</button
+                                                >
+                                            </td>
+                                        </tr>
+                                    {/if}
+                                {:else}
+                                    <tr><td colspan="7">Nincs megye-adat (API / migráció).</td></tr>
+                                {/each}
+                            </tbody>
+                        </table>
                     </div>
 
-                    <h3 class="admin-region-heading">Megye bemutatkozás (Markdown)</h3>
+                    <h3 class="admin-region-heading">Történelmi székek</h3>
                     <p class="admin-info">
-                        A nyilvános megye-oldalon jelenik meg (pl. Hargita megye).
+                        Megjelenés: <a href="/szekek" target="_blank" rel="noopener">/szekek</a> és
+                        <code>/szekek/…</code> oldalak.
                     </p>
-                    {#each countiesFromAPI as c (c.id)}
-                        <div class="admin-region-block">
-                            <h4 class="admin-region-title">{c.name}</h4>
-                            <textarea
-                                class="admin-region-textarea"
-                                rows="8"
-                                bind:value={c.content}
-                                placeholder="## Bevezető&#10;..."
-                            ></textarea>
-                            <button
-                                type="button"
-                                class="admin-submit-btn"
-                                on:click={() => saveCountyContent(c)}
-                            >Mentés — {c.name}</button>
-                        </div>
-                    {:else}
-                        <p class="admin-info">Megyei adatok betöltése…</p>
-                    {/each}
-
-                    <h3 class="admin-region-heading">Történelmi székek (Markdown)</h3>
-                    <p class="admin-info">
-                        A <a href="/szekek" target="_blank" rel="noopener">/szekek</a> listán és a <code>/szekek/…</code> oldalakon.
-                    </p>
-                    {#each historicalSeatsFromAPI as h (h.id)}
-                        <div class="admin-region-block">
-                            <h4 class="admin-region-title">{h.name}</h4>
-                            <textarea
-                                class="admin-region-textarea"
-                                rows="8"
-                                bind:value={h.content}
-                                placeholder="## Történet&#10;..."
-                            ></textarea>
-                            <button
-                                type="button"
-                                class="admin-submit-btn"
-                                on:click={() => saveHistoricalSeatContent(h)}
-                            >Mentés — {h.name}</button>
-                        </div>
-                    {:else}
-                        <p class="admin-info">Szék-adatok betöltése…</p>
-                    {/each}
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Név (HU)</th>
+                                    <th>Név (RO)</th>
+                                    <th>Név (DE)</th>
+                                    <th>Slug</th>
+                                    <th>Tartalom (előnézet)</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each historicalSeatsFromAPI as h (h.id)}
+                                    {#if editingHistoricalSeat?.id === h.id}
+                                        <tr class="admin-table-edit-row">
+                                            <td colspan="6">
+                                                <div class="admin-region-edit-panel">
+                                                    <div class="admin-region-edit-grid">
+                                                        <label>
+                                                            Név (HU)
+                                                            <input type="text" bind:value={editingHistoricalSeat.name} />
+                                                        </label>
+                                                        <label>
+                                                            Név (RO)
+                                                            <input type="text" bind:value={editingHistoricalSeat.name_ro} />
+                                                        </label>
+                                                        <label>
+                                                            Név (DE)
+                                                            <input type="text" bind:value={editingHistoricalSeat.name_de} />
+                                                        </label>
+                                                        <label>
+                                                            Slug (URL)
+                                                            <input type="text" bind:value={editingHistoricalSeat.slug} placeholder="pl. csikszek" />
+                                                        </label>
+                                                    </div>
+                                                    <label class="admin-region-edit-full">
+                                                        Tartalom (Markdown)
+                                                        <textarea
+                                                            rows="10"
+                                                            bind:value={editingHistoricalSeat.content}
+                                                            placeholder="## …&#10;..."
+                                                        ></textarea>
+                                                    </label>
+                                                    <div class="admin-region-edit-actions">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={saveEditingHistoricalSeat}>Mentés</button
+                                                        >
+                                                        <button
+                                                            type="button"
+                                                            class="btn-update"
+                                                            on:click={cancelEditHistoricalSeat}>Mégse</button
+                                                        >
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {:else}
+                                        <tr>
+                                            <td><strong>{h.name}</strong></td>
+                                            <td>{h.name_ro || "—"}</td>
+                                            <td>{h.name_de || "—"}</td>
+                                            <td><code>{h.slug}</code></td>
+                                            <td class="admin-table-cell-preview" title={h.content || ""}
+                                                >{contentPreview(h.content)}</td
+                                            >
+                                            <td>
+                                                <button
+                                                    type="button"
+                                                    class="btn-update"
+                                                    on:click={() => startEditHistoricalSeat(h)}>Szerkesztés</button
+                                                >
+                                            </td>
+                                        </tr>
+                                    {/if}
+                                {:else}
+                                    <tr><td colspan="6">Nincs szék-adat (API / migráció).</td></tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
                 {/if}
             </div>
         </main>
@@ -3488,76 +3680,63 @@
         margin-bottom: 0.5rem;
         font-size: 1.1rem;
     }
-    .admin-region-block {
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px dashed var(--border-color, #ccc);
-    }
-    .admin-region-title {
-        margin: 0 0 0.5rem 0;
-        font-size: 1rem;
-    }
-    .admin-region-textarea {
-        width: 100%;
-        max-width: 48rem;
-        font-family: ui-monospace, monospace;
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-    }
 
-    .counties-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-        gap: 1.5rem;
-    }
-    .county-card {
-        border: 1px solid var(--border-color, #e5e7eb);
-        border-radius: 8px;
-        padding: 1.25rem;
-        background: var(--card-bg, #fff);
-    }
-    .county-card-title {
-        margin: 0 0 0.25rem;
-        font-size: 1.15rem;
-    }
-    .county-card-subtitle {
-        margin: 0 0 1rem;
-        font-size: 0.9rem;
+    .admin-table-cell-preview {
+        max-width: 16rem;
+        font-size: 0.85rem;
         color: var(--text-faint, #666);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-    .county-seat-list {
+    .admin-table-edit-row td {
+        vertical-align: top;
+        background: var(--hover-bg, #f9fafb);
+    }
+    .admin-region-edit-panel {
+        padding: 0.35rem 0 0.25rem;
+    }
+    .admin-region-edit-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 0.75rem 1rem;
+        margin-bottom: 0.75rem;
+    }
+    .admin-region-edit-grid label {
         display: flex;
         flex-direction: column;
-        gap: 0.35rem;
-        max-height: 400px;
-        overflow-y: auto;
+        gap: 0.25rem;
+        font-size: 0.85rem;
     }
-    .county-seat-row {
+    .admin-region-edit-grid input,
+    .admin-region-edit-grid select {
+        width: 100%;
+        padding: 0.35rem 0.5rem;
+    }
+    .admin-region-edit-span2 {
+        grid-column: span 2;
+    }
+    @media (max-width: 720px) {
+        .admin-region-edit-span2 {
+            grid-column: span 1;
+        }
+    }
+    .admin-region-edit-full {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.85rem;
+    }
+    .admin-region-edit-full textarea {
+        width: 100%;
+        font-family: ui-monospace, monospace;
+        font-size: 0.9rem;
+    }
+    .admin-region-edit-actions {
+        display: flex;
         gap: 0.5rem;
-        padding: 0.4rem 0.6rem;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background 0.1s;
-    }
-    .county-seat-row:hover {
-        background: var(--hover-bg, #f3f4f6);
-    }
-    .county-seat-row.is-seat {
-        background: var(--accent-bg, #e0f2fe);
-        font-weight: 600;
-    }
-    .county-seat-name {
-        flex: 1;
-    }
-    .county-seat-type {
-        font-size: 0.8rem;
-        color: var(--text-faint, #999);
-    }
-    .county-seat-ro {
-        font-size: 0.8rem;
-        color: var(--text-faint, #999);
+        flex-wrap: wrap;
     }
 
     .org-autosuggest-wrapper {
