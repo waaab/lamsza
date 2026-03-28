@@ -179,6 +179,10 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		if err := validateAdminEvent(&ev); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		err := db.DB.QueryRow(`INSERT INTO events (location_id, title, description, start_date, start_time, end_date, end_time, event_type, organizer) 
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
 			ev.LocationID, ev.Title, ev.Description, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventType, ev.Organizer).Scan(&ev.ID)
@@ -192,6 +196,10 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 		var ev models.AdminEvent
 		if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
 			http.Error(w, err.Error(), 400)
+			return
+		}
+		if err := validateAdminEvent(&ev); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		_, err := db.DB.Exec(`UPDATE events SET location_id=$1, title=$2, description=$3, start_date=$4, start_time=$5, end_date=$6, end_time=$7, event_type=$8, organizer=$9 WHERE id=$10`,
@@ -209,4 +217,20 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusOK)
 	}
+}
+
+func validateAdminEvent(ev *models.AdminEvent) error {
+	if strings.TrimSpace(ev.Title) == "" {
+		return fmt.Errorf("Az esemény címe kötelező.")
+	}
+	if ev.LocationID == nil || *ev.LocationID == 0 {
+		return fmt.Errorf("Település / helyszín kötelező.")
+	}
+	if strings.TrimSpace(ev.StartDate) == "" || strings.TrimSpace(ev.EndDate) == "" {
+		return fmt.Errorf("Kezdő és befejező dátum kötelező.")
+	}
+	if strings.TrimSpace(ev.StartTime) == "" || strings.TrimSpace(ev.EndTime) == "" {
+		return fmt.Errorf("Kezdő és befejező időpont (óra:perc) kötelező.")
+	}
+	return nil
 }

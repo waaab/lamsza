@@ -538,6 +538,43 @@
     function fetchEvents() {
         loadData("events", (d) => (events = d));
     }
+
+    /** @param {Record<string, unknown>} ev */
+    function eventDateTimeComplete(ev) {
+        const sd = String(ev.start_date ?? "").trim();
+        const ed = String(ev.end_date ?? "").trim();
+        const st = String(ev.start_time ?? "").trim();
+        const et = String(ev.end_time ?? "").trim();
+        return !!(sd && ed && st && et);
+    }
+
+    /** @param {Record<string, unknown>} ev */
+    function validateEventFields(ev) {
+        const loc = ev.location_id;
+        const locNum =
+            typeof loc === "number"
+                ? loc
+                : parseInt(String(loc ?? ""), 10);
+        if (
+            loc === "" ||
+            loc === null ||
+            loc === undefined ||
+            !Number.isFinite(locNum) ||
+            locNum <= 0
+        ) {
+            return "Válassz települést / helyszínt.";
+        }
+        if (!String(ev.title ?? "").trim()) return "Az esemény címe kötelező.";
+        if (!String(ev.start_date ?? "").trim()) return "A kezdő dátum kötelező.";
+        if (!String(ev.end_date ?? "").trim()) return "A befejező dátum kötelező.";
+        if (!String(ev.start_time ?? "").trim())
+            return "A kezdő időpont (óra:perc) kötelező.";
+        if (!String(ev.end_time ?? "").trim())
+            return "A befejező időpont (óra:perc) kötelező.";
+        return null;
+    }
+
+    $: eventsWithIncompleteDateTime = events.filter((e) => !eventDateTimeComplete(e));
     function fetchAttractions() {
         loadData("attractions", (d) => (attractions = d));
     }
@@ -817,11 +854,21 @@
                 }),
         );
     }
-    function submitEvent(e) {
+    async function submitEvent(e) {
         e.preventDefault();
+        const lid = parseInt(String(newEvent.location_id), 10);
+        const payload = {
+            ...newEvent,
+            location_id: Number.isFinite(lid) && lid > 0 ? lid : 0,
+        };
+        const err = validateEventFields(payload);
+        if (err) {
+            await showAlert(err);
+            return;
+        }
         createRecord(
             "events",
-            { ...newEvent, location_id: parseInt(newEvent.location_id) || 0 },
+            payload,
             fetchEvents,
             () =>
                 (newEvent = {
@@ -994,7 +1041,13 @@
     async function startEditEvent(ev) {
         const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
         if (!ok) return;
-        editingEvent = { ...ev };
+        const st = ev.start_time ? String(ev.start_time) : "";
+        const et = ev.end_time ? String(ev.end_time) : "";
+        editingEvent = {
+            ...ev,
+            start_time: st.length >= 5 ? st.slice(0, 5) : "",
+            end_time: et.length >= 5 ? et.slice(0, 5) : "",
+        };
         orgEditQuery = ev.organizer || "";
     }
     function cancelEditEvent() {
@@ -1002,6 +1055,11 @@
     }
     async function saveEditEvent() {
         if (!editingEvent) return;
+        const err = validateEventFields(editingEvent);
+        if (err) {
+            await showAlert(err);
+            return;
+        }
         const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
         if (!ok) return;
         await updateRecord("events", editingEvent, fetchEvents);
@@ -1421,11 +1479,30 @@
                     {#if activeTab === "settings"}Beállítások{/if}
                     {#if activeTab === "weather_translations"}Időjárás fordítások{/if}
                     {#if activeTab === "pages"}Oldalak{/if}
+                    {#if activeTab === "events"}Események Kezelése{/if}
                 </h2>
                 <button class="btn-logout" on:click={logout}
                     >Kijelentkezés</button
                 >
             </div>
+
+            {#if eventsWithIncompleteDateTime.length > 0}
+                <div class="admin-alert admin-alert--warning" role="alert">
+                    <strong>Hiányos esemény-időpontok.</strong>
+                    {eventsWithIncompleteDateTime.length} eseménynél nincs meg minden
+                    kötelező mező (kezdő/befejező dátum és időpont). Kérjük, szerkessze
+                    az Események lapon a listában szereplő tételeket, és töltse ki a dátumokat
+                    és az óra:perc időpontokat.
+                    <button
+                        type="button"
+                        class="btn-update admin-alert__btn"
+                        on:click={() => {
+                            activeTab = "events";
+                            fetchEvents();
+                        }}>Ugrás az Eseményekhez</button
+                    >
+                </div>
+            {/if}
 
             <div class="admin-container w-full">
                 <!-- Mondások Tab -->
@@ -1871,8 +1948,16 @@
                 <!-- Events Tab -->
                 {#if activeTab === "events"}
                     <h3>Új Esemény</h3>
+                    <p class="admin-form-hint">
+                        A <strong>kezdő és befejező dátum</strong> és a hozzájuk tartozó
+                        <strong>időpontok (óra:perc)</strong> mind kötelezőek — a mentés nélkülük nem lehetséges.
+                    </p>
                     <form class="admin-form" on:submit={submitEvent}>
-                        <label for="event_loc">Település / Helyszín</label>
+                        <label for="event_loc"
+                            >Település / Helyszín <span class="admin-req" title="Kötelező"
+                                >*</span
+                            ></label
+                        >
                         <select
                             id="event_loc"
                             bind:value={newEvent.location_id}
@@ -1886,7 +1971,10 @@
                             {/each}
                         </select>
 
-                        <label for="event_title">Esemény neve</label>
+                        <label for="event_title"
+                            >Esemény neve <span class="admin-req" title="Kötelező">*</span
+                            ></label
+                        >
                         <input
                             id="event_title"
                             type="text"
@@ -1902,7 +1990,10 @@
 
                         <div class="flex gap-lg">
                             <div class="flex-1">
-                                <label for="event_start_date">Kezdő dátum</label
+                                <label for="event_start_date"
+                                    >Kezdő dátum <span class="admin-req" title="Kötelező"
+                                        >*</span
+                                    ></label
                                 >
                                 <input
                                     id="event_start_date"
@@ -1913,12 +2004,16 @@
                             </div>
                             <div class="flex-1">
                                 <label for="event_start_time"
-                                    >Kezdő időpont</label
+                                    >Kezdő időpont (óra:perc) <span
+                                        class="admin-req"
+                                        title="Kötelező">*</span
+                                    ></label
                                 >
                                 <input
                                     id="event_start_time"
                                     type="time"
                                     bind:value={newEvent.start_time}
+                                    required
                                 />
                             </div>
                         </div>
@@ -1926,7 +2021,9 @@
                         <div class="flex gap-lg">
                             <div class="flex-1">
                                 <label for="event_end_date"
-                                    >Befejező dátum</label
+                                    >Befejező dátum <span class="admin-req" title="Kötelező"
+                                        >*</span
+                                    ></label
                                 >
                                 <input
                                     id="event_end_date"
@@ -1937,12 +2034,16 @@
                             </div>
                             <div class="flex-1">
                                 <label for="event_end_time"
-                                    >Befejező időpont</label
+                                    >Befejező időpont (óra:perc) <span
+                                        class="admin-req"
+                                        title="Kötelező">*</span
+                                    ></label
                                 >
                                 <input
                                     id="event_end_time"
                                     type="time"
                                     bind:value={newEvent.end_time}
+                                    required
                                 />
                             </div>
                         </div>
@@ -2021,8 +2122,21 @@
                             </thead>
                             <tbody>
                                 {#each events as e}
-                                    <tr>
-                                        <td>{e.title}</td>
+                                    <tr
+                                        class:admin-row-warn={!eventDateTimeComplete(
+                                            e,
+                                        )}
+                                    >
+                                        <td>
+                                            {#if !eventDateTimeComplete(e)}
+                                                <span
+                                                    class="admin-req"
+                                                    title="Hiányos dátum vagy időpont — szerkessze és töltse ki."
+                                                    >⚠</span
+                                                >
+                                            {/if}
+                                            {e.title}
+                                        </td>
                                         <td>
                                             {new Date(
                                                 e.start_date,
@@ -3489,11 +3603,16 @@
         >
             <div class="admin-modal">
                 <h3>Esemény szerkesztése</h3>
+                <p class="admin-form-hint">
+                    A dátumok és időpontok (óra:perc) kötelezőek.
+                </p>
                 <form
                     class="admin-form"
                     on:submit|preventDefault={saveEditEvent}
                 >
-                    <label for="edit_ev_loc">Helyszín</label>
+                    <label for="edit_ev_loc"
+                        >Helyszín <span class="admin-req" title="Kötelező">*</span></label
+                    >
                     <select
                         id="edit_ev_loc"
                         bind:value={editingEvent.location_id}
@@ -3506,7 +3625,9 @@
                         {/each}
                     </select>
 
-                    <label for="edit_ev_title">Cím</label>
+                    <label for="edit_ev_title"
+                        >Cím <span class="admin-req" title="Kötelező">*</span></label
+                    >
                     <input
                         id="edit_ev_title"
                         type="text"
@@ -3522,7 +3643,11 @@
 
                     <div class="flex gap-lg">
                         <div class="flex-1">
-                            <label for="edit_ev_start_date">Kezdő dátum</label>
+                            <label for="edit_ev_start_date"
+                                >Kezdő dátum <span class="admin-req" title="Kötelező"
+                                    >*</span
+                                ></label
+                            >
                             <input
                                 id="edit_ev_start_date"
                                 type="date"
@@ -3535,18 +3660,27 @@
                             />
                         </div>
                         <div class="flex-1">
-                            <label for="edit_ev_start_time">Kezdő időpont</label
+                            <label for="edit_ev_start_time"
+                                >Kezdő időpont (óra:perc) <span
+                                    class="admin-req"
+                                    title="Kötelező">*</span
+                                ></label
                             >
                             <input
                                 id="edit_ev_start_time"
                                 type="time"
                                 bind:value={editingEvent.start_time}
+                                required
                             />
                         </div>
                     </div>
                     <div class="flex gap-lg">
                         <div class="flex-1">
-                            <label for="edit_ev_end_date">Befejező dátum</label>
+                            <label for="edit_ev_end_date"
+                                >Befejező dátum <span class="admin-req" title="Kötelező"
+                                    >*</span
+                                ></label
+                            >
                             <input
                                 id="edit_ev_end_date"
                                 type="date"
@@ -3560,12 +3694,16 @@
                         </div>
                         <div class="flex-1">
                             <label for="edit_ev_end_time"
-                                >Befejező időpont</label
+                                >Befejező időpont (óra:perc) <span
+                                    class="admin-req"
+                                    title="Kötelező">*</span
+                                ></label
                             >
                             <input
                                 id="edit_ev_end_time"
                                 type="time"
                                 bind:value={editingEvent.end_time}
+                                required
                             />
                         </div>
                     </div>

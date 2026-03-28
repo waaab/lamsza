@@ -201,3 +201,42 @@
 .btn-update:hover {
     background: var(--btn-update-hover);
 }
+
+.admin-req {
+    color: #b45309;
+    font-weight: 700;
+}
+
+.admin-form-hint {
+    margin: 0 0 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: var(--text-muted);
+    background: var(--bg-body);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+
+.admin-alert {
+    margin: 0 0 1.5rem;
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    line-height: 1.5;
+}
+
+.admin-alert--warning {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #7c2d12;
+}
+
+.admin-alert__btn {
+    display: inline-block;
+    margin-top: 0.75rem;
+}
+
+.admin-row-warn {
+    background: #fffbeb;
+}
