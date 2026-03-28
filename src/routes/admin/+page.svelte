@@ -1,6 +1,10 @@
 <script>
     import { onMount } from "svelte";
     import { auth } from "$lib/stores/auth";
+    import {
+        SCHEDULE_ACTIVITY_TYPES,
+        SCHEDULE_ACTIVITY_TYPE_LABELS,
+    } from "$lib/scheduleActivityTypes.js";
 
     const getBase = () =>
         import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
@@ -110,6 +114,8 @@
     let editingLink = null;
     let editingNews = null;
     let editingEvent = null;
+    /** @type {Array<{ schedule_date: string, notes: string, activities: Array<{ activity_type: string, starts_at: string, ends_at: string, title: string, description: string }> }>} */
+    let scheduleDraftDays = [];
     let editingAttraction = null;
 
     let orgQuery = "";
@@ -1049,9 +1055,140 @@
             end_time: et.length >= 5 ? et.slice(0, 5) : "",
         };
         orgEditQuery = ev.organizer || "";
+        await loadScheduleForEditing(ev.id);
     }
     function cancelEditEvent() {
         editingEvent = null;
+        scheduleDraftDays = [];
+    }
+
+    async function loadScheduleForEditing(eventId) {
+        try {
+            const res = await fetch(
+                `${getBase()}/api/admin/events/schedule?event_id=${eventId}`,
+            );
+            if (!res.ok) {
+                scheduleDraftDays = [];
+                return;
+            }
+            const data = await res.json();
+            scheduleDraftDays = (data.days || []).map((d) => ({
+                schedule_date: d.schedule_date,
+                notes: d.notes || "",
+                activities: (d.activities || []).map((a) => ({
+                    activity_type: a.activity_type || "other",
+                    starts_at: a.starts_at
+                        ? String(a.starts_at).slice(0, 5)
+                        : "",
+                    ends_at: a.ends_at ? String(a.ends_at).slice(0, 5) : "",
+                    title: a.title || "",
+                    description: a.description || "",
+                })),
+            }));
+        } catch (e) {
+            console.error(e);
+            scheduleDraftDays = [];
+        }
+    }
+
+    async function generateScheduleDaysFromEvent() {
+        if (!editingEvent) return;
+        const ok = await showConfirm(
+            "A jelenlegi napi program törlődik, és a kezdő–befejező dátum közötti minden nap üres programmal kerül be. Folytatja?",
+        );
+        if (!ok) return;
+        const s = editingEvent.start_date?.split("T")[0];
+        const e = editingEvent.end_date?.split("T")[0];
+        if (!s || !e) {
+            await showAlert("Előbb állítsa be a kezdő és befejező dátumot.");
+            return;
+        }
+        const out = [];
+        const cur = new Date(s + "T12:00:00");
+        const end = new Date(e + "T12:00:00");
+        while (cur <= end) {
+            out.push({
+                schedule_date: cur.toISOString().slice(0, 10),
+                notes: "",
+                activities: [],
+            });
+            cur.setDate(cur.getDate() + 1);
+        }
+        scheduleDraftDays = out;
+    }
+
+    function addScheduleDayRow() {
+        scheduleDraftDays = [
+            ...scheduleDraftDays,
+            { schedule_date: "", notes: "", activities: [] },
+        ];
+    }
+
+    function removeScheduleDayRow(i) {
+        scheduleDraftDays = scheduleDraftDays.filter((_, j) => j !== i);
+    }
+
+    function addScheduleActivity(dayIndex) {
+        const d = scheduleDraftDays[dayIndex];
+        if (!d) return;
+        d.activities = [
+            ...d.activities,
+            {
+                activity_type: "match",
+                starts_at: "",
+                ends_at: "",
+                title: "",
+                description: "",
+            },
+        ];
+        scheduleDraftDays = [...scheduleDraftDays];
+    }
+
+    function removeScheduleActivity(dayIndex, actIndex) {
+        const d = scheduleDraftDays[dayIndex];
+        if (!d) return;
+        d.activities = d.activities.filter((_, j) => j !== actIndex);
+        scheduleDraftDays = [...scheduleDraftDays];
+    }
+
+    async function saveEventSchedule() {
+        if (!editingEvent) return;
+        try {
+            const body = {
+                event_id: editingEvent.id,
+                days: scheduleDraftDays
+                    .filter((d) => d.schedule_date && String(d.schedule_date).trim())
+                    .map((d) => ({
+                        schedule_date: d.schedule_date,
+                        notes: d.notes || "",
+                        activities: (d.activities || [])
+                            .filter((a) => a.title && String(a.title).trim())
+                            .map((a, ai) => ({
+                                activity_type: a.activity_type || "other",
+                                starts_at: a.starts_at || "",
+                                ends_at: a.ends_at || "",
+                                title: a.title.trim(),
+                                description: a.description || "",
+                                sort_order: ai,
+                            })),
+                    })),
+            };
+            const res = await fetch(`${getBase()}/api/admin/events/schedule`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                await showAlert(
+                    "Program mentése sikertelen: " + (await res.text()),
+                );
+                return;
+            }
+            await showAlert("Napi program elmentve.");
+            await loadScheduleForEditing(editingEvent.id);
+        } catch (err) {
+            await showAlert("Hiba: " + err.message);
+        }
     }
     async function saveEditEvent() {
         if (!editingEvent) return;
@@ -1241,11 +1378,18 @@
         <div class="admin-login-wrapper">
             <div class="admin-container login-box">
                 <h2>Adminisztráció Belépés</h2>
-                <form class="admin-form mt-lg" on:submit={login}>
+                <form
+                    class="admin-form mt-lg"
+                    on:submit={login}
+                    autocomplete="on"
+                >
                     <input
+                        id="admin-login-password"
+                        name="password"
                         type="password"
                         bind:value={password}
                         placeholder="Jelszó..."
+                        autocomplete="current-password"
                         required
                     />
                     <button type="submit" class="admin-submit-btn"
@@ -3608,6 +3752,7 @@
                 </p>
                 <form
                     class="admin-form"
+                    autocomplete="off"
                     on:submit|preventDefault={saveEditEvent}
                 >
                     <label for="edit_ev_loc"
@@ -3615,6 +3760,7 @@
                     >
                     <select
                         id="edit_ev_loc"
+                        name="location_id"
                         bind:value={editingEvent.location_id}
                         required
                     >
@@ -3630,6 +3776,7 @@
                     >
                     <input
                         id="edit_ev_title"
+                        name="title"
                         type="text"
                         bind:value={editingEvent.title}
                         required
@@ -3638,6 +3785,7 @@
                     <label for="edit_ev_desc">Leírás</label>
                     <textarea
                         id="edit_ev_desc"
+                        name="description"
                         bind:value={editingEvent.description}
                     ></textarea>
 
@@ -3650,6 +3798,7 @@
                             >
                             <input
                                 id="edit_ev_start_date"
+                                name="start_date"
                                 type="date"
                                 value={editingEvent.start_date
                                     ? editingEvent.start_date.split("T")[0]
@@ -3668,6 +3817,7 @@
                             >
                             <input
                                 id="edit_ev_start_time"
+                                name="start_time"
                                 type="time"
                                 bind:value={editingEvent.start_time}
                                 required
@@ -3683,6 +3833,7 @@
                             >
                             <input
                                 id="edit_ev_end_date"
+                                name="end_date"
                                 type="date"
                                 value={editingEvent.end_date
                                     ? editingEvent.end_date.split("T")[0]
@@ -3701,6 +3852,7 @@
                             >
                             <input
                                 id="edit_ev_end_time"
+                                name="end_time"
                                 type="time"
                                 bind:value={editingEvent.end_time}
                                 required
@@ -3711,6 +3863,7 @@
                     <label for="edit_ev_type">Típus</label>
                     <select
                         id="edit_ev_type"
+                        name="event_type"
                         bind:value={editingEvent.event_type}
                     >
                         <option value="cultural">Kulturális</option>
@@ -3725,6 +3878,7 @@
                         <div class="org-autosuggest-row">
                             <input
                                 id="edit_ev_org"
+                                name="organizer"
                                 type="text"
                                 bind:value={orgEditQuery}
                                 on:input={() => {
@@ -3759,6 +3913,150 @@
                             </ul>
                         {/if}
                     </div>
+
+                    <details class="admin-schedule-details">
+                        <summary>Napi program (opcionális)</summary>
+                        <p class="admin-form-hint admin-schedule-hint">
+                            A fenti kezdő–befejező dátum és idő továbbra is az alap; ide
+                            naponkénti tételeket írhat (megnyitó, mérkőzések, záró stb.).
+                            A <strong>vége</strong> idő opcionális (pl. ismeretlen mérkőzés-hossz).
+                            Üresen hagyható.
+                        </p>
+                        <div class="schedule-toolbar">
+                            <button
+                                type="button"
+                                class="btn-update"
+                                on:click|preventDefault={generateScheduleDaysFromEvent}
+                                >Napok generálása a dátumokból</button
+                            >
+                            <button
+                                type="button"
+                                class="btn-update"
+                                on:click|preventDefault={addScheduleDayRow}
+                                >Új nap</button
+                            >
+                        </div>
+
+                        {#each scheduleDraftDays as day, di}
+                            <div class="schedule-day-block">
+                                <div class="schedule-day-head">
+                                    <label class="schedule-inline"
+                                        >Dátum
+                                        <input
+                                            id={`schedule-day-${di}-date`}
+                                            name={`schedule_day_${di}_date`}
+                                            type="date"
+                                            bind:value={day.schedule_date}
+                                        /></label
+                                    >
+                                    <input
+                                        id={`schedule-day-${di}-notes`}
+                                        name={`schedule_day_${di}_notes`}
+                                        type="text"
+                                        class="schedule-notes"
+                                        placeholder="Megjegyzés (pl. helyszín)"
+                                        bind:value={day.notes}
+                                    />
+                                    <button
+                                        type="button"
+                                        class="btn-delete btn-xs"
+                                        on:click={() =>
+                                            removeScheduleDayRow(di)}
+                                        >Nap törlése</button
+                                    >
+                                </div>
+                                <table class="admin-table schedule-act-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Típus</th>
+                                            <th title="Opcionális">Kezdés</th>
+                                            <th title="Opcionális; mérkőzésnél gyakran üres"
+                                                >Vége</th
+                                            >
+                                            <th>Cím / program</th>
+                                            <th>Leírás</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {#each day.activities || [] as act, ai}
+                                            <tr>
+                                                <td>
+                                                    <select
+                                                        id={`schedule-${di}-act-${ai}-type`}
+                                                        name={`schedule_${di}_act_${ai}_type`}
+                                                        class="schedule-act-type"
+                                                        bind:value={act.activity_type}
+                                                    >
+                                                        {#each SCHEDULE_ACTIVITY_TYPES as t}
+                                                            <option value={t}
+                                                                >{SCHEDULE_ACTIVITY_TYPE_LABELS[
+                                                                    t
+                                                                ]}</option
+                                                            >
+                                                        {/each}
+                                                    </select>
+                                                </td>
+                                                <td
+                                                    ><input
+                                                        id={`schedule-${di}-act-${ai}-start`}
+                                                        name={`schedule_${di}_act_${ai}_starts_at`}
+                                                        type="time"
+                                                        bind:value={act.starts_at}
+                                                /></td>
+                                                <td
+                                                    ><input
+                                                        id={`schedule-${di}-act-${ai}-end`}
+                                                        name={`schedule_${di}_act_${ai}_ends_at`}
+                                                        type="time"
+                                                        bind:value={act.ends_at}
+                                                /></td>
+                                                <td
+                                                    ><input
+                                                        id={`schedule-${di}-act-${ai}-title`}
+                                                        name={`schedule_${di}_act_${ai}_title`}
+                                                        type="text"
+                                                        placeholder="Kötelező cím"
+                                                        bind:value={act.title}
+                                                /></td>
+                                                <td
+                                                    ><input
+                                                        id={`schedule-${di}-act-${ai}-desc`}
+                                                        name={`schedule_${di}_act_${ai}_description`}
+                                                        type="text"
+                                                        bind:value={act.description}
+                                                /></td>
+                                                <td
+                                                    ><button
+                                                        type="button"
+                                                        class="btn-delete btn-xs"
+                                                        on:click={() =>
+                                                            removeScheduleActivity(
+                                                                di,
+                                                                ai,
+                                                            )}>×</button
+                                                    ></td
+                                                >
+                                            </tr>
+                                        {/each}
+                                    </tbody>
+                                </table>
+                                <button
+                                    type="button"
+                                    class="btn-update btn-xs"
+                                    on:click={() => addScheduleActivity(di)}
+                                    >+ Tevékenység</button
+                                >
+                            </div>
+                        {/each}
+
+                        <button
+                            type="button"
+                            class="admin-submit-btn schedule-save-btn"
+                            on:click|preventDefault={saveEventSchedule}
+                            >Napi program mentése</button
+                        >
+                    </details>
 
                     <div class="modal-actions">
                         <button type="submit" class="admin-submit-btn"
@@ -3863,7 +4161,7 @@
         border: 1px solid var(--border-color, #444);
         border-radius: 12px;
         padding: 2rem;
-        width: min(600px, 95vw);
+        width: min(1200px, 95vw);
         max-height: 90vh;
         overflow-y: auto;
     }

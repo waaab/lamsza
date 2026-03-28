@@ -38,7 +38,11 @@
     $: formatted = formatDateTime(now);
 </script>
 
-<div id="datetime" class="datetime-card widget">
+<div
+    id="datetime"
+    class="datetime-card widget"
+    data-now-ms={now.getTime()}
+>
     <div class="widget-header">
         <h3 class="widget-title">Dátum és idő</h3>
     </div>

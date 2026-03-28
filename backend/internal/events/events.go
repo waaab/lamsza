@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type paginatedResponse struct {
@@ -17,11 +18,33 @@ type paginatedResponse struct {
 	Total  int            `json:"total"`
 }
 
+var allowedEventTypes = map[string]bool{
+	"cultural": true, "sports": true, "festival": true, "religious": true, "other": true,
+}
+
+func parseDateQueryParam(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return ""
+	}
+	return t.Format("2006-01-02")
+}
+
 func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	locationSlug := r.URL.Query().Get("location_slug")
 	countySlug := r.URL.Query().Get("county_slug")
 	organizer := r.URL.Query().Get("organizer")
 	locationType := r.URL.Query().Get("location_type")
+	eventType := strings.TrimSpace(r.URL.Query().Get("event_type"))
+	if eventType != "" && !allowedEventTypes[eventType] {
+		eventType = ""
+	}
+	dateFrom := parseDateQueryParam(r.URL.Query().Get("date_from"))
+	dateTo := parseDateQueryParam(r.URL.Query().Get("date_to"))
 
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
@@ -57,11 +80,13 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 		conditions = append(conditions, fmt.Sprintf("e.organizer = $%d", argIdx))
 		args = append(args, organizer)
 		argIdx++
-	} else if locationSlug != "" {
+	}
+	if locationSlug != "" {
 		conditions = append(conditions, fmt.Sprintf("(s.slug = $%d OR s.parent_id = (SELECT id FROM settlements WHERE slug = $%d))", argIdx, argIdx))
 		args = append(args, locationSlug)
 		argIdx++
-	} else if countySlug != "" {
+	}
+	if countySlug != "" {
 		conditions = append(conditions, fmt.Sprintf("c.slug = $%d", argIdx))
 		args = append(args, countySlug)
 		argIdx++
@@ -70,6 +95,22 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	if locationType != "" {
 		conditions = append(conditions, fmt.Sprintf("s.type = $%d", argIdx))
 		args = append(args, locationType)
+		argIdx++
+	}
+
+	if eventType != "" {
+		conditions = append(conditions, fmt.Sprintf("e.event_type = $%d", argIdx))
+		args = append(args, eventType)
+		argIdx++
+	}
+	if dateFrom != "" {
+		conditions = append(conditions, fmt.Sprintf("e.start_date >= $%d::date", argIdx))
+		args = append(args, dateFrom)
+		argIdx++
+	}
+	if dateTo != "" {
+		conditions = append(conditions, fmt.Sprintf("e.start_date <= $%d::date", argIdx))
+		args = append(args, dateTo)
 		argIdx++
 	}
 
@@ -119,10 +160,11 @@ func HandleEventDetail(w http.ResponseWriter, r *http.Request) {
 
 	var ev models.Event
 	err = db.DB.QueryRow(`
-		SELECT e.id, e.location_id, l.name, l.slug, l.county, l.county_slug, e.title, e.description,
-		       e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer, COALESCE(l.type, '')
+		SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, COALESCE(e.description, ''),
+		       e.start_date::text, COALESCE(e.start_time::text, ''), e.end_date::text, COALESCE(e.end_time::text, ''), e.event_type, COALESCE(e.organizer, ''), COALESCE(s.type, '')
 		FROM events e
-		JOIN locations l ON e.location_id = l.id
+		JOIN settlements s ON e.location_id = s.id
+		JOIN counties c ON s.county_id = c.id
 		WHERE e.id = $1`, id).Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer, &ev.LocationType)
 	if err == sql.ErrNoRows {
 		http.Error(w, "Event not found", http.StatusNotFound)
@@ -132,7 +174,13 @@ func HandleEventDetail(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	json.NewEncoder(w).Encode(ev)
+	schedule, err := fetchScheduleForEvent(id)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	out := models.EventWithSchedule{Event: ev, Schedule: schedule}
+	json.NewEncoder(w).Encode(out)
 }
 
 func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {

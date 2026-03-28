@@ -3,6 +3,7 @@
     import { onMount, onDestroy } from "svelte";
     import { apiFetch } from "$lib/api";
     import { formatDateShort } from "$lib/utils";
+    import EventDateBadge from "$lib/components/EventDateBadge.svelte";
 
     export let settlementSlug = null;
     export let countySlug = null;
@@ -226,6 +227,7 @@
                                             {#if event.start_time}
                                                 <span class="start-time-label sr-only">Időpont:</span>{event.start_time.slice(0, 5)}
                                             {/if}
+                                            <EventDateBadge event={event} live={true} />
                                         </span>
                                         <span class="event-time-separator"> - </span>
                                         <span class="end-date">
@@ -264,6 +266,7 @@
                                 {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
                                 {formatDateShort(event.start_date)}
                                 {#if event.start_time} · {event.start_time.slice(0, 5)}{/if}
+                                <EventDateBadge event={event} live={true} />
                             </span>
                             <a href="/esemenyek/{event.id}" title="Esemény részletei" class="event-card-title">{event.title}</a>
                             <span class="event-card-meta">

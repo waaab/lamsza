@@ -53,6 +53,34 @@ type AdminEvent struct {
 	Organizer   string `json:"organizer"`
 }
 
+// EventScheduleActivity is one line in the per-day program (optional schedule).
+// ActivityType: opening | match | closing | other (sport blocks, ceremonies, etc.).
+// StartsAt / EndsAt may be empty; ends_at often omitted for matches with unknown finish time.
+type EventScheduleActivity struct {
+	ID           int    `json:"id"`
+	ActivityType string `json:"activity_type"`
+	StartsAt     string `json:"starts_at"`
+	EndsAt       string `json:"ends_at"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	SortOrder    int    `json:"sort_order"`
+}
+
+// EventScheduleDay is one calendar day in the optional program.
+type EventScheduleDay struct {
+	ID           int                     `json:"id"`
+	ScheduleDate string                  `json:"schedule_date"`
+	Notes        string                  `json:"notes"`
+	SortOrder    int                     `json:"sort_order"`
+	Activities   []EventScheduleActivity `json:"activities"`
+}
+
+// EventWithSchedule is the public detail payload (event + optional schedule).
+type EventWithSchedule struct {
+	Event
+	Schedule []EventScheduleDay `json:"schedule"`
+}
+
 type Mondas struct {
 	ID        int    `json:"id"`
 	Text      string `json:"text"`

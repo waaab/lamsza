@@ -68,8 +68,10 @@ func main() {
 
 	if config.AppConfig.Features.Events {
 		mux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
+		mux.HandleFunc("/api/events/filter-options", middleware.ApplyCORS(events.HandleEventFilterOptions))
 		mux.HandleFunc("/api/events/detail", middleware.ApplyCORS(events.HandleEventDetail))
 		mux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
+		mux.HandleFunc("/api/admin/events/schedule", middleware.ApplyCORS(events.HandleAdminEventSchedule))
 		log.Println("Module [Events] enabled")
 	}
 

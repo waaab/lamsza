@@ -147,6 +147,56 @@
             <span>Erdélyi Hírek</span>
         </a>
         <a
+        href="/esemenyek"
+        class="nav-btn {$page.url.pathname.startsWith('/esemenyek')
+            ? 'active'
+            : ''}"
+        title="Események"
+    >
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+        >
+            <path d="M8 2v4" />
+            <path d="M16 2v4" />
+            <rect width="18" height="18" x="3" y="4" rx="2" />
+            <path d="M3 10h18" />
+        </svg>
+        <span>Kik verekettek?</span>
+    </a>
+    <a
+    href="/szekek"
+    class="nav-btn {$page.url.pathname === '/szekek' ||
+    $page.url.pathname.startsWith('/szekek/')
+        ? 'active'
+        : ''}"
+    title="Történelmi székek"
+>
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+    >
+        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+        <path d="M2 17l10 5 10-5" />
+        <path d="M2 12l10 5 10-5" />
+    </svg>
+    <span>Székek</span>
+</a>
+        <a
             href="/megyek"
             class="nav-btn {$page.url.pathname === '/megyek' ||
             $page.url.pathname.includes('-megye')
@@ -170,31 +220,7 @@
             <span class="nav-btn-label">A megyétől</span>
             <span class="sr-only nav-btn-label-lang szekely-hungarian">Megyék</span>
         </a>
-        <a
-            href="/szekek"
-            class="nav-btn {$page.url.pathname === '/szekek' ||
-            $page.url.pathname.startsWith('/szekek/')
-                ? 'active'
-                : ''}"
-            title="Történelmi székek"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                <path d="M2 17l10 5 10-5" />
-                <path d="M2 12l10 5 10-5" />
-            </svg>
-            <span>Székek</span>
-        </a>
+
         <a
             href="/varosok"
             class="nav-btn {$page.url.pathname === '/varosok' ||
@@ -249,31 +275,6 @@
                 <path d="M3 20h18"></path>
             </svg>
             <span>Falusiak</span>
-        </a>
-        <a
-            href="/esemenyek"
-            class="nav-btn {$page.url.pathname.startsWith('/esemenyek')
-                ? 'active'
-                : ''}"
-            title="Események"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <path d="M8 2v4" />
-                <path d="M16 2v4" />
-                <rect width="18" height="18" x="3" y="4" rx="2" />
-                <path d="M3 10h18" />
-            </svg>
-            <span>Kik verekettek?</span>
         </a>
     </div>
     <div class="nav">

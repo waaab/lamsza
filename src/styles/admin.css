@@ -240,3 +240,80 @@
 .admin-row-warn {
     background: #fffbeb;
 }
+
+.admin-schedule-details {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-body);
+}
+
+.admin-schedule-details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.admin-schedule-hint {
+    margin-top: 0.75rem;
+}
+
+.schedule-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0 1rem;
+}
+
+.schedule-day-block {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.schedule-day-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.schedule-day-head .schedule-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+}
+
+.schedule-notes {
+    flex: 1;
+    min-width: 12rem;
+}
+
+.schedule-act-table {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.schedule-act-table input[type="text"],
+.schedule-act-table input[type="time"],
+.schedule-act-table select.schedule-act-type {
+    width: 100%;
+    min-width: 0;
+}
+
+.schedule-act-table select.schedule-act-type {
+    max-width: 11rem;
+    font-size: inherit;
+}
+
+.schedule-save-btn {
+    margin-top: 0.5rem;
+}
+
+.btn-xs {
+    padding: 0.15rem 0.4rem;
+    font-size: 0.8rem;
+}
