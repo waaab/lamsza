@@ -3,6 +3,7 @@ package events
 import (
 	"backend/internal/db"
 	"backend/internal/models"
+	"backend/internal/venues"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -43,11 +44,12 @@ func fetchScheduleForEvent(eventID int) ([]models.EventScheduleDay, error) {
 
 func fetchActivitiesForDay(dayID int) ([]models.EventScheduleActivity, error) {
 	rows, err := db.DB.Query(`
-		SELECT id, COALESCE(activity_type, 'other'), COALESCE(starts_at::text, ''), COALESCE(ends_at::text, ''),
-		       title, COALESCE(description, ''), sort_order
-		FROM event_schedule_activities
-		WHERE event_day_id = $1
-		ORDER BY sort_order ASC, id ASC`, dayID)
+		SELECT a.id, COALESCE(a.activity_type, 'other'), COALESCE(a.starts_at::text, ''), COALESCE(a.ends_at::text, ''),
+		       a.title, COALESCE(a.description, ''), a.sort_order, a.venue_id, COALESCE(v.name, ''), COALESCE(v.slug, '')
+		FROM event_schedule_activities a
+		LEFT JOIN venues v ON a.venue_id = v.id
+		WHERE a.event_day_id = $1
+		ORDER BY a.sort_order ASC, a.id ASC`, dayID)
 	if err != nil {
 		return nil, err
 	}
@@ -57,11 +59,19 @@ func fetchActivitiesForDay(dayID int) ([]models.EventScheduleActivity, error) {
 	for rows.Next() {
 		var a models.EventScheduleActivity
 		var st, et string
-		if err := rows.Scan(&a.ID, &a.ActivityType, &st, &et, &a.Title, &a.Description, &a.SortOrder); err != nil {
+		var vid sql.NullInt64
+		var vname, vslug string
+		if err := rows.Scan(&a.ID, &a.ActivityType, &st, &et, &a.Title, &a.Description, &a.SortOrder, &vid, &vname, &vslug); err != nil {
 			return nil, err
 		}
 		a.StartsAt = formatTimeForJSON(st)
 		a.EndsAt = formatTimeForJSON(et)
+		if vid.Valid {
+			x := int(vid.Int64)
+			a.VenueID = &x
+		}
+		a.VenueName = vname
+		a.VenueSlug = vslug
 		list = append(list, a)
 	}
 	if list == nil {
@@ -124,6 +134,7 @@ func HandleAdminEventSchedule(w http.ResponseWriter, r *http.Request) {
 					Title        string `json:"title"`
 					Description  string `json:"description"`
 					SortOrder    int    `json:"sort_order"`
+					VenueID      *int   `json:"venue_id"`
 				} `json:"activities"`
 			} `json:"days"`
 		}
@@ -153,6 +164,12 @@ func HandleAdminEventSchedule(w http.ResponseWriter, r *http.Request) {
 		}
 		defer tx.Rollback()
 
+		var settlementID int
+		if err := tx.QueryRow(`SELECT location_id FROM events WHERE id = $1`, body.EventID).Scan(&settlementID); err != nil {
+			http.Error(w, "esemény nem található", http.StatusNotFound)
+			return
+		}
+
 		if _, err := tx.Exec(`DELETE FROM event_schedule_days WHERE event_id = $1`, body.EventID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -178,13 +195,18 @@ func HandleAdminEventSchedule(w http.ResponseWriter, r *http.Request) {
 				if title == "" {
 					continue
 				}
+				if err := venues.EnsureVenueBelongsToSettlement(a.VenueID, settlementID); err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
 				st := parseTimeOrNil(a.StartsAt)
 				et := parseTimeOrNil(a.EndsAt)
 				at := normalizeActivityType(a.ActivityType)
+				vid := nullIntPtr(a.VenueID)
 				_, execErr := tx.Exec(`
-					INSERT INTO event_schedule_activities (event_day_id, activity_type, starts_at, ends_at, title, description, sort_order)
-					VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-					dayID, at, st, et, title, strings.TrimSpace(a.Description), ai)
+					INSERT INTO event_schedule_activities (event_day_id, activity_type, starts_at, ends_at, title, description, sort_order, venue_id)
+					VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+					dayID, at, st, et, title, strings.TrimSpace(a.Description), ai, vid)
 				if execErr != nil {
 					http.Error(w, execErr.Error(), 500)
 					return

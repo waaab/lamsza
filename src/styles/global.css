@@ -1352,6 +1352,7 @@ section {
   box-shadow: 0 2px 8px var(--shadow-md);
   font-size: 1.25rem;
   line-height: 1;
+  user-select: none;
 }
 
 .scroll-arrow:hover {
@@ -2148,6 +2149,7 @@ footer {
   font-weight: 600;
   color: var(--text-muted);
   padding: 0 0.25rem;
+  user-select: none;
 }
 
 .nav-btn {
@@ -2164,6 +2166,7 @@ footer {
   cursor: pointer;
   transition: all 0.2s ease;
   background-color: transparent;
+  user-select: none;
 }
 
 .nav-btn:hover,

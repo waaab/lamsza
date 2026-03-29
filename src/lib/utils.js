@@ -63,12 +63,39 @@ export function formatDate(date) {
 }
 
 /**
+ * Full Hungarian date plus ", HH:MM" when a time string is provided (e.g. API "12:00:00").
+ * @param {string | null | undefined} dateStr
+ * @param {string | null | undefined} timeStr
+ * @returns {string}
+ */
+export function formatDateWithOptionalTime(dateStr, timeStr) {
+    if (!dateStr) return "";
+    const datePart = formatDate(dateStr);
+    const t = timeStr != null && String(timeStr).trim();
+    if (!t) return datePart;
+    const hm = t.length >= 5 ? t.slice(0, 5) : t;
+    return `${datePart}, ${hm}`;
+}
+
+/**
  * Format a date in short Hungarian: "márc. 7."
  * @param {number|string|Date} date 
  * @returns {string}
  */
 export function formatDateShort(date) {
     return new Date(date).toLocaleDateString("hu-HU", { month: "short", day: "numeric" });
+}
+
+/**
+ * Short month label only, matching {@link formatDateShort} style on cards (e.g. "jún.").
+ * @param {number} year
+ * @param {number} month1to12
+ * @returns {string}
+ */
+export function formatMonthShortLikeCard(year, month1to12) {
+    const iso = `${year}-${String(month1to12).padStart(2, "0")}-15`;
+    const s = formatDateShort(iso).trim();
+    return s.replace(/\d+\.?\s*$/, "").trim();
 }
 
 /**
@@ -81,4 +108,58 @@ export function formatTime(date) {
         hour: "2-digit",
         minute: "2-digit"
     });
+}
+
+/** Hungarian long date with weekday — same options as the homepage `#datetime` widget. */
+export function formatHuDateLong(d) {
+    const x = d instanceof Date ? d : new Date(d);
+    return x.toLocaleDateString("hu-HU", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        weekday: "long",
+    });
+}
+
+/**
+ * Local calendar date as YYYY-MM-DD (matches what the user sees on `#datetime`).
+ * @param {Date} [d]
+ * @returns {string}
+ */
+export function localCalendarISODate(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
+/**
+ * Format a YYYY-MM-DD string as Hungarian long date (local calendar day, same style as `formatHuDateLong`).
+ * @param {string} iso
+ * @returns {string}
+ */
+export function formatHuDateLongFromYMD(iso) {
+    if (!iso || typeof iso !== "string") return "";
+    const [y, mo, da] = iso.split("-").map((x) => parseInt(x, 10));
+    if (!y || !mo || !da) return iso;
+    try {
+        return formatHuDateLong(new Date(y, mo - 1, da));
+    } catch {
+        return iso;
+    }
+}
+
+/**
+ * Public venue detail URL under a settlement (matches `/[countySlug]-megye/[slug]/helyszin/[venueSlug]`).
+ * @param {{ county_slug?: string, location_slug?: string }} eventLike
+ * @param {string | null | undefined} venueSlug
+ * @returns {string | null}
+ */
+export function venuePageUrl(eventLike, venueSlug) {
+    const s = String(venueSlug ?? "").trim();
+    if (!s) return null;
+    const cs = String(eventLike?.county_slug ?? "").trim();
+    const ls = String(eventLike?.location_slug ?? "").trim();
+    if (!cs || !ls) return null;
+    return `/${cs}-megye/${ls}/helyszin/${s}`;
 }

@@ -6,22 +6,79 @@
     margin: 0;
 }
 
+/* Full-viewport column: percentage heights need html/body to participate */
+:global(html:has(.admin-layout)),
+:global(body:has(.admin-layout)) {
+    height: 100%;
+    min-height: 100dvh;
+}
+
+:global(body:has(.admin-layout)) {
+    margin: 0;
+    overflow: hidden;
+}
+
+/* Viewport-locked shell: do not rely on height:100% chains (they often collapse to content height). */
 .admin-layout {
     display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
     min-height: 100vh;
+    min-height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
 }
 
 .admin-sidebar {
     width: 80px;
     background: var(--bg-body);
     border-right: 1px solid var(--border-color);
+    flex: 0 0 80px;
+    align-self: stretch;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    /* No height:% here — stretch from .admin-layout gives a definite column height */
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+/* Fill the rail; space-between spreads icons across full available height */
+.admin-sidebar-inner {
+    box-sizing: border-box;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding-top: 2rem;
-    gap: 1.5rem;
+    justify-content: space-between;
+    gap: 0;
+    padding: 0.5rem 0;
+}
+
+.admin-sidebar-inner > .admin-sidebar-btn,
+.admin-sidebar-inner > .admin-sidebar-sep {
     flex-shrink: 0;
-    transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.admin-sidebar-sep {
+    flex-shrink: 0;
+    width: 44px;
+    max-width: calc(100% - 1rem);
+    height: 1px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: var(--border-color);
+    opacity: 0.95;
 }
 
 .admin-sidebar-btn {
@@ -55,10 +112,104 @@
     stroke-linejoin: round;
 }
 
+/* Quote icon (mondasok): single „ uses <text>, not stroke */
+.admin-sidebar-btn svg.app-icon-quote,
+.admin-welcome-card svg.app-icon-quote {
+    stroke: none;
+    fill: none;
+}
+
+.admin-sidebar-btn svg.app-icon-quote text,
+.admin-welcome-card svg.app-icon-quote text {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* Venue icon: filled dot (same as original sidebar markup) */
+.admin-sidebar-btn svg circle[fill="currentColor"],
+.admin-welcome-card svg circle[fill="currentColor"] {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* Stadium pennants (venues) */
+.admin-sidebar-btn svg polygon.app-icon-solid,
+.admin-welcome-card svg polygon.app-icon-solid {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* Welcome dashboard: same icon styling as sidebar, larger size */
+.admin-welcome-card svg {
+    width: 56px;
+    height: 56px;
+    stroke-width: 2;
+    stroke: currentColor;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
 .admin-main {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
     padding: 3rem;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Open public site in new tab */
+.admin-sidebar-btn--external {
+    text-decoration: none;
+    color: var(--text-muted);
+}
+
+.admin-welcome {
+    width: 100%;
+}
+
+.admin-welcome-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+    gap: 1.25rem;
+    max-width: 56rem;
+}
+
+.admin-welcome-card {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: var(--card-bg, var(--bg-body));
+    cursor: pointer;
+    color: var(--text-muted);
+    transition:
+        background 0.2s ease,
+        color 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.15s ease;
+}
+
+.admin-welcome-card:hover {
+    background: var(--entry-category-bg);
+    color: var(--text-primary);
+    border-color: var(--primary, #5c6bc0);
+    transform: translateY(-2px);
+}
+
+.admin-welcome-card:focus-visible {
+    outline: 2px solid var(--primary, #5c6bc0);
+    outline-offset: 2px;
+}
+
+.admin-welcome-card.active {
+    background: var(--entry-category-bg);
+    color: var(--text-primary);
+    border-color: var(--primary, #5c6bc0);
 }
 
 .admin-header {
@@ -116,36 +267,86 @@
 
 .admin-table-wrapper {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    max-width: 100%;
+}
+
+.admin-table-wrapper .admin-table {
+    margin-top: 0;
 }
 
 .admin-table {
     width: 100%;
+    min-width: 720px;
     border-collapse: collapse;
     margin-top: 1rem;
+    font-size: 0.95rem;
+}
+
+.admin-table.admin-table--compact {
+    font-size: 0.875rem;
 }
 
 .admin-table th,
 .admin-table td {
-    padding: 0.8rem;
+    padding: 0.65rem 0.75rem;
     border: 1px solid var(--border-color);
     text-align: left;
     color: var(--text-primary);
+    vertical-align: top;
 }
+
+.admin-table tr:nth-child(odd) {
+    background: var(--card-bg);
+}
+
+.admin-table tr:hover {
+    background: var(--entry-category-bg);
+    color: var(--text-primary);
+}
+
 
 .admin-table th {
     background: var(--bg-body);
     font-weight: bold;
     transition: background 0.25s ease;
+    white-space: nowrap;
+}
+
+/* Never use display:flex on <td> — it breaks table grid and causes bogus “inner borders”. */
+.admin-table th.admin-table-col--action,
+.admin-table td.admin-table-col--action {
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    width: 1%;
+}
+
+.admin-table td.admin-table-col--action--muted {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+/* Single-button action cells (no class needed on every row) */
+.admin-table tbody td:has(> .btn-update:only-child),
+.admin-table tbody td:has(> .btn-delete:only-child) {
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+    width: 1%;
 }
 
 .btn-delete {
     background: var(--btn-danger-bg);
     color: white;
     border: none;
-    padding: 0.4rem 0.8rem;
-    border-radius: 4px;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background 0.2s ease;
 }
 
 .btn-delete:hover {
@@ -186,20 +387,31 @@
 
 
 
+/* Secondary / edit — outline, matches table + modal “Szerkesztés” across admin */
 .btn-update {
-    background: var(--btn-update-bg);
-    color: var(--text-primary);
-    border: none;
-    padding: 0.3rem 0.6rem;
-    border-radius: 4px;
+    display: inline-block;
+    box-sizing: border-box;
+    background: transparent;
+    color: var(--primary, #5c6bc0);
+    border: 1px solid var(--primary, #5c6bc0);
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 1rem;
-    font-weight: bold;
-    transition: background 0.2s ease;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
 }
 
-.btn-update:hover {
-    background: var(--btn-update-hover);
+.btn-update:hover:not(:disabled) {
+    background: var(--primary, #5c6bc0);
+    color: #fff;
+}
+
+.btn-update:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 .admin-req {
@@ -208,13 +420,12 @@
 }
 
 .admin-form-hint {
-    margin: 0 0 1rem;
+    margin: 1rem;
     padding: 0.75rem 1rem;
     font-size: 0.95rem;
     line-height: 1.45;
     color: var(--text-muted);
-    background: var(--bg-body);
-    border: 1px solid var(--border-color);
+    border: 1px dashed var(--border-color);
     border-radius: 6px;
 }
 
@@ -230,6 +441,12 @@
     background: #fff7ed;
     border-color: #fdba74;
     color: #7c2d12;
+}
+
+.admin-alert--error {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #7f1d1d;
 }
 
 .admin-alert__btn {
@@ -304,9 +521,14 @@
     min-width: 0;
 }
 
-.schedule-act-table select.schedule-act-type {
+.schedule-act-table select.schedule-act-type,
+.schedule-act-table select.schedule-act-venue {
     max-width: 11rem;
     font-size: inherit;
+}
+
+.schedule-act-table select.schedule-act-venue {
+    max-width: 12rem;
 }
 
 .schedule-save-btn {
@@ -316,4 +538,89 @@
 .btn-xs {
     padding: 0.15rem 0.4rem;
     font-size: 0.8rem;
+}
+
+/* Collapsible “create new” blocks + table search toolbars */
+.admin-create-panel {
+    margin-bottom: 1.25rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--card-bg, var(--bg-body));
+    overflow: hidden;
+}
+
+.admin-create-panel > .admin-create-summary {
+    list-style: none;
+}
+
+.admin-create-panel > .admin-create-summary::-webkit-details-marker {
+    display: none;
+}
+
+.admin-create-summary {
+    cursor: pointer;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--entry-category-bg, rgba(127, 127, 127, 0.08));
+    border-bottom: 1px solid transparent;
+}
+
+.admin-create-panel[open] > .admin-create-summary {
+    border-bottom-color: var(--border-color);
+}
+
+.admin-create-panel .admin-create-form {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+}
+
+.admin-table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+.admin-search-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.admin-search-input {
+    min-width: 12rem;
+    max-width: 22rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: var(--card-bg);
+    color: var(--text-primary);
+}
+
+.admin-subsection-title {
+    margin: 1.5rem 0 0.75rem;
+    font-size: 1.05rem;
+    color: var(--text-primary);
+}
+
+/* List cell previews — 20 chars max in JS (contentPreview / urlPreview); full text in title */
+.admin-table-cell-preview {
+    max-width: 9rem;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-table__mono {
+    font-size: 0.8125rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }

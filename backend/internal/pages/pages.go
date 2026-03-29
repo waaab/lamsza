@@ -72,7 +72,7 @@ func HandlePublicPage(w http.ResponseWriter, r *http.Request) {
 func HandleAdminPages(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		rows, err := db.DB.Query("SELECT id, slug, title, content, updated_at::text FROM pages ORDER BY slug ASC")
+		rows, err := db.DB.Query("SELECT id, slug, title, content, updated_at::text FROM pages ORDER BY LOWER(title) ASC, id ASC")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -85,7 +85,7 @@ func HandleAdminLocations(w http.ResponseWriter, r *http.Request) {
 				baseQuery += " AND " + conditions[i]
 			}
 		}
-		baseQuery += " ORDER BY name ASC"
+		baseQuery += " ORDER BY LOWER(name) ASC, id ASC"
 
 		rows, err := db.DB.Query(baseQuery, args...)
 		if err != nil {

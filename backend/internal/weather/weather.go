@@ -702,7 +702,7 @@ func HandleAdminWeatherTranslations(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	switch r.Method {
 	case http.MethodGet:
-		rows, err := db.DB.Query("SELECT id, source_text, lang, translated_text FROM weather_desc_translations ORDER BY lang, source_text")
+		rows, err := db.DB.Query("SELECT id, source_text, lang, translated_text FROM weather_desc_translations ORDER BY LOWER(source_text) ASC, lang ASC, id ASC")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -6,10 +6,16 @@ import (
 	"net/http"
 )
 
-// filterOptionsResponse drives the /esemenyek sidebar (types + locations).
+// filterOptionsResponse drives the /esemenyek filters (types, locations, month list).
 type filterOptionsResponse struct {
-	EventTypes []string          `json:"event_types"`
-	Locations  []locationOption  `json:"locations"`
+	EventTypes []string         `json:"event_types"`
+	Locations  []locationOption `json:"locations"`
+	// Months are YYYY-MM values that have at least one upcoming event (by start_date).
+	Months []string `json:"months"`
+	// EventDays are YYYY-MM-DD start dates of upcoming events (distinct calendar days).
+	EventDays []string `json:"event_days"`
+	// ScheduleEventIDs lists upcoming events that have at least one napi program day (for list UI fallback).
+	ScheduleEventIDs []int `json:"schedule_event_ids"`
 }
 
 type locationOption struct {
@@ -72,6 +78,96 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		out.Locations = append(out.Locations, loc)
+	}
+
+	rows3, err := db.DB.Query(`
+		SELECT DISTINCT ym FROM (
+			SELECT to_char(e.start_date::date + gs.day_offset * interval '1 day', 'YYYY-MM') AS ym
+			FROM events e
+			CROSS JOIN LATERAL generate_series(
+				0,
+				GREATEST(0, (e.end_date::date - e.start_date::date)),
+				1
+			) AS gs(day_offset)
+			WHERE e.end_date >= CURRENT_DATE
+			UNION
+			SELECT to_char(esd.schedule_date, 'YYYY-MM') AS ym
+			FROM event_schedule_days esd
+			INNER JOIN events e ON e.id = esd.event_id
+			WHERE e.end_date >= CURRENT_DATE
+		) t
+		WHERE ym IS NOT NULL AND ym != ''
+		ORDER BY 1`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows3.Close()
+	for rows3.Next() {
+		var ym string
+		if err := rows3.Scan(&ym); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if ym != "" {
+			out.Months = append(out.Months, ym)
+		}
+	}
+
+	rows4, err := db.DB.Query(`
+		SELECT DISTINCT d FROM (
+			SELECT to_char(e.start_date::date + gs.day_offset * interval '1 day', 'YYYY-MM-DD') AS d
+			FROM events e
+			CROSS JOIN LATERAL generate_series(
+				0,
+				GREATEST(0, (e.end_date::date - e.start_date::date)),
+				1
+			) AS gs(day_offset)
+			WHERE e.end_date >= CURRENT_DATE
+			UNION
+			SELECT to_char(esd.schedule_date, 'YYYY-MM-DD') AS d
+			FROM event_schedule_days esd
+			INNER JOIN events e ON e.id = esd.event_id
+			WHERE e.end_date >= CURRENT_DATE
+		) x
+		WHERE d IS NOT NULL AND d != ''
+		ORDER BY 1`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows4.Close()
+	for rows4.Next() {
+		var d string
+		if err := rows4.Scan(&d); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if d != "" {
+			out.EventDays = append(out.EventDays, d)
+		}
+	}
+
+	rows5, err := db.DB.Query(`
+		SELECT DISTINCT esd.event_id
+		FROM event_schedule_days esd
+		INNER JOIN events e ON e.id = esd.event_id
+		WHERE e.end_date >= CURRENT_DATE
+		ORDER BY 1`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows5.Close()
+	for rows5.Next() {
+		var eid int
+		if err := rows5.Scan(&eid); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if eid > 0 {
+			out.ScheduleEventIDs = append(out.ScheduleEventIDs, eid)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

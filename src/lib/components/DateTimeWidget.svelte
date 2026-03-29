@@ -1,16 +1,12 @@
 <script>
     import { onMount, onDestroy } from "svelte";
+    import { formatHuDateLong } from "$lib/utils";
 
     let now = new Date();
     let interval;
 
     function formatDateTime(d) {
-        const dateStr = d.toLocaleDateString("hu-HU", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            weekday: "long",
-        });
+        const dateStr = formatHuDateLong(d);
         const timeStr = d.toLocaleTimeString("hu-HU", {
             hour: "2-digit",
             minute: "2-digit",

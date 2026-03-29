@@ -123,7 +123,7 @@ func getSettingInt(key string, defaultVal int) (int, error) {
 func HandleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		rows, err := db.DB.Query("SELECT key, value FROM site_settings ORDER BY key")
+		rows, err := db.DB.Query("SELECT key, value FROM site_settings ORDER BY LOWER(key) ASC")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

@@ -1,9 +1,16 @@
 <script>
+    import { onMount } from "svelte";
     import { page } from "$app/stores";
     import { apiFetch } from "$lib/api";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EventDateBadge from "$lib/components/EventDateBadge.svelte";
+    import {
+        getReferenceNow,
+        isScheduleActivityHappeningNow,
+        referenceTodayYMD,
+    } from "$lib/eventStatus";
     import { SCHEDULE_ACTIVITY_TYPE_LABELS } from "$lib/scheduleActivityTypes.js";
+    import { venuePageUrl } from "$lib/utils";
 
     let event = null;
     let loading = true;
@@ -37,18 +44,27 @@
         return s.length >= 10 ? s.slice(0, 10) : s;
     }
 
-    function todayLocalYMD() {
-        const d = new Date();
-        const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        return `${y}-${m}-${day}`;
-    }
+    /** Bumps on interval so “Ma” chips and “Most” badges follow the homepage clock. */
+    let scheduleClockTick = 0;
+
+    onMount(() => {
+        scheduleClockTick = 1;
+        const id = setInterval(() => {
+            scheduleClockTick++;
+        }, 30000);
+        return () => clearInterval(id);
+    });
+
+    /** @type {string} YYYY-MM-DD for “today” per #datetime */
+    $: todayYmd = (scheduleClockTick, referenceTodayYMD());
+
+    /** @type {Date} */
+    $: referenceNow = (scheduleClockTick, getReferenceNow());
 
     /** @param {string} dateStr */
     function isScheduleDayToday(dateStr) {
         const key = normalizeScheduleDateKey(dateStr);
-        return key !== "" && key === todayLocalYMD();
+        return key !== "" && key === todayYmd;
     }
 
     /** Visible filter chip: weekday only (e.g. vasárnap). */
@@ -59,6 +75,15 @@
         const d = new Date(key + "T12:00:00");
         if (Number.isNaN(d.getTime())) return key;
         return d.toLocaleDateString("hu-HU", { weekday: "long" });
+    }
+
+    /** @param {string} dateStr @param {boolean} isToday */
+    function scheduleFilterChipLabel(dateStr, isToday) {
+        const w = formatScheduleFilterWeekday(dateStr);
+        if (isToday) {
+            return w ? `Ma ${w}` : "Ma";
+        }
+        return w;
     }
 
     // Inline filter so `scheduleFilterDay` is a reactive dependency (nested fn missed updates in Svelte 5).
@@ -115,6 +140,70 @@
         if (e) return e;
         return "";
     }
+
+    /** @param {Record<string, unknown>} ev @param {Record<string, unknown>} act */
+    function activityVenueLabel(ev, act) {
+        const n = act.venue_name ? String(act.venue_name) : "";
+        if (n) return n;
+        return ev.default_venue_name ? String(ev.default_venue_name) : "";
+    }
+
+    /** @param {Record<string, unknown>} ev @param {Record<string, unknown>} act */
+    function activityVenueSlugForLink(ev, act) {
+        const vs = act.venue_slug ? String(act.venue_slug).trim() : "";
+        if (vs) return vs;
+        const vn = act.venue_name ? String(act.venue_name).trim() : "";
+        if (!vn && ev.default_venue_slug)
+            return String(ev.default_venue_slug).trim();
+        return "";
+    }
+
+    /**
+     * Unique venues: order follows the napi program (activities), then default venue if not already listed.
+     * @param {Record<string, unknown>} ev
+     * @returns {{ name: string, slug: string }[]}
+     */
+    function uniqueEventVenuesForMeta(ev) {
+        /** @type {{ name: string, slug: string }[]} */
+        const out = [];
+        const seen = new Set();
+        /** @param {string} name @param {string} slug */
+        const keyOf = (name, slug) => {
+            const s = String(slug || "").trim();
+            if (s) return `s:${s}`;
+            return `n:${String(name || "").trim().toLowerCase()}`;
+        };
+        /** @param {string} name @param {string} slug */
+        const push = (name, slug) => {
+            const n = String(name || "").trim();
+            if (!n) return;
+            const k = keyOf(n, slug);
+            if (seen.has(k)) return;
+            seen.add(k);
+            out.push({ name: n, slug: String(slug || "").trim() });
+        };
+        const sched = ev.schedule;
+        if (Array.isArray(sched)) {
+            for (const day of sched) {
+                const acts = day?.activities;
+                if (!Array.isArray(acts)) continue;
+                for (const act of acts) {
+                    push(activityVenueLabel(ev, act), activityVenueSlugForLink(ev, act));
+                }
+            }
+        }
+        const defN = String(ev.default_venue_name || "").trim();
+        const defS = String(ev.default_venue_slug || "").trim();
+        if (defN) {
+            push(defN, defS);
+        }
+        return out;
+    }
+
+    $: eventMetaVenues =
+        event && typeof event === "object"
+            ? uniqueEventVenuesForMeta(/** @type {Record<string, unknown>} */ (event))
+            : [];
 </script>
 
 <svelte:head>
@@ -130,7 +219,6 @@
 {:else}
     <Breadcrumbs label={event.title} parentLabel="Események" parentUrl="/esemenyek" />
 
-    <section id="event-detail">
         <article class="event-detail">
             <div class="event-detail-header">
                 <div class="badge event">
@@ -156,6 +244,23 @@
                     </span>
                 </div>
 
+                {#if eventMetaVenues.length > 0}
+                    <div class="meta-row meta-row--venue">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-4"></path><path d="M9 9v0M9 12v0M9 15v0M9 18v0"></path></svg>
+                        <span class="meta-row-venue-list">
+                            <strong>Helyszín:</strong>
+                            {#each eventMetaVenues as v, vi (v.slug ? v.slug : v.name + String(vi))}
+                                {#if vi > 0}<span class="meta-venue-sep"> · </span>{/if}
+                                {#if v.slug && venuePageUrl(event, v.slug)}
+                                    <a href={venuePageUrl(event, v.slug)} title="Helyszín részletei">{v.name}</a>
+                                {:else}
+                                    {v.name}
+                                {/if}
+                            {/each}
+                        </span>
+                    </div>
+                {/if}
+
                 {#if event.organizer}
                     <div class="meta-row">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle></svg>
@@ -170,9 +275,8 @@
                 </div>
             {/if}
         </article>
-    </section>
     {#if event.schedule && event.schedule.length > 0}
-    <section class="event-schedule" aria-label="Napi program">
+    <section id="program" class="event-schedule" aria-label="Napi program">
         <div class="event-schedule-head">
             <h2 class="event-schedule-title">Napi program</h2>
             <div
@@ -217,48 +321,75 @@
                         on:click={() =>
                             (scheduleFilterDay = dayKey)}
                     >
-                        {formatScheduleFilterWeekday(
+                        {scheduleFilterChipLabel(
                             day.schedule_date,
+                            isToday,
                         )}
                     </button>
                 {/each}
             </div>
         </div>
         {#each filteredScheduleDays as day}
+            {@const dayKey = normalizeScheduleDateKey(day.schedule_date)}
             <div class="schedule-day">
                 <h3 class="schedule-day-title">
                     {formatDate(day.schedule_date)}
                 </h3>
-                {#if day.notes}
-                    <p class="schedule-day-notes">{day.notes}</p>
-                {/if}
                 <ul class="schedule-activities">
                     {#each day.activities as act}
+                        {@const actVenue = activityVenueLabel(event, act)}
+                        {@const timePart = formatScheduleTimePart(act)}
+                        {@const showNowBadge =
+                            timePart &&
+                            isScheduleActivityHappeningNow(
+                                act,
+                                dayKey,
+                                referenceNow,
+                            )}
+                        {@const hasTypePill =
+                            act.activity_type &&
+                            act.activity_type !== "other" &&
+                            SCHEDULE_ACTIVITY_TYPE_LABELS[act.activity_type]}
+                        {@const hasTypeCol =
+                            !!hasTypePill || !!timePart || !!actVenue}
                         <li
                             class="schedule-activity schedule-activity--{act.activity_type || 'other'}"
+                            class:schedule-activity--no-typecol={!hasTypeCol}
                         >
-                            {#if act.activity_type && act.activity_type !== "other" && SCHEDULE_ACTIVITY_TYPE_LABELS[act.activity_type]}
-                                <span class="schedule-type-pill"
-                                    >{SCHEDULE_ACTIVITY_TYPE_LABELS[
-                                        act.activity_type
-                                    ]}</span
-                                >
+                            {#if hasTypeCol}
+                                <div class="schedule-activity-type-col">
+                                    {#if hasTypePill}
+                                        <span class="schedule-type-pill"
+                                            >{SCHEDULE_ACTIVITY_TYPE_LABELS[
+                                                act.activity_type
+                                            ]}</span
+                                        >
+                                    {/if}
+                                    {#if timePart}
+                                        <div class="schedule-activity-time-row">
+                                            <span class="schedule-activity-time">{timePart}</span>
+                                            {#if showNowBadge}
+                                                <span
+                                                    class="schedule-activity-now-badge"
+                                                    title="A főoldali óra szerint épp most zajlik"
+                                                    >Most</span
+                                                >
+                                            {/if}
+                                        </div>
+                                    {/if}
+                                    {#if actVenue}
+                                        <span class="schedule-activity-venue schedule-activity-venue--meta"
+                                            >{actVenue}</span
+                                        >
+                                    {/if}
+                                </div>
                             {/if}
-                            <span class="schedule-activity-main">
-                                <span class="schedule-activity-title"
-                                    >{act.title}</span
-                                >
-                                {#if formatScheduleTimePart(act)}
-                                    <span class="schedule-activity-time"
-                                        >({formatScheduleTimePart(act)})</span
-                                    >
+                            <div class="schedule-activity-main">
+                                <h4 class="schedule-activity-title">{act.title}</h4>
+                                {#if act.description}
+                                    <p class="schedule-activity-desc">{act.description}</p>
                                 {/if}
-                            </span>
-                            {#if act.description}
-                                <p class="schedule-activity-desc">
-                                    {act.description}
-                                </p>
-                            {/if}
+                            </div>
                         </li>
                     {/each}
                 </ul>
@@ -356,6 +487,15 @@
         gap: 0.75rem 1rem;
         margin-bottom: 1rem;
     }
+    @media (max-width: 640px) {
+        .event-schedule-head {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .event-schedule-title {
+            min-width: 0;
+        }
+    }
     .event-schedule-title {
         font-size: 1.15rem;
         margin: 0;
@@ -370,6 +510,20 @@
         align-items: center;
         justify-content: flex-end;
         max-width: 100%;
+    }
+    @media (max-width: 640px) {
+        .schedule-filter-bar {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overflow-y: hidden;
+            justify-content: flex-start;
+            padding-bottom: 0.35rem;
+            margin: 0 -0.25rem;
+            padding-left: 0.25rem;
+            padding-right: 0.25rem;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin;
+        }
     }
     .schedule-filter-btn {
         font-size: 0.85rem;
@@ -409,12 +563,10 @@
         filter: brightness(1.05);
     }
     .schedule-day {
-        margin-bottom: 1.5rem;
+        margin: 1.5rem 0;
     }
     .schedule-day-title {
         font-size: 1rem;
-        margin: 0 0 0.5rem;
-        color: var(--primary-color);
     }
     .schedule-day-notes {
         margin: 0 0 0.75rem;
@@ -427,11 +579,28 @@
         list-style: disc;
     }
     .schedule-activity {
-        margin-bottom: 0.75rem;
+        margin: 0.75rem 0;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        align-items: start;
+        gap: 0.35rem 0.75rem;
+    }
+    .schedule-activity--no-typecol {
+        grid-template-columns: 1fr;
+    }
+    .schedule-activity-type-col {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+        max-width: 11rem;
+        flex-shrink: 0;
+    }
+    .schedule-activity-time-row {
         display: flex;
         flex-wrap: wrap;
-        align-items: baseline;
-        gap: 0.35rem 0.5rem;
+        align-items: center;
+        gap: 0.35rem 0.45rem;
     }
     .schedule-type-pill {
         font-size: 0.68rem;
@@ -440,27 +609,89 @@
         letter-spacing: 0.03em;
         color: var(--szekely-red, #c0392b);
         flex-shrink: 0;
+        line-height: 1.25;
     }
     .schedule-activity-main {
-        display: inline;
-        flex: 1;
         min-width: 0;
     }
     .schedule-activity-time {
-        font-weight: 600;
-        margin-left: 0.35rem;
-        color: var(--text-faint);
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        line-height: 1.25;
+        color: var(--text-color);
+        flex-shrink: 0;
         white-space: nowrap;
     }
-    .schedule-activity-title {
+    .schedule-activity-now-badge {
+        display: inline-block;
+        font-size: 0.62rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.15rem 0.4rem;
+        border-radius: 4px;
+        vertical-align: middle;
+        line-height: 1.2;
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #86efac;
+        flex-shrink: 0;
+    }
+    .schedule-activity-venue--meta {
+        display: block;
+        width: 100%;
+        font-size: 0.68rem;
+        color: var(--text-faint);
+        line-height: 1.35;
+        word-break: break-word;
+    }
+    .meta-row--venue strong {
         font-weight: 600;
-        color: var(--text-color);
+        color: var(--text-faint);
+        margin-right: 0.25rem;
+    }
+    .meta-row-venue-list {
+        flex: 1;
+        min-width: 0;
+    }
+    .meta-venue-sep {
+        color: var(--text-faint);
+        font-weight: 400;
+    }
+    .schedule-activity-title {
+        display: block;
+        margin: 0;
     }
     .schedule-activity-desc {
-        margin: 0.25rem 0 0;
+        margin: 0.35rem 0 0;
         font-size: 0.9rem;
         line-height: 1.5;
         color: var(--text-faint);
+    }
+    @media (max-width: 560px) {
+        .schedule-activity-desc {
+            margin-top: 0.4rem;
+        }
+        .schedule-activity:not(.schedule-activity--no-typecol) {
+            grid-template-columns: 1fr;
+        }
+        .schedule-activity-type-col {
+            max-width: none;
+        }
+    }
+
+    .event-detail {
+        box-sizing: border-box;
+    }
+    @media (max-width: 560px) {
+        .event-detail {
+            padding: 1.25rem;
+        }
+        .page-title {
+            font-size: clamp(1.35rem, 5vw, 1.75rem);
+            word-break: break-word;
+        }
     }
 </style>

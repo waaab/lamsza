@@ -1,1 +1,0 @@
-import{a7 as y,a0 as u,aC as _,aD as o,h as t,C as g,v as i,a4 as l,x as d,q as p,A as v}from"./CsT2J97q.js";function m(n,r){let a=null,E=t;var s;if(t){a=p;for(var e=v(document.head);e!==null&&(e.nodeType!==g||e.data!==n);)e=i(e);if(e===null)l(!1);else{var f=i(e);e.remove(),d(f)}}t||(s=document.head.appendChild(y()));try{u(()=>r(s),_|o)}finally{E&&(l(!0),d(a))}}export{m as h};

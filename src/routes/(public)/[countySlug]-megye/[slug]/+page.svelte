@@ -12,6 +12,8 @@
     let settlementData = null;
     let attractionData = null;
     let countyAttractions = [];
+    /** @type {Record<string, unknown>[]} */
+    let settlementVenues = [];
     let entries = [];
     let loading = true;
     let entriesError = null;
@@ -52,6 +54,7 @@
         settlementData = null;
         attractionData = null;
         countyAttractions = [];
+        settlementVenues = [];
         entries = [];
         entriesError = null;
         try {
@@ -80,6 +83,14 @@
                     if (!Array.isArray(countyAttractions)) countyAttractions = [];
                 } catch {
                     countyAttractions = [];
+                }
+                try {
+                    const vlist = await apiFetch(
+                        `/api/venues?settlement_id=${locData.id}`,
+                    );
+                    settlementVenues = Array.isArray(vlist) ? vlist : [];
+                } catch {
+                    settlementVenues = [];
                 }
             } else {
                 // 2. Try attraction
@@ -234,6 +245,25 @@
     </div>
 
     <EventsWidget settlementSlug={town} locationName={settlementData.name} />
+
+    {#if settlementVenues.length > 0}
+        <section
+            class="settlement-venues component-box"
+            aria-label="Rendezvényhelyszínek"
+        >
+            <h2 class="aside-title">Rendezvényhelyszínek</h2>
+            <ul class="settlement-venues-list">
+                {#each settlementVenues as ven (ven.id)}
+                    <li>
+                        <a
+                            href="/{$page.params.countySlug}-megye/{town}/helyszin/{ven.slug}"
+                            class="settlement-venue-link">{ven.name}</a
+                        >
+                    </li>
+                {/each}
+            </ul>
+        </section>
+    {/if}
 
     <NewsWidget settlementSlug={town} ticker={true} />
 
@@ -509,5 +539,22 @@
         padding: 0.5rem 1rem;
         border: 1px solid var(--border-color);
         border-radius: 8px;
+    }
+
+    .settlement-venues {
+        margin-bottom: 2rem;
+    }
+    .settlement-venues-list {
+        margin: 0;
+        padding-left: 1.25rem;
+        line-height: 1.75;
+    }
+    .settlement-venue-link {
+        color: var(--primary-color);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .settlement-venue-link:hover {
+        text-decoration: underline;
     }
 </style>

@@ -8,6 +8,9 @@ node_modules
 /.svelte-kit
 /build
 
+# SvelteKit static export (adapter-static → dist/); regenerate with npm run build
+/dist
+
 # OS
 .DS_Store
 Thumbs.db
@@ -22,8 +25,14 @@ Thumbs.db
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Backend Binaries
+# Backend binaries (local go build; CI uses its own output name)
 backend/sz-gugel-bin
+backend/backend
+
+# Local dev: PID files and logs (scripts/restart_all.sh, etc.)
+server.pid
+backend/server.pid
+*.log
 
 # Extension Build Output
 extension/

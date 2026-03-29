@@ -66,7 +66,7 @@ type NewsItem struct {
 
 // FetchNewsItems fetches and aggregates news from all feeds. Used by unified search.
 func FetchNewsItems(limit int) []NewsItem {
-	rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY id ASC")
+	rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY LOWER(title) ASC, id ASC")
 	if err != nil {
 		return nil
 	}
@@ -194,7 +194,7 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY id ASC")
+	rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY LOWER(title) ASC, id ASC")
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -245,7 +245,7 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 func HandleAdminNewsFeeds(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY id ASC")
+		rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY LOWER(title) ASC, id ASC")
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return

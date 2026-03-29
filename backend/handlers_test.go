@@ -23,6 +23,7 @@ var testMux *http.ServeMux
 func init() {
 	config.Load()
 	db.InitDB()
+	mondasok.Migrate()
 
 	testMux = http.NewServeMux()
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
@@ -39,6 +40,7 @@ func init() {
 	testMux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 	testMux.HandleFunc("/api/admin/news_feeds", middleware.ApplyCORS(news.HandleAdminNewsFeeds))
 	testMux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
+	testMux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
 	testMux.HandleFunc("/api/admin/mondasok", middleware.ApplyCORS(mondasok.HandleAdminMondasok))
 	testMux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
@@ -352,7 +354,10 @@ func TestAdminQuickLinksCRUD(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAdminMondasokCRUD(t *testing.T) {
-	payload := map[string]string{"text": "Test mondas for integration testing"}
+	payload := map[string]string{
+		"text":          "Test mondas for integration testing",
+		"display_date":  "2030-06-15",
+	}
 
 	rr := doRequest(t, "POST", "/api/admin/mondasok", payload)
 	if rr.Code != http.StatusOK {
@@ -367,7 +372,7 @@ func TestAdminMondasokCRUD(t *testing.T) {
 		t.Fatalf("GET mondasok: expected 200, got %d", rr.Code)
 	}
 
-	rr = doRequest(t, "PUT", "/api/admin/mondasok", map[string]interface{}{"id": id, "text": "Updated mondas"})
+	rr = doRequest(t, "PUT", "/api/admin/mondasok", map[string]interface{}{"id": id, "text": "Updated mondas", "display_date": "2030-07-01"})
 	if rr.Code != http.StatusOK {
 		t.Fatalf("PUT mondasok: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}

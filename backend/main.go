@@ -16,6 +16,7 @@ import (
 	"backend/internal/pages"
 	"backend/internal/search"
 	"backend/internal/settings"
+	"backend/internal/venues"
 	"backend/internal/weather"
 )
 
@@ -23,6 +24,7 @@ func main() {
 	config.Load()
 	db.InitDB()
 	db.SeedHistoricalSeatsContent()
+	mondasok.Migrate()
 	settings.MigrateSiteSettings()
 	weather.MigrateWeatherTranslations()
 	pages.MigratePages()
@@ -70,8 +72,12 @@ func main() {
 		mux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
 		mux.HandleFunc("/api/events/filter-options", middleware.ApplyCORS(events.HandleEventFilterOptions))
 		mux.HandleFunc("/api/events/detail", middleware.ApplyCORS(events.HandleEventDetail))
+		mux.HandleFunc("/api/venues", middleware.ApplyCORS(venues.HandlePublic))
+		mux.HandleFunc("/api/venue_types", middleware.ApplyCORS(venues.HandlePublicVenueTypes))
 		mux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
 		mux.HandleFunc("/api/admin/events/schedule", middleware.ApplyCORS(events.HandleAdminEventSchedule))
+		mux.HandleFunc("/api/admin/venues", middleware.ApplyCORS(venues.HandleAdmin))
+		mux.HandleFunc("/api/admin/venue_types", middleware.ApplyCORS(venues.HandleAdminVenueTypes))
 		log.Println("Module [Events] enabled")
 	}
 
@@ -82,6 +88,7 @@ func main() {
 	}
 
 	if config.AppConfig.Features.Mondasok {
+		mux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
 		mux.HandleFunc("/api/admin/mondasok", middleware.ApplyCORS(mondasok.HandleAdminMondasok))
 		log.Println("Module [Mondasok] enabled")
 	}

@@ -14,7 +14,7 @@ import (
 func HandleAdminQuickLinks(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		rows, err := db.DB.Query("SELECT id, title, url, COALESCE(bg_color, '#ffffff') FROM quick_links ORDER BY id ASC")
+		rows, err := db.DB.Query("SELECT id, title, url, COALESCE(bg_color, '#ffffff') FROM quick_links ORDER BY LOWER(title) ASC, id ASC")
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return

@@ -2,7 +2,7 @@
     import { browser } from "$app/environment";
     import { onMount, onDestroy } from "svelte";
     import { apiFetch } from "$lib/api";
-    import { formatDateShort } from "$lib/utils";
+    import { formatDateShort, venuePageUrl } from "$lib/utils";
     import EventDateBadge from "$lib/components/EventDateBadge.svelte";
 
     export let settlementSlug = null;
@@ -193,9 +193,11 @@
                 <div class="event-cards-row">
                     {#each Array(limit) as _}
                         <article class="card sm">
-                            <span class="event-card-date">...</span>
-                            <span class="event-card-title">...</span>
-                            <span class="event-card-meta">...</span>
+                            <div class="event-card-date-row">
+                                <span class="event-card-date">…</span>
+                            </div>
+                            <span class="event-card-title">…</span>
+                            <span class="event-card-meta">…</span>
                         </article>
                     {/each}
                 </div>
@@ -220,31 +222,44 @@
                                     {event.title}
                                 </a>
                                 <span class="event-ticker-meta">
-                                    <span class="datetime-text">
-                                        <span class="start-date">
-                                            <span class="start-date-label sr-only">Esemény kezdete:</span>
-                                            {formatDateShort(event.start_date)}
-                                            {#if event.start_time}
-                                                <span class="start-time-label sr-only">Időpont:</span>{event.start_time.slice(0, 5)}
-                                            {/if}
-                                            <EventDateBadge event={event} live={true} />
+                                    <div class="event-ticker-date-row">
+                                        <span class="datetime-text">
+                                            <span class="start-date">
+                                                <span class="start-date-label sr-only">Esemény kezdete:</span>
+                                                {formatDateShort(event.start_date)}
+                                                {#if event.start_time}
+                                                    <span class="start-time-label sr-only">Időpont:</span>
+                                                    <span aria-hidden="true"> · </span>{event.start_time.slice(0, 5)}
+                                                {/if}
+                                            </span>
+                                            <span class="event-time-separator"> - </span>
+                                            <span class="end-date">
+                                                <span class="end-date-label sr-only">Esemény vége:</span>
+                                                {#if event.end_date && event.end_date !== event.start_date}
+                                                    {formatDateShort(event.end_date)}
+                                                    {#if event.end_time} {event.end_time.slice(0, 5)}{/if}
+                                                {:else if event.end_time}
+                                                    - {event.end_time.slice(0, 5)}
+                                                {/if}
+                                            </span>
                                         </span>
-                                        <span class="event-time-separator"> - </span>
-                                        <span class="end-date">
-                                            <span class="end-date-label sr-only">Esemény vége:</span>
-                                            {#if event.end_date && event.end_date !== event.start_date}
-                                                {formatDateShort(event.end_date)}
-                                                {#if event.end_time} {event.end_time.slice(0, 5)}{/if}
-                                            {:else if event.end_time}
-                                                - {event.end_time.slice(0, 5)}
-                                            {/if}
-                                        </span>
-                                    </span>
-                                    
+                                        <EventDateBadge event={event} live={true} corner={true} />
+                                    </div>
                                     <span class="event-location-container">
                                         <span class="event-location-name"><span class="event-location-name-label sr-only">Település:</span> {#if event.location_name}<a href="/{event.county_slug}-megye/{event.location_slug}">{event.location_name}</a>{/if}</span>
                                         <span class="event-location-separator"> · </span>
                                         <span class="event-location-county"><span class="event-location-county-label sr-only">Megye:</span> {#if event.county}<a href="/{event.county_slug}-megye">{event.county} megye</a>{/if}</span>
+                                        {#if event.default_venue_name}
+                                        <span class="event-location-separator"> · </span>
+                                        <span class="event-location-venue">
+                                            <span class="event-location-venue-label sr-only">Helyszín:</span>
+                                            {#if venuePageUrl(event, event.default_venue_slug)}
+                                                <a href={venuePageUrl(event, event.default_venue_slug)} title="Helyszín részletei">{event.default_venue_name}</a>
+                                            {:else}
+                                                {event.default_venue_name}
+                                            {/if}
+                                        </span>
+                                    {/if}
                                     </span>
                                 </span>
                             </div>
@@ -262,12 +277,14 @@
                 <div class="event-cards-row">
                     {#each visibleEvents as event}
                         <article href="/esemenyek/{event.id}" class="card sm">
-                            <span class="event-card-date">
-                                {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
-                                {formatDateShort(event.start_date)}
-                                {#if event.start_time} · {event.start_time.slice(0, 5)}{/if}
-                                <EventDateBadge event={event} live={true} />
-                            </span>
+                            <div class="event-card-date-row">
+                                <span class="event-card-date">
+                                    {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
+                                    {formatDateShort(event.start_date)}
+                                    {#if event.start_time} · {event.start_time.slice(0, 5)}{/if}
+                                </span>
+                                <EventDateBadge event={event} live={true} corner={true} />
+                            </div>
                             <a href="/esemenyek/{event.id}" title="Esemény részletei" class="event-card-title">{event.title}</a>
                             <span class="event-card-meta">
                                 {#if event.end_date && event.end_date !== event.start_date}
@@ -276,7 +293,11 @@
                                 {:else if event.end_time}
                                     - {event.end_time.slice(0, 5)}
                                 {/if}
-                                {#if event.location_name} · {event.location_name}{/if}
+                                {#if event.location_name}
+                                    · {#if event.county_slug && event.location_slug}<a href="/{event.county_slug}-megye/{event.location_slug}" title="Település">{event.location_name}</a>{:else}{event.location_name}{/if}
+                                {/if}{#if event.default_venue_name}
+                                    · {#if venuePageUrl(event, event.default_venue_slug)}<a href={venuePageUrl(event, event.default_venue_slug)} title="Helyszín részletei">{event.default_venue_name}</a>{:else}{event.default_venue_name}{/if}
+                                {/if}
                             </span>
                         </article>
                     {/each}
@@ -318,11 +339,21 @@
         gap: 0.75rem;
         margin-bottom: 0.5rem;
     }
+    .event-card-date-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        width: 100%;
+        margin-bottom: 0.1rem;
+        min-width: 0;
+    }
     .event-card-date {
         font-size: 0.75rem;
         font-weight: 600;
         color: var(--text-faint);
         text-transform: uppercase;
+        min-width: 0;
     }
     .event-card-title {
         font-weight: 600;
@@ -379,6 +410,21 @@
         font-size: 0.9em;
         color: var(--text-faint);
         margin-top: 0.2rem;
+    }
+    .event-ticker-date-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.5rem;
+        width: 100%;
+        min-width: 0;
+    }
+    .event-ticker-date-row .datetime-text {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.25rem;
+        min-width: 0;
     }
 
     .event-type-badges {

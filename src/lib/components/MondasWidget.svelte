@@ -1,66 +1,50 @@
 <script>
     import { onMount } from "svelte";
     import { apiFetch } from "$lib/api";
+    import { formatHuDateLongFromYMD, localCalendarISODate } from "$lib/utils";
 
-    const MONDAS_CACHE_KEY = "mondas_cache";
-    const MONDAS_TTL = 24 * 60 * 60 * 1000;
-
-    let text = "";
+    /** @type {{ id: number, text: string, display_date: string }[]} */
+    let quotes = [];
     let loading = true;
-    let error = false;
 
     onMount(async () => {
-        localStorage.removeItem(MONDAS_CACHE_KEY);
-        const cached = localStorage.getItem(MONDAS_CACHE_KEY);
-        if (cached) {
-            try {
-                const { text: cachedText, timestamp } = JSON.parse(cached);
-                if (Date.now() - timestamp < MONDAS_TTL) {
-                    text = cachedText;
-                    loading = false;
-                    return;
-                }
-            } catch (e) {}
-        }
-
         try {
-            const data = await apiFetch("/api/admin/mondasok");
-            if (data && data.length > 0) {
-                const randomIndex = Math.floor(Math.random() * data.length);
-                text = data[randomIndex].text;
-                localStorage.setItem(
-                    MONDAS_CACHE_KEY,
-                    JSON.stringify({
-                        text,
-                        timestamp: Date.now(),
-                    }),
-                );
-            }
-        } catch (err) {
-            error = true;
+            const day = localCalendarISODate();
+            const data = await apiFetch(
+                `/api/mondasok?date=${encodeURIComponent(day)}`,
+            );
+            quotes = Array.isArray(data) ? data : [];
+        } catch {
+            quotes = [];
         } finally {
             loading = false;
         }
     });
 </script>
 
-{#if loading || text !== "" || error}
+{#if !loading && quotes.length > 0}
     <section id="szekely-mondasok">
         <div class="mondas-inner">
             <div class="mondas-label-row">
-                <span class="heading-label">Napi Székely Mondás: Aszongya, hogy...</span>
+                <span class="heading-label"
+                    >Napi Székely Mondás: Aszongya, hogy…
+                    {#if quotes[0]?.display_date}
+                        <span class="mondas-date-label"
+                            >· {formatHuDateLongFromYMD(quotes[0].display_date)}</span
+                        >
+                    {/if}</span
+                >
             </div>
-            {#if loading}
-                <blockquote class="mondas-quote" style="opacity:0.5">adat betöltés...</blockquote>
-            {:else if error}
-                <p class="mondas-quote">A mondás jelenleg nem elérhető.</p>
-            {:else}
-                <blockquote class="mondas-quote">{text}</blockquote>
-            {/if}
+            {#each quotes as q (q.id)}
+                <blockquote class="mondas-quote">{q.text}</blockquote>
+            {/each}
         </div>
     </section>
 {/if}
 
 <style>
-    /* Styles are already in global.css, but we keep the structure here */
+    .mondas-date-label {
+        font-weight: 500;
+        opacity: 0.85;
+    }
 </style>

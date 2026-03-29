@@ -1,12 +1,15 @@
 /**
  * Event timing vs “now”, using the same clock as `#datetime` when present.
  *
- * @typedef {'upcoming' | 'ongoing' | 'ending_soon' | 'ended'} EventStatus
+ * @typedef {'scheduled' | 'upcoming' | 'ongoing' | 'ending_soon' | 'ended'} EventStatus
  * @typedef {{ start_date?: string, end_date?: string, start_time?: string, end_time?: string }} EventLike
  */
 
 /** Last 48h of the window show “ending soon” (still ongoing). */
 const ENDING_SOON_MS = 48 * 60 * 60 * 1000;
+
+/** “Hamarosan” only if the event starts within this window; otherwise “Betervezett”. */
+const WITHIN_ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** @param {string | undefined} t */
 function normalizeTimeStr(t) {
@@ -100,6 +103,43 @@ export function getReferenceNow() {
 }
 
 /**
+ * Calendar “today” (YYYY-MM-DD) in the local timezone of {@link getReferenceNow},
+ * so schedule chips like “Ma …” match the homepage clock.
+ */
+export function referenceTodayYMD() {
+    const d = getReferenceNow();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+}
+
+/**
+ * Whether a single schedule activity is in progress at `now` on its day.
+ * Uses end of local day when `ends_at` is missing.
+ *
+ * @param {{ starts_at?: string, ends_at?: string }} act
+ * @param {string} scheduleDateKey YYYY-MM-DD
+ * @param {Date} [now]
+ */
+export function isScheduleActivityHappeningNow(act, scheduleDateKey, now) {
+    const t = (now ?? getReferenceNow()).getTime();
+    const day = String(scheduleDateKey || "").trim().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+    const startMs = parseLocalInstantMs(day, act?.starts_at);
+    if (startMs == null) return false;
+    let endMs = null;
+    if (act?.ends_at && String(act.ends_at).trim()) {
+        endMs = parseLocalInstantMs(day, act.ends_at);
+    }
+    if (endMs == null || endMs < startMs) {
+        endMs = endOfLocalDayMs(day);
+    }
+    if (endMs == null) return false;
+    return t >= startMs && t <= endMs;
+}
+
+/**
  * @param {EventLike} ev
  * @param {Date} [now]
  * @returns {EventStatus}
@@ -107,16 +147,20 @@ export function getReferenceNow() {
 export function getEventStatus(ev, now) {
     const t = (now ?? getReferenceNow()).getTime();
     const { startMs, endMs } = computeEventWindowMs(ev);
-    if (startMs == null || endMs == null) return "upcoming";
+    if (startMs == null || endMs == null) return "scheduled";
 
     if (t > endMs) return "ended";
-    if (t < startMs) return "upcoming";
+    if (t < startMs) {
+        if (startMs - t <= WITHIN_ONE_MONTH_MS) return "upcoming";
+        return "scheduled";
+    }
     if (endMs - t <= ENDING_SOON_MS) return "ending_soon";
     return "ongoing";
 }
 
 /** @type {Record<EventStatus, string>} */
 export const EVENT_STATUS_LABELS = {
+    scheduled: "Betervezett",
     upcoming: "Hamarosan",
     ongoing: "Folyamatban",
     ending_soon: "Hamarosan véget ér",

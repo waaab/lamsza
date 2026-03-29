@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import AdminNavIcon from "$lib/components/admin/AdminNavIcon.svelte";
     import { auth } from "$lib/stores/auth";
     import {
         SCHEDULE_ACTIVITY_TYPES,
@@ -9,9 +10,62 @@
     const getBase = () =>
         import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
+    /** Local calendar date as YYYY-MM-DD (for date inputs). */
+    function localISODate() {
+        const d = new Date();
+        const z = (n) => String(n).padStart(2, "0");
+        return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+    }
+
     let authenticated = false;
     let password = "";
-    let activeTab = "mondasok";
+    let activeTab = "welcome";
+
+    /** Section shortcuts on the dashboard (order matches sidebar). */
+    const ADMIN_WELCOME_ITEMS = [
+        { id: "mondasok", label: "Mondások" },
+        { id: "quicklinks", label: "Gyorslinkek" },
+        { id: "newsfeeds", label: "Hírfolyamok" },
+        { id: "counties", label: "Megyék" },
+        { id: "locations", label: "Települések" },
+        { id: "venues", label: "Helyszínek" },
+        { id: "attractions", label: "Látnivalók" },
+        { id: "events", label: "Események" },
+        { id: "entry_categories", label: "Bejegyzés kategóriák" },
+        { id: "entry_types", label: "Bejegyzés típusok" },
+        { id: "entries", label: "Bejegyzések" },
+        { id: "weather_translations", label: "Időjárás fordítások" },
+        { id: "pages", label: "Oldalak" },
+        { id: "settings", label: "Beállítások" },
+    ];
+
+    function goToAdminTab(/** @type {string} */ tab) {
+        activeTab = tab;
+        if (tab === "counties") fetchCountyRegions();
+        if (tab === "venues") {
+            fetchVenuesCatalog();
+            fetchVenueTypes();
+        }
+        if (tab === "attractions") fetchAttractions();
+        if (tab === "events") fetchEvents();
+        if (tab === "settings") fetchSettings();
+        if (tab === "weather_translations") fetchWeatherTranslations();
+        if (tab === "pages") fetchPages();
+    }
+
+    /** @type {{ tab: string, message: string } | null} */
+    let adminTabError = null;
+    $: if (adminTabError && activeTab !== adminTabError.tab) {
+        adminTabError = null;
+    }
+
+    function setAdminTabError(msg) {
+        adminTabError = { tab: activeTab, message: msg };
+    }
+
+    function clearAdminTabError() {
+        adminTabError = null;
+    }
 
     let mondasok = [];
     let quickLinks = [];
@@ -33,7 +87,7 @@
     let feedTimestamps = {};
 
     // Form binding objects
-    let newMondas = { text: "" };
+    let newMondas = { text: "", display_date: localISODate() };
     let newLink = { title: "", url: "", bg_color: "#e6f0ff" };
     let newNews = { title: "", feed_url: "", bg_color: "#ffebd6" };
     let newLocation = {
@@ -66,6 +120,7 @@
     let newEntryType = { name: "" };
     let newEvent = {
         location_id: "",
+        default_venue_id: "",
         title: "",
         description: "",
         start_date: "",
@@ -75,6 +130,59 @@
         event_type: "cultural",
         organizer: "",
     };
+    /** @type {Record<string, unknown>[]} */
+    let venuesCatalog = [];
+    /** @type {typeof venuesCatalog} */
+    let venueOptionsNew = [];
+    /** @type {typeof venuesCatalog} */
+    let venueOptionsEdit = [];
+    let newVenue = {
+        settlement_id: "",
+        name: "",
+        name_ro: "",
+        name_de: "",
+        slug: "",
+        kind: "sports_arena",
+        address: "",
+        latitude: "",
+        longitude: "",
+        seating_capacity: "",
+        description: "",
+        notes: "",
+    };
+    /** @type {{ id: number, slug: string, label_hu: string }[]} */
+    let venueTypesList = [];
+    let newVenueType = { label_hu: "" };
+    /** @type {Record<string, unknown> | null} */
+    let editingVenueType = null;
+
+    let searchMondasok = "";
+    let searchQuickLinks = "";
+    let searchNewsFeeds = "";
+    let searchLocations = "";
+    let searchVenueTypes = "";
+    let searchVenues = "";
+    let searchEvents = "";
+    let searchEntryCategories = "";
+    let searchEntries = "";
+    let searchEntryTypes = "";
+    let searchAttractions = "";
+    let searchCounties = "";
+    let searchHistoricalSeats = "";
+    let searchWeatherTrans = "";
+    let searchAdminPages = "";
+    let searchPageFaqRows = "";
+    /** Counties / historical seats: keep inline edit row visible when search would hide it */
+    $: displayCounties = (countiesFromAPI || []).filter(
+        (c) =>
+            editingCounty?.id === c.id ||
+            countyMatchesSearch(c, searchCounties),
+    );
+    $: displayHistoricalSeats = (historicalSeatsFromAPI || []).filter(
+        (h) =>
+            editingHistoricalSeat?.id === h.id ||
+            historicalSeatMatchesSearch(h, searchHistoricalSeats),
+    );
     let newAttraction = {
         county_slug: "hargita",
         name: "",
@@ -117,6 +225,8 @@
     /** @type {Array<{ schedule_date: string, notes: string, activities: Array<{ activity_type: string, starts_at: string, ends_at: string, title: string, description: string }> }>} */
     let scheduleDraftDays = [];
     let editingAttraction = null;
+    /** @type {Record<string, unknown> | null} */
+    let editingVenue = null;
 
     let orgQuery = "";
     let orgEditQuery = "";
@@ -224,6 +334,30 @@
         dialogResolve = null;
     }
 
+    /** @param {unknown[]} fields */
+    function matchesSearch(q, fields) {
+        const s = String(q || "").trim().toLowerCase();
+        if (!s) return true;
+        return fields.some((f) => String(f ?? "").toLowerCase().includes(s));
+    }
+    /** @template T
+     * @param {T[]} rows
+     * @param {string} q
+     * @param {(row: T) => unknown[]} fieldFn
+     */
+    function filterRows(rows, q, fieldFn) {
+        if (!rows || !rows.length) return rows || [];
+        const s = String(q || "").trim().toLowerCase();
+        if (!s) return rows;
+        return rows.filter((row) =>
+            fieldFn(row).some((f) =>
+                String(f ?? "")
+                    .toLowerCase()
+                    .includes(s),
+            ),
+        );
+    }
+
     onMount(() => {
         auth.init();
         if (localStorage.getItem("admin_auth") === "true") {
@@ -267,6 +401,8 @@
         fetchEntryCategories();
         fetchEntryTypes();
         fetchEvents();
+        fetchVenuesCatalog();
+        fetchVenueTypes();
         fetchSettings();
         fetchWeatherTranslations();
         fetchPages();
@@ -291,10 +427,11 @@
                 body: JSON.stringify(editingWeatherTrans),
             });
             if (res.ok) {
+                clearAdminTabError();
                 fetchWeatherTranslations();
                 editingWeatherTrans = null;
             } else {
-                showAlert("Hiba: " + (await res.text()));
+                setAdminTabError("Hiba: " + (await res.text()));
             }
         } else {
             const res = await fetch(`${getBase()}/api/admin/weather_translations`, {
@@ -303,10 +440,11 @@
                 body: JSON.stringify(newWeatherTrans),
             });
             if (res.ok) {
+                clearAdminTabError();
                 fetchWeatherTranslations();
                 newWeatherTrans = { source_text: "", lang: "hu", translated_text: "" };
             } else {
-                showAlert("Hiba: " + (await res.text()));
+                setAdminTabError("Hiba: " + (await res.text()));
             }
         }
     }
@@ -324,7 +462,7 @@
         if (!ok) return;
         const res = await fetch(`${getBase()}/api/admin/weather_translations?id=${id}`, { method: "DELETE" });
         if (res.ok) fetchWeatherTranslations();
-        else showAlert("Hiba: " + (await res.text()));
+        else setAdminTabError("Hiba: " + (await res.text()));
     }
 
     async function fetchSettings() {
@@ -361,10 +499,12 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
-            if (res.ok) await showAlert("Beállítások mentve.");
-            else await showAlert("Hiba: " + (await res.text()));
+            if (res.ok) {
+                clearAdminTabError();
+                await showAlert("Beállítások mentve.");
+            } else setAdminTabError("Hiba: " + (await res.text()));
         } catch (e) {
-            await showAlert("Hiba: " + e.message);
+            setAdminTabError("Hiba: " + e.message);
         } finally {
             settingsSaving = false;
         }
@@ -375,11 +515,12 @@
         try {
             const res = await fetch(`${getBase()}/api/admin/settings/clear-weather-cache`, { method: "POST" });
             if (res.ok) {
+                clearAdminTabError();
                 await showAlert("Időjárás cache verzió növelve – látogatók friss adatot fognak kapni.");
                 fetchSettings();
-            } else await showAlert("Hiba: " + (await res.text()));
+            } else setAdminTabError("Hiba: " + (await res.text()));
         } catch (e) {
-            await showAlert("Hiba: " + e.message);
+            setAdminTabError("Hiba: " + e.message);
         } finally {
             settingsCacheClearing = false;
         }
@@ -415,14 +556,15 @@
                 body: JSON.stringify(editingPage),
             });
             if (res.ok) {
+                clearAdminTabError();
                 await showAlert("Oldal mentve.");
                 editingPage = null;
                 fetchPages();
             } else {
-                await showAlert("Hiba: " + (await res.text()));
+                setAdminTabError("Hiba: " + (await res.text()));
             }
         } catch (e) {
-            await showAlert("Hiba: " + e.message);
+            setAdminTabError("Hiba: " + e.message);
         } finally {
             pageSaving = false;
         }
@@ -474,14 +616,15 @@
                 }),
             });
             if (res.ok) {
+                clearAdminTabError();
                 await showAlert("GYIK / disclaimer mentve.");
                 editingPageFaq = null;
                 fetchPages();
             } else {
-                await showAlert("Hiba: " + (await res.text()));
+                setAdminTabError("Hiba: " + (await res.text()));
             }
         } catch (e) {
-            await showAlert("Hiba: " + e.message);
+            setAdminTabError("Hiba: " + e.message);
         } finally {
             pageFaqSaving = false;
         }
@@ -544,6 +687,319 @@
     function fetchEvents() {
         loadData("events", (d) => (events = d));
     }
+    async function fetchVenuesCatalog() {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/venues`);
+            if (res.ok) venuesCatalog = await res.json();
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    async function fetchVenueTypes() {
+        try {
+            const res = await fetch(`${getBase()}/api/admin/venue_types`);
+            if (res.ok) {
+                venueTypesList = await res.json();
+                if (venueTypesList.length) {
+                    const slugs = new Set(venueTypesList.map((t) => t.slug));
+                    if (!slugs.has(String(newVenue.kind))) {
+                        newVenue = {
+                            ...newVenue,
+                            kind: venueTypesList[0].slug,
+                        };
+                    }
+                    if (
+                        editingVenue &&
+                        !slugs.has(String(editingVenue.kind))
+                    ) {
+                        editingVenue = {
+                            ...editingVenue,
+                            kind: venueTypesList[0].slug,
+                        };
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    async function submitNewVenueType(e) {
+        e.preventDefault();
+        if (!String(newVenueType.label_hu || "").trim()) {
+            await showAlert("A megnevezés kötelező.");
+            return;
+        }
+        try {
+            const res = await fetch(`${getBase()}/api/admin/venue_types`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    label_hu: String(newVenueType.label_hu).trim(),
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            newVenueType = { label_hu: "" };
+            await fetchVenueTypes();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    /** @param {Record<string, unknown>} t */
+    function startEditVenueType(t) {
+        editingVenueType = {
+            id: t.id,
+            slug: t.slug,
+            label_hu: t.label_hu ?? "",
+        };
+    }
+    function cancelEditVenueType() {
+        editingVenueType = null;
+    }
+    async function saveEditVenueType() {
+        if (!editingVenueType) return;
+        const id = parseInt(String(editingVenueType.id || ""), 10);
+        if (!Number.isFinite(id) || id < 1) return;
+        try {
+            const res = await fetch(`${getBase()}/api/admin/venue_types`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id,
+                    label_hu: String(editingVenueType.label_hu || "").trim(),
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            editingVenueType = null;
+            await fetchVenueTypes();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    async function deleteVenueTypeRow(id) {
+        const ok = await showConfirm(
+            "Biztosan törlöd ezt a helyszíntípust? (Nem lehetséges, ha van hozzárendelt helyszín.)",
+        );
+        if (!ok) return;
+        try {
+            const res = await fetch(
+                `${getBase()}/api/admin/venue_types?id=${encodeURIComponent(id)}`,
+                { method: "DELETE" },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            await fetchVenueTypes();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    async function loadVenuesForNewEvent() {
+        const sid = parseInt(String(newEvent.location_id || ""), 10);
+        if (!Number.isFinite(sid) || sid < 1) {
+            venueOptionsNew = [];
+            return;
+        }
+        try {
+            const res = await fetch(
+                `${getBase()}/api/venues?settlement_id=${sid}`,
+            );
+            venueOptionsNew = res.ok ? await res.json() : [];
+        } catch (e) {
+            console.error(e);
+            venueOptionsNew = [];
+        }
+    }
+    async function loadVenuesForEditSettlement(sidRaw) {
+        const sid = parseInt(String(sidRaw || ""), 10);
+        if (!Number.isFinite(sid) || sid < 1) {
+            venueOptionsEdit = [];
+            return;
+        }
+        try {
+            const res = await fetch(
+                `${getBase()}/api/venues?settlement_id=${sid}`,
+            );
+            venueOptionsEdit = res.ok ? await res.json() : [];
+        } catch (e) {
+            console.error(e);
+            venueOptionsEdit = [];
+        }
+    }
+    function parseOptFloatVenue(s) {
+        const t = String(s ?? "")
+            .trim()
+            .replace(",", ".");
+        if (!t) return null;
+        const n = parseFloat(t);
+        return Number.isFinite(n) ? n : null;
+    }
+    function parseOptIntVenue(s) {
+        const t = String(s ?? "").trim();
+        if (!t) return null;
+        const n = parseInt(t, 10);
+        return Number.isFinite(n) ? n : null;
+    }
+
+    function emptyNewVenue() {
+        return {
+            settlement_id: "",
+            name: "",
+            name_ro: "",
+            name_de: "",
+            slug: "",
+            kind: "sports_arena",
+            address: "",
+            latitude: "",
+            longitude: "",
+            seating_capacity: "",
+            description: "",
+            notes: "",
+        };
+    }
+
+    async function submitNewVenue(e) {
+        e.preventDefault();
+        const sid = parseInt(String(newVenue.settlement_id || ""), 10);
+        if (!Number.isFinite(sid) || sid < 1 || !String(newVenue.name || "").trim()) {
+            await showAlert("Válassz települést és adj meg nevet.");
+            return;
+        }
+        try {
+            const res = await fetch(`${getBase()}/api/admin/venues`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    settlement_id: sid,
+                    name: newVenue.name.trim(),
+                    name_ro: String(newVenue.name_ro || "").trim(),
+                    name_de: String(newVenue.name_de || "").trim(),
+                    slug: newVenue.slug?.trim() || "",
+                    kind: newVenue.kind || "other",
+                    address: newVenue.address || "",
+                    notes: newVenue.notes || "",
+                    latitude: parseOptFloatVenue(newVenue.latitude),
+                    longitude: parseOptFloatVenue(newVenue.longitude),
+                    seating_capacity: parseOptIntVenue(newVenue.seating_capacity),
+                    description: String(newVenue.description || "").trim(),
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            await fetchVenuesCatalog();
+            await loadVenuesForNewEvent();
+            if (editingEvent)
+                await loadVenuesForEditSettlement(editingEvent.location_id);
+            newVenue = emptyNewVenue();
+            await showAlert("Helyszín elmentve.");
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+
+    /** @param {Record<string, unknown>} v */
+    function startEditVenue(v) {
+        editingVenue = {
+            id: v.id,
+            settlement_id: String(v.settlement_id ?? ""),
+            name: v.name ?? "",
+            name_ro: v.name_ro ?? "",
+            name_de: v.name_de ?? "",
+            slug: v.slug ?? "",
+            kind: v.kind ?? "other",
+            address: v.address ?? "",
+            notes: v.notes ?? "",
+            latitude:
+                v.latitude != null && v.latitude !== ""
+                    ? String(v.latitude)
+                    : "",
+            longitude:
+                v.longitude != null && v.longitude !== ""
+                    ? String(v.longitude)
+                    : "",
+            seating_capacity:
+                v.seating_capacity != null && v.seating_capacity !== ""
+                    ? String(v.seating_capacity)
+                    : "",
+            description: v.description ?? "",
+        };
+    }
+    function cancelEditVenue() {
+        editingVenue = null;
+    }
+    async function saveEditVenue() {
+        if (!editingVenue) return;
+        const sid = parseInt(String(editingVenue.settlement_id || ""), 10);
+        const id = parseInt(String(editingVenue.id || ""), 10);
+        if (!Number.isFinite(sid) || sid < 1 || !Number.isFinite(id) || id < 1) {
+            await showAlert("Érvénytelen azonosító.");
+            return;
+        }
+        if (!String(editingVenue.name || "").trim()) {
+            await showAlert("A magyar név kötelező.");
+            return;
+        }
+        try {
+            const res = await fetch(`${getBase()}/api/admin/venues`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id,
+                    settlement_id: sid,
+                    name: String(editingVenue.name).trim(),
+                    name_ro: String(editingVenue.name_ro || "").trim(),
+                    name_de: String(editingVenue.name_de || "").trim(),
+                    slug: String(editingVenue.slug || "").trim(),
+                    kind: editingVenue.kind || "other",
+                    address: String(editingVenue.address || ""),
+                    notes: String(editingVenue.notes || ""),
+                    latitude: parseOptFloatVenue(editingVenue.latitude),
+                    longitude: parseOptFloatVenue(editingVenue.longitude),
+                    seating_capacity: parseOptIntVenue(editingVenue.seating_capacity),
+                    description: String(editingVenue.description || "").trim(),
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            editingVenue = null;
+            await fetchVenuesCatalog();
+            await loadVenuesForNewEvent();
+            if (editingEvent)
+                await loadVenuesForEditSettlement(editingEvent.location_id);
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    async function deleteVenueRow(id) {
+        const ok = await showConfirm("Biztosan törlöd ezt a helyszínt?");
+        if (!ok) return;
+        try {
+            const res = await fetch(
+                `${getBase()}/api/admin/venues?id=${encodeURIComponent(id)}`,
+                { method: "DELETE" },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            await fetchVenuesCatalog();
+            await loadVenuesForNewEvent();
+            if (editingEvent)
+                await loadVenuesForEditSettlement(editingEvent.location_id);
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
 
     /** @param {Record<string, unknown>} ev */
     function eventDateTimeComplete(ev) {
@@ -596,10 +1052,30 @@
         }
     }
 
-    function contentPreview(text, maxLen = 96) {
+    /** One limit for every truncated label in admin tables (full value in title/tooltip). */
+    const ADMIN_TABLE_PREVIEW_MAX = 20;
+
+    function contentPreview(text, maxLen = ADMIN_TABLE_PREVIEW_MAX) {
         if (!text || !String(text).trim()) return "—";
         const t = String(text).replace(/\s+/g, " ").trim();
         return t.length > maxLen ? t.slice(0, maxLen) + "…" : t;
+    }
+
+    /** URLs and long strings in table cells use the same max length as contentPreview. */
+    function urlPreview(url, maxLen = ADMIN_TABLE_PREVIEW_MAX) {
+        if (!url || !String(url).trim()) return "—";
+        const s = String(url).trim();
+        return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
+    }
+
+    function formatLatLon(lat, lon) {
+        const la = lat != null && lat !== "" ? Number(lat) : NaN;
+        const lo = lon != null && lon !== "" ? Number(lon) : NaN;
+        if (!Number.isFinite(la) && !Number.isFinite(lo)) return "—";
+        if (la === 0 && lo === 0) return "—";
+        const a = Number.isFinite(la) ? la.toFixed(4) : "—";
+        const o = Number.isFinite(lo) ? lo.toFixed(4) : "—";
+        return `${a}, ${o}`;
     }
 
     function settlementsForCountyName(countyName) {
@@ -621,6 +1097,27 @@
             (l) => l.county === c.name && l.type !== "megye" && l.is_county_seat,
         );
         return seat ? `${seat.name} (${seat.type})` : "—";
+    }
+
+    function countyMatchesSearch(c, q) {
+        return matchesSearch(q, [
+            c.name,
+            c.name_ro,
+            c.name_de,
+            c.slug,
+            countySeatDisplayName(c),
+            c.content || "",
+        ]);
+    }
+
+    function historicalSeatMatchesSearch(h, q) {
+        return matchesSearch(q, [
+            h.name,
+            h.name_ro,
+            h.name_de,
+            h.slug,
+            h.content || "",
+        ]);
     }
 
     function startEditCounty(c) {
@@ -658,23 +1155,28 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert("Hiba (megye): " + (await res.text()));
+                setAdminTabError("Hiba (megye): " + (await res.text()));
                 return;
             }
             if (ec.seat_location_id) {
                 const ok = await setCountySeat(Number(ec.seat_location_id));
                 if (!ok) {
-                    await showAlert(
+                    setAdminTabError(
                         "A megye szövege mentve, de a megyeszékhely beállítása nem sikerült.",
                     );
+                    editingCounty = null;
+                    fetchCountyRegions();
+                    fetchLocations();
+                    return;
                 }
             }
             editingCounty = null;
+            clearAdminTabError();
             await showAlert("Megye mentve: " + ec.name);
             fetchCountyRegions();
             fetchLocations();
         } catch (e) {
-            await showAlert("Hiba: " + e.message);
+            setAdminTabError("Hiba: " + e.message);
         }
     }
 
@@ -711,14 +1213,15 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert("Hiba (szék): " + (await res.text()));
+                setAdminTabError("Hiba (szék): " + (await res.text()));
                 return;
             }
             editingHistoricalSeat = null;
+            clearAdminTabError();
             await showAlert("Szék mentve: " + h.name);
             fetchCountyRegions();
         } catch (e) {
-            await showAlert("Hiba: " + e.message);
+            setAdminTabError("Hiba: " + e.message);
         }
     }
 
@@ -731,13 +1234,15 @@
                 body: JSON.stringify(data),
             });
             if (res.ok) {
+                clearAdminTabError();
                 reloadFunc();
                 resetFormFunc();
             } else {
-                showAlert("Hiba: " + (await res.text()));
+                setAdminTabError("Hiba: " + (await res.text()));
             }
         } catch (e) {
             console.error(e);
+            setAdminTabError("Hiba: " + (e && e.message ? e.message : String(e)));
         }
     }
 
@@ -750,12 +1255,14 @@
                 body: JSON.stringify(data),
             });
             if (res.ok) {
+                clearAdminTabError();
                 reloadFunc();
             } else {
-                showAlert("Mentési hiba: " + (await res.text()));
+                setAdminTabError("Mentési hiba: " + (await res.text()));
             }
         } catch (e) {
             console.error(e);
+            setAdminTabError("Hiba: " + (e && e.message ? e.message : String(e)));
         }
     }
 
@@ -774,14 +1281,23 @@
         }
     }
 
+    /** Normalize YYYY-MM-DD from date input or API (may include time). */
+    function normalizeYmdInput(v) {
+        const s = String(v ?? "").trim();
+        return s.length >= 10 ? s.slice(0, 10) : s;
+    }
+
     // specific creates
     function submitMondas(e) {
         e.preventDefault();
+        const display_date =
+            normalizeYmdInput(newMondas.display_date) || localISODate();
+        const text = String(newMondas.text ?? "").trim();
         createRecord(
             "mondasok",
-            newMondas,
+            { text, display_date },
             fetchMondasok,
-            () => (newMondas = { text: "" }),
+            () => (newMondas = { text: "", display_date: localISODate() }),
         );
     }
     function submitLink(e) {
@@ -863,13 +1379,16 @@
     async function submitEvent(e) {
         e.preventDefault();
         const lid = parseInt(String(newEvent.location_id), 10);
+        const dv = parseInt(String(newEvent.default_venue_id || ""), 10);
         const payload = {
             ...newEvent,
             location_id: Number.isFinite(lid) && lid > 0 ? lid : 0,
+            default_venue_id:
+                Number.isFinite(dv) && dv > 0 ? dv : null,
         };
         const err = validateEventFields(payload);
         if (err) {
-            await showAlert(err);
+            setAdminTabError(err);
             return;
         }
         createRecord(
@@ -879,6 +1398,7 @@
             () =>
                 (newEvent = {
                     location_id: "",
+                    default_venue_id: "",
                     title: "",
                     description: "",
                     start_date: "",
@@ -998,7 +1518,11 @@
     async function startEditMondas(m) {
         const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
         if (!ok) return;
-        editingMondas = { ...m };
+        editingMondas = {
+            ...m,
+            display_date:
+                normalizeYmdInput(m.display_date) || localISODate(),
+        };
     }
     function cancelEditMondas() {
         editingMondas = null;
@@ -1007,7 +1531,15 @@
         if (!editingMondas) return;
         const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
         if (!ok) return;
-        await updateRecord("mondasok", editingMondas, fetchMondasok);
+        const id = parseInt(String(editingMondas.id ?? ""), 10);
+        const display_date =
+            normalizeYmdInput(editingMondas.display_date) || localISODate();
+        const text = String(editingMondas.text ?? "").trim();
+        await updateRecord(
+            "mondasok",
+            { id, text, display_date },
+            fetchMondasok,
+        );
         editingMondas = null;
     }
 
@@ -1051,10 +1583,15 @@
         const et = ev.end_time ? String(ev.end_time) : "";
         editingEvent = {
             ...ev,
+            default_venue_id:
+                ev.default_venue_id != null && ev.default_venue_id !== ""
+                    ? String(ev.default_venue_id)
+                    : "",
             start_time: st.length >= 5 ? st.slice(0, 5) : "",
             end_time: et.length >= 5 ? et.slice(0, 5) : "",
         };
         orgEditQuery = ev.organizer || "";
+        await loadVenuesForEditSettlement(ev.location_id);
         await loadScheduleForEditing(ev.id);
     }
     function cancelEditEvent() {
@@ -1081,6 +1618,10 @@
                         ? String(a.starts_at).slice(0, 5)
                         : "",
                     ends_at: a.ends_at ? String(a.ends_at).slice(0, 5) : "",
+                    venue_id:
+                        a.venue_id != null && a.venue_id !== ""
+                            ? String(a.venue_id)
+                            : "",
                     title: a.title || "",
                     description: a.description || "",
                 })),
@@ -1137,6 +1678,7 @@
                 activity_type: "match",
                 starts_at: "",
                 ends_at: "",
+                venue_id: "",
                 title: "",
                 description: "",
             },
@@ -1160,17 +1702,27 @@
                     .filter((d) => d.schedule_date && String(d.schedule_date).trim())
                     .map((d) => ({
                         schedule_date: d.schedule_date,
-                        notes: d.notes || "",
+                        notes: "",
                         activities: (d.activities || [])
                             .filter((a) => a.title && String(a.title).trim())
-                            .map((a, ai) => ({
-                                activity_type: a.activity_type || "other",
-                                starts_at: a.starts_at || "",
-                                ends_at: a.ends_at || "",
-                                title: a.title.trim(),
-                                description: a.description || "",
-                                sort_order: ai,
-                            })),
+                            .map((a, ai) => {
+                                const vid = parseInt(
+                                    String(a.venue_id || ""),
+                                    10,
+                                );
+                                return {
+                                    activity_type: a.activity_type || "other",
+                                    starts_at: a.starts_at || "",
+                                    ends_at: a.ends_at || "",
+                                    venue_id:
+                                        Number.isFinite(vid) && vid > 0
+                                            ? vid
+                                            : null,
+                                    title: a.title.trim(),
+                                    description: a.description || "",
+                                    sort_order: ai,
+                                };
+                            }),
                     })),
             };
             const res = await fetch(`${getBase()}/api/admin/events/schedule`, {
@@ -1199,7 +1751,16 @@
         }
         const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
         if (!ok) return;
-        await updateRecord("events", editingEvent, fetchEvents);
+        const dv = parseInt(
+            String(editingEvent.default_venue_id || ""),
+            10,
+        );
+        const payload = {
+            ...editingEvent,
+            default_venue_id:
+                Number.isFinite(dv) && dv > 0 ? dv : null,
+        };
+        await updateRecord("events", payload, fetchEvents);
         editingEvent = null;
     }
     // --- Tag helpers ---
@@ -1402,218 +1963,188 @@
 {:else}
     <div class="admin-layout">
         <aside class="admin-sidebar">
-            <a href="/" target="_blank" class="admin-sidebar-btn" title="Vissza a Lámsza-ra">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-                    ></path><polyline points="9 22 9 12 15 12 15 22"
-                    ></polyline></svg
+            <div class="admin-sidebar-inner">
+            <a
+                href="/"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="admin-sidebar-btn admin-sidebar-btn--external"
+                title="Open homepage in new tab"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"
+                    ><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline
+                        points="15 3 21 3 21 9"
+                    ></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg
                 >
             </a>
+
+            <button
+                type="button"
+                class="admin-sidebar-btn {activeTab === 'welcome' ? 'active' : ''}"
+                on:click={() => goToAdminTab('welcome')}
+                title="Dashboard home"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"
+                    ><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline
+                        points="9 22 9 12 15 12 15 22"
+                    ></polyline></svg
+                >
+            </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'mondasok'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "mondasok")}
+                on:click={() => goToAdminTab("mondasok")}
                 title="Mondások"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path
-                        d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"
-                    ></path></svg
-                >
+                <AdminNavIcon name="mondasok" />
             </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'quicklinks'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "quicklinks")}
+                on:click={() => goToAdminTab("quicklinks")}
                 title="Gyorslinkek"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path
-                        d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
-                    ></path><path
-                        d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
-                    ></path></svg
-                >
+                <AdminNavIcon name="quicklinks" />
             </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'newsfeeds'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "newsfeeds")}
+                on:click={() => goToAdminTab("newsfeeds")}
                 title="Hírfolyamok"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path d="M4 11a9 9 0 0 1 9 9"></path><path
-                        d="M4 4a16 16 0 0 1 16 16"
-                    ></path><circle cx="5" cy="19" r="1"></circle></svg
-                >
+                <AdminNavIcon name="newsfeeds" />
             </button>
+
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
                 class="admin-sidebar-btn {activeTab === 'counties'
                     ? 'active'
                     : ''}"
-                on:click={() => {
-                    activeTab = "counties";
-                    fetchCountyRegions();
-                }}
+                on:click={() => goToAdminTab("counties")}
                 title="Megyék"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path d="M3 21V3h18v18H3zm2-2h14V5H5v14zm2-2h10v-2H7v2zm0-4h10v-2H7v2z"
-                    ></path></svg
-                >
+                <AdminNavIcon name="counties" />
             </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'locations'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "locations")}
+                on:click={() => goToAdminTab("locations")}
                 title="Települések"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"
-                    ></path><circle cx="12" cy="10" r="3"></circle></svg
-                >
+                <AdminNavIcon name="locations" />
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'venues' ? 'active' : ''}"
+                on:click={() => goToAdminTab("venues")}
+                title="Helyszínek"
+            >
+                <AdminNavIcon name="venues" />
             </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'attractions'
                     ? 'active'
                     : ''}"
-                on:click={() => { activeTab = "attractions"; fetchAttractions(); }}
+                on:click={() => goToAdminTab("attractions")}
                 title="Látnivalók"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <AdminNavIcon name="attractions" />
             </button>
+
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
                 class="admin-sidebar-btn {activeTab === 'events'
                     ? 'active'
                     : ''}"
-                on:click={() => {
-                    activeTab = "events";
-                    fetchEvents();
-                }}
+                on:click={() => goToAdminTab("events")}
                 title="Események"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><rect x="3" y="4" width="18" height="18" rx="2" ry="2"
-                    ></rect><line x1="16" y1="2" x2="16" y2="6"></line><line
-                        x1="8"
-                        y1="2"
-                        x2="8"
-                        y2="6"
-                    ></line><line x1="3" y1="10" x2="21" y2="10"></line></svg
-                >
+                <AdminNavIcon name="events" />
             </button>
+
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
                 class="admin-sidebar-btn {activeTab === 'entry_categories'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "entry_categories")}
+                on:click={() => goToAdminTab("entry_categories")}
                 title="Bejegyzés Kategóriák"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <line x1="8" y1="6" x2="21" y2="6"></line>
-                    <line x1="8" y1="12" x2="21" y2="12"></line>
-                    <line x1="8" y1="18" x2="21" y2="18"></line>
-                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                </svg>
+                <AdminNavIcon name="entry_categories" />
             </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'entry_types'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "entry_types")}
+                on:click={() => goToAdminTab("entry_types")}
                 title="Bejegyzés típusok"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                >
-                    <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                    <polyline points="2 17 12 22 22 17"></polyline>
-                    <polyline points="2 12 12 17 22 12"></polyline>
-                </svg>
+                <AdminNavIcon name="entry_types" />
             </button>
             <button
                 class="admin-sidebar-btn {activeTab === 'entries'
                     ? 'active'
                     : ''}"
-                on:click={() => (activeTab = "entries")}
+                on:click={() => goToAdminTab("entries")}
                 title="Index"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                    ><rect x="3" y="3" width="7" height="7"></rect><rect
-                        x="14"
-                        y="3"
-                        width="7"
-                        height="7"
-                    ></rect><rect x="14" y="14" width="7" height="7"
-                    ></rect><rect x="3" y="14" width="7" height="7"></rect></svg
-                >
+                <AdminNavIcon name="entries" />
             </button>
+
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'weather_translations' ? 'active' : ''}"
+                on:click={() => goToAdminTab('weather_translations')}
+                title="Időjárás fordítások"
+            >
+                <AdminNavIcon name="weather_translations" />
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'pages' ? 'active' : ''}"
+                on:click={() => goToAdminTab('pages')}
+                title="Oldalak"
+            >
+                <AdminNavIcon name="pages" />
+            </button>
+
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
                 class="admin-sidebar-btn {activeTab === 'settings'
                     ? 'active'
                     : ''}"
-                on:click={() => { activeTab = "settings"; fetchSettings(); }}
+                on:click={() => goToAdminTab("settings")}
                 title="Beállítások"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    ><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg
-                >
+                <AdminNavIcon name="settings" />
             </button>
-
-            <button
-                class="admin-sidebar-btn {activeTab === 'weather_translations' ? 'active' : ''}"
-                on:click={() => { activeTab = 'weather_translations'; fetchWeatherTranslations(); }}
-                title="Időjárás fordítások"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6"></path><path d="M4 14l6-6 2-3"></path><path d="M2 5h12"></path><path d="M7 2h3l2 2 2 4-3 1"></path><path d="M22 22l-5-10-5 10"></path><path d="M14 18h6"></path></svg>
-            </button>
-
-            <button
-                class="admin-sidebar-btn {activeTab === 'pages' ? 'active' : ''}"
-                on:click={() => { activeTab = 'pages'; fetchPages(); }}
-                title="Oldalak"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            </button>
+            </div>
         </aside>
 
         <main class="admin-main">
             <div class="admin-header">
                 <h2>
+                    {#if activeTab === "welcome"}Dashboard{/if}
                     {#if activeTab === "mondasok"}Mondások Kezelése{/if}
                     {#if activeTab === "quicklinks"}Gyorslinkek Kezelése{/if}
                     {#if activeTab === "newsfeeds"}Hírfolyamok Kezelése{/if}
                     {#if activeTab === "locations"}Települések Kezelése{/if}
+                    {#if activeTab === "venues"}Helyszínek Kezelése{/if}
                     {#if activeTab === "entry_categories"}Bejegyzés Kategóriák
                         Kezelése{/if}
                     {#if activeTab === "entries"}Bejegyzések Kezelése{/if}
@@ -1630,55 +2161,95 @@
                 >
             </div>
 
-            {#if eventsWithIncompleteDateTime.length > 0}
-                <div class="admin-alert admin-alert--warning" role="alert">
-                    <strong>Hiányos esemény-időpontok.</strong>
-                    {eventsWithIncompleteDateTime.length} eseménynél nincs meg minden
-                    kötelező mező (kezdő/befejező dátum és időpont). Kérjük, szerkessze
-                    az Események lapon a listában szereplő tételeket, és töltse ki a dátumokat
-                    és az óra:perc időpontokat.
-                    <button
-                        type="button"
-                        class="btn-update admin-alert__btn"
-                        on:click={() => {
-                            activeTab = "events";
-                            fetchEvents();
-                        }}>Ugrás az Eseményekhez</button
-                    >
-                </div>
-            {/if}
-
             <div class="admin-container w-full">
+                {#if activeTab === "welcome"}
+                    <div class="admin-welcome" role="navigation" aria-label="Admin sections">
+                        <div class="admin-welcome-grid">
+                            {#each ADMIN_WELCOME_ITEMS as item}
+                                <button
+                                    type="button"
+                                    class="admin-welcome-card"
+                                    on:click={() => goToAdminTab(item.id)}
+                                    aria-label={item.label}
+                                >
+                                    <AdminNavIcon name={item.id} size={56} />
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                {/if}
+
                 <!-- Mondások Tab -->
                 {#if activeTab === "mondasok"}
-                    <h3>Új mondás hozzáadása</h3>
-                    <form class="admin-form" on:submit={submitMondas}>
-                        <label for="mondas_text">Mondás szövege</label>
-                        <textarea
-                            id="mondas_text"
-                            bind:value={newMondas.text}
-                            required
-                            rows="3"
-                        ></textarea>
-                        <button type="submit" class="admin-submit-btn"
-                            >Hozzáadás</button
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            A kezdőlapon az adott <strong>naptári napra</strong> beütemezett mondások jelennek meg
+                            (a látogató böngészőjének helyi dátuma, ugyanaz mint a „Dátum és idő” widget a főoldalon).
+                            Ugyanarra a napra több mondás is
+                            beállítható. Ha nincs egyetlen idézet sem az aktuális napra, a főoldalon nem
+                            jelenik meg mondás-blokk.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            >Új mondás hozzáadása</summary
                         >
-                    </form>
+                        <form class="admin-form admin-create-form" on:submit={submitMondas}>
+                            <label for="mondas_text">Mondás szövege</label>
+                            <textarea
+                                id="mondas_text"
+                                name="mondas_text"
+                                bind:value={newMondas.text}
+                                required
+                                rows="3"
+                            ></textarea>
+                            <label for="mondas_day">Megjelenés napja</label>
+                            <input
+                                id="mondas_day"
+                                name="display_date"
+                                type="date"
+                                bind:value={newMondas.display_date}
+                                required
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Hozzáadás</button
+                            >
+                        </form>
+                    </details>
 
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_mondasok"
+                                name="search_mondasok"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchMondasok}
+                                placeholder="Szöveg vagy ID…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
+                                    <th>Megjelenés napja</th>
                                     <th>Szöveg</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each mondasok as m}
+                                {#each filterRows(mondasok, searchMondasok, (m) => [m.id, m.text, m.display_date]) as m}
                                     <tr>
                                         <td>{m.id}</td>
+                                        <td>{m.display_date ?? "—"}</td>
                                         <td>{m.text}</td>
                                         <td>
                                             <button
@@ -1702,7 +2273,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="4">Nincsenek idézetek.</td
+                                        ><td colspan="5">Nincsenek idézetek.</td
                                         ></tr
                                     >
                                 {/each}
@@ -1713,49 +2284,80 @@
 
                 <!-- Quick Links Tab -->
                 {#if activeTab === "quicklinks"}
-                    <h3>Új gyorslink hozzáadása</h3>
-                    <form class="admin-form" on:submit={submitLink}>
-                        <label for="link_title">Cím</label>
-                        <input
-                            id="link_title"
-                            type="text"
-                            bind:value={newLink.title}
-                            required
-                        />
-
-                        <label for="link_url">URL</label>
-                        <input
-                            id="link_url"
-                            type="url"
-                            bind:value={newLink.url}
-                            required
-                        />
-
-                        <label for="link_color">Háttérszín (pl. #e6f0ff)</label>
-                        <input
-                            id="link_color"
-                            type="text"
-                            bind:value={newLink.bg_color}
-                            placeholder="#e6f0ff"
-                        />
-
-                        <button type="submit" class="admin-submit-btn"
-                            >Hozzáadás</button
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Gyorslinkek a kezdőlaphoz: cím, URL és opcionális háttérszín. A kártyák a főoldalon
+                            jelennek meg.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            >Új gyorslink hozzáadása</summary
                         >
-                    </form>
+                        <form class="admin-form admin-create-form" on:submit={submitLink}>
+                            <label for="link_title">Cím</label>
+                            <input
+                                id="link_title"
+                                name="title"
+                                type="text"
+                                bind:value={newLink.title}
+                                required
+                            />
 
+                            <label for="link_url">URL</label>
+                            <input
+                                id="link_url"
+                                name="url"
+                                type="url"
+                                bind:value={newLink.url}
+                                required
+                            />
+
+                            <label for="link_color">Háttérszín (pl. #e6f0ff)</label>
+                            <input
+                                id="link_color"
+                                name="bg_color"
+                                type="text"
+                                bind:value={newLink.bg_color}
+                                placeholder="#e6f0ff"
+                            />
+
+                            <button type="submit" class="admin-submit-btn"
+                                >Hozzáadás</button
+                            >
+                        </form>
+                    </details>
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_quick_links"
+                                name="search_quick_links"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchQuickLinks}
+                                placeholder="Cím, URL…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>Szín</th>
                                     <th>Cím</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th>URL</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each quickLinks as q}
+                                {#each filterRows(quickLinks, searchQuickLinks, (q) => [q.title, q.url, q.bg_color]) as q}
                                     <tr>
                                         <td>
                                             <span
@@ -1763,13 +2365,9 @@
                                                 style:background={q.bg_color}
                                             ></span>
                                         </td>
-                                        <td>
-                                            <a
-                                                href={q.url}
-                                                target="_blank"
-                                                rel="nofollow noopener"
-                                                >{q.title}</a
-                                            >
+                                        <td>{q.title}</td>
+                                        <td class="admin-table-cell-preview" title={q.url || ""}>
+                                            <a href={q.url} target="_blank" rel="nofollow noopener">{urlPreview(q.url)}</a>
                                         </td>
                                         <td>
                                             <button
@@ -1793,7 +2391,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="4"
+                                        ><td colspan="5"
                                             >Nincsenek gyorslinkek.</td
                                         ></tr
                                     >
@@ -1805,37 +2403,67 @@
 
                 <!-- News Feeds Tab -->
                 {#if activeTab === "newsfeeds"}
-                    <h3>Új RSS hírfolyam hozzáadása</h3>
-                    <form class="admin-form" on:submit={submitNews}>
-                        <label for="news_title">Hírportál neve</label>
-                        <input
-                            id="news_title"
-                            type="text"
-                            bind:value={newNews.title}
-                            required
-                        />
-
-                        <label for="news_url">RSS URL</label>
-                        <input
-                            id="news_url"
-                            type="url"
-                            bind:value={newNews.feed_url}
-                            required
-                        />
-
-                        <label for="news_color">Háttérszín (pl. #ffebd6)</label>
-                        <input
-                            id="news_color"
-                            type="text"
-                            bind:value={newNews.bg_color}
-                            placeholder="#ffebd6"
-                        />
-
-                        <button type="submit" class="admin-submit-btn"
-                            >Hozzáadás</button
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            RSS / Atom hírfolyamok: a <strong>Hírek</strong> oldal ezekből gyűjti a cikkeket.
+                            Utolsó frissítés időpontja és egyedi szín is beállítható.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            >Új RSS hírfolyam hozzáadása</summary
                         >
-                    </form>
+                        <form class="admin-form admin-create-form" on:submit={submitNews}>
+                            <label for="news_title">Hírportál neve</label>
+                            <input
+                                id="news_title"
+                                name="title"
+                                type="text"
+                                bind:value={newNews.title}
+                                required
+                            />
 
+                            <label for="news_url">RSS URL</label>
+                            <input
+                                id="news_url"
+                                name="feed_url"
+                                type="url"
+                                bind:value={newNews.feed_url}
+                                required
+                            />
+
+                            <label for="news_color">Háttérszín (pl. #ffebd6)</label>
+                            <input
+                                id="news_color"
+                                name="bg_color"
+                                type="text"
+                                bind:value={newNews.bg_color}
+                                placeholder="#ffebd6"
+                            />
+
+                            <button type="submit" class="admin-submit-btn"
+                                >Hozzáadás</button
+                            >
+                        </form>
+                    </details>
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_news_feeds"
+                                name="search_news_feeds"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchNewsFeeds}
+                                placeholder="Név, URL…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -1844,12 +2472,12 @@
                                     <th>Forrás</th>
                                     <th>Utolsó frissítés</th>
                                     <th>Szín</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each newsFeeds as nf}
+                                {#each filterRows(newsFeeds, searchNewsFeeds, (nf) => [nf.title, nf.feed_url, String(nf.id)]) as nf}
                                     <tr>
                                         <td>{nf.title}</td>
                                         <td>{nf.feed_url}</td>
@@ -1916,8 +2544,19 @@
 
                 <!-- Locations Tab -->
                 {#if activeTab === "locations"}
-                    <h3>Új Település</h3>
-                    <form class="admin-form" on:submit={submitLocation}>
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Települések (falu, város, község, municípium): név, megye, típus, irányítószám,
+                            koordináták és kapcsolódó adatok. Az egész oldal ezekre az azonosítókra épül.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary">Új település</summary>
+                        <form class="admin-form admin-create-form" on:submit={submitLocation}>
                         <label for="loc_name">Település neve (HU)</label>
                         <input
                             id="loc_name"
@@ -2011,7 +2650,21 @@
                             >Hozzáadás</button
                         >
                     </form>
+                    </details>
 
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_locations"
+                                name="search_locations"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchLocations}
+                                placeholder="Név, megye, típus, ir.sz…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -2028,12 +2681,24 @@
                                     <th>Terület (km²)</th>
                                     <th>Címer</th>
                                     <th>Szülő település</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each locations as l}
+                                {#each filterRows(locations, searchLocations, (l) => [
+                                        l.id,
+                                        l.name,
+                                        l.name_ro,
+                                        l.name_de,
+                                        l.county,
+                                        l.type,
+                                        l.post_code,
+                                        l.coordinates,
+                                        l.population,
+                                        l.area,
+                                        getLocationName(l.parent_id),
+                                    ]) as l}
                                     <tr>
                                         <td>{l.id}</td>
                                         <td>{l.name}</td>
@@ -2049,7 +2714,7 @@
                                         <td>{l.coordinates || "-"}</td>
                                         <td>{l.population || "-"}</td>
                                         <td>{l.area || "-"}</td>
-                                        <td>{l.crest ? "Van" : "-"}</td>
+                                        <td class="admin-table-cell-preview" title={l.crest || ""}>{l.crest ? urlPreview(l.crest) : "—"}</td>
                                         <td>
                                             {#if l.parent_id}
                                                 {getLocationName(l.parent_id)}
@@ -2089,14 +2754,396 @@
                     </div>
                 {/if}
 
+                <!-- Venues Tab -->
+                {#if activeTab === "venues"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Rendezvényhelyszínek (csarnokok, terek, pályák) településhez kötve. Felül a
+                            <strong>helyszíntípusok</strong> (a slug a megnevezésből képződik, megjelenített név, sorrend) — ezek
+                            szerepelnek a listákban és a nyilvános helyszín-oldalakon. Alatta a konkrét
+                            helyszínek; az <strong>Események</strong> napi programjában itt választhatók.
+                        </p>
+                    {/if}
+
+                    <h3 class="admin-subsection-title">Helyszín típusok</h3>
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            >Új helyszíntípus</summary
+                        >
+                        <form
+                            class="admin-form admin-create-form"
+                            on:submit|preventDefault={submitNewVenueType}
+                        >
+                            <label for="vt-label">Megnevezés (HU) *</label>
+                            <input
+                                id="vt-label"
+                                type="text"
+                                bind:value={newVenueType.label_hu}
+                                required
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Típus hozzáadása</button
+                            >
+                        </form>
+                    </details>
+
+                    {#if editingVenueType}
+                        <form
+                            class="admin-form admin-venues-type-edit"
+                            on:submit|preventDefault={saveEditVenueType}
+                        >
+                            <p class="admin-form-hint">
+                                Slug (automatikusan a megnevezésből; mentéskor frissül, és a hozzá tartozó
+                                helyszínek <code>kind</code> mezője is ehhez igazodik):
+                                <code>{editingVenueType.slug}</code>
+                            </p>
+                            <label for="vt-edit-label">Megnevezés (HU)</label>
+                            <input
+                                id="vt-edit-label"
+                                type="text"
+                                bind:value={editingVenueType.label_hu}
+                                required
+                            />
+                            <div class="flex gap-md">
+                                <button type="submit" class="admin-submit-btn"
+                                    >Mentés</button
+                                >
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    on:click={cancelEditVenueType}>Mégse</button
+                                >
+                            </div>
+                        </form>
+                    {/if}
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (típusok)
+                            <input
+                                id="search_venue_types"
+                                name="search_venue_types"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchVenueTypes}
+                                placeholder="Slug, megnevezés…"
+                            /></label
+                        >
+                    </div>
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table admin-table--compact">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Slug</th>
+                                    <th>Megnevezés (HU)</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each filterRows(venueTypesList, searchVenueTypes, (t) => [t.id, t.slug, t.label_hu]) as t}
+                                    <tr>
+                                        <td>{t.id}</td>
+                                        <td><code>{t.slug}</code></td>
+                                        <td>{t.label_hu}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditVenueType(t)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteVenueTypeRow(t.id)}
+                                                >Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="5"
+                                            >Nincs típus (futtasd a migrációt).</td
+                                        ></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="admin-subsection-title" style="margin-top:2rem"
+                        >Helyszínek</h3
+                    >
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            >Új helyszín hozzáadása</summary
+                        >
+                    <form
+                        class="admin-form admin-venues-form admin-create-form"
+                        on:submit|preventDefault={submitNewVenue}
+                    >
+                        <div class="flex gap-lg flex-wrap">
+                            <label class="flex-1" style="min-width:12rem"
+                                >Település (város / falu)
+                                <select
+                                    bind:value={newVenue.settlement_id}
+                                    required
+                                >
+                                    <option value="">Válassz...</option>
+                                    {#each settlementsForSelect as loc}
+                                        <option value={loc.id}
+                                            >{loc.name} ({loc.county})</option
+                                        >
+                                    {/each}
+                                </select>
+                            </label>
+                            <label class="flex-1" style="min-width:12rem"
+                                >Név (HU) *
+                                <input
+                                    type="text"
+                                    bind:value={newVenue.name}
+                                    required
+                                    placeholder="pl. Deme László Műjégpálya"
+                                />
+                            </label>
+                        </div>
+                        <div class="flex gap-lg flex-wrap">
+                            <label
+                                class="flex-1"
+                                style="min-width:10rem"
+                                for="new-venue-name-ro"
+                                >Név (RO)
+                                <input
+                                    id="new-venue-name-ro"
+                                    type="text"
+                                    bind:value={newVenue.name_ro}
+                                    placeholder="opcionális"
+                                />
+                            </label>
+                            <label
+                                class="flex-1"
+                                style="min-width:10rem"
+                                for="new-venue-name-de"
+                                >Név (DE)
+                                <input
+                                    id="new-venue-name-de"
+                                    type="text"
+                                    bind:value={newVenue.name_de}
+                                    placeholder="opcionális"
+                                />
+                            </label>
+                        </div>
+                        <div class="flex gap-lg flex-wrap">
+                            <label class="flex-1" style="min-width:8rem"
+                                >Slug (opcionális)
+                                <input
+                                    type="text"
+                                    bind:value={newVenue.slug}
+                                    placeholder="auto, ha üres"
+                                />
+                            </label>
+                            <label class="flex-1" style="min-width:10rem"
+                                >Típus
+                                <select bind:value={newVenue.kind}>
+                                    {#each venueTypesList as vt}
+                                        <option value={vt.slug}
+                                            >{vt.label_hu}</option
+                                        >
+                                    {/each}
+                                </select>
+                            </label>
+                        </div>
+                        <label for="new-venue-address">Cím</label>
+                        <input
+                            id="new-venue-address"
+                            type="text"
+                            bind:value={newVenue.address}
+                            placeholder="Utca, házszám"
+                        />
+                        <div class="flex gap-lg flex-wrap">
+                            <label class="flex-1" style="min-width:8rem"
+                                >Szélesség (lat)
+                                <input
+                                    type="text"
+                                    bind:value={newVenue.latitude}
+                                    placeholder="pl. 46.1234"
+                                />
+                            </label>
+                            <label class="flex-1" style="min-width:8rem"
+                                >Hosszúság (lon)
+                                <input
+                                    type="text"
+                                    bind:value={newVenue.longitude}
+                                    placeholder="pl. 25.5678"
+                                />
+                            </label>
+                            <label class="flex-1" style="min-width:8rem"
+                                >Férőhely
+                                <input
+                                    type="text"
+                                    bind:value={newVenue.seating_capacity}
+                                    placeholder="ülőhely / kapacitás"
+                                />
+                            </label>
+                        </div>
+                        <label for="new-venue-description">Leírás</label>
+                        <textarea
+                            id="new-venue-description"
+                            bind:value={newVenue.description}
+                            rows="3"
+                        ></textarea>
+                        <label for="new-venue-notes">Belső megjegyzés</label>
+                        <textarea
+                            id="new-venue-notes"
+                            bind:value={newVenue.notes}
+                            rows="2"
+                        ></textarea>
+                        <button type="submit" class="admin-submit-btn"
+                            >Helyszín hozzáadása</button
+                        >
+                    </form>
+                    </details>
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (helyszínek)
+                            <input
+                                id="search_venues"
+                                name="search_venues"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchVenues}
+                                placeholder="Név, település, típus…"
+                            /></label
+                        >
+                    </div>
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table admin-table--compact">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Település</th>
+                                    <th>Név (HU)</th>
+                                    <th>Név (RO)</th>
+                                    <th>Név (DE)</th>
+                                    <th>Slug</th>
+                                    <th>Típus</th>
+                                    <th>Cím</th>
+                                    <th>Koordináták</th>
+                                    <th>Férőhely</th>
+                                    <th>Leírás</th>
+                                    <th>Belső megjegyzés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each filterRows(venuesCatalog, searchVenues, (v) => [
+                                        v.id,
+                                        v.name,
+                                        v.name_ro,
+                                        v.name_de,
+                                        v.settlement_name,
+                                        v.county_name,
+                                        v.kind,
+                                        v.kind_label,
+                                        v.slug,
+                                        v.address,
+                                        v.description,
+                                        v.notes,
+                                    ]) as v}
+                                    <tr>
+                                        <td>{v.id}</td>
+                                        <td
+                                            >{v.settlement_name}, {v.county_name}</td
+                                        >
+                                        <td>{v.name}</td>
+                                        <td>{v.name_ro || "—"}</td>
+                                        <td>{v.name_de || "—"}</td>
+                                        <td><code>{v.slug || "—"}</code></td>
+                                        <td
+                                            >{v.kind_label || v.kind}</td
+                                        >
+                                        <td class="admin-table-cell-preview" title={v.address || ""}>{contentPreview(v.address)}</td>
+                                        <td
+                                            >{#if v.latitude != null && v.longitude != null}{Number(
+                                                    v.latitude,
+                                                ).toFixed(4)}, {Number(
+                                                    v.longitude,
+                                                ).toFixed(4)}{:else}—{/if}</td
+                                        >
+                                        <td>{v.seating_capacity ?? "—"}</td>
+                                        <td class="admin-table-cell-preview" title={v.description || ""}>{contentPreview(v.description)}</td>
+                                        <td class="admin-table-cell-preview" title={v.notes || ""}>{contentPreview(v.notes)}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditVenue(v)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteVenueRow(v.id)}
+                                                >Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="14"
+                                            >Nincs még helyszín.</td
+                                        ></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+
                 <!-- Events Tab -->
                 {#if activeTab === "events"}
-                    <h3>Új Esemény</h3>
-                    <p class="admin-form-hint">
-                        A <strong>kezdő és befejező dátum</strong> és a hozzájuk tartozó
-                        <strong>időpontok (óra:perc)</strong> mind kötelezőek — a mentés nélkülük nem lehetséges.
-                    </p>
-                    <form class="admin-form" on:submit={submitEvent}>
+                    {#if eventsWithIncompleteDateTime.length > 0}
+                        <div class="admin-alert admin-alert--warning" role="alert">
+                            <strong>Hiányos esemény-időpontok.</strong>
+                            {eventsWithIncompleteDateTime.length} eseménynél nincs meg minden kötelező mező
+                            (kezdő/befejező dátum és óra:perc). Szerkeszd a listában a ⚠ jelű sorokat, és töltsd
+                            ki a mezőket.
+                        </div>
+                    {:else if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Közösségi és sportesemények: település, opcionális kiválasztott helyszín, típus,
+                            szervező, leírás. A kezdő és befejező <strong>dátum és időpont (óra:perc)</strong> mind
+                            kötelező — a mentés és a nyilvános időjelzések ettől függnek. Opcionálisan
+                            <strong>napi program</strong> (több nap, helyszínenkénti tételek) adható meg a szerkesztőben.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary">Új esemény</summary>
+                        <p class="admin-form-hint">
+                            A <strong>kezdő és befejező dátum</strong> és a hozzájuk tartozó
+                            <strong>időpontok (óra:perc)</strong> mind kötelezőek — a mentés nélkülük nem lehetséges.
+                        </p>
+                    <form class="admin-form admin-create-form" on:submit={submitEvent}>
                         <label for="event_loc"
                             >Település / Helyszín <span class="admin-req" title="Kötelező"
                                 >*</span
@@ -2106,12 +3153,27 @@
                             id="event_loc"
                             bind:value={newEvent.location_id}
                             required
+                            on:change={loadVenuesForNewEvent}
                         >
                             <option value="">Válassz...</option>
                             {#each settlementsForSelect as loc}
                                 <option value={loc.id}
                                     >{loc.name} ({loc.county})</option
                                 >
+                            {/each}
+                        </select>
+
+                        <label for="event_default_venue"
+                            >Konkrét helyszín (opcionális)</label
+                        >
+                        <select
+                            id="event_default_venue"
+                            name="default_venue_id"
+                            bind:value={newEvent.default_venue_id}
+                        >
+                            <option value="">— nincs megadva —</option>
+                            {#each venueOptionsNew as v}
+                                <option value={String(v.id)}>{v.name}</option>
                             {/each}
                         </select>
 
@@ -2249,7 +3311,21 @@
                             >Hozzáadás</button
                         >
                     </form>
+                    </details>
 
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_events"
+                                name="search_events"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchEvents}
+                                placeholder="Cím, szervező, helyszín…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -2258,14 +3334,25 @@
                                     <th>Kezdés</th>
                                     <th>Befejezés</th>
                                     <th>Típus</th>
-                                    <th>Helyszín</th>
+                                    <th>Település</th>
+                                    <th>Alapért. helyszín</th>
                                     <th>Szervező</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th>Leírás</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each events as e}
+                                {#each filterRows(events, searchEvents, (e) => [
+                                        e.title,
+                                        e.description,
+                                        e.organizer,
+                                        getLocationName(e.location_id),
+                                        e.default_venue_name,
+                                        e.event_type,
+                                        e.start_date,
+                                        e.end_date,
+                                    ]) as e}
                                     <tr
                                         class:admin-row-warn={!eventDateTimeComplete(
                                             e,
@@ -2301,7 +3388,9 @@
                                         </td>
                                         <td>{({cultural: "Kulturális", sports: "Sport", festival: "Fesztivál", religious: "Vallási", other: "Egyéb"})[e.event_type] || e.event_type}</td>
                                         <td>{getLocationName(e.location_id)}</td>
-                                        <td>{e.organizer || "-"}</td>
+                                        <td class="admin-table-cell-preview" title={e.default_venue_name || ""}>{contentPreview(e.default_venue_name || "")}</td>
+                                        <td>{e.organizer || "—"}</td>
+                                        <td class="admin-table-cell-preview" title={e.description || ""}>{contentPreview(e.description)}</td>
                                         <td>
                                             <button
                                                 class="btn-update"
@@ -2324,7 +3413,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="8"
+                                        ><td colspan="10"
                                             >Nincsenek események.</td
                                         ></tr
                                     >
@@ -2336,33 +3425,59 @@
 
                 <!-- Entry Categories Tab -->
                 {#if activeTab === "entry_categories"}
-                    <h3>Új Kategória</h3>
-                    <form class="admin-form" on:submit={submitEntryCategory}>
-                        <label for="cat_name">Kategória neve</label>
-                        <input
-                            id="cat_name"
-                            type="text"
-                            bind:value={newEntryCategory.name}
-                            required
-                        />
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Bejegyzés-kategóriák (pl. szolgáltatás típusok): a településoldali és index
+                            bejegyzések csoportosításához.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary">Új kategória</summary>
+                        <form class="admin-form admin-create-form" on:submit={submitEntryCategory}>
+                            <label for="cat_name">Kategória neve</label>
+                            <input
+                                id="cat_name"
+                                name="name"
+                                type="text"
+                                bind:value={newEntryCategory.name}
+                                required
+                            />
 
-                        <button type="submit" class="admin-submit-btn"
-                            >Hozzáadás</button
+                            <button type="submit" class="admin-submit-btn"
+                                >Hozzáadás</button
+                            >
+                        </form>
+                    </details>
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_entry_categories"
+                                name="search_entry_categories"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchEntryCategories}
+                                placeholder="Név, ID…"
+                            /></label
                         >
-                    </form>
-
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Név</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each entryCategories as cat}
+                                {#each filterRows(entryCategories, searchEntryCategories, (cat) => [cat.id, cat.name]) as cat}
                                     <tr>
                                         <td>{cat.id}</td>
                                         <td>{cat.name}</td>
@@ -2400,8 +3515,20 @@
 
                 <!-- Entries Tab -->
                 {#if activeTab === "entries"}
-                    <h3>Új bejegyzés</h3>
-                    <form class="admin-form" on:submit={submitEntry}>
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Településhez kötött bejegyzések (üzletek, szervezetek, szolgáltatások): típus,
+                            kategória, elérhetőség, nyelvek és címkék. Ezek a város/falu oldalakon és indexeken
+                            jelennek meg.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary">Új bejegyzés</summary>
+                    <form class="admin-form admin-create-form" on:submit={submitEntry}>
                         <label for="serv_type">Típus</label>
                         <select id="serv_type" bind:value={newEntry.type}>
                             {#each entryTypes as t}<option value={t.name}
@@ -2506,7 +3633,21 @@
                             >Hozzáadás</button
                         >
                     </form>
+                    </details>
 
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_entries"
+                                name="search_entries"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchEntries}
+                                placeholder="Név, URL, címke…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -2516,14 +3657,28 @@
                                     <th>URL</th>
                                     <th>Település</th>
                                     <th>Kategória</th>
+                                    <th>Telefon</th>
+                                    <th>Cím</th>
+                                    <th>Megjegyzés</th>
                                     <th>Nyelvek</th>
                                     <th>Címkék</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each entries as s}
+                                {#each filterRows(entries, searchEntries, (s) => [
+                                        s.name,
+                                        s.type,
+                                        s.url,
+                                        s.phone,
+                                        s.address,
+                                        s.notes,
+                                        getLocationName(s.location_id),
+                                        getCategoryName(s.category_id),
+                                        (s.languages || []).join(","),
+                                        (s.tags || []).join(","),
+                                    ]) as s}
                                     <tr>
                                         <td>{s.name}</td>
                                         <td
@@ -2531,11 +3686,14 @@
                                                 >{s.type || "entry"}</span
                                             ></td
                                         >
-                                        <td>{s.url ? s.url : "-"}</td>
+                                        <td class="admin-table-cell-preview" title={s.url || ""}>{s.url ? urlPreview(s.url) : "—"}</td>
                                         <td>{getLocationName(s.location_id)}</td
                                         >
                                         <td>{getCategoryName(s.category_id)}</td
                                         >
+                                        <td>{s.phone || "—"}</td>
+                                        <td class="admin-table-cell-preview" title={s.address || ""}>{contentPreview(s.address)}</td>
+                                        <td class="admin-table-cell-preview" title={s.notes || ""}>{contentPreview(s.notes)}</td>
                                         <td>{(s.languages || []).join(", ")}</td
                                         >
                                         <td>
@@ -2545,7 +3703,7 @@
                                                         .map((t) => "#" + t)
                                                         .join(" ")}
                                                 </div>
-                                            {:else}-{/if}
+                                            {:else}—{/if}
                                         </td>
                                         <td>
                                             <button
@@ -2568,7 +3726,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="9"
+                                        ><td colspan="12"
                                             >Nincsenek bejegyzések.</td
                                         ></tr
                                     >
@@ -2580,12 +3738,23 @@
 
                 <!-- Beállítások (Settings) Tab -->
                 {#if activeTab === "settings"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Oldalszintű beállítások: alapértelmezett település (kezdőlap időjárás, eseményszűrés),
+                            időjárás-szolgáltatók engedélyezése, ikon stílus, cache TTL és látogató-becslés.
+                            A <strong>cache törlése</strong> új verziószámot ad — a látogatók frissebb időjárást kapnak.
+                        </p>
+                    {/if}
                     <section class="admin-form-section">
                         <h3>Alapértelmezett település (MyLocation)</h3>
                         <p class="admin-hint">A kezdőlap időjárás widgetje és az események szűrése ezt a települést használja alapértelmezettként.</p>
                         <div class="admin-form" style="max-width: 32rem;">
                             <label for="my_location_slug">Település</label>
-                            <select id="my_location_slug" bind:value={siteSettings.my_location_slug}>
+                            <select id="my_location_slug" name="my_location_slug" bind:value={siteSettings.my_location_slug}>
                                 {#each settlementsForSelect as loc}
                                     <option value={loc.slug}>{loc.name}{loc.county ? ` (${loc.county})` : ''}{loc.type ? ` – ${loc.type}` : ''}</option>
                                 {/each}
@@ -2602,7 +3771,7 @@
                         <h3>Időjárás (Weather)</h3>
                         <div class="admin-form" style="max-width: 32rem;">
                             <label for="weather_provider_default">Alapértelmezett szolgáltató</label>
-                            <select id="weather_provider_default" bind:value={siteSettings.weather_provider_default}>
+                            <select id="weather_provider_default" name="weather_provider_default" bind:value={siteSettings.weather_provider_default}>
                                 <option value="open_meteo">Open-Meteo</option>
                                 <option value="weatherapi_com">WeatherAPI.com</option>
                                 <option value="openweathermap">OpenWeatherMap</option>
@@ -2611,30 +3780,30 @@
                             <span class="form-group-label">Szolgáltatók engedélyezése</span>
                             <div class="flex gap-lg flex-wrap mb-lg">
                                 <label class="flex items-center gap-xs font-normal">
-                                    <input type="checkbox" checked={siteSettings.weather_provider_open_meteo_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_open_meteo_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
+                                    <input id="weather_provider_open_meteo_enabled" name="weather_provider_open_meteo_enabled" type="checkbox" checked={siteSettings.weather_provider_open_meteo_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_open_meteo_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
                                     Open-Meteo
                                 </label>
                                 <label class="flex items-center gap-xs font-normal">
-                                    <input type="checkbox" checked={siteSettings.weather_provider_weatherapi_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_weatherapi_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
+                                    <input id="weather_provider_weatherapi_enabled" name="weather_provider_weatherapi_enabled" type="checkbox" checked={siteSettings.weather_provider_weatherapi_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_weatherapi_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
                                     WeatherAPI.com
                                 </label>
                                 <label class="flex items-center gap-xs font-normal">
-                                    <input type="checkbox" checked={siteSettings.weather_provider_openweathermap_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_openweathermap_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
+                                    <input id="weather_provider_openweathermap_enabled" name="weather_provider_openweathermap_enabled" type="checkbox" checked={siteSettings.weather_provider_openweathermap_enabled === 'true'} on:change={(e) => siteSettings.weather_provider_openweathermap_enabled = e.target.checked ? 'true' : 'false'} class="w-auto" />
                                     OpenWeatherMap
                                 </label>
                             </div>
 
                             <label for="weather_icon_style">Időjárás ikon stílus</label>
-                            <select id="weather_icon_style" bind:value={siteSettings.weather_icon_style}>
+                            <select id="weather_icon_style" name="weather_icon_style" bind:value={siteSettings.weather_icon_style}>
                                 <option value="emoji">Emoji</option>
                                 <option value="svg">SVG (saját ikonok)</option>
                             </select>
 
                             <label for="weather_cache_ttl">Időjárás cache TTL (perc)</label>
-                            <input id="weather_cache_ttl" type="number" min="1" max="1440" bind:value={siteSettings.weather_cache_ttl_minutes} />
+                            <input id="weather_cache_ttl" name="weather_cache_ttl_minutes" type="number" min="1" max="1440" bind:value={siteSettings.weather_cache_ttl_minutes} />
 
                             <label for="weather_active_users">Aktív felhasználók becslése</label>
-                            <input id="weather_active_users" type="number" min="1" bind:value={siteSettings.weather_active_users_estimate} />
+                            <input id="weather_active_users" name="weather_active_users_estimate" type="number" min="1" bind:value={siteSettings.weather_active_users_estimate} />
 
                             <div class="flex gap-md mt-md flex-wrap">
                                 <button type="button" class="admin-submit-btn" on:click={saveSettings} disabled={settingsSaving}>
@@ -2650,54 +3819,81 @@
 
                 <!-- Időjárás fordítások (Weather translations) Tab -->
                 {#if activeTab === "weather_translations"}
-                    <p class="admin-hint">Ha nincs admin fordítás, a rendszer az alapértelmezett magyar szöveget jeleníti meg. Több nyelv támogatása (hu, ro, de) készen áll.</p>
-                    {#if editingWeatherTrans}
-                        <h3>Fordítás szerkesztése</h3>
-                        <form class="admin-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
-                            <label for="wet_src">Eredeti szöveg (pl. API angol)</label>
-                            <input id="wet_src" type="text" bind:value={editingWeatherTrans.source_text} required />
-                            <label for="wet_lang">Nyelv</label>
-                            <select id="wet_lang" bind:value={editingWeatherTrans.lang}>
-                                {#each WEATHER_TRANS_LANGS as opt}
-                                    <option value={opt.value}>{opt.label}</option>
-                                {/each}
-                            </select>
-                            <label for="wet_txt">Lefordított szöveg</label>
-                            <input id="wet_txt" type="text" bind:value={editingWeatherTrans.translated_text} required />
-                            <div class="flex gap-md mt-md">
-                                <button type="submit" class="admin-submit-btn">Mentés</button>
-                                <button type="button" class="btn-update" on:click={cancelEditWeatherTrans}>Mégse</button>
-                            </div>
-                        </form>
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
                     {:else}
-                        <h3>Új fordítás</h3>
-                        <form class="admin-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
+                        <p class="admin-info">
+                            Az időjárás API angol (vagy más) szövegeinek fordítása (hu, ro, de). Ha nincs egyedi sor,
+                            a rendszer az alapértelmezett magyar megnevezést használja. Új sor: eredeti szöveg =
+                            pontos egyezés a bejövő API szöveggel.
+                        </p>
+                    {/if}
+                    {#if editingWeatherTrans}
+                        <details class="admin-create-panel" open>
+                            <summary class="admin-create-summary">Fordítás szerkesztése</summary>
+                            <form class="admin-form admin-create-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
+                                <label for="wet_src">Eredeti szöveg (pl. API angol)</label>
+                                <input id="wet_src" name="source_text" type="text" bind:value={editingWeatherTrans.source_text} required />
+                                <label for="wet_lang">Nyelv</label>
+                                <select id="wet_lang" name="lang" bind:value={editingWeatherTrans.lang}>
+                                    {#each WEATHER_TRANS_LANGS as opt}
+                                        <option value={opt.value}>{opt.label}</option>
+                                    {/each}
+                                </select>
+                                <label for="wet_txt">Lefordított szöveg</label>
+                                <input id="wet_txt" name="translated_text" type="text" bind:value={editingWeatherTrans.translated_text} required />
+                                <div class="flex gap-md mt-md">
+                                    <button type="submit" class="admin-submit-btn">Mentés</button>
+                                    <button type="button" class="btn-update" on:click={cancelEditWeatherTrans}>Mégse</button>
+                                </div>
+                            </form>
+                        </details>
+                    {:else}
+                        <details class="admin-create-panel">
+                            <summary class="admin-create-summary">Új fordítás</summary>
+                        <form class="admin-form admin-create-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
                             <label for="wt_src">Eredeti szöveg (pl. overcast, partly cloudy)</label>
-                            <input id="wt_src" type="text" bind:value={newWeatherTrans.source_text} required placeholder="pl. overcast" />
+                            <input id="wt_src" name="source_text" type="text" bind:value={newWeatherTrans.source_text} required placeholder="pl. overcast" />
                             <label for="wt_lang">Nyelv</label>
-                            <select id="wt_lang" bind:value={newWeatherTrans.lang}>
+                            <select id="wt_lang" name="lang" bind:value={newWeatherTrans.lang}>
                                 {#each WEATHER_TRANS_LANGS as opt}
                                     <option value={opt.value}>{opt.label}</option>
                                 {/each}
                             </select>
                             <label for="wt_txt">Lefordított szöveg</label>
-                            <input id="wt_txt" type="text" bind:value={newWeatherTrans.translated_text} required placeholder="pl. borult" />
+                            <input id="wt_txt" name="translated_text" type="text" bind:value={newWeatherTrans.translated_text} required placeholder="pl. borult" />
                             <button type="submit" class="admin-submit-btn">Hozzáadás</button>
                         </form>
+                        </details>
                     {/if}
-                    <div class="admin-table-wrapper mt-lg">
+                    <div class="admin-table-toolbar mt-lg">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_weather_trans"
+                                name="search_weather_trans"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchWeatherTrans}
+                                placeholder="Szöveg, nyelv…"
+                            /></label
+                        >
+                    </div>
+                    <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>Eredeti</th>
                                     <th>Nyelv</th>
                                     <th>Fordítás</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each weatherTranslations as wt}
+                                {#each filterRows(weatherTranslations, searchWeatherTrans, (wt) => [wt.source_text, wt.lang, wt.translated_text]) as wt}
                                     <tr>
                                         <td>{wt.source_text}</td>
                                         <td>{wt.lang}</td>
@@ -2715,14 +3911,19 @@
 
                 <!-- Oldalak (Pages) Tab -->
                 {#if activeTab === "pages"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {/if}
                     {#if editingPage}
                         <h3>Oldal szerkesztése: {editingPage.title}</h3>
                         <form class="admin-form" on:submit|preventDefault={savePage} style="max-width: 48rem;">
                             <label for="page_title">Cím</label>
-                            <input id="page_title" type="text" bind:value={editingPage.title} required />
+                            <input id="page_title" name="title" type="text" bind:value={editingPage.title} required />
 
                             <label for="page_content">Tartalom (HTML)</label>
-                            <textarea id="page_content" bind:value={editingPage.content} rows="20" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+                            <textarea id="page_content" name="content" bind:value={editingPage.content} rows="20" style="font-family: monospace; font-size: 0.85rem;"></textarea>
 
                             <div class="flex gap-md mt-md">
                                 <button type="submit" class="admin-submit-btn" disabled={pageSaving}>
@@ -2741,10 +3942,10 @@
                         </p>
                         <form class="admin-form" on:submit|preventDefault={savePageFaq} style="max-width: 52rem;">
                             <label for="pfaq_label">Megjelenített név (admin)</label>
-                            <input id="pfaq_label" type="text" bind:value={editingPageFaq.label_hu} />
+                            <input id="pfaq_label" name="label_hu" type="text" bind:value={editingPageFaq.label_hu} />
 
                             <label for="pfaq_title">GYIK szekció címe (H2)</label>
-                            <input id="pfaq_title" type="text" bind:value={editingPageFaq.faq_title} placeholder="pl. Hogyan működik ez az oldal?" />
+                            <input id="pfaq_title" name="faq_title" type="text" bind:value={editingPageFaq.faq_title} placeholder="pl. Hogyan működik ez az oldal?" />
 
                             <div class="admin-faq-toolbar">
                                 <span class="admin-faq-toolbar-label">Kérdések és válaszok</span>
@@ -2760,6 +3961,7 @@
                                         <label for={"pfaq_q_" + i}>Kérdés (summary)</label>
                                         <input
                                             id={"pfaq_q_" + i}
+                                            name={"faq_question_" + i}
                                             type="text"
                                             bind:value={editingPageFaq.faq_items[i].question}
                                             placeholder="Rövid kérdés"
@@ -2767,6 +3969,7 @@
                                         <label for={"pfaq_a_" + i}>Válasz (Markdown)</label>
                                         <textarea
                                             id={"pfaq_a_" + i}
+                                            name={"faq_answer_" + i}
                                             bind:value={editingPageFaq.faq_items[i].answer}
                                             rows="5"
                                             style="font-family: monospace; font-size: 0.85rem;"
@@ -2794,7 +3997,27 @@
                             </div>
                         </form>
                     {:else}
+                        {#if !adminTabError}
+                            <p class="admin-info">
+                                Statikus HTML oldalak (pl. irányelvek), valamint oldalankénti <strong>GYIK és disclaimer</strong>
+                                szekciók. A GYIK a nyilvános oldalon a <code>PageFaqDisclaimer</code> komponensen keresztül
+                                jelenik meg (kérdés–válasz párok, disclaimer).
+                            </p>
+                        {/if}
                         <h3 class="admin-subtab-heading">Irányelvek és statikus oldalak</h3>
+                        <div class="admin-table-toolbar">
+                            <label class="admin-search-label"
+                                >Keresés (oldalak)
+                                <input
+                                    id="search_admin_pages"
+                                    name="search_admin_pages"
+                                    type="search"
+                                    class="admin-search-input"
+                                    bind:value={searchAdminPages}
+                                    placeholder="Slug, cím…"
+                                /></label
+                            >
+                        </div>
                         <div class="admin-table-wrapper">
                             <table class="admin-table">
                                 <thead>
@@ -2802,19 +4025,27 @@
                                         <th>Slug</th>
                                         <th>Cím</th>
                                         <th>Utolsó módosítás</th>
-                                        <th>Szerk.</th>
+                                        <th class="admin-table-col--action">Szerk.</th>
+                                        <th class="admin-table-col--action">Törlés</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {#each adminPages as pg}
+                                    {#each filterRows(adminPages, searchAdminPages, (pg) => [pg.slug, pg.title, pg.updated_at]) as pg}
                                         <tr>
                                             <td><a href="/{pg.slug}" target="_blank">/{pg.slug}</a></td>
                                             <td>{pg.title}</td>
                                             <td>{pg.updated_at ? pg.updated_at.slice(0, 19) : ''}</td>
-                                            <td><button type="button" class="btn-update" on:click={() => startEditPage(pg)}>Szerk.</button></td>
+                                            <td class="admin-table-col--action"><button type="button" class="btn-update" on:click={() => startEditPage(pg)}>Szerk.</button></td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
                                         </tr>
                                     {:else}
-                                        <tr><td colspan="4">Nincsenek oldalak.</td></tr>
+                                        <tr
+                                            ><td colspan="5"
+                                                >{adminPages?.length
+                                                    ? "Nincs találat a keresésre."
+                                                    : "Nincsenek oldalak."}</td
+                                            ></tr
+                                        >
                                     {/each}
                                 </tbody>
                             </table>
@@ -2826,6 +4057,19 @@
                             <code>.faq-title</code>, <code>.faq-list</code>, <code>.faq-item</code>, <code>#disclaimer</code>,
                             <code>.note.info</code>.
                         </p>
+                        <div class="admin-table-toolbar">
+                            <label class="admin-search-label"
+                                >Keresés (GYIK)
+                                <input
+                                    id="search_page_faq"
+                                    name="search_page_faq"
+                                    type="search"
+                                    class="admin-search-input"
+                                    bind:value={searchPageFaqRows}
+                                    placeholder="Kulcs, név, cím…"
+                                /></label
+                            >
+                        </div>
                         <div class="admin-table-wrapper">
                             <table class="admin-table">
                                 <thead>
@@ -2835,21 +4079,29 @@
                                         <th>GYIK cím</th>
                                         <th>Kérdések</th>
                                         <th>Utolsó módosítás</th>
-                                        <th>Szerk.</th>
+                                        <th class="admin-table-col--action">Szerk.</th>
+                                        <th class="admin-table-col--action">Törlés</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {#each pageFaqSections as row}
+                                    {#each filterRows(pageFaqSections, searchPageFaqRows, (row) => [row.section_key, row.label_hu, row.faq_title, String((row.faq_items || []).length), row.updated_at]) as row}
                                         <tr>
                                             <td><code>{row.section_key}</code></td>
                                             <td>{row.label_hu}</td>
-                                            <td class="admin-table-cell-preview" title={row.faq_title || ''}>{row.faq_title || "—"}</td>
+                                            <td class="admin-table-cell-preview" title={row.faq_title || ''}>{contentPreview(row.faq_title || "")}</td>
                                             <td>{(row.faq_items || []).length}</td>
                                             <td>{row.updated_at ? row.updated_at.slice(0, 19) : ''}</td>
-                                            <td><button type="button" class="btn-update" on:click={() => startEditPageFaq(row)}>Szerk.</button></td>
+                                            <td class="admin-table-col--action"><button type="button" class="btn-update" on:click={() => startEditPageFaq(row)}>Szerk.</button></td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
                                         </tr>
                                     {:else}
-                                        <tr><td colspan="6">Nincs GYIK rekord (futtasd a backend migrációt).</td></tr>
+                                        <tr
+                                            ><td colspan="7"
+                                                >{pageFaqSections?.length
+                                                    ? "Nincs találat a keresésre."
+                                                    : "Nincs GYIK rekord (futtasd a backend migrációt)."}</td
+                                            ></tr
+                                        >
                                     {/each}
                                 </tbody>
                             </table>
@@ -2859,33 +4111,59 @@
 
                 <!-- Entry Types Tab -->
                 {#if activeTab === "entry_types"}
-                    <h3>Új Típus</h3>
-                    <form class="admin-form" on:submit={submitEntryType}>
-                        <label for="etype_name">Típus neve</label>
-                        <input
-                            id="etype_name"
-                            type="text"
-                            bind:value={newEntryType.name}
-                            required
-                            placeholder="pl. entry, business..."
-                        />
-                        <button type="submit" class="admin-submit-btn"
-                            >Hozzáadás</button
-                        >
-                    </form>
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Bejegyzés <strong>típusok</strong> (pl. entry, business): belső címkék a bejegyzések
+                            szerkezetéhez és szűréséhez — nem ugyanaz, mint a kategória.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary">Új típus</summary>
+                        <form class="admin-form admin-create-form" on:submit={submitEntryType}>
+                            <label for="etype_name">Típus neve</label>
+                            <input
+                                id="etype_name"
+                                name="name"
+                                type="text"
+                                bind:value={newEntryType.name}
+                                required
+                                placeholder="pl. entry, business..."
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Hozzáadás</button
+                            >
+                        </form>
+                    </details>
 
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_entry_types"
+                                name="search_entry_types"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchEntryTypes}
+                                placeholder="Név, ID…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>ID</th>
                                     <th>Név</th>
-                                    <th>Szerk.</th>
-                                    <th>Törlés</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each entryTypes as et}
+                                {#each filterRows(entryTypes, searchEntryTypes, (et) => [et.id, et.name]) as et}
                                     <tr>
                                         <td>{et.id}</td>
                                         <td>{et.name}</td>
@@ -2922,12 +4200,22 @@
 
                 <!-- Attractions Tab -->
                 {#if activeTab === "attractions"}
-                    <p class="admin-info">Látnivalók (pl. Szent Anna-tó) kezelése. Megye, név, koordináták, tartalom.</p>
-                    <form class="admin-form mb-lg" on:submit|preventDefault={submitNewAttraction}>
-                        <h4>Új látnivaló</h4>
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Megyéhez kötött látnivalók (természet, kultúra): név, slug, rövid leírás, koordináták,
+                            kiemelt kép és bővebb tartalom (Markdown). A megye és település oldalakon jelennek meg.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary">Új látnivaló</summary>
+                    <form class="admin-form admin-create-form mb-lg" on:submit|preventDefault={submitNewAttraction}>
                         <div class="form-row">
                             <label for="att_county">Megye</label>
-                            <select id="att_county" bind:value={newAttraction.county_slug}>
+                            <select id="att_county" name="county_slug" bind:value={newAttraction.county_slug}>
                                 <option value="hargita">Hargita</option>
                                 <option value="kovaszna">Kovászna</option>
                                 <option value="maros">Maros</option>
@@ -2935,54 +4223,91 @@
                         </div>
                         <div class="form-row">
                             <label for="att_name">Név</label>
-                            <input id="att_name" type="text" bind:value={newAttraction.name} required placeholder="pl. Szent Anna-tó" />
+                            <input id="att_name" name="name" type="text" bind:value={newAttraction.name} required placeholder="pl. Szent Anna-tó" />
                         </div>
                         <div class="form-row">
                             <label for="att_desc">Rövid leírás</label>
-                            <input id="att_desc" type="text" bind:value={newAttraction.description} placeholder="Közép-Európa egyetlen vulkanikus tava..." />
+                            <input id="att_desc" name="description" type="text" bind:value={newAttraction.description} placeholder="Közép-Európa egyetlen vulkanikus tava..." />
                         </div>
                         <div class="form-row">
                             <label for="att_coords">Koordináták (lat, lon)</label>
-                            <input id="att_coords" type="text" bind:value={newAttraction.latitude} placeholder="46.1265" style="width:6rem" />
-                            <input type="text" bind:value={newAttraction.longitude} placeholder="25.8876" style="width:6rem" />
+                            <input id="att_coords" name="latitude" type="text" bind:value={newAttraction.latitude} placeholder="46.1265" style="width:6rem" />
+                            <input id="att_lon" name="longitude" type="text" bind:value={newAttraction.longitude} placeholder="25.8876" style="width:6rem" />
                         </div>
                         <div class="form-row">
                             <label for="att_featured">Kiemelt kép URL</label>
-                            <input id="att_featured" type="url" bind:value={newAttraction.featured_image} placeholder="https://..." />
+                            <input id="att_featured" name="featured_image" type="url" bind:value={newAttraction.featured_image} placeholder="https://..." />
                         </div>
                         <div class="form-row">
                             <label for="att_content">Tartalom (Markdown)</label>
-                            <textarea id="att_content" bind:value={newAttraction.content} rows="6" placeholder="## Cím&#10;Szöveg..."></textarea>
+                            <textarea id="att_content" name="content" bind:value={newAttraction.content} rows="6" placeholder="## Cím&#10;Szöveg..."></textarea>
                         </div>
                         <div class="form-row">
                             <label for="att_images">Galéria URL-ek (soronként egy)</label>
-                            <textarea id="att_images" bind:value={newAttraction.images} rows="3" placeholder="https://kep1.jpg&#10;https://kep2.jpg"></textarea>
+                            <textarea id="att_images" name="images" bind:value={newAttraction.images} rows="3" placeholder="https://kep1.jpg&#10;https://kep2.jpg"></textarea>
                         </div>
                         <button type="submit" class="admin-submit-btn">Hozzáadás</button>
                     </form>
-                    <div class="admin-table-wrap">
+                    </details>
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_attractions"
+                                name="search_attractions"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchAttractions}
+                                placeholder="Név, slug, megye…"
+                            /></label
+                        >
+                    </div>
+                    <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>Név</th>
                                     <th>Megye</th>
                                     <th>Slug</th>
-                                    <th></th>
+                                    <th>Rövid leírás</th>
+                                    <th>Koordináták</th>
+                                    <th>Kiemelt kép</th>
+                                    <th>Tartalom (előnézet)</th>
+                                    <th>Galéria</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each attractions as att}
+                                {#each filterRows(attractions, searchAttractions, (att) => [
+                                        att.name,
+                                        att.slug,
+                                        att.county_name,
+                                        att.description,
+                                        att.featured_image,
+                                        att.content,
+                                        (att.images || []).join(" "),
+                                        String(att.latitude ?? ""),
+                                        String(att.longitude ?? ""),
+                                    ]) as att}
                                     <tr>
                                         <td>{att.name}</td>
                                         <td>{att.county_name}</td>
-                                        <td>{att.slug}</td>
-                                        <td>
-                                            <button type="button" class="btn-sm" on:click={() => openEditAttraction(att)}>Szerkesztés</button>
-                                            <button type="button" class="btn-delete btn-sm" on:click={() => deleteAttraction(att.id)}>Törlés</button>
+                                        <td><code>{att.slug}</code></td>
+                                        <td class="admin-table-cell-preview" title={att.description || ""}>{contentPreview(att.description)}</td>
+                                        <td class="admin-table__mono">{formatLatLon(att.latitude, att.longitude)}</td>
+                                        <td class="admin-table-cell-preview" title={att.featured_image || ""}>{urlPreview(att.featured_image)}</td>
+                                        <td class="admin-table-cell-preview" title={att.content || ""}>{contentPreview(att.content)}</td>
+                                        <td>{(att.images && att.images.length) || 0} kép</td>
+                                        <td class="admin-table-col--action">
+                                            <button type="button" class="btn-update" on:click={() => openEditAttraction(att)}>Szerk.</button>
+                                        </td>
+                                        <td class="admin-table-col--action">
+                                            <button type="button" class="btn-delete" on:click={() => deleteAttraction(att.id)}>Törlés</button>
                                         </td>
                                     </tr>
                                 {:else}
-                                    <tr><td colspan="4">Nincsenek látnivalók.</td></tr>
+                                    <tr><td colspan="10">Nincsenek látnivalók.</td></tr>
                                 {/each}
                             </tbody>
                         </table>
@@ -2991,12 +4316,33 @@
 
                 <!-- Counties Tab -->
                 {#if activeTab === "counties"}
-                    <p class="admin-info">
-                        Megyék: név, slug, megyeszékhely (település lista), bemutatkozó szöveg (Markdown). A
-                        megyeszékhely szerkesztésénél a települések legördülő listából választhatók.
-                    </p>
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            <strong>Megyék:</strong> magyar / román / név név, URL-slug, bemutatkozó szöveg (Markdown),
+                            és a <strong>megyeszékhely</strong> település kiválasztása a listából.
+                            <strong>Történelmi székek</strong> (pl. Csíkszék): külön név, slug és tartalom —
+                            a <code>/szekek</code> oldalakon jelennek meg.
+                        </p>
+                    {/if}
 
                     <h3 class="admin-region-heading">Megyék</h3>
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (megyék)
+                            <input
+                                id="search_counties"
+                                name="search_counties"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchCounties}
+                                placeholder="Név, slug, székhely…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -3007,35 +4353,36 @@
                                     <th>Slug</th>
                                     <th>Megyeszékhely</th>
                                     <th>Tartalom (előnézet)</th>
-                                    <th></th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each countiesFromAPI as c (c.id)}
+                                {#each displayCounties as c (c.id)}
                                     {#if editingCounty?.id === c.id}
                                         <tr class="admin-table-edit-row">
-                                            <td colspan="7">
+                                            <td colspan="8">
                                                 <div class="admin-region-edit-panel">
                                                     <div class="admin-region-edit-grid">
-                                                        <label>
+                                                        <label for="county_edit_name">
                                                             Megye (HU)
-                                                            <input type="text" bind:value={editingCounty.name} />
+                                                            <input id="county_edit_name" name="name" type="text" bind:value={editingCounty.name} />
                                                         </label>
-                                                        <label>
+                                                        <label for="county_edit_name_ro">
                                                             Név (RO)
-                                                            <input type="text" bind:value={editingCounty.name_ro} />
+                                                            <input id="county_edit_name_ro" name="name_ro" type="text" bind:value={editingCounty.name_ro} />
                                                         </label>
-                                                        <label>
+                                                        <label for="county_edit_name_de">
                                                             Név (DE)
-                                                            <input type="text" bind:value={editingCounty.name_de} />
+                                                            <input id="county_edit_name_de" name="name_de" type="text" bind:value={editingCounty.name_de} />
                                                         </label>
-                                                        <label>
+                                                        <label for="county_edit_slug">
                                                             Slug (URL)
-                                                            <input type="text" bind:value={editingCounty.slug} placeholder="pl. hargita" />
+                                                            <input id="county_edit_slug" name="slug" type="text" bind:value={editingCounty.slug} placeholder="pl. hargita" />
                                                         </label>
-                                                        <label class="admin-region-edit-span2">
+                                                        <label class="admin-region-edit-span2" for="county_edit_seat_location_id">
                                                             Megyeszékhely
-                                                            <select bind:value={editingCounty.seat_location_id}>
+                                                            <select id="county_edit_seat_location_id" name="seat_location_id" bind:value={editingCounty.seat_location_id}>
                                                                 <option value="">— válassz települést —</option>
                                                                 {#each settlementsForCountyName(c.name) as loc (loc.id)}
                                                                     <option value={String(loc.id)}
@@ -3045,9 +4392,11 @@
                                                             </select>
                                                         </label>
                                                     </div>
-                                                    <label class="admin-region-edit-full">
+                                                    <label class="admin-region-edit-full" for="county_edit_content">
                                                         Bemutatkozás (Markdown)
                                                         <textarea
+                                                            id="county_edit_content"
+                                                            name="content"
                                                             rows="10"
                                                             bind:value={editingCounty.content}
                                                             placeholder="## Bevezető&#10;..."
@@ -3078,27 +4427,47 @@
                                             <td class="admin-table-cell-preview" title={c.content || ""}
                                                 >{contentPreview(c.content)}</td
                                             >
-                                            <td>
+                                            <td class="admin-table-col--action">
                                                 <button
                                                     type="button"
                                                     class="btn-update"
-                                                    on:click={() => startEditCounty(c)}>Szerkesztés</button
+                                                    on:click={() => startEditCounty(c)}>Szerk.</button
                                                 >
                                             </td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
                                         </tr>
                                     {/if}
                                 {:else}
-                                    <tr><td colspan="7">Nincs megye-adat (API / migráció).</td></tr>
+                                    <tr
+                                        ><td colspan="8"
+                                            >{countiesFromAPI?.length
+                                                ? "Nincs találat a keresésre."
+                                                : "Nincs megye-adat (API / migráció)."}</td
+                                        ></tr
+                                    >
                                 {/each}
                             </tbody>
                         </table>
                     </div>
 
                     <h3 class="admin-region-heading">Történelmi székek</h3>
-                    <p class="admin-info">
+                    <p class="admin-hint">
                         Megjelenés: <a href="/szekek" target="_blank" rel="noopener">/szekek</a> és
                         <code>/szekek/…</code> oldalak.
                     </p>
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (székek)
+                            <input
+                                id="search_historical_seats"
+                                name="search_historical_seats"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchHistoricalSeats}
+                                placeholder="Név, slug…"
+                            /></label
+                        >
+                    </div>
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -3108,36 +4477,39 @@
                                     <th>Név (DE)</th>
                                     <th>Slug</th>
                                     <th>Tartalom (előnézet)</th>
-                                    <th></th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each historicalSeatsFromAPI as h (h.id)}
+                                {#each displayHistoricalSeats as h (h.id)}
                                     {#if editingHistoricalSeat?.id === h.id}
                                         <tr class="admin-table-edit-row">
-                                            <td colspan="6">
+                                            <td colspan="7">
                                                 <div class="admin-region-edit-panel">
                                                     <div class="admin-region-edit-grid">
-                                                        <label>
+                                                        <label for="hseat_edit_name">
                                                             Név (HU)
-                                                            <input type="text" bind:value={editingHistoricalSeat.name} />
+                                                            <input id="hseat_edit_name" name="name" type="text" bind:value={editingHistoricalSeat.name} />
                                                         </label>
-                                                        <label>
+                                                        <label for="hseat_edit_name_ro">
                                                             Név (RO)
-                                                            <input type="text" bind:value={editingHistoricalSeat.name_ro} />
+                                                            <input id="hseat_edit_name_ro" name="name_ro" type="text" bind:value={editingHistoricalSeat.name_ro} />
                                                         </label>
-                                                        <label>
+                                                        <label for="hseat_edit_name_de">
                                                             Név (DE)
-                                                            <input type="text" bind:value={editingHistoricalSeat.name_de} />
+                                                            <input id="hseat_edit_name_de" name="name_de" type="text" bind:value={editingHistoricalSeat.name_de} />
                                                         </label>
-                                                        <label>
+                                                        <label for="hseat_edit_slug">
                                                             Slug (URL)
-                                                            <input type="text" bind:value={editingHistoricalSeat.slug} placeholder="pl. csikszek" />
+                                                            <input id="hseat_edit_slug" name="slug" type="text" bind:value={editingHistoricalSeat.slug} placeholder="pl. csikszek" />
                                                         </label>
                                                     </div>
-                                                    <label class="admin-region-edit-full">
+                                                    <label class="admin-region-edit-full" for="hseat_edit_content">
                                                         Tartalom (Markdown)
                                                         <textarea
+                                                            id="hseat_edit_content"
+                                                            name="content"
                                                             rows="10"
                                                             bind:value={editingHistoricalSeat.content}
                                                             placeholder="## …&#10;..."
@@ -3167,17 +4539,24 @@
                                             <td class="admin-table-cell-preview" title={h.content || ""}
                                                 >{contentPreview(h.content)}</td
                                             >
-                                            <td>
+                                            <td class="admin-table-col--action">
                                                 <button
                                                     type="button"
                                                     class="btn-update"
-                                                    on:click={() => startEditHistoricalSeat(h)}>Szerkesztés</button
+                                                    on:click={() => startEditHistoricalSeat(h)}>Szerk.</button
                                                 >
                                             </td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
                                         </tr>
                                     {/if}
                                 {:else}
-                                    <tr><td colspan="6">Nincs szék-adat (API / migráció).</td></tr>
+                                    <tr
+                                        ><td colspan="7"
+                                            >{historicalSeatsFromAPI?.length
+                                                ? "Nincs találat a keresésre."
+                                                : "Nincs szék-adat (API / migráció)."}</td
+                                        ></tr
+                                    >
                                 {/each}
                             </tbody>
                         </table>
@@ -3206,11 +4585,21 @@
                     <label for="emondas_text">Mondás szövege</label>
                     <textarea
                         id="emondas_text"
+                        name="mondas_text"
                         bind:value={editingMondas.text}
                         required
                         rows="4"
                         class="w-full"
                     ></textarea>
+                    <label for="emondas_day_edit">Megjelenés napja</label>
+                    <input
+                        id="emondas_day_edit"
+                        name="display_date"
+                        type="date"
+                        bind:value={editingMondas.display_date}
+                        required
+                        class="w-full"
+                    />
 
                     <div class="modal-actions">
                         <button type="submit" class="admin-submit-btn"
@@ -3588,6 +4977,135 @@
         </div>
     {/if}
 
+    <!-- Edit Venue Modal -->
+    {#if editingVenue}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditVenue}
+            on:keydown={(e) => e.key === "Escape" && cancelEditVenue()}
+        >
+            <div class="admin-modal">
+                <h3>Helyszín szerkesztése</h3>
+                <form
+                    class="admin-form"
+                    on:submit|preventDefault={saveEditVenue}
+                >
+                    <label for="ev-venue-settlement">Település</label>
+                    <select
+                        id="ev-venue-settlement"
+                        bind:value={editingVenue.settlement_id}
+                        required
+                    >
+                        {#each settlementsForSelect as loc}
+                            <option value={String(loc.id)}
+                                >{loc.name} ({loc.county})</option
+                            >
+                        {/each}
+                    </select>
+
+                    <label for="ev-venue-name">Név (HU)</label>
+                    <input
+                        id="ev-venue-name"
+                        type="text"
+                        bind:value={editingVenue.name}
+                        required
+                    />
+
+                    <label for="ev-venue-name-ro">Név (RO)</label>
+                    <input
+                        id="ev-venue-name-ro"
+                        type="text"
+                        bind:value={editingVenue.name_ro}
+                    />
+
+                    <label for="ev-venue-name-de">Név (DE)</label>
+                    <input
+                        id="ev-venue-name-de"
+                        type="text"
+                        bind:value={editingVenue.name_de}
+                    />
+
+                    <div class="flex gap-lg flex-wrap">
+                        <label class="flex-1" style="min-width:8rem"
+                            >Slug
+                            <input
+                                type="text"
+                                bind:value={editingVenue.slug}
+                            />
+                        </label>
+                        <label class="flex-1" style="min-width:10rem"
+                            >Típus
+                            <select bind:value={editingVenue.kind}>
+                                {#each venueTypesList as vt}
+                                    <option value={vt.slug}>{vt.label_hu}</option>
+                                {/each}
+                            </select>
+                        </label>
+                    </div>
+
+                    <label for="ev-venue-address">Cím</label>
+                    <input
+                        id="ev-venue-address"
+                        type="text"
+                        bind:value={editingVenue.address}
+                    />
+
+                    <div class="flex gap-lg flex-wrap">
+                        <label class="flex-1" style="min-width:8rem"
+                            >Szélesség (lat)
+                            <input
+                                type="text"
+                                bind:value={editingVenue.latitude}
+                            />
+                        </label>
+                        <label class="flex-1" style="min-width:8rem"
+                            >Hosszúság (lon)
+                            <input
+                                type="text"
+                                bind:value={editingVenue.longitude}
+                            />
+                        </label>
+                        <label class="flex-1" style="min-width:8rem"
+                            >Férőhely
+                            <input
+                                type="text"
+                                bind:value={editingVenue.seating_capacity}
+                            />
+                        </label>
+                    </div>
+
+                    <label for="ev-venue-description">Leírás</label>
+                    <textarea
+                        id="ev-venue-description"
+                        bind:value={editingVenue.description}
+                        rows="4"
+                    ></textarea>
+
+                    <label for="ev-venue-notes">Belső megjegyzés</label>
+                    <textarea
+                        id="ev-venue-notes"
+                        bind:value={editingVenue.notes}
+                        rows="2"
+                    ></textarea>
+
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn"
+                            >Mentés</button
+                        >
+                        <button
+                            type="button"
+                            class="btn-delete"
+                            on:click={cancelEditVenue}>Mégse</button
+                        >
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
     <!-- Edit Category Modal -->
     {#if editingCategory}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -3683,24 +5201,24 @@
                     on:submit|preventDefault={saveEditAttraction}
                 >
                     <label for="eatt_county">Megye</label>
-                    <select id="eatt_county" bind:value={editingAttraction.county_slug}>
+                    <select id="eatt_county" name="county_slug" bind:value={editingAttraction.county_slug}>
                         <option value="hargita">Hargita</option>
                         <option value="kovaszna">Kovászna</option>
                         <option value="maros">Maros</option>
                     </select>
                     <label for="eatt_name">Név</label>
-                    <input id="eatt_name" type="text" bind:value={editingAttraction.name} required />
+                    <input id="eatt_name" name="name" type="text" bind:value={editingAttraction.name} required />
                     <label for="eatt_desc">Rövid leírás</label>
-                    <input id="eatt_desc" type="text" bind:value={editingAttraction.description} />
+                    <input id="eatt_desc" name="description" type="text" bind:value={editingAttraction.description} />
                     <label for="eatt_coords">Koordináták (lat, lon)</label>
-                    <input id="eatt_coords" type="text" bind:value={editingAttraction.latitude} style="width:6rem" />
-                    <input type="text" bind:value={editingAttraction.longitude} style="width:6rem" />
+                    <input id="eatt_coords" name="latitude" type="text" bind:value={editingAttraction.latitude} placeholder="46.1265" style="width:6rem" />
+                    <input id="eatt_lon" name="longitude" type="text" bind:value={editingAttraction.longitude} placeholder="25.8876" style="width:6rem" />
                     <label for="eatt_featured">Kiemelt kép URL</label>
-                    <input id="eatt_featured" type="url" bind:value={editingAttraction.featured_image} />
+                    <input id="eatt_featured" name="featured_image" type="url" bind:value={editingAttraction.featured_image} />
                     <label for="eatt_content">Tartalom (Markdown)</label>
-                    <textarea id="eatt_content" bind:value={editingAttraction.content} rows="6"></textarea>
+                    <textarea id="eatt_content" name="content" bind:value={editingAttraction.content} rows="6"></textarea>
                     <label for="eatt_images">Galéria URL-ek (soronként egy)</label>
-                    <textarea id="eatt_images" bind:value={editingAttraction.images} rows="3"></textarea>
+                    <textarea id="eatt_images" name="images" bind:value={editingAttraction.images} rows="3"></textarea>
                     <div class="modal-actions">
                         <button type="submit" class="admin-submit-btn">Mentés</button>
                         <button type="button" class="btn-delete" on:click={cancelEditAttraction}>Mégse</button>
@@ -3763,11 +5281,29 @@
                         name="location_id"
                         bind:value={editingEvent.location_id}
                         required
+                        on:change={() => {
+                            editingEvent.default_venue_id = "";
+                            loadVenuesForEditSettlement(editingEvent.location_id);
+                        }}
                     >
                         {#each settlementsForSelect as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
                             >
+                        {/each}
+                    </select>
+
+                    <label for="edit_ev_default_venue"
+                        >Konkrét helyszín (opcionális)</label
+                    >
+                    <select
+                        id="edit_ev_default_venue"
+                        name="default_venue_id"
+                        bind:value={editingEvent.default_venue_id}
+                    >
+                        <option value="">— nincs megadva —</option>
+                        {#each venueOptionsEdit as v}
+                            <option value={String(v.id)}>{v.name}</option>
                         {/each}
                     </select>
 
@@ -3920,7 +5456,8 @@
                             A fenti kezdő–befejező dátum és idő továbbra is az alap; ide
                             naponkénti tételeket írhat (megnyitó, mérkőzések, záró stb.).
                             A <strong>vége</strong> idő opcionális (pl. ismeretlen mérkőzés-hossz).
-                            Üresen hagyható.
+                            Üresen hagyható. A helyszínt soronként a <strong>Helyszín</strong> oszlopban
+                            állíthatod (üres = esemény alaphelyszíne).
                         </p>
                         <div class="schedule-toolbar">
                             <button
@@ -3949,14 +5486,6 @@
                                             bind:value={day.schedule_date}
                                         /></label
                                     >
-                                    <input
-                                        id={`schedule-day-${di}-notes`}
-                                        name={`schedule_day_${di}_notes`}
-                                        type="text"
-                                        class="schedule-notes"
-                                        placeholder="Megjegyzés (pl. helyszín)"
-                                        bind:value={day.notes}
-                                    />
                                     <button
                                         type="button"
                                         class="btn-delete btn-xs"
@@ -3972,6 +5501,9 @@
                                             <th title="Opcionális">Kezdés</th>
                                             <th title="Opcionális; mérkőzésnél gyakran üres"
                                                 >Vége</th
+                                            >
+                                            <th title="Opcionális; üres = esemény alaphelyszíne"
+                                                >Helyszín</th
                                             >
                                             <th>Cím / program</th>
                                             <th>Leírás</th>
@@ -4011,6 +5543,26 @@
                                                         type="time"
                                                         bind:value={act.ends_at}
                                                 /></td>
+                                                <td>
+                                                    <select
+                                                        id={`schedule-${di}-act-${ai}-venue`}
+                                                        name={`schedule_${di}_act_${ai}_venue`}
+                                                        class="schedule-act-venue"
+                                                        bind:value={act.venue_id}
+                                                    >
+                                                        <option value=""
+                                                            >— alapértelmezett —</option
+                                                        >
+                                                        {#each venueOptionsEdit as v}
+                                                            <option
+                                                                value={String(
+                                                                    v.id,
+                                                                )}
+                                                                >{v.name}</option
+                                                            >
+                                                        {/each}
+                                                    </select>
+                                                </td>
                                                 <td
                                                     ><input
                                                         id={`schedule-${di}-act-${ai}-title`}
@@ -4168,20 +5720,6 @@
     .admin-modal h3 {
         margin-top: 0;
     }
-    .btn-update {
-        padding: 0.35rem 0.75rem;
-        font-size: 0.8rem;
-        border: 1px solid var(--primary, #5c6bc0);
-        color: var(--primary, #5c6bc0);
-        background: transparent;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-    .btn-update:hover {
-        background: var(--primary, #5c6bc0);
-        color: #fff;
-    }
     .badge {
         display: inline-block;
         padding: 0.15rem 0.5rem;
@@ -4293,14 +5831,6 @@
         margin-top: 0;
     }
 
-    .admin-table-cell-preview {
-        max-width: 16rem;
-        font-size: 0.85rem;
-        color: var(--text-faint, #666);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
     .admin-table-edit-row td {
         vertical-align: top;
         background: var(--hover-bg, #f9fafb);

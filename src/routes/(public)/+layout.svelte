@@ -189,10 +189,12 @@
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
+        aria-hidden="true"
     >
-        <path d="M12 2L2 7l10 5 10-5-10-5z" />
-        <path d="M2 17l10 5 10-5" />
-        <path d="M2 12l10 5 10-5" />
+        <!-- Side-view chair: back + rear leg, seat, front leg -->
+        <line x1="6" y1="5" x2="6" y2="21" />
+        <line x1="6" y1="15" x2="19" y2="15" />
+        <line x1="19" y1="15" x2="19" y2="21" />
     </svg>
     <span>Székek</span>
 </a>

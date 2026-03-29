@@ -8,9 +8,12 @@ import (
 
 func Slugify(s string) string {
 	s = strings.ToLower(s)
-	// Simple Hungarian replacement
+	// Latin diacritics → ASCII (HU / RO / DE); then keep only letters/digits, collapse separators to '-'.
 	replacer := strings.NewReplacer(
 		"á", "a", "é", "e", "í", "i", "ó", "o", "ö", "o", "ő", "o", "ú", "u", "ü", "u", "ű", "u",
+		"ă", "a", "â", "a", "î", "i", "ș", "s", "ț", "t",
+		"ş", "s", "ţ", "t",
+		"ä", "a", "ß", "ss",
 	)
 	s = replacer.Replace(s)
 

@@ -26,7 +26,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
 			GROUP BY e.id, e.type, e.location_id, e.category_id, e.category, e.name, e.url, e.phone, e.address, e.notes, e.languages
-			ORDER BY e.id DESC
+			ORDER BY LOWER(e.name) ASC, e.id ASC
 		`
 		rows, err := db.DB.Query(sqlQuery)
 		if err != nil {

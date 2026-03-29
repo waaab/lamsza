@@ -1,1 +1,0 @@
-function c(){return String("http://localhost:3000").replace(/\/$/,"")}async function n(r,e={}){const s=c(),o=r.startsWith("http")?r:`${s}${r}`;try{const t=await fetch(o,e);if(!t.ok){const a=await t.text();throw new Error(a||`API Error: ${t.status}`)}return await t.json()}catch(t){throw console.error(`Fetch error for ${o}:`,t),t}}export{n as a,c as g};

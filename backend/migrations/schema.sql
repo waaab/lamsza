@@ -53,9 +53,12 @@ CREATE TABLE IF NOT EXISTS entry_tags (
 CREATE TABLE IF NOT EXISTS mondasok (
     id SERIAL PRIMARY KEY,
     text TEXT NOT NULL,
+    display_date DATE NOT NULL DEFAULT CURRENT_DATE,
     category VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_mondasok_display_date ON mondasok (display_date);
 
 CREATE TABLE IF NOT EXISTS quick_links (
     id SERIAL PRIMARY KEY,

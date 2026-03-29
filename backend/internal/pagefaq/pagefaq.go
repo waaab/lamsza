@@ -218,7 +218,7 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		rows, err := db.DB.Query(
 			`SELECT id, section_key, label_hu, faq_title, COALESCE(faq_items, '[]'::jsonb), COALESCE(disclaimer_markdown,''), updated_at::text
-			 FROM page_faq_sections ORDER BY section_key ASC`,
+			 FROM page_faq_sections ORDER BY LOWER(label_hu) ASC, id ASC`,
 		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
