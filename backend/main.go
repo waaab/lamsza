@@ -32,6 +32,7 @@ func main() {
 	pages.MigratePages()
 	pagefaq.Migrate()
 	handlers.MigrateEntryVerified()
+	handlers.MigrateEntryReviews()
 	account.Migrate()
 
 	mux := http.DefaultServeMux

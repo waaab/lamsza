@@ -31,6 +31,7 @@ func init() {
 	db.InitDB()
 	mondasok.Migrate()
 	handlers.MigrateEntryVerified()
+	handlers.MigrateEntryReviews()
 	auth.Migrate()
 	account.Migrate()
 

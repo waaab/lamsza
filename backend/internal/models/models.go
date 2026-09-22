@@ -1,48 +1,76 @@
 package models
 
+import "encoding/json"
+
 type Entry struct {
-	ID             string   `json:"id"`
-	Type           string   `json:"type"`
-	Category       string   `json:"category"`
-	Name           string   `json:"name"`
-	Slug           string   `json:"slug"`
-	Location       string   `json:"location"`
-	LocationSlug   string   `json:"location_slug"`
-	LocationCounty string   `json:"location_county"`
-	CountySlug     string   `json:"county_slug"`
-	LocationType   string   `json:"location_type"`
-	LocationRo     string   `json:"location_ro"`
-	LocationDe     string   `json:"location_de"`
-	Phone          string   `json:"phone"`
-	Address        string   `json:"address"`
-	Notes          string   `json:"notes"`
-	Tags           []string `json:"tags"`
-	Languages      []string `json:"languages"`
-	URL            string   `json:"url"`
-	Claimed        bool     `json:"claimed"`
-	Verified       bool     `json:"verified"`
-	IsDirectMatch  bool     `json:"is_direct_match"`
+	ID             string          `json:"id"`
+	Type           string          `json:"type"`
+	Category       string          `json:"category"`
+	Name           string          `json:"name"`
+	Slug           string          `json:"slug"`
+	Location       string          `json:"location"`
+	LocationSlug   string          `json:"location_slug"`
+	LocationCounty string          `json:"location_county"`
+	CountySlug     string          `json:"county_slug"`
+	LocationType   string          `json:"location_type"`
+	LocationRo     string          `json:"location_ro"`
+	LocationDe     string          `json:"location_de"`
+	Phone          string          `json:"phone"`
+	Address        string          `json:"address"`
+	Notes          string          `json:"notes"`
+	Tags           []string        `json:"tags"`
+	Languages      []string        `json:"languages"`
+	URL            string          `json:"url"`
+	Claimed        bool            `json:"claimed"`
+	Verified       bool            `json:"verified"`
+	Hours          json.RawMessage `json:"hours"`
+	DeliveryHours  json.RawMessage `json:"delivery_hours"`
+	Photos         json.RawMessage `json:"photos"`
+	IsDirectMatch  bool            `json:"is_direct_match"`
+	RatingsEnabled bool            `json:"ratings_enabled"`
+	Rating         *float64        `json:"rating,omitempty"`
+	ReviewCount    int             `json:"review_count,omitempty"`
+	Reviews        []PublicReview  `json:"reviews,omitempty"`
+	MyReview       *PublicReview   `json:"my_review,omitempty"`
+}
+
+type PublicReview struct {
+	ID          string `json:"id"`
+	AuthorName  string `json:"author_name"`
+	AuthorPhoto string `json:"author_photo"`
+	Score       int    `json:"score"`
+	Text        string `json:"text"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
 }
 
 type Event struct {
-	ID               int    `json:"id"`
-	LocationID       int    `json:"location_id"`
-	LocationName     string `json:"location_name"`
-	LocationSlug     string `json:"location_slug"`
-	County           string `json:"county"`
-	CountySlug       string `json:"county_slug"`
-	Title            string `json:"title"`
-	Description      string `json:"description"`
-	StartDate        string `json:"start_date"`
-	StartTime        string `json:"start_time"`
-	EndDate          string `json:"end_date"`
-	EndTime          string `json:"end_time"`
-	EventType        string `json:"event_type"`
-	Organizer        string `json:"organizer"`
-	LocationType     string `json:"location_type"`
-	DefaultVenueID     *int   `json:"default_venue_id,omitempty"`
-	DefaultVenueName   string `json:"default_venue_name,omitempty"`
-	DefaultVenueSlug   string `json:"default_venue_slug,omitempty"`
+	ID                    int    `json:"id"`
+	LocationID            int    `json:"location_id"`
+	LocationName          string `json:"location_name"`
+	LocationSlug          string `json:"location_slug"`
+	County                string `json:"county"`
+	CountySlug            string `json:"county_slug"`
+	Title                 string `json:"title"`
+	Description           string `json:"description"`
+	FeaturedImage         string `json:"featured_image,omitempty"`
+	StartDate             string `json:"start_date"`
+	StartTime             string `json:"start_time"`
+	EndDate               string `json:"end_date"`
+	EndTime               string `json:"end_time"`
+	EventType             string `json:"event_type"`
+	EventTypeLabel        string `json:"event_type_label,omitempty"`
+	EventSubtype          string `json:"event_subtype,omitempty"`
+	EventSubtypeLabel     string `json:"event_subtype_label,omitempty"`
+	AccessType            string `json:"access_type"`
+	Organizer             string `json:"organizer"`
+	EntryPrice            string `json:"entry_price"`
+	LocationType          string `json:"location_type"`
+	DefaultVenueID        *int   `json:"default_venue_id,omitempty"`
+	DefaultVenueName      string `json:"default_venue_name,omitempty"`
+	DefaultVenueSlug      string `json:"default_venue_slug,omitempty"`
+	DefaultVenueKind      string `json:"default_venue_kind,omitempty"`
+	DefaultVenueKindLabel string `json:"default_venue_kind_label,omitempty"`
 	// HasSchedule is true when the event has at least one napi program day (same idea as the detail #program block).
 	HasSchedule bool `json:"has_schedule"`
 }
@@ -54,12 +82,36 @@ type AdminEvent struct {
 	DefaultVenueName string `json:"default_venue_name,omitempty"`
 	Title            string `json:"title"`
 	Description      string `json:"description"`
+	FeaturedImage    string `json:"featured_image"`
 	StartDate        string `json:"start_date"`
 	StartTime        string `json:"start_time"`
 	EndDate          string `json:"end_date"`
 	EndTime          string `json:"end_time"`
-	EventType        string `json:"event_type"`
-	Organizer        string `json:"organizer"`
+	EventTypeID      int    `json:"event_type_id"`
+	EventSubtypeID   *int   `json:"event_subtype_id,omitempty"`
+	// EventType / EventSubtype are catalog slugs (for forms and legacy clients).
+	EventType    string `json:"event_type,omitempty"`
+	EventSubtype string `json:"event_subtype,omitempty"`
+	AccessType   string `json:"access_type,omitempty"`
+	Organizer    string `json:"organizer"`
+	EntryPrice   string `json:"entry_price"`
+}
+
+// CatalogEventType is a top-level event category (admin-managed).
+type CatalogEventType struct {
+	ID        int    `json:"id"`
+	Slug      string `json:"slug"`
+	LabelHu   string `json:"label_hu"`
+	SortOrder int    `json:"sort_order"`
+}
+
+// CatalogEventSubtype is a subtype under a CatalogEventType (e.g. sport → hockey).
+type CatalogEventSubtype struct {
+	ID          int    `json:"id"`
+	EventTypeID int    `json:"event_type_id"`
+	Slug        string `json:"slug"`
+	LabelHu     string `json:"label_hu"`
+	SortOrder   int    `json:"sort_order"`
 }
 
 // VenueType is a configurable label for venues.kind (slug identifies the row).
@@ -67,6 +119,14 @@ type VenueType struct {
 	ID      int    `json:"id"`
 	Slug    string `json:"slug"`
 	LabelHu string `json:"label_hu"`
+}
+
+// SettlementLocationType is a label for settlements.type (város, falu, megye, …).
+type SettlementLocationType struct {
+	ID        int    `json:"id"`
+	Slug      string `json:"slug"`
+	LabelHu   string `json:"label_hu"`
+	SortOrder int    `json:"sort_order"`
 }
 
 // Venue is a named site within a settlement (arena, market square, etc.).
@@ -163,20 +223,23 @@ type Location struct {
 }
 
 type AdminEntry struct {
-	ID         int      `json:"id"`
-	Type       string   `json:"type"`
-	LocationID *int     `json:"location_id"`
-	CategoryID *int     `json:"category_id"`
-	Category   string   `json:"category"`
-	Name       string   `json:"name"`
-	Slug       string   `json:"slug"`
-	URL        string   `json:"url"`
-	Phone      string   `json:"phone"`
-	Address    string   `json:"address"`
-	Notes      string   `json:"notes"`
-	Languages  []string `json:"languages"`
-	Tags       []string `json:"tags"`
-	Verified   bool     `json:"verified"`
+	ID            int             `json:"id"`
+	Type          string          `json:"type"`
+	LocationID    *int            `json:"location_id"`
+	CategoryID    *int            `json:"category_id"`
+	Category      string          `json:"category"`
+	Name          string          `json:"name"`
+	Slug          string          `json:"slug"`
+	URL           string          `json:"url"`
+	Phone         string          `json:"phone"`
+	Address       string          `json:"address"`
+	Notes         string          `json:"notes"`
+	Languages     []string        `json:"languages"`
+	Tags          []string        `json:"tags"`
+	Verified      bool            `json:"verified"`
+	Hours         json.RawMessage `json:"hours"`
+	DeliveryHours json.RawMessage `json:"delivery_hours"`
+	Photos        json.RawMessage `json:"photos"`
 }
 
 type EntryCategory struct {

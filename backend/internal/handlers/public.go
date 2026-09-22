@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"backend/internal/auth"
 	"backend/internal/db"
 	"backend/internal/models"
 	"database/sql"
@@ -33,15 +34,18 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	if q != "" && normalizedQ != "" {
 		sqlQuery = `
 			SELECT 
-				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				e.id, COALESCE(typ.name, ''), COALESCE(ec.name, ''), e.name, e.slug, 
 				s.name, s.slug, c.name, c.slug, s.type, 
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
-				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false),
+				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
-				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
+				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank,
+				COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[])
 			FROM entries e
+			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
 			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
@@ -55,15 +59,18 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		sqlQuery = `
 			SELECT 
-				e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+				e.id, COALESCE(typ.name, ''), COALESCE(ec.name, ''), e.name, e.slug, 
 				s.name, s.slug, c.name, c.slug, s.type, 
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
-				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false),
+				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
-				0 as rank
+				0 as rank,
+				COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[])
 			FROM entries e
+			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
 			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
@@ -76,7 +83,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if category != "" {
-		sqlQuery += " AND (unaccent(ec.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + ") OR e.category ILIKE $" + fmt.Sprintf("%d", paramIdx) + ")"
+		sqlQuery += " AND (unaccent(ec.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + ") OR pg_slugify(ec.name) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + "))"
 		params = append(params, category)
 		paramIdx++
 	}
@@ -97,9 +104,9 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if q != "" && normalizedQ != "" {
-		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
 	} else {
-		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified ORDER BY is_direct_match DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, e.name ASC"
 	}
 
 	log.Printf("EntriesHandler query: %s", sqlQuery)
@@ -117,13 +124,35 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var e models.Entry
 		var pqLanguages []string
+		var pqTags []string
 		var rank float64
-		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &e.IsDirectMatch, &rank); err != nil {
+		var hours, delivery, photos []byte
+		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos, &e.IsDirectMatch, &rank, pq.Array(&pqTags)); err != nil {
 			log.Printf("EntriesHandler scan error: %v", err)
 			continue
 		}
 		e.Languages = pqLanguages
+		e.Type = utils.CanonicalEntryType(e.Type)
+		e.Hours = jsonObjectOrEmpty(hours)
+		e.DeliveryHours = jsonObjectOrEmpty(delivery)
+		e.Photos = sanitizePhotos(photos)
+		if pqTags != nil {
+			e.Tags = pqTags
+		} else {
+			e.Tags = []string{}
+		}
 		entries = append(entries, e)
+	}
+	// encoding/json encodes nil []string as null; clients expect [] for "no tags".
+	viewerUserID := 0
+	if user, err := auth.UserFromRequest(r); err == nil && user != nil {
+		viewerUserID = user.ID
+	}
+	for i := range entries {
+		if entries[i].Tags == nil {
+			entries[i].Tags = []string{}
+		}
+		ApplyPublicEntryExtras(&entries[i], viewerUserID)
 	}
 	json.NewEncoder(w).Encode(entries)
 	log.Printf("EntriesHandler found %d entries", len(entries))
@@ -138,25 +167,32 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 	var e models.Entry
 	var pqLanguages []string
+	var hours, delivery, photos []byte
 	err := db.DB.QueryRow(`
 		SELECT 
-			e.id, COALESCE(e.type, ''), COALESCE(ec.name, ''), e.name, e.slug, 
+			e.id, COALESCE(typ.name, ''), COALESCE(ec.name, ''), e.name, e.slug, 
 			s.name, s.slug, c.name, c.slug, s.type, 
 			COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 			e.languages, COALESCE(e.url, ''),
-			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false)
+			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+			COALESCE(e.photos, '[]'::jsonb)
 		FROM entries e
+		JOIN entry_types typ ON typ.id = e.type_id
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
-		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified)
+		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos)
 
 	if err != nil {
 		http.Error(w, "Entry not found", 404)
 		return
 	}
 	e.Languages = pqLanguages
+	e.Type = utils.CanonicalEntryType(e.Type)
+	e.Hours = jsonObjectOrEmpty(hours)
+	e.DeliveryHours = jsonObjectOrEmpty(delivery)
+	e.Photos = sanitizePhotos(photos)
 
 	rows, _ := db.DB.Query("SELECT t.name FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = $1", e.ID)
 	defer rows.Close()
@@ -166,6 +202,13 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			e.Tags = append(e.Tags, tag)
 		}
 	}
+
+	// Apply public entry extras based on claimed status
+	viewerUserID := 0
+	if user, err := auth.UserFromRequest(r); err == nil && user != nil {
+		viewerUserID = user.ID
+	}
+	ApplyPublicEntryExtras(&e, viewerUserID)
 
 	json.NewEncoder(w).Encode(e)
 }
