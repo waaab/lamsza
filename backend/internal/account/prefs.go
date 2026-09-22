@@ -11,6 +11,7 @@ import (
 )
 
 func Migrate() {
+	migrateUserLinks()
 	log.Println("Account preferences ready")
 }
 
@@ -160,11 +161,34 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 		argN++
 	}
 
+	tx, err := db.DB.Begin()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	var linkCount int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM user_links WHERE user_id = $1`, u.ID).Scan(&linkCount); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if linkCount == 0 {
+		if err := insertImportLinks(tx, u.ID, body.Links); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
 	setClauses = append(setClauses, "prefs_imported_at = NOW()")
 	query := fmt.Sprintf("UPDATE users SET %s WHERE id = $%d", joinSetClauses(setClauses), argN)
 	args = append(args, u.ID)
 
-	if _, err := db.DB.Exec(query, args...); err != nil {
+	if _, err := tx.Exec(query, args...); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

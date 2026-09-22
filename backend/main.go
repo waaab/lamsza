@@ -36,6 +36,7 @@ func main() {
 
 	mux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
 	mux.HandleFunc("/api/account/import", middleware.ApplyCORS(account.HandleImport))
+	mux.HandleFunc("/api/account/links", middleware.ApplyCORS(account.HandleLinks))
 
 	// Core Module (Always Enabled)
 	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))

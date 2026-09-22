@@ -17,3 +17,13 @@ func TestClampSlots(t *testing.T) {
 		t.Fatal("slot clamp mismatch")
 	}
 }
+
+func TestNormalizeLink(t *testing.T) {
+	title, url, color, err := NormalizeLink("  RMDSZ ", "https://rmdsz.ro", "")
+	if err != nil || title != "RMDSZ" || url != "https://rmdsz.ro" || color != "#e6f0ff" {
+		t.Fatalf("got %q %q %q %v", title, url, color, err)
+	}
+	if _, _, _, err := NormalizeLink("", "https://rmdsz.ro", ""); err == nil {
+		t.Fatal("expected empty title to fail")
+	}
+}
