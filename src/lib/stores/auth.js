@@ -86,7 +86,18 @@ function createAuthStore() {
                         ),
                     });
                     if (importRes.ok) {
-                        return refresh();
+                        try {
+                            const meRes = await fetch(`${getApiBase()}/api/auth/me`, {
+                                credentials: "include",
+                            });
+                            if (meRes.ok) {
+                                const updated = meToAuthState(await meRes.json());
+                                set(updated);
+                                return updated;
+                            }
+                        } catch {
+                            /* keep pre-import session */
+                        }
                     }
                 } catch {
                     /* keep session; prefsImportedAt stays null */

@@ -15,6 +15,38 @@ test("buildImportPayload copies browser prefs", () => {
     assert.equal(payload.history[0].slug, "kavezo");
 });
 
+test("buildImportPayload drops links missing title or url", () => {
+    const payload = buildImportPayload({
+        theme: "",
+        slots: null,
+        links: [
+            { title: "OK", url: "https://example.test" },
+            { title: "", url: "https://example.test" },
+            { title: "No URL", url: "" },
+            { url: "https://example.test" },
+        ],
+        history: [],
+    });
+    assert.equal(payload.links.length, 1);
+    assert.equal(payload.links[0].title, "OK");
+});
+
+test("buildImportPayload drops history rows missing slug or name", () => {
+    const payload = buildImportPayload({
+        theme: "",
+        slots: null,
+        links: [],
+        history: [
+            { slug: "kavezo", name: "Kávézó" },
+            { slug: "", name: "Névtelen" },
+            { slug: "ures", name: "" },
+            { name: "Nincs slug" },
+        ],
+    });
+    assert.equal(payload.history.length, 1);
+    assert.equal(payload.history[0].slug, "kavezo");
+});
+
 test("meToAuthState maps google fields", () => {
     const state = meToAuthState({
         name: "Anna",
