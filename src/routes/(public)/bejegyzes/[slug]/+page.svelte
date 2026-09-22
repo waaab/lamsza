@@ -1,7 +1,17 @@
 <script>
+    import { onMount } from "svelte";
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
     import { get } from "svelte/store";
+    import { openLogin } from "$lib/openLogin.js";
+    import FavoriteButton from "$lib/components/FavoriteButton.svelte";
+    import {
+        addFavorite,
+        favoriteListWithToggle,
+        isFavorite,
+        loadFavoriteList,
+        removeFavorite,
+    } from "$lib/favorites.js";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import { apiFetch } from "$lib/api";
@@ -12,6 +22,54 @@
     let entry = null;
     let loading = true;
     let error = null;
+    /** @type {{ type: string, id: number }[]} */
+    let favoriteList = [];
+
+    async function initFavorites() {
+        await auth.init();
+        if (!get(auth).loggedIn) {
+            favoriteList = [];
+            return;
+        }
+        try {
+            favoriteList = await loadFavoriteList();
+        } catch {
+            favoriteList = [];
+        }
+    }
+
+    /** @param {string} type @param {number} id @param {boolean} currentlyActive */
+    async function handleFavoriteToggle(type, id, currentlyActive) {
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        try {
+            if (currentlyActive) {
+                await removeFavorite(type, id);
+                favoriteList = favoriteListWithToggle(
+                    favoriteList,
+                    type,
+                    id,
+                    false,
+                );
+            } else {
+                await addFavorite(type, id);
+                favoriteList = favoriteListWithToggle(
+                    favoriteList,
+                    type,
+                    id,
+                    true,
+                );
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    onMount(() => {
+        initFavorites();
+    });
 
     $: slug = $page.params.slug;
 
@@ -88,6 +146,20 @@
                     >
                 </div>
             {/if}
+        </div>
+
+        <div class="page-actions">
+            <FavoriteButton
+                type="entry"
+                id={entry.id}
+                active={isFavorite(favoriteList, "entry", entry.id)}
+                ontoggle={() =>
+                    handleFavoriteToggle(
+                        "entry",
+                        entry.id,
+                        isFavorite(favoriteList, "entry", entry.id),
+                    )}
+            />
         </div>
 
         <div class="contact-card">

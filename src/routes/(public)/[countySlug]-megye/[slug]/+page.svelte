@@ -1,6 +1,18 @@
 <script>
+    import { onMount } from "svelte";
+    import { get } from "svelte/store";
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
+    import { auth } from "$lib/stores/auth";
+    import { openLogin } from "$lib/openLogin.js";
+    import FavoriteButton from "$lib/components/FavoriteButton.svelte";
+    import {
+        addFavorite,
+        favoriteListWithToggle,
+        isFavorite,
+        loadFavoriteList,
+        removeFavorite,
+    } from "$lib/favorites.js";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
@@ -17,6 +29,54 @@
     let entries = [];
     let loading = true;
     let entriesError = null;
+    /** @type {{ type: string, id: number }[]} */
+    let favoriteList = [];
+
+    async function initFavorites() {
+        await auth.init();
+        if (!get(auth).loggedIn) {
+            favoriteList = [];
+            return;
+        }
+        try {
+            favoriteList = await loadFavoriteList();
+        } catch {
+            favoriteList = [];
+        }
+    }
+
+    /** @param {string} type @param {number} id @param {boolean} currentlyActive */
+    async function handleFavoriteToggle(type, id, currentlyActive) {
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        try {
+            if (currentlyActive) {
+                await removeFavorite(type, id);
+                favoriteList = favoriteListWithToggle(
+                    favoriteList,
+                    type,
+                    id,
+                    false,
+                );
+            } else {
+                await addFavorite(type, id);
+                favoriteList = favoriteListWithToggle(
+                    favoriteList,
+                    type,
+                    id,
+                    true,
+                );
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    onMount(() => {
+        initFavorites();
+    });
 
     let viewMode = "grid";
     let sortMode = "title";
@@ -123,7 +183,20 @@
         countySlug={$page.params.countySlug}
     />
 
-    <h1 class="page-title">{attractionData.name}</h1>
+    <div class="location-title-row">
+        <h1 class="page-title">{attractionData.name}</h1>
+        <FavoriteButton
+            type="attraction"
+            id={attractionData.id}
+            active={isFavorite(favoriteList, "attraction", attractionData.id)}
+            ontoggle={() =>
+                handleFavoriteToggle(
+                    "attraction",
+                    attractionData.id,
+                    isFavorite(favoriteList, "attraction", attractionData.id),
+                )}
+        />
+    </div>
     <p class="greeting">
         Látnivaló {attractionData.county_name} megyében.
     </p>
@@ -200,10 +273,23 @@
         countySlug={$page.params.countySlug}
     />
 
-    <h1 class="page-title">
-        {settlementData.name}
-        {settlementData.type} és környéke
-    </h1>
+    <div class="location-title-row">
+        <h1 class="page-title">
+            {settlementData.name}
+            {settlementData.type} és környéke
+        </h1>
+        <FavoriteButton
+            type="settlement"
+            id={settlementData.id}
+            active={isFavorite(favoriteList, "settlement", settlementData.id)}
+            ontoggle={() =>
+                handleFavoriteToggle(
+                    "settlement",
+                    settlementData.id,
+                    isFavorite(favoriteList, "settlement", settlementData.id),
+                )}
+        />
+    </div>
     <p class="greeting">
         Helyi hírek, időjárás és címtár {settlementData.name} területén.
     </p>
@@ -556,5 +642,16 @@
     }
     .settlement-venue-link:hover {
         text-decoration: underline;
+    }
+    .location-title-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .location-title-row .page-title {
+        margin: 0;
+        flex: 1 1 auto;
     }
 </style>

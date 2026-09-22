@@ -1,7 +1,18 @@
 <script>
     import { onMount } from "svelte";
+    import { get } from "svelte/store";
     import { page } from "$app/stores";
     import { apiFetch } from "$lib/api";
+    import { auth } from "$lib/stores/auth";
+    import { openLogin } from "$lib/openLogin.js";
+    import FavoriteButton from "$lib/components/FavoriteButton.svelte";
+    import {
+        addFavorite,
+        favoriteListWithToggle,
+        isFavorite,
+        loadFavoriteList,
+        removeFavorite,
+    } from "$lib/favorites.js";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EventDateBadge from "$lib/components/EventDateBadge.svelte";
     import {
@@ -15,6 +26,50 @@
     let event = null;
     let loading = true;
     let error = null;
+    /** @type {{ type: string, id: number }[]} */
+    let favoriteList = [];
+
+    async function initFavorites() {
+        await auth.init();
+        if (!get(auth).loggedIn) {
+            favoriteList = [];
+            return;
+        }
+        try {
+            favoriteList = await loadFavoriteList();
+        } catch {
+            favoriteList = [];
+        }
+    }
+
+    /** @param {string} type @param {number} id @param {boolean} currentlyActive */
+    async function handleFavoriteToggle(type, id, currentlyActive) {
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        try {
+            if (currentlyActive) {
+                await removeFavorite(type, id);
+                favoriteList = favoriteListWithToggle(
+                    favoriteList,
+                    type,
+                    id,
+                    false,
+                );
+            } else {
+                await addFavorite(type, id);
+                favoriteList = favoriteListWithToggle(
+                    favoriteList,
+                    type,
+                    id,
+                    true,
+                );
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
     /** `null` = show all schedule days; otherwise YYYY-MM-DD */
     let scheduleFilterDay = /** @type {string | null} */ (null);
 
@@ -49,6 +104,7 @@
 
     onMount(() => {
         scheduleClockTick = 1;
+        initFavorites();
         const id = setInterval(() => {
             scheduleClockTick++;
         }, 30000);
@@ -274,6 +330,20 @@
                     <p>{event.description}</p>
                 </div>
             {/if}
+
+            <div class="page-actions">
+                <FavoriteButton
+                    type="event"
+                    id={event.id}
+                    active={isFavorite(favoriteList, "event", event.id)}
+                    ontoggle={() =>
+                        handleFavoriteToggle(
+                            "event",
+                            event.id,
+                            isFavorite(favoriteList, "event", event.id),
+                        )}
+                />
+            </div>
         </article>
     {#if event.schedule && event.schedule.length > 0}
     <section id="program" class="event-schedule" aria-label="Napi program">
