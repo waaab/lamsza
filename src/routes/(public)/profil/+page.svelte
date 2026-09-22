@@ -4,6 +4,7 @@
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { profileTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
+    import { removeFavorite } from "$lib/favorites.js";
     import { openLogin } from "$lib/openLogin.js";
     import {
         clampSlotCount,
@@ -21,6 +22,7 @@
         beallitasok: "Beállítások",
         linkjeim: "Linkjeim",
         elozmenyek: "Előzmények",
+        kedvencek: "Kedvenc helyek",
     };
 
     /** @param {unknown} value */
@@ -50,6 +52,15 @@
     let accountHistory = $state([]);
     let linksLoading = $state(false);
     let historyLoading = $state(false);
+    let favoritesError = $state("");
+    /** @type {{ settlements: Array<{ id: number, name: string, slug?: string | null, county_slug?: string | null }>, attractions: Array<{ id: number, name: string, slug?: string | null, county_slug?: string | null }>, entries: Array<{ id: number, name: string, slug?: string | null }>, events: Array<{ id: number, name: string }> }} */
+    let accountFavorites = $state({
+        settlements: [],
+        attractions: [],
+        entries: [],
+        events: [],
+    });
+    let favoritesLoading = $state(false);
     let linkDialogOpen = $state(false);
     let linkDialogMode = $state(/** @type {"add" | "edit"} */ ("add"));
     let linkDialogData = $state({
@@ -90,6 +101,73 @@
         }
     }
 
+    async function loadFavorites() {
+        favoritesLoading = true;
+        favoritesError = "";
+        try {
+            const payload = (await apiFetch("/api/account/favorites")) || {};
+            accountFavorites = {
+                settlements: Array.isArray(payload.settlements) ? payload.settlements : [],
+                attractions: Array.isArray(payload.attractions) ? payload.attractions : [],
+                entries: Array.isArray(payload.entries) ? payload.entries : [],
+                events: Array.isArray(payload.events) ? payload.events : [],
+            };
+        } catch {
+            accountFavorites = {
+                settlements: [],
+                attractions: [],
+                entries: [],
+                events: [],
+            };
+        } finally {
+            favoritesLoading = false;
+        }
+    }
+
+    /** @param {{ slug?: string | null, county_slug?: string | null }} item */
+    function countyPlaceUrl(item) {
+        const countySlug = String(item.county_slug ?? "").trim();
+        const slug = String(item.slug ?? "").trim();
+        if (!countySlug || !slug) return "";
+        return `/${countySlug}-megye/${slug}`;
+    }
+
+    /** @param {{ slug?: string | null }} item */
+    function entryFavoriteUrl(item) {
+        const slug = String(item.slug ?? "").trim();
+        if (!slug) return "";
+        return `/bejegyzes/${slug}`;
+    }
+
+    /** @param {{ id: number }} item */
+    function eventFavoriteUrl(item) {
+        return `/esemenyek/${item.id}`;
+    }
+
+    /** @param {"settlement" | "attraction" | "entry" | "event"} type @param {number} id */
+    async function removeFavoriteRow(type, id) {
+        favoritesError = "";
+        const prev = accountFavorites;
+        const key =
+            type === "settlement"
+                ? "settlements"
+                : type === "attraction"
+                  ? "attractions"
+                  : type === "entry"
+                    ? "entries"
+                    : "events";
+        try {
+            await removeFavorite(type, id);
+            accountFavorites = {
+                ...prev,
+                [key]: prev[key].filter((row) => row.id !== id),
+            };
+        } catch {
+            accountFavorites = prev;
+            favoritesError = "A mentés nem sikerült";
+        }
+    }
+
     onMount(() => {
         let accountDataLoaded = false;
         selectedTheme = get(theme);
@@ -103,6 +181,7 @@
             initSettingsFromAuth();
             void loadLinks();
             void loadHistory();
+            void loadFavorites();
         });
         const unsubscribeTheme = theme.subscribe((value) => {
             selectedTheme = value;
@@ -496,6 +575,99 @@
                     </ul>
                 {/if}
             </div>
+        {:else if activeTab === "kedvencek"}
+            <div class="profile-favorites">
+                {#if favoritesError}
+                    <p class="profile-error">{favoritesError}</p>
+                {/if}
+                {#if favoritesLoading}
+                    <p>Betöltés…</p>
+                {:else}
+                    {#if accountFavorites.settlements.length > 0}
+                        <h3>Települések</h3>
+                        <ul class="profile-favorites-list">
+                            {#each accountFavorites.settlements as row (row.id)}
+                                <li class="profile-favorites-row">
+                                    {#if countyPlaceUrl(row)}
+                                        <a href={countyPlaceUrl(row)} class="profile-favorites-name">
+                                            {row.name}
+                                        </a>
+                                    {:else}
+                                        <span class="profile-favorites-name">{row.name}</span>
+                                    {/if}
+                                    <button
+                                        type="button"
+                                        class="btn btn-xs"
+                                        onclick={() => removeFavoriteRow("settlement", row.id)}
+                                    >Eltávolítás</button>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                    {#if accountFavorites.attractions.length > 0}
+                        <h3>Látnivalók</h3>
+                        <ul class="profile-favorites-list">
+                            {#each accountFavorites.attractions as row (row.id)}
+                                <li class="profile-favorites-row">
+                                    {#if countyPlaceUrl(row)}
+                                        <a href={countyPlaceUrl(row)} class="profile-favorites-name">
+                                            {row.name}
+                                        </a>
+                                    {:else}
+                                        <span class="profile-favorites-name">{row.name}</span>
+                                    {/if}
+                                    <button
+                                        type="button"
+                                        class="btn btn-xs"
+                                        onclick={() => removeFavoriteRow("attraction", row.id)}
+                                    >Eltávolítás</button>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                    {#if accountFavorites.entries.length > 0}
+                        <h3>Bejegyzések</h3>
+                        <ul class="profile-favorites-list">
+                            {#each accountFavorites.entries as row (row.id)}
+                                <li class="profile-favorites-row">
+                                    {#if entryFavoriteUrl(row)}
+                                        <a href={entryFavoriteUrl(row)} class="profile-favorites-name">
+                                            {row.name}
+                                        </a>
+                                    {:else}
+                                        <span class="profile-favorites-name">{row.name}</span>
+                                    {/if}
+                                    <button
+                                        type="button"
+                                        class="btn btn-xs"
+                                        onclick={() => removeFavoriteRow("entry", row.id)}
+                                    >Eltávolítás</button>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                    {#if accountFavorites.events.length > 0}
+                        <h3>Események</h3>
+                        <ul class="profile-favorites-list">
+                            {#each accountFavorites.events as row (row.id)}
+                                <li class="profile-favorites-row">
+                                    <a href={eventFavoriteUrl(row)} class="profile-favorites-name">
+                                        {row.name}
+                                    </a>
+                                    <button
+                                        type="button"
+                                        class="btn btn-xs"
+                                        onclick={() => removeFavoriteRow("event", row.id)}
+                                    >Eltávolítás</button>
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                    {#if accountFavorites.settlements.length === 0 && accountFavorites.attractions.length === 0 && accountFavorites.entries.length === 0 && accountFavorites.events.length === 0}
+                        <p class="profile-empty">Még nincs kedvenc hely.</p>
+                    {/if}
+                {/if}
+            </div>
         {/if}
     {/if}
 </section>
@@ -615,7 +787,8 @@
         color: var(--text-muted, #666);
     }
     .profile-link-list,
-    .profile-history-list {
+    .profile-history-list,
+    .profile-favorites-list {
         list-style: none;
         margin: 0.75rem 0 0;
         padding: 0;
@@ -625,7 +798,8 @@
         width: 100%;
     }
     .profile-link-row,
-    .profile-history-row {
+    .profile-history-row,
+    .profile-favorites-row {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
@@ -652,8 +826,16 @@
         gap: 0.35rem;
         margin-left: auto;
     }
-    .profile-history-name {
+    .profile-history-name,
+    .profile-favorites-name {
         font-weight: 600;
+    }
+    .profile-favorites h3 {
+        margin: 0.75rem 0 0;
+        font-size: 1rem;
+    }
+    .profile-favorites h3:first-child {
+        margin-top: 0;
     }
     .profile-history-meta {
         color: var(--text-muted, #666);

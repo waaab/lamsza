@@ -52,7 +52,13 @@ test("buildImportPayload drops history rows missing slug or name", () => {
 });
 
 test("profileTabIds are the account tabs", () => {
-    assert.deepEqual(profileTabIds, ["profil", "beallitasok", "linkjeim", "elozmenyek"]);
+    assert.deepEqual(profileTabIds, [
+        "profil",
+        "beallitasok",
+        "linkjeim",
+        "elozmenyek",
+        "kedvencek",
+    ]);
 });
 
 test("meToAuthState maps google fields", () => {

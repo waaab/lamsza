@@ -1,4 +1,4 @@
-export const profileTabIds = ["profil", "beallitasok", "linkjeim", "elozmenyek"];
+export const profileTabIds = ["profil", "beallitasok", "linkjeim", "elozmenyek", "kedvencek"];
 
 /** @param {{ title?: unknown; url?: unknown; bg_color?: unknown }} link */
 function validLink(link) {
