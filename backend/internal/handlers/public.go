@@ -43,7 +43,8 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank,
-				COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[])
+				COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[]),
+				COALESCE(e.ratings_enabled, false)
 			FROM entries e
 			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
@@ -68,7 +69,8 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				0 as rank,
-				COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[])
+				COALESCE(array_agg(DISTINCT t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::text[]),
+				COALESCE(e.ratings_enabled, false)
 			FROM entries e
 			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
@@ -127,7 +129,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		var pqTags []string
 		var rank float64
 		var hours, delivery, photos []byte
-		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos, &e.IsDirectMatch, &rank, pq.Array(&pqTags)); err != nil {
+		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos, &e.IsDirectMatch, &rank, pq.Array(&pqTags), &e.RatingsEnabled); err != nil {
 			log.Printf("EntriesHandler scan error: %v", err)
 			continue
 		}
@@ -176,13 +178,14 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 			e.languages, COALESCE(e.url, ''),
 			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
-			COALESCE(e.photos, '[]'::jsonb)
+			COALESCE(e.photos, '[]'::jsonb),
+			COALESCE(e.ratings_enabled, false)
 		FROM entries e
 		JOIN entry_types typ ON typ.id = e.type_id
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
-		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos)
+		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos, &e.RatingsEnabled)
 
 	if err != nil {
 		http.Error(w, "Entry not found", 404)

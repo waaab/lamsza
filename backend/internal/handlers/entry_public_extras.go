@@ -9,7 +9,8 @@ import (
 
 // ApplyPublicEntryExtras enforces public listing vs claimed-extras on an Entry.
 // Unclaimed public listings must not expose photos, hours, or ratings even if admin data exists.
-// Claimed listings keep stored extras and gain ratings_enabled.
+// Claimed listings keep stored extras and gain ratings_enabled from the entry struct.
+// ratings_enabled is pre-loaded by the entry SELECT in public.go (list + detail queries).
 func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 	if !e.Claimed {
 		// Unclaimed: strip photos, hours, delivery_hours, ratings
@@ -20,24 +21,16 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 		return
 	}
 
-	// Claimed: scan ratings_enabled from DB
-	var ratingsEnabled bool
-	entryIDInt, _ := strconv.Atoi(e.ID)
-	err := db.DB.QueryRow(`SELECT COALESCE(ratings_enabled, false) FROM entries WHERE id = $1`, entryIDInt).Scan(&ratingsEnabled)
-	if err != nil {
-		e.RatingsEnabled = false
+	if !e.RatingsEnabled {
 		return
 	}
-	e.RatingsEnabled = ratingsEnabled
 
-	if !ratingsEnabled {
-		return
-	}
+	entryIDInt, _ := strconv.Atoi(e.ID)
 
 	// Load rating and review count
 	var avgRating *float64
 	var reviewCount int
-	err = db.DB.QueryRow(`
+	err := db.DB.QueryRow(`
 		SELECT 
 			ROUND(AVG(score)::numeric, 1),
 			COUNT(*)
@@ -70,7 +63,7 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 	}
 	defer rows.Close()
 
-	var reviews []models.PublicReview
+	reviews := []models.PublicReview{}
 	for rows.Next() {
 		var r models.PublicReview
 		var id int
