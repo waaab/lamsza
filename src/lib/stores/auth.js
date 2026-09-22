@@ -1,34 +1,121 @@
 import { writable } from "svelte/store";
+import { getApiBase } from "$lib/api.js";
+import { buildImportPayload, meToAuthState } from "$lib/accountPrefs.js";
+import { readHistory } from "$lib/entryHistory.js";
+import { readSlotCount } from "$lib/quickLinksDisplay.js";
+
+const empty = {
+    loggedIn: false,
+    user: "",
+    email: "",
+    isAdmin: false,
+    picture: "",
+    givenName: "",
+    familyName: "",
+    locale: "",
+    googleSub: "",
+    lastLoginAt: null,
+    createdAt: null,
+    theme: null,
+    quicklinkSlots: null,
+    prefsImportedAt: null,
+};
+
+function clearLegacyStorage() {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem("admin_auth");
+    localStorage.removeItem("admin_user");
+    localStorage.removeItem("admin_is_admin");
+}
+
+function readBrowserImportInput() {
+    let theme = "";
+    let links = [];
+    if (typeof localStorage === "undefined") {
+        return { theme, slots: null, links, history: [] };
+    }
+    try {
+        theme = localStorage.getItem("theme") || "";
+    } catch {
+        /* private mode / quota */
+    }
+    try {
+        const raw = localStorage.getItem("user_quick_links");
+        links = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(links)) links = [];
+    } catch {
+        links = [];
+    }
+    return {
+        theme,
+        slots: readSlotCount(),
+        links,
+        history: readHistory(),
+    };
+}
 
 function createAuthStore() {
-    const { subscribe, set } = writable({ loggedIn: false, user: "", isAdmin: false });
+    const { subscribe, set } = writable(empty);
+
+    async function refresh() {
+        if (typeof window === "undefined") {
+            set(empty);
+            return empty;
+        }
+        clearLegacyStorage();
+        try {
+            const res = await fetch(`${getApiBase()}/api/auth/me`, {
+                credentials: "include",
+            });
+            if (!res.ok) {
+                set(empty);
+                return empty;
+            }
+            const me = await res.json();
+            const next = meToAuthState(me);
+            set(next);
+
+            if (next.prefsImportedAt == null && typeof localStorage !== "undefined") {
+                try {
+                    const importRes = await fetch(`${getApiBase()}/api/account/import`, {
+                        method: "POST",
+                        credentials: "include",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(
+                            buildImportPayload(readBrowserImportInput()),
+                        ),
+                    });
+                    if (importRes.ok) {
+                        return refresh();
+                    }
+                } catch {
+                    /* keep session; prefsImportedAt stays null */
+                }
+            }
+
+            return next;
+        } catch {
+            set(empty);
+            return empty;
+        }
+    }
 
     return {
         subscribe,
         init() {
-            if (typeof window !== "undefined") {
-                set({
-                    loggedIn: localStorage.getItem("admin_auth") === "true",
-                    user: localStorage.getItem("admin_user") || "",
-                    isAdmin: localStorage.getItem("admin_is_admin") === "true",
+            return refresh();
+        },
+        refresh,
+        async logout() {
+            try {
+                await fetch(`${getApiBase()}/api/auth/logout`, {
+                    method: "POST",
+                    credentials: "include",
                 });
+            } catch {
+                /* still clear locally */
             }
-        },
-        login(user, isAdmin = false) {
-            if (typeof window !== "undefined") {
-                localStorage.setItem("admin_auth", "true");
-                localStorage.setItem("admin_user", user || "User");
-                localStorage.setItem("admin_is_admin", isAdmin ? "true" : "false");
-                set({ loggedIn: true, user: user || "User", isAdmin });
-            }
-        },
-        logout() {
-            if (typeof window !== "undefined") {
-                localStorage.removeItem("admin_auth");
-                localStorage.removeItem("admin_user");
-                localStorage.removeItem("admin_is_admin");
-                set({ loggedIn: false, user: "", isAdmin: false });
-            }
+            set(empty);
         },
     };
 }
