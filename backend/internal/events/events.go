@@ -19,10 +19,6 @@ type paginatedResponse struct {
 	Total  int            `json:"total"`
 }
 
-var allowedEventTypes = map[string]bool{
-	"cultural": true, "sports": true, "festival": true, "religious": true, "other": true,
-}
-
 func parseDateQueryParam(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -41,9 +37,7 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	organizer := r.URL.Query().Get("organizer")
 	locationType := r.URL.Query().Get("location_type")
 	eventType := strings.TrimSpace(r.URL.Query().Get("event_type"))
-	if eventType != "" && !allowedEventTypes[eventType] {
-		eventType = ""
-	}
+	eventSubtype := strings.TrimSpace(r.URL.Query().Get("event_subtype"))
 	dateFrom := parseDateQueryParam(r.URL.Query().Get("date_from"))
 	dateTo := parseDateQueryParam(r.URL.Query().Get("date_to"))
 
@@ -63,16 +57,21 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	var rows *sql.Rows
 	var err error
 
-	baseSelect := `SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, COALESCE(e.description, ''),
-		e.start_date::text, COALESCE(e.start_time::text, ''), e.end_date::text, COALESCE(e.end_time::text, ''), e.event_type, COALESCE(e.organizer, ''), COALESCE(s.type, ''),
-		e.default_venue_id, COALESCE(vdef.name, ''), COALESCE(vdef.slug, ''),
+	baseSelect := `SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, COALESCE(e.description, ''), COALESCE(e.featured_image, ''),
+		e.start_date::text, COALESCE(e.start_time::text, ''), e.end_date::text, COALESCE(e.end_time::text, ''),
+		COALESCE(et.slug, ''), COALESCE(et.label_hu, ''), COALESCE(es.slug, ''), COALESCE(es.label_hu, ''),
+		COALESCE(e.access_type, 'public'), COALESCE(e.organizer, ''), COALESCE(e.entry_price, ''), COALESCE(s.type, ''),
+		e.default_venue_id, COALESCE(vdef.name, ''), COALESCE(vdef.slug, ''), COALESCE(vdef.kind, ''), COALESCE(vt.label_hu, ''),
 		EXISTS (SELECT 1 FROM event_schedule_days esd WHERE esd.event_id = e.id)
 		FROM events e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
-		LEFT JOIN venues vdef ON e.default_venue_id = vdef.id`
+		JOIN catalog_event_types et ON e.event_type_id = et.id
+		LEFT JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
+		LEFT JOIN venues vdef ON e.default_venue_id = vdef.id
+		LEFT JOIN venue_types vt ON vt.slug = vdef.kind`
 
-	baseCount := `SELECT COUNT(*) FROM events e JOIN settlements s ON e.location_id = s.id JOIN counties c ON s.county_id = c.id`
+	baseCount := `SELECT COUNT(*) FROM events e JOIN settlements s ON e.location_id = s.id JOIN counties c ON s.county_id = c.id JOIN catalog_event_types et ON e.event_type_id = et.id LEFT JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id`
 
 	var conditions []string
 	var args []interface{}
@@ -103,8 +102,13 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if eventType != "" {
-		conditions = append(conditions, fmt.Sprintf("e.event_type = $%d", argIdx))
+		conditions = append(conditions, fmt.Sprintf("et.slug = $%d", argIdx))
 		args = append(args, eventType)
+		argIdx++
+	}
+	if eventSubtype != "" {
+		conditions = append(conditions, fmt.Sprintf("es.slug = $%d", argIdx))
+		args = append(args, eventSubtype)
 		argIdx++
 	}
 	// Overlap with [dateFrom, dateTo]: includes multi-day events on every day in range (day pick, month range).
@@ -213,8 +217,8 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var ev models.Event
 		var defVID sql.NullInt64
-		var defVName, defVSlug string
-		if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer, &ev.LocationType, &defVID, &defVName, &defVSlug, &ev.HasSchedule); err != nil {
+		var defVName, defVSlug, defVKind, defVKindLabel string
+		if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.FeaturedImage, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.EventTypeLabel, &ev.EventSubtype, &ev.EventSubtypeLabel, &ev.AccessType, &ev.Organizer, &ev.EntryPrice, &ev.LocationType, &defVID, &defVName, &defVSlug, &defVKind, &defVKindLabel, &ev.HasSchedule); err != nil {
 			log.Printf("HandleEvents rows.Scan: %v", err)
 			continue
 		}
@@ -224,6 +228,8 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 		}
 		ev.DefaultVenueName = defVName
 		ev.DefaultVenueSlug = defVSlug
+		ev.DefaultVenueKind = defVKind
+		ev.DefaultVenueKindLabel = defVKindLabel
 		events = append(events, ev)
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -244,25 +250,31 @@ func HandleEventDetail(w http.ResponseWriter, r *http.Request) {
 
 	var ev models.Event
 	var defVID sql.NullInt64
-	var defVName, defVSlug string
+	var defVName, defVSlug, defVKind, defVKindLabel string
 	err = db.DB.QueryRow(`
-		SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, COALESCE(e.description, ''),
-		       e.start_date::text, COALESCE(e.start_time::text, ''), e.end_date::text, COALESCE(e.end_time::text, ''), e.event_type, COALESCE(e.organizer, ''), COALESCE(s.type, ''),
-		       e.default_venue_id, COALESCE(vdef.name, ''), COALESCE(vdef.slug, ''),
+		SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug, e.title, COALESCE(e.description, ''), COALESCE(e.featured_image, ''),
+		       e.start_date::text, COALESCE(e.start_time::text, ''), e.end_date::text, COALESCE(e.end_time::text, ''),
+		       COALESCE(et.slug, ''), COALESCE(et.label_hu, ''), COALESCE(es.slug, ''), COALESCE(es.label_hu, ''),
+		       COALESCE(e.access_type, 'public'), COALESCE(e.organizer, ''), COALESCE(e.entry_price, ''), COALESCE(s.type, ''),
+		       e.default_venue_id, COALESCE(vdef.name, ''), COALESCE(vdef.slug, ''), COALESCE(vdef.kind, ''), COALESCE(vt.label_hu, ''),
 		       EXISTS (SELECT 1 FROM event_schedule_days esd WHERE esd.event_id = e.id)
 		FROM events e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
+		JOIN catalog_event_types et ON e.event_type_id = et.id
+		LEFT JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
 		LEFT JOIN venues vdef ON e.default_venue_id = vdef.id
-		WHERE e.id = $1`, id).Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer, &ev.LocationType, &defVID, &defVName, &defVSlug, &ev.HasSchedule)
+		LEFT JOIN venue_types vt ON vt.slug = vdef.kind
+		WHERE e.id = $1`, id).Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.FeaturedImage, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.EventTypeLabel, &ev.EventSubtype, &ev.EventSubtypeLabel, &ev.AccessType, &ev.Organizer, &ev.EntryPrice, &ev.LocationType, &defVID, &defVName, &defVSlug, &defVKind, &defVKindLabel, &ev.HasSchedule)
 	if err == nil && defVID.Valid {
 		x := int(defVID.Int64)
 		ev.DefaultVenueID = &x
+	}
+	if err == nil {
 		ev.DefaultVenueName = defVName
 		ev.DefaultVenueSlug = defVSlug
-	} else if err == nil {
-		ev.DefaultVenueName = defVName
-		ev.DefaultVenueSlug = defVSlug
+		ev.DefaultVenueKind = defVKind
+		ev.DefaultVenueKindLabel = defVKindLabel
 	}
 	if err == sql.ErrNoRows {
 		http.Error(w, "Event not found", http.StatusNotFound)
@@ -286,9 +298,12 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		rows, err := db.DB.Query(`
 			SELECT e.id, e.location_id, e.default_venue_id, COALESCE(vdef.name, ''),
-				e.title, e.description, e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text, e.event_type, e.organizer
+				e.title, e.description, COALESCE(e.featured_image, ''), e.start_date::text, e.start_time::text, e.end_date::text, e.end_time::text,
+				e.event_type_id, e.event_subtype_id, COALESCE(et.slug, ''), COALESCE(es.slug, ''), COALESCE(e.access_type, 'public'), e.organizer, COALESCE(e.entry_price, '')
 			FROM events e
 			LEFT JOIN venues vdef ON e.default_venue_id = vdef.id
+			JOIN catalog_event_types et ON e.event_type_id = et.id
+			LEFT JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
 			ORDER BY LOWER(e.title) ASC, e.id ASC`)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -298,9 +313,11 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 		events := []models.AdminEvent{}
 		for rows.Next() {
 			var ev models.AdminEvent
-			var locID, defVID sql.NullInt64
+			var locID, defVID, subID sql.NullInt64
 			var desc, st, et, org sql.NullString
-			if err := rows.Scan(&ev.ID, &locID, &defVID, &ev.DefaultVenueName, &ev.Title, &desc, &ev.StartDate, &st, &ev.EndDate, &et, &ev.EventType, &org); err != nil {
+			var feat string
+			var entryPrice string
+			if err := rows.Scan(&ev.ID, &locID, &defVID, &ev.DefaultVenueName, &ev.Title, &desc, &feat, &ev.StartDate, &st, &ev.EndDate, &et, &ev.EventTypeID, &subID, &ev.EventType, &ev.EventSubtype, &ev.AccessType, &org, &entryPrice); err != nil {
 				log.Printf("handleAdminEvents rows.Scan: %v", err)
 				continue
 			}
@@ -312,9 +329,14 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 				v := int(defVID.Int64)
 				ev.DefaultVenueID = &v
 			}
+			if subID.Valid {
+				v := int(subID.Int64)
+				ev.EventSubtypeID = &v
+			}
 			if desc.Valid {
 				ev.Description = desc.String
 			}
+			ev.FeaturedImage = feat
 			if st.Valid {
 				ev.StartTime = st.String
 			}
@@ -324,6 +346,7 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 			if org.Valid {
 				ev.Organizer = org.String
 			}
+			ev.EntryPrice = entryPrice
 			events = append(events, ev)
 		}
 		json.NewEncoder(w).Encode(events)
@@ -334,6 +357,11 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		if err := resolveAdminEventIDs(&ev); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		ev.AccessType = normalizeAccessType(ev.AccessType)
 		if err := validateAdminEvent(&ev); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -342,9 +370,9 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		err := db.DB.QueryRow(`INSERT INTO events (location_id, title, description, start_date, start_time, end_date, end_time, event_type, organizer, default_venue_id) 
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-			ev.LocationID, ev.Title, ev.Description, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventType, ev.Organizer, nullIntPtr(ev.DefaultVenueID)).Scan(&ev.ID)
+		err := db.DB.QueryRow(`INSERT INTO events (location_id, title, description, featured_image, start_date, start_time, end_date, end_time, event_type_id, event_subtype_id, access_type, organizer, default_venue_id, entry_price) 
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id`,
+			ev.LocationID, ev.Title, ev.Description, ev.FeaturedImage, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventTypeID, nullIntPtr(ev.EventSubtypeID), ev.AccessType, ev.Organizer, nullIntPtr(ev.DefaultVenueID), strings.TrimSpace(ev.EntryPrice)).Scan(&ev.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -357,6 +385,11 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
+		if err := resolveAdminEventIDs(&ev); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		ev.AccessType = normalizeAccessType(ev.AccessType)
 		if err := validateAdminEvent(&ev); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
@@ -365,8 +398,8 @@ func HandleAdminEvents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		_, err := db.DB.Exec(`UPDATE events SET location_id=$1, title=$2, description=$3, start_date=$4, start_time=$5, end_date=$6, end_time=$7, event_type=$8, organizer=$9, default_venue_id=$10 WHERE id=$11`,
-			ev.LocationID, ev.Title, ev.Description, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventType, ev.Organizer, nullIntPtr(ev.DefaultVenueID), ev.ID)
+		_, err := db.DB.Exec(`UPDATE events SET location_id=$1, title=$2, description=$3, featured_image=$4, start_date=$5, start_time=$6, end_date=$7, end_time=$8, event_type_id=$9, event_subtype_id=$10, access_type=$11, organizer=$12, default_venue_id=$13, entry_price=$14 WHERE id=$15`,
+			ev.LocationID, ev.Title, ev.Description, ev.FeaturedImage, ev.StartDate, ev.StartTime, ev.EndDate, ev.EndTime, ev.EventTypeID, nullIntPtr(ev.EventSubtypeID), ev.AccessType, ev.Organizer, nullIntPtr(ev.DefaultVenueID), strings.TrimSpace(ev.EntryPrice), ev.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -394,6 +427,49 @@ func validateAdminEvent(ev *models.AdminEvent) error {
 	}
 	if strings.TrimSpace(ev.StartTime) == "" || strings.TrimSpace(ev.EndTime) == "" {
 		return fmt.Errorf("Kezdő és befejező időpont (óra:perc) kötelező.")
+	}
+	if ev.EventTypeID < 1 {
+		return fmt.Errorf("Eseménytípus kötelező.")
+	}
+	return nil
+}
+
+func normalizeAccessType(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "members_only", "invitation_only":
+		return s
+	default:
+		return "public"
+	}
+}
+
+func resolveAdminEventIDs(ev *models.AdminEvent) error {
+	if ev.EventTypeID < 1 && strings.TrimSpace(ev.EventType) != "" {
+		slug := strings.TrimSpace(strings.ToLower(ev.EventType))
+		err := db.DB.QueryRow(`SELECT id FROM catalog_event_types WHERE slug = $1`, slug).Scan(&ev.EventTypeID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return fmt.Errorf("Ismeretlen eseménytípus.")
+			}
+			return err
+		}
+	}
+	if ev.EventTypeID < 1 {
+		return fmt.Errorf("Eseménytípus kötelező.")
+	}
+	if ev.EventSubtypeID != nil && *ev.EventSubtypeID > 0 {
+		var etid int
+		err := db.DB.QueryRow(`SELECT event_type_id FROM catalog_event_subtypes WHERE id = $1`, *ev.EventSubtypeID).Scan(&etid)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return fmt.Errorf("Érvénytelen altípus.")
+			}
+			return err
+		}
+		if etid != ev.EventTypeID {
+			return fmt.Errorf("Az altípus nem ehhez a típushoz tartozik.")
+		}
 	}
 	return nil
 }

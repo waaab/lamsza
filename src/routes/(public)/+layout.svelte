@@ -9,19 +9,26 @@
     import { auth } from "$lib/stores/auth";
     import { theme, cycleTheme, LABELS } from "$lib/stores/theme";
     import { fade } from "svelte/transition";
+    import { apiFetch } from "$lib/api.js";
+    import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
 
     let settingsOpen = false;
     let scrollY = 0;
     let loginDialogOpen = false;
-    let loginPassword = "";
-    let loginError = "";
+    let googleClientId = "";
+    let configLoaded = false;
 
-    const ADMIN_PASSWORD = "szekely123";
-
-    onMount(() => {
+    onMount(async () => {
         const stopLoginListener = listenForOpenLogin(openLoginDialog);
-        auth.init();
+        await auth.init();
+        try {
+            const cfg = await apiFetch("/api/config/public");
+            googleClientId = cfg.google_client_id || "";
+        } catch (e) {
+            console.error(e);
+        }
+        configLoaded = true;
         return stopLoginListener;
     });
 
@@ -39,31 +46,21 @@
         }
     }
 
-    function logout() {
-        auth.logout();
+    async function logout() {
+        await auth.logout();
     }
 
     function openLoginDialog() {
         loginDialogOpen = true;
-        loginPassword = "";
-        loginError = "";
     }
 
     function closeLoginDialog() {
         loginDialogOpen = false;
-        loginPassword = "";
-        loginError = "";
     }
 
-    function submitLogin(e) {
-        e.preventDefault();
-        loginError = "";
-        if (loginPassword === ADMIN_PASSWORD) {
-            auth.login("Admin", true);
-            closeLoginDialog();
-        } else {
-            loginError = "Na de kicsibarátom, ez nem a jó jelszó!";
-        }
+    async function onGoogleSignedIn() {
+        await auth.refresh();
+        closeLoginDialog();
     }
 
 </script>
@@ -78,7 +75,7 @@
     <div class="nav">
         <a
             href="/"
-            class="nav-btn {$page.url.pathname === '/' ? 'active' : ''}"
+            class="btn nav-btn {$page.url.pathname === '/' ? 'active' : ''}"
             title="Vissza a főódalra"
         >
             <svg
@@ -99,7 +96,7 @@
         </a>
         <a
             href="/index"
-            class="nav-btn {$page.url.pathname.startsWith('/index')
+            class="btn nav-btn {$page.url.pathname.startsWith('/index')
                 ? 'active'
                 : ''}"
             title="Index"
@@ -126,7 +123,7 @@
         </a>
         <a
             href="/hirek"
-            class="nav-btn {$page.url.pathname.startsWith('/hirek')
+            class="btn nav-btn {$page.url.pathname.startsWith('/hirek')
                 ? 'active'
                 : ''}"
             title="Hírek"
@@ -151,7 +148,7 @@
         </a>
         <a
         href="/esemenyek"
-        class="nav-btn {$page.url.pathname.startsWith('/esemenyek')
+        class="btn nav-btn {$page.url.pathname.startsWith('/esemenyek')
             ? 'active'
             : ''}"
         title="Események"
@@ -176,7 +173,7 @@
     </a>
     <a
     href="/szekek"
-    class="nav-btn {$page.url.pathname === '/szekek' ||
+    class="btn nav-btn {$page.url.pathname === '/szekek' ||
     $page.url.pathname.startsWith('/szekek/')
         ? 'active'
         : ''}"
@@ -203,7 +200,7 @@
 </a>
         <a
             href="/megyek"
-            class="nav-btn {$page.url.pathname === '/megyek' ||
+            class="btn nav-btn {$page.url.pathname === '/megyek' ||
             $page.url.pathname.includes('-megye')
                 ? 'active'
                 : ''}"
@@ -228,7 +225,7 @@
 
         <a
             href="/varosok"
-            class="nav-btn {$page.url.pathname === '/varosok' ||
+            class="btn nav-btn {$page.url.pathname === '/varosok' ||
             $page.url.pathname.startsWith('/varos/')
                 ? 'active'
                 : ''}"
@@ -257,7 +254,7 @@
         </a>
         <a
             href="/falvak"
-            class="nav-btn {$page.url.pathname === '/falvak' ||
+            class="btn nav-btn {$page.url.pathname === '/falvak' ||
             $page.url.pathname.startsWith('/falu/')
                 ? 'active'
                 : ''}"
@@ -288,7 +285,7 @@
             {#if $auth.isAdmin}
             <button
                 type="button"
-                class="nav-btn nav-btn--admin {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
+                class="btn nav-btn nav-btn--admin {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
                 title="Admin panel"
                 on:click={() => goto('/admin')}
             >
@@ -316,7 +313,7 @@
             {/if}
             <button
                 type="button"
-                class="nav-btn"
+                class="btn nav-btn"
                 on:click={logout}
                 title="Kijelentkezés"
             >
@@ -337,7 +334,7 @@
         {:else}
             <button
                 type="button"
-                class="nav-btn"
+                class="btn nav-btn"
                 title="Belépés"
                 on:click={openLogin}
             >
@@ -359,7 +356,7 @@
 
         <div class="settings-container">
             <button
-                class="nav-btn"
+                class="btn nav-btn"
                 on:click|stopPropagation={toggleSettings}
                 aria-label="Beállítások megnyitása"
                 aria-expanded={settingsOpen}
@@ -412,37 +409,33 @@
 
 <footer>
     <div class="copyright">
-        Készítette sok ❤️-el <a
-            href="https://bogozi.com"
-            target="_blank"
-            rel="nofollow noopener"
-            title="bogozi.com - webfejlesztés, webshop készítés, keresőoptimalizálás"
-            >bogozi.com</a
-        >
+        Sok ❤️-el Székelyföldről.
         © {new Date().getFullYear()} &bull; Na lámsza - Erdélyi magyar startlap
-        és kereső. Az internet székely kapuja &bull;
-        <a href="/valtozasnaplo" title="Verzió és Változásnapló"
-            >v1.0.0 - Változásnapló</a
-        >
+        és kereső. Az internet székely kapuja.
     </div>
-    <div class="brand-info">
-        <div class="logo">Na Lámsza!</div>
-        <div class="social-links">
-            <a href="/" target="_blank" rel="noopener" title="Facebook"
-                >Facebook</a
-            >
-            <a href="/" target="_blank" rel="noopener" title="Twitter"
-                >Twitter</a
-            >
-            <a href="/" target="_blank" rel="noopener" title="Instagram"
-                >Instagram</a
+    <div class="footer-bottom">
+        <div class="brand-info">
+            <div class="social-links">
+                <a href="https://www.facebook.com/szekelygugel" target="_blank" rel="noopener" title="Facebook"
+                    >Facebook</a
+                >
+                <a href="/" target="_blank" rel="noopener" title="Twitter"
+                    >Twitter</a
+                >
+                <a href="/" target="_blank" rel="noopener" title="Instagram"
+                    >Instagram</a
+                >
+            </div>
+        </div>
+        <div class="policy-links">
+            <a href="/iranyelvek" title="Irányelvek">Irányelvek</a>
+            <a href="/iranyelvek/feltetelek" title="Feltételek">Feltételek</a>
+            <a href="/iranyelvek/sutik" title="Sütik">Sütik</a>
+            &bull;
+            <a href="/valtozasnaplo" title="Verzió és Változásnapló"
+                >v1.0.0 - Változásnapló</a
             >
         </div>
-    </div>
-    <div class="policy-links">
-        <a href="/iranyelvek" title="Irányelvek">Irányelvek</a>
-        <a href="/iranyelvek/feltetelek" title="Feltételek">Feltételek</a>
-        <a href="/iranyelvek/sutik" title="Sütik">Sütik</a>
     </div>
 </footer>
 
@@ -458,23 +451,19 @@
     >
         <div class="link-dialog" on:click|stopPropagation>
             <h3 id="login-dialog-title">Belépés</h3>
-            <form class="link-dialog-form" on:submit|preventDefault={submitLogin}>
-                <label for="login_password">Jelszó</label>
-                <input
-                    id="login_password"
-                    type="password"
-                    bind:value={loginPassword}
-                    placeholder="Jelszó..."
-                    required
-                />
-                {#if loginError}
-                    <p class="login-error">{loginError}</p>
-                {/if}
-                <div class="link-dialog-actions">
-                    <button type="submit" class="link-dialog-submit">Belépés</button>
-                    <button type="button" class="link-dialog-cancel" on:click={closeLoginDialog}>Mégse</button>
-                </div>
-            </form>
+            {#if googleClientId}
+                {#key googleClientId}
+                    <GoogleSignIn
+                        clientId={googleClientId}
+                        onSignedIn={onGoogleSignedIn}
+                    />
+                {/key}
+            {:else if configLoaded}
+                <p class="login-error">A Google belépés nincs beállítva.</p>
+            {/if}
+            <div class="link-dialog-actions">
+                <button type="button" class="link-dialog-cancel" on:click={closeLoginDialog}>Mégse</button>
+            </div>
         </div>
     </div>
 {/if}
@@ -489,6 +478,7 @@
         ↑
     </button>
 {/if}
+
 <style>
     .nav-btn--admin {
         position: relative;

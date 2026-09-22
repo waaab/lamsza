@@ -29,6 +29,9 @@ vite.config.ts.timestamp-*
 backend/sz-gugel-bin
 backend/backend
 
+# Uploaded event images (served from /api/media/event-images/)
+backend/data/
+
 # Local dev: PID files and logs (scripts/restart_all.sh, etc.)
 server.pid
 backend/server.pid

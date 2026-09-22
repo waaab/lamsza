@@ -1,12 +1,18 @@
 <script>
     import { onMount } from "svelte";
-    import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import { apiFetch } from "$lib/api";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+
+    let pageHeader = initialPageHeader("megyek");
+    let pageHeaderLoading = false;
 
     let locations = [];
     let loading = true;
 
     onMount(async () => {
+        pageHeader = await loadPageMeta("megyek");
+        pageHeaderLoading = false;
         try {
             const all = await apiFetch("/api/locations?type=megye");
             locations = all.sort((a, b) => a.name.localeCompare(b.name));
@@ -18,44 +24,39 @@
     });
 </script>
 
-<svelte:head>
-    <title>Székelyföldi Megyék - Lámsza Index</title>
-</svelte:head>
-
-<Breadcrumbs label="Székelyföldi Megyék" />
-<h1 class="page-title">Székelyföldi Megyék</h1>
+<PublicPageHero
+    title={pageHeader.title}
+    greeting={pageHeader.greeting}
+    loading={pageHeaderLoading}
+    breadcrumbLabel="Székelyföldi Megyék"
+    documentTitleSuffix=" - Lámsza Index"
+/>
 
 <div class="page-inner">
     {#if loading}
-        <span class="badge county-badge" style="opacity:0.5">adat betöltés...</span>
+        <div class="info-box"><p>Betöltés…</p></div>
+    {:else if locations.length === 0}
+        <div class="info-box"><p>Nincs megjeleníthető adat.</p></div>
     {:else}
         {#each locations as loc}
-            <a href="/{loc.slug}-megye" class="badge county-badge">
-                {loc.name}
+            <a href="/{loc.slug}-megye" class="card sm county">
+                <span class="location-name">{loc.name}</span>
+                <span class="location-county">{loc.type}</span>
             </a>
         {/each}
     {/if}
-    <p class="megyek-szek-link">
-        <a href="/szekek">Történelmi székek (Csíkszék, Háromszék, …)</a>
-    </p>
 </div>
+<nav class="page-nav">
+    <h4 class="page-nav-title">Oldal navigáció</h4>
+    <ul>
+        <li><a class="btn nav-btn" href="/szekek">Történelmi székek</a></li>
+        <li><a class="btn nav-btn" href="/varosok">Székelyföldi városok</a></li>
+        <li><a class="btn nav-btn" href="/falvak">Székelyföldi falvak</a></li>
+    </ul>
+</nav>
 
 <style>
-    .megyek-szek-link {
-        margin-top: 1.5rem;
-        width: 100%;
-        flex-basis: 100%;
-    }
-    .megyek-szek-link a {
-        color: var(--szekely-blue, #1565c0);
-    }
-    .county-badge {
-        text-decoration: none;
-        color: var(--primary-color);
-        background: var(--card-bg);
-        font-weight: 500;
-        padding: 0.8rem 1.5rem;
-        border: 1px solid var(--border-color);
-        font-size: 1.1rem;
+    .location-county {
+        color: var(--text-faint);
     }
 </style>

@@ -7,6 +7,9 @@ export function entries() {
         { category: 'oktatas' },
         { category: 'mesteremberek' },
         { category: 'hivatalok' },
-        { category: 'egyeb' }
+        { category: 'egyeb' },
+        { category: 'vendeglo' },
+        { category: 'bolt' },
+        { category: 'sportegyesulet' },
     ];
 }

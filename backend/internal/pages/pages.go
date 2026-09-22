@@ -12,6 +12,7 @@ type Page struct {
 	ID        int    `json:"id"`
 	Slug      string `json:"slug"`
 	Title     string `json:"title"`
+	Greeting  string `json:"greeting"`
 	Content   string `json:"content"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -30,16 +31,35 @@ func MigratePages() {
 		log.Printf("pages create: %v", err)
 		return
 	}
+	_, _ = db.DB.Exec(`ALTER TABLE pages ADD COLUMN IF NOT EXISTS greeting TEXT NOT NULL DEFAULT ''`)
 
-	seeds := []struct{ slug, title string }{
-		{"iranyelvek", "Irányelvek"},
-		{"iranyelvek/sutik", "Sütik"},
-		{"iranyelvek/feltetelek", "Feltételek"},
+	seeds := []struct{ slug, title, greeting string }{
+		{"home", "Na Lámsza!", "Erdélyi magyar startlap és kereső. Az internet székely kapuja."},
+		{"esemenyek", "Székelyföldi események", "Válogass a legfrissebb székelyföldi események közül."},
+		{"hirek", "Friss hírek erdélyi forrásból", "Helyi hírcsatornák legfrissebb hírei időrendben."},
+		{"megyek", "Székelyföldi Megyék", "Válassz megyét a települések és tartalmak böngészéséhez."},
+		{"varosok", "Székelyföldi Városok", "Székelyföldi városok listája megyénként."},
+		{"falvak", "Székelyföldi Falvak", "Falvak és községek listája megyénként."},
+		{"szekek", "Székelyföld történelmi székei", "A székely székek és a hozzájuk kapcsolódó megyék."},
+		{"index", "Index", "Minden, ami helyi: szakemberek, intézmények, szolgáltatások."},
+		{"index/szolgaltatasok", "Szolgáltatások", "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár."},
+		{"terkep", "Székelyföld Térkép", "Hamarosan érkezik az interaktív térképünk helyi adatokkal!"},
+		{"valtozasnaplo", "Változásnapló", "Újítások, javítások — emberi nyelven."},
+		{"iranyelvek", "Irányelvek", "Adatvédelem, sütik és felhasználási feltételek — összefoglaló."},
+		{"iranyelvek/sutik", "Sütik", "Hogyan használjuk a sütiket és mire valók."},
+		{"iranyelvek/feltetelek", "Feltételek", "A szolgáltatás igénybevételének feltételei."},
 	}
 	for _, s := range seeds {
 		_, _ = db.DB.Exec(
-			`INSERT INTO pages (slug, title) VALUES ($1, $2) ON CONFLICT (slug) DO NOTHING`,
-			s.slug, s.title,
+			`INSERT INTO pages (slug, title, greeting) VALUES ($1, $2, $3) ON CONFLICT (slug) DO NOTHING`,
+			s.slug, s.title, s.greeting,
+		)
+	}
+	// Meglévő sorok: üres bevezető feltöltése (egyszeri jelleggel üres greeting esetén).
+	for _, s := range seeds {
+		_, _ = db.DB.Exec(
+			`UPDATE pages SET greeting = $2 WHERE slug = $1 AND COALESCE(TRIM(greeting), '') = ''`,
+			s.slug, s.greeting,
 		)
 	}
 	log.Println("Pages table ready")
@@ -58,8 +78,8 @@ func HandlePublicPage(w http.ResponseWriter, r *http.Request) {
 	}
 	var p Page
 	err := db.DB.QueryRow(
-		"SELECT id, slug, title, content, updated_at::text FROM pages WHERE slug = $1", slug,
-	).Scan(&p.ID, &p.Slug, &p.Title, &p.Content, &p.UpdatedAt)
+		"SELECT id, slug, title, greeting, content, updated_at::text FROM pages WHERE slug = $1", slug,
+	).Scan(&p.ID, &p.Slug, &p.Title, &p.Greeting, &p.Content, &p.UpdatedAt)
 	if err != nil {
 		http.Error(w, "Page not found", http.StatusNotFound)
 		return
@@ -72,7 +92,7 @@ func HandlePublicPage(w http.ResponseWriter, r *http.Request) {
 func HandleAdminPages(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		rows, err := db.DB.Query("SELECT id, slug, title, content, updated_at::text FROM pages ORDER BY LOWER(title) ASC, id ASC")
+		rows, err := db.DB.Query("SELECT id, slug, title, greeting, content, updated_at::text FROM pages ORDER BY LOWER(title) ASC, id ASC")
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -81,7 +101,7 @@ func HandleAdminPages(w http.ResponseWriter, r *http.Request) {
 		var result []Page
 		for rows.Next() {
 			var p Page
-			if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Content, &p.UpdatedAt); err == nil {
+			if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Greeting, &p.Content, &p.UpdatedAt); err == nil {
 				result = append(result, p)
 			}
 		}
@@ -102,8 +122,8 @@ func HandleAdminPages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err := db.DB.Exec(
-			`UPDATE pages SET title = $1, content = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
-			p.Title, p.Content, p.ID,
+			`UPDATE pages SET title = $1, greeting = $2, content = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+			p.Title, p.Greeting, p.Content, p.ID,
 		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

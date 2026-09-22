@@ -1,14 +1,22 @@
 <script>
     import { onMount } from "svelte";
     import AdminNavIcon from "$lib/components/admin/AdminNavIcon.svelte";
+    import AdminPlusIcon from "$lib/components/admin/AdminPlusIcon.svelte";
+    import AdminPaginationBar from "$lib/components/admin/AdminPaginationBar.svelte";
+    import { ADMIN_PAGE_SIZE, adminPageSlice } from "$lib/adminPageSlice.js";
     import { auth } from "$lib/stores/auth";
     import {
         SCHEDULE_ACTIVITY_TYPES,
         SCHEDULE_ACTIVITY_TYPE_LABELS,
     } from "$lib/scheduleActivityTypes.js";
-
-    const getBase = () =>
-        import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+    import { absoluteMediaUrl } from "$lib/eventImage.js";
+    import { getApiBase, apiCall } from "$lib/api.js";
+    import { ENTRY_TYPE_SERVICE } from "$lib/entryType.js";
+    import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import { emptyPhotos, normalizePhotos } from "$lib/entryPhotos.js";
+    import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
+    import EntryPhotosEditor from "$lib/components/EntryPhotosEditor.svelte";
+    import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
 
     /** Local calendar date as YYYY-MM-DD (for date inputs). */
     function localISODate() {
@@ -18,34 +26,39 @@
     }
 
     let authenticated = false;
-    let password = "";
+    let authReady = false;
+    let authDenied = false;
+    let googleClientId = "";
     let activeTab = "welcome";
 
-    /** Section shortcuts on the dashboard (order matches sidebar). */
+    /** Section shortcuts: order matches sidebar (below Dashboard / home). Footer hint = right column label. */
     const ADMIN_WELCOME_ITEMS = [
-        { id: "mondasok", label: "Mondások" },
-        { id: "quicklinks", label: "Gyorslinkek" },
-        { id: "newsfeeds", label: "Hírfolyamok" },
-        { id: "counties", label: "Megyék" },
-        { id: "locations", label: "Települések" },
-        { id: "venues", label: "Helyszínek" },
-        { id: "attractions", label: "Látnivalók" },
-        { id: "events", label: "Események" },
-        { id: "entry_categories", label: "Bejegyzés kategóriák" },
-        { id: "entry_types", label: "Bejegyzés típusok" },
-        { id: "entries", label: "Bejegyzések" },
-        { id: "weather_translations", label: "Időjárás fordítások" },
-        { id: "pages", label: "Oldalak" },
-        { id: "settings", label: "Beállítások" },
+        { id: "mondasok", label: "Mondások", footerHint: "sor" },
+        { id: "quicklinks", label: "Gyorslinkek", footerHint: "link" },
+        { id: "locations", label: "Települések", footerHint: "település" },
+        { id: "counties", label: "Megyék", footerHint: "megye" },
+        { id: "venues", label: "Helyszínek", footerHint: "helyszín" },
+        { id: "attractions", label: "Látnivalók", footerHint: "látnivaló" },
+        { id: "events", label: "Események", footerHint: "esemény" },
+        { id: "entries", label: "Bejegyzések", footerHint: "bejegyzés" },
+        { id: "entry_categories", label: "Bejegyzés kategóriák", footerHint: "kategória" },
+        { id: "entry_types", label: "Bejegyzés típusok", footerHint: "típus" },
+        { id: "pages", label: "Oldalak", footerHint: "oldal" },
+        { id: "weather_translations", label: "Időjárás fordítások", footerHint: "fordítás" },
+        { id: "newsfeeds", label: "Hírfolyamok", footerHint: "folyam" },
+        /** site_settings: egy sor = egy konfigurációs kulcs */
+        { id: "settings", label: "Beállítások", footerHint: "kulcs" },
     ];
 
     function goToAdminTab(/** @type {string} */ tab) {
         activeTab = tab;
+        if (tab === "welcome") fetchDashboardStats();
         if (tab === "counties") fetchCountyRegions();
         if (tab === "venues") {
             fetchVenuesCatalog();
             fetchVenueTypes();
         }
+        if (tab === "locations") fetchSettlementLocationTypes();
         if (tab === "attractions") fetchAttractions();
         if (tab === "events") fetchEvents();
         if (tab === "settings") fetchSettings();
@@ -112,9 +125,13 @@
         phone: "",
         address: "",
         notes: "",
-        type: "entry",
+        type: ENTRY_TYPE_SERVICE,
         languages: ["HU"],
         tags: "",
+        verified: false,
+        hours: emptyWeekHours(),
+        delivery_hours: emptyWeekHours(),
+        photos: emptyPhotos(),
     };
     let newEntryCategory = { name: "" };
     let newEntryType = { name: "" };
@@ -127,9 +144,30 @@
         start_time: "",
         end_date: "",
         end_time: "",
-        event_type: "cultural",
+        event_type_id: "",
+        event_subtype_id: "",
+        access_type: "public",
         organizer: "",
+        featured_image: "",
+        entry_price: "",
     };
+    /** @type {{ id: number, slug: string, label_hu: string, sort_order: number }[]} */
+    let catalogEventTypes = [];
+    /** @type {{ id: number, event_type_id: number, slug: string, label_hu: string, sort_order: number }[]} */
+    let catalogEventSubtypes = [];
+    let newCatalogEventType = { slug: "", label_hu: "", sort_order: 0 };
+    /** @type {{ id: number, slug: string, label_hu: string, sort_order: number } | null} */
+    let editingCatalogEventType = null;
+    let newCatalogEventSubtype = {
+        event_type_id: "",
+        slug: "",
+        label_hu: "",
+        sort_order: 0,
+    };
+    /** @type {{ id: number, event_type_id: number, slug: string, label_hu: string, sort_order: number } | null} */
+    let editingCatalogEventSubtype = null;
+    let searchCatalogTypes = "";
+    let searchCatalogSubtypes = "";
     /** @type {Record<string, unknown>[]} */
     let venuesCatalog = [];
     /** @type {typeof venuesCatalog} */
@@ -172,6 +210,24 @@
     let searchWeatherTrans = "";
     let searchAdminPages = "";
     let searchPageFaqRows = "";
+    let pageMondasok = 1;
+    let pageQuickLinks = 1;
+    let pageNewsFeeds = 1;
+    let pageLocations = 1;
+    let pageVenueTypes = 1;
+    let pageVenues = 1;
+    let pageEvents = 1;
+    let pageEntryCategories = 1;
+    let pageEntries = 1;
+    let pageWeatherTrans = 1;
+    let pageAdminPages = 1;
+    let pagePageFaqRows = 1;
+    let pageEntryTypes = 1;
+    let pageAttractions = 1;
+    let pageCounties = 1;
+    let pageHistoricalSeats = 1;
+    let pageCatalogTypes = 1;
+    let pageCatalogSubtypes = 1;
     /** Counties / historical seats: keep inline edit row visible when search would hide it */
     $: displayCounties = (countiesFromAPI || []).filter(
         (c) =>
@@ -207,7 +263,7 @@
         phone: "",
         address: "",
         notes: "",
-        type: "entry",
+        type: ENTRY_TYPE_SERVICE,
         languages: ["HU"],
         tags: "",
     };
@@ -258,9 +314,184 @@
     let editingPageFaq = null;
     let pageFaqSaving = false;
 
+    /** Row counts from DB (GET /api/admin/dashboard_stats); keys match ADMIN_WELCOME_ITEMS id. */
+    let dashboardStats = /** @type {Record<string, number>} */ ({});
+    let dashboardStatsFetched = false;
+    let dashboardStatsError = "";
+
+    /** @type {{ id: number, name: string, slug: string, owner_email: string }[]} */
     let listingQueueUnpublished = [];
+    /** @type {{ entry_id: number, entry_name: string, user_id: number, email: string }[]} */
     let listingQueueMembers = [];
     let listingQueueError = "";
+
+    async function fetchDashboardStats() {
+        dashboardStatsFetched = false;
+        dashboardStatsError = "";
+        try {
+            const res = await apiCall("/api/admin/dashboard_stats");
+            if (!res.ok) {
+                dashboardStatsError = (await res.text()) || `HTTP ${res.status}`;
+                return;
+            }
+            const raw = await res.json();
+            const next = /** @type {Record<string, number>} */ ({});
+            if (raw && typeof raw === "object") {
+                for (const k of Object.keys(raw)) {
+                    const n = Number(raw[k]);
+                    next[k] = Number.isFinite(n) ? n : 0;
+                }
+            }
+            dashboardStats = next;
+            dashboardStatsFetched = true;
+        } catch (e) {
+            dashboardStatsError = String(e?.message || e);
+            console.error(e);
+        }
+    }
+
+    /** @param {string} tabId */
+    function adminWelcomeCount(tabId) {
+        const v = dashboardStats[tabId];
+        if (v === undefined || v === null) return 0;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    async function fetchListingQueue() {
+        listingQueueError = "";
+        try {
+            const res = await apiCall("/api/admin/listing-queue");
+            if (!res.ok) {
+                listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+                return;
+            }
+            const data = await res.json();
+            listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
+            listingQueueMembers = Array.isArray(data.members) ? data.members : [];
+        } catch (e) {
+            listingQueueError = String(e?.message || e);
+            console.error(e);
+        }
+    }
+
+    async function publishListingQueueEntry(entryId) {
+        const res = await apiCall("/api/admin/listing-queue/publish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    async function approveListingQueueMember(entryId, userId) {
+        const res = await apiCall("/api/admin/listing-queue/member", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "approve" }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    async function rejectListingQueueMember(entryId, userId) {
+        const res = await apiCall("/api/admin/listing-queue/member", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "reject" }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    /** Cím + rövid köszöntő / leírás — minden admin-fülön egységes fejléc. */
+    const ADMIN_PAGE_COPY = {
+        welcome: {
+            title: "Dashboard",
+            greeting:
+                "Üdvözöllek. A kártyákon a táblák rekordjainak száma látható; jobb oldalon egy rövid típus-címke. Kattintva megnyílik a megfelelő kezelőfelület.",
+        },
+        mondasok: {
+            title: "Mondások",
+            greeting:
+                "A kezdőlap napi idézeteinek és megjelenési napjának kezelése.",
+        },
+        quicklinks: {
+            title: "Gyorslinkek",
+            greeting: "Kezdőlap gyors hivatkozásai: cím, URL és háttérszín.",
+        },
+        newsfeeds: {
+            title: "Hírfolyamok",
+            greeting: "RSS és Atom hírcsatornák a Hírek oldalhoz.",
+        },
+        locations: {
+            title: "Települések",
+            greeting:
+                "Települések, megyék és kapcsolódó metaadatok (címer, irányítószám, típus).",
+        },
+        counties: {
+            title: "Megyék",
+            greeting: "Megyei tartalom és beállítások a történelmi székekhez kapcsolódóan.",
+        },
+        venues: {
+            title: "Helyszínek",
+            greeting:
+                "Rendezvényhelyszínek: típusok, településhez kötés, és eseményekhez való hozzárendelés.",
+        },
+        attractions: {
+            title: "Látnivalók",
+            greeting: "Megyei látnivalók, leírások és képgaléria.",
+        },
+        events: {
+            title: "Események",
+            greeting:
+                "Közösségi és sportesemények: időpontok, helyszín, típusok és opcionális program.",
+        },
+        entries: {
+            title: "Bejegyzések",
+            greeting: "Címtár-bejegyzések: kategória, típus, elérhetőségek és címkék.",
+        },
+        entry_categories: {
+            title: "Bejegyzés kategóriák",
+            greeting: "Index kategóriák felvétele, sorrendezése és törlése.",
+        },
+        entry_types: {
+            title: "Bejegyzés típusok",
+            greeting: "A címtárban használható bejegyzés-típusok kezelése.",
+        },
+        pages: {
+            title: "Oldalak",
+            greeting: "Statikus oldalak (szabályzatok, szöveges tartalmak) szerkesztése.",
+        },
+        weather_translations: {
+            title: "Időjárás fordítások",
+            greeting:
+                "Az időjárás API szövegeinek fordítása magyarra, románra, németre.",
+        },
+        settings: {
+            title: "Beállítások",
+            greeting: "Rendszer-, időjárás- és egyéb szolgáltatás-beállítások.",
+        },
+    };
+
+    $: adminPageHead =
+        ADMIN_PAGE_COPY[activeTab] || {
+            title: "Admin",
+            greeting: "",
+        };
 
     function filterOrganizers(query, target) {
         if (!query || query.length < 2) return [];
@@ -303,7 +534,12 @@
 
     const LANGUAGES = ["HU", "RO", "DE", "EN"];
     const COUNTIES = ["Hargita", "Kovászna", "Maros"];
-    const LOCATION_TYPES = ["város", "község", "falu", "megye", "municípium"];
+
+    /** @type {{ id: number, slug: string, label_hu: string, sort_order: number }[]} */
+    let settlementLocationTypes = [];
+    let newSettlementLocationType = { slug: "", label_hu: "", sort_order: 0 };
+    /** @type {{ id: number, slug: string, label_hu: string, sort_order: number } | null} */
+    let editingSettlementLocationType = null;
 
     // Custom dialog state
     let dialogVisible = false;
@@ -362,12 +598,254 @@
         );
     }
 
+    const ACCESS_TYPE_LABELS = {
+        public: "Nyitott (bárki)",
+        members_only: "Zártkörű (csak tagoknak)",
+        invitation_only: "Meghívóval (zárt kör)",
+    };
+
+    /** @param {unknown} v */
+    function accessTypeLabel(v) {
+        const k = String(v || "public");
+        return ACCESS_TYPE_LABELS[k] || k;
+    }
+
+    /** @param {unknown} slug */
+    function settlementTypeLabel(slug) {
+        const s = String(slug || "").trim();
+        if (!s) return "—";
+        const t = settlementLocationTypes.find((x) => x.slug === s);
+        return t ? t.label_hu : s;
+    }
+
+    /** @param {string} slug */
+    function eventTypeLabelFromCatalog(slug) {
+        const s = String(slug || "").trim();
+        if (!s) return "—";
+        const t = catalogEventTypes.find((x) => x.slug === s);
+        return t ? t.label_hu : s;
+    }
+
+    /** @param {number} typeId @param {string} subSlug */
+    function eventSubtypeLabelFromCatalog(typeId, subSlug) {
+        const ss = String(subSlug || "").trim();
+        if (!ss) return "—";
+        const s = catalogEventSubtypes.find(
+            (x) =>
+                x.slug === ss &&
+                (typeId ? x.event_type_id === typeId : true),
+        );
+        return s ? s.label_hu : ss;
+    }
+
+    $: rfMondasok = filterRows(mondasok, searchMondasok, (m) => [
+        m.id,
+        m.text,
+        m.display_date,
+    ]);
+    $: pgMondasok = adminPageSlice(rfMondasok, pageMondasok);
+    $: mondasTodayYmd = localISODate();
+    $: mondasokTodayCount = mondasok.filter(
+        (m) => normalizeYmdInput(m.display_date) === mondasTodayYmd,
+    ).length;
+    $: rfQuickLinks = filterRows(quickLinks, searchQuickLinks, (q) => [
+        q.title,
+        q.url,
+        q.bg_color,
+    ]);
+    $: pgQuickLinks = adminPageSlice(rfQuickLinks, pageQuickLinks);
+    $: rfNewsFeeds = filterRows(newsFeeds, searchNewsFeeds, (nf) => [
+        nf.title,
+        nf.feed_url,
+        String(nf.id),
+    ]);
+    $: pgNewsFeeds = adminPageSlice(rfNewsFeeds, pageNewsFeeds);
+    $: rfLocations = filterRows(locations, searchLocations, (l) => {
+        const parentN =
+            l.parent_id != null && l.parent_id !== ""
+                ? (() => {
+                      const p = locations.find((x) => x.id === l.parent_id);
+                      return p
+                          ? `${p.name}${p.county ? " (" + p.county + ")" : ""}`
+                          : String(l.parent_id);
+                  })()
+                : "";
+        return [
+            l.id,
+            l.name,
+            l.name_ro,
+            l.name_de,
+            l.county,
+            l.type,
+            l.post_code,
+            l.coordinates,
+            l.population,
+            l.area,
+            parentN,
+        ];
+    });
+    $: pgLocations = adminPageSlice(rfLocations, pageLocations);
+    $: rfVenueTypes = filterRows(venueTypesList, searchVenueTypes, (t) => [
+        t.id,
+        t.slug,
+        t.label_hu,
+    ]);
+    $: pgVenueTypes = adminPageSlice(rfVenueTypes, pageVenueTypes);
+    $: rfVenuesCatalog = filterRows(venuesCatalog, searchVenues, (v) => [
+        v.name,
+        v.slug,
+        v.kind,
+        v.settlement_name,
+    ]);
+    $: pgVenuesCatalog = adminPageSlice(rfVenuesCatalog, pageVenues);
+    $: rfEvents = filterRows(events, searchEvents, (e) => {
+        const loc = locations.find((l) => l.id === e.location_id);
+        const locN = loc
+            ? `${loc.name}${loc.county ? " (" + loc.county + ")" : ""}`
+            : String(e.location_id ?? "");
+        return [
+            e.title,
+            e.description,
+            e.organizer,
+            locN,
+            e.default_venue_name,
+            e.event_type,
+            e.event_subtype,
+            e.access_type,
+            e.start_date,
+            e.end_date,
+            e.featured_image,
+            e.entry_price,
+        ];
+    });
+    $: pgEvents = adminPageSlice(rfEvents, pageEvents);
+    $: rfEntryCategories = filterRows(
+        entryCategories,
+        searchEntryCategories,
+        (cat) => [cat.id, cat.name],
+    );
+    $: pgEntryCategories = adminPageSlice(rfEntryCategories, pageEntryCategories);
+    $: rfEntries = filterRows(entries, searchEntries, (s) => {
+        const locN = locations.find((l) => l.id === s.location_id);
+        const locName = locN
+            ? `${locN.name}${locN.county ? " (" + locN.county + ")" : ""}`
+            : String(s.location_id ?? "");
+        const cat = entryCategories.find((c) => c.id === s.category_id);
+        const catName = cat ? cat.name : String(s.category_id ?? "");
+        return [
+            s.name,
+            s.type,
+            s.url,
+            s.phone,
+            s.address,
+            s.notes,
+            locName,
+            catName,
+            (s.languages || []).join(","),
+            (s.tags || []).join(","),
+        ];
+    });
+    $: pgEntries = adminPageSlice(rfEntries, pageEntries);
+    $: rfWeatherTrans = filterRows(
+        weatherTranslations,
+        searchWeatherTrans,
+        (wt) => [wt.source_text, wt.lang, wt.translated_text],
+    );
+    $: pgWeatherTrans = adminPageSlice(rfWeatherTrans, pageWeatherTrans);
+    $: rfAdminPages = filterRows(adminPages, searchAdminPages, (pg) => [
+        pg.slug,
+        pg.title,
+        pg.greeting,
+        pg.updated_at,
+    ]);
+    $: pgAdminPages = adminPageSlice(rfAdminPages, pageAdminPages);
+    $: rfPageFaqRows = filterRows(pageFaqSections, searchPageFaqRows, (row) => [
+        row.section_key,
+        row.label_hu,
+        row.faq_title,
+        String((row.faq_items || []).length),
+        row.updated_at,
+    ]);
+    $: pgPageFaqRows = adminPageSlice(rfPageFaqRows, pagePageFaqRows);
+    $: rfEntryTypes = filterRows(entryTypes, searchEntryTypes, (et) => [
+        et.id,
+        et.name,
+    ]);
+    $: pgEntryTypes = adminPageSlice(rfEntryTypes, pageEntryTypes);
+    $: rfAttractions = filterRows(attractions, searchAttractions, (att) => [
+        att.name,
+        att.slug,
+        att.county_slug,
+    ]);
+    $: pgAttractions = adminPageSlice(rfAttractions, pageAttractions);
+    $: pgCounties = adminPageSlice(
+        displayCounties,
+        pageCounties,
+        editingCounty
+            ? Math.max(ADMIN_PAGE_SIZE, displayCounties.length)
+            : ADMIN_PAGE_SIZE,
+    );
+    $: pgHistoricalSeats = adminPageSlice(
+        displayHistoricalSeats,
+        pageHistoricalSeats,
+        editingHistoricalSeat
+            ? Math.max(ADMIN_PAGE_SIZE, displayHistoricalSeats.length)
+            : ADMIN_PAGE_SIZE,
+    );
+    $: rfCatalogTypes = filterRows(
+        catalogEventTypes,
+        searchCatalogTypes,
+        (t) => [t.id, t.slug, t.label_hu, String(t.sort_order)],
+    );
+    $: pgCatalogTypes = adminPageSlice(
+        rfCatalogTypes,
+        pageCatalogTypes,
+        editingCatalogEventType
+            ? Math.max(ADMIN_PAGE_SIZE, rfCatalogTypes.length)
+            : ADMIN_PAGE_SIZE,
+    );
+    $: rfCatalogSubtypes = filterRows(
+        catalogEventSubtypes,
+        searchCatalogSubtypes,
+        (s) => [s.id, s.slug, s.label_hu, String(s.sort_order), s.event_type_id],
+    );
+    $: pgCatalogSubtypes = adminPageSlice(
+        rfCatalogSubtypes,
+        pageCatalogSubtypes,
+        editingCatalogEventSubtype
+            ? Math.max(ADMIN_PAGE_SIZE, rfCatalogSubtypes.length)
+            : ADMIN_PAGE_SIZE,
+    );
+    $: subtypesForNewEvent = catalogEventSubtypes.filter(
+        (s) => s.event_type_id === Number(newEvent.event_type_id),
+    );
+    $: subtypesForEditEvent = editingEvent
+        ? catalogEventSubtypes.filter(
+              (s) =>
+                  s.event_type_id === Number(editingEvent.event_type_id),
+          )
+        : [];
+
     onMount(() => {
-        auth.init();
-        if (localStorage.getItem("admin_auth") === "true") {
-            authenticated = true;
-            fetchAll();
-        }
+        (async () => {
+            try {
+                const res = await apiCall("/api/config/public");
+                if (res.ok) {
+                    const data = await res.json();
+                    googleClientId = data.google_client_id || "";
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            const me = await auth.refresh();
+            authReady = true;
+            if (me.isAdmin) {
+                authenticated = true;
+                fetchAll();
+            } else if (me.loggedIn) {
+                authDenied = true;
+            }
+        })();
 
         const storedTs = localStorage.getItem("news_feed_timestamps");
         if (storedTs) {
@@ -377,93 +855,31 @@
         }
     });
 
-    function login(e) {
-        e.preventDefault();
-        if (password === "szekely123") {
+    async function onGoogleSignedIn() {
+        const me = await auth.refresh();
+        if (me.isAdmin) {
             authenticated = true;
-            auth.login("Admin", true);
+            authDenied = false;
             fetchAll();
         } else {
-            alert("Na de kicsibarátom, ez nem a jó jelszó!");
+            authDenied = true;
         }
     }
 
-    function logout() {
+    async function logout() {
         authenticated = false;
-        password = "";
-        auth.logout();
+        await auth.logout();
         window.location.href = "/";
     }
 
-
-    async function fetchListingQueue() {
-        listingQueueError = "";
-        try {
-            const res = await fetch(`${getBase()}/api/admin/listing-queue`, { credentials: "include" });
-            if (!res.ok) {
-                listingQueueError = (await res.text()) || `HTTP ${res.status}`;
-                return;
-            }
-            const data = await res.json();
-            listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
-            listingQueueMembers = Array.isArray(data.members) ? data.members : [];
-        } catch (e) {
-            listingQueueError = String(e?.message || e);
-            console.error(e);
-        }
-    }
-
-    async function publishListingQueueEntry(entryId) {
-        const res = await fetch(`${getBase()}/api/admin/listing-queue/publish`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ entry_id: entryId }),
-        });
-        if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
-            return;
-        }
-        await fetchListingQueue();
-        await auth.refresh();
-    }
-
-    async function approveListingQueueMember(entryId, userId) {
-        const res = await fetch(`${getBase()}/api/admin/listing-queue/member`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "approve" }),
-        });
-        if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
-            return;
-        }
-        await fetchListingQueue();
-        await auth.refresh();
-    }
-
-    async function rejectListingQueueMember(entryId, userId) {
-        const res = await fetch(`${getBase()}/api/admin/listing-queue/member`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "reject" }),
-        });
-        if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
-            return;
-        }
-        await fetchListingQueue();
-        await auth.refresh();
-    }
-
     async function fetchAll() {
-        fetchListingQueue();
+        await fetchDashboardStats();
+        await fetchListingQueue();
         fetchMondasok();
         fetchQuickLinks();
         fetchNewsFeeds();
         fetchLocations();
+        fetchSettlementLocationTypes();
         fetchAttractions();
         fetchEntries();
         fetchEntryCategories();
@@ -479,7 +895,7 @@
 
     async function fetchWeatherTranslations() {
         try {
-            const res = await fetch(`${getBase()}/api/admin/weather_translations`);
+            const res = await apiCall(`/api/admin/weather_translations`);
             if (res.ok) weatherTranslations = await res.json();
         } catch (e) {
             console.error(e);
@@ -489,7 +905,7 @@
     async function saveWeatherTranslation(e) {
         e?.preventDefault();
         if (editingWeatherTrans) {
-            const res = await fetch(`${getBase()}/api/admin/weather_translations`, {
+            const res = await apiCall(`/api/admin/weather_translations`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(editingWeatherTrans),
@@ -502,7 +918,7 @@
                 setAdminTabError("Hiba: " + (await res.text()));
             }
         } else {
-            const res = await fetch(`${getBase()}/api/admin/weather_translations`, {
+            const res = await apiCall(`/api/admin/weather_translations`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(newWeatherTrans),
@@ -528,14 +944,14 @@
     async function deleteWeatherTranslation(id) {
         const ok = await showConfirm("Biztosan törölni szeretnéd ezt a fordítást?");
         if (!ok) return;
-        const res = await fetch(`${getBase()}/api/admin/weather_translations?id=${id}`, { method: "DELETE" });
+        const res = await apiCall(`/api/admin/weather_translations?id=${id}`, { method: "DELETE" });
         if (res.ok) fetchWeatherTranslations();
         else setAdminTabError("Hiba: " + (await res.text()));
     }
 
     async function fetchSettings() {
         try {
-            const res = await fetch(`${getBase()}/api/admin/settings`);
+            const res = await apiCall(`/api/admin/settings`);
             if (res.ok) {
                 const data = await res.json();
                 siteSettings = {
@@ -562,7 +978,7 @@
             const payload = Object.fromEntries(
                 Object.entries(siteSettings).map(([k, v]) => [k, v != null ? String(v) : ""])
             );
-            const res = await fetch(`${getBase()}/api/admin/settings`, {
+            const res = await apiCall(`/api/admin/settings`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -581,7 +997,7 @@
     async function clearWeatherCache() {
         settingsCacheClearing = true;
         try {
-            const res = await fetch(`${getBase()}/api/admin/settings/clear-weather-cache`, { method: "POST" });
+            const res = await apiCall(`/api/admin/settings/clear-weather-cache`, { method: "POST" });
             if (res.ok) {
                 clearAdminTabError();
                 await showAlert("Időjárás cache verzió növelve – látogatók friss adatot fognak kapni.");
@@ -596,9 +1012,9 @@
 
     async function fetchPages() {
         try {
-            const res = await fetch(`${getBase()}/api/admin/pages`);
+            const res = await apiCall(`/api/admin/pages`);
             if (res.ok) adminPages = await res.json();
-            const r2 = await fetch(`${getBase()}/api/admin/page_faq`);
+            const r2 = await apiCall(`/api/admin/page_faq`);
             if (r2.ok) pageFaqSections = await r2.json();
         } catch (e) {
             console.error(e);
@@ -607,7 +1023,7 @@
 
     function startEditPage(page) {
         editingPageFaq = null;
-        editingPage = { ...page };
+        editingPage = { ...page, greeting: page.greeting ?? "" };
     }
 
     function cancelEditPage() {
@@ -618,7 +1034,7 @@
         if (!editingPage) return;
         pageSaving = true;
         try {
-            const res = await fetch(`${getBase()}/api/admin/pages`, {
+            const res = await apiCall(`/api/admin/pages`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(editingPage),
@@ -672,7 +1088,7 @@
         if (!editingPageFaq) return;
         pageFaqSaving = true;
         try {
-            const res = await fetch(`${getBase()}/api/admin/page_faq`, {
+            const res = await apiCall(`/api/admin/page_faq`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -701,7 +1117,7 @@
     // generic fetch helper
     async function loadData(endpoint, setter) {
         try {
-            const res = await fetch(`${getBase()}/api/admin/${endpoint}`);
+            const res = await apiCall(`/api/admin/${endpoint}`);
             if (res.ok) setter(await res.json());
         } catch (e) {
             console.error(e);
@@ -721,13 +1137,118 @@
     function fetchLocations() {
         loadData("locations", (d) => (locations = d));
     }
+
+    async function fetchSettlementLocationTypes() {
+        try {
+            const res = await apiCall(`/api/admin/settlement_location_types`,
+            );
+            if (res.ok) {
+                settlementLocationTypes = await res.json();
+            }
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    async function submitNewSettlementLocationType(e) {
+        e.preventDefault();
+        const label_hu = String(newSettlementLocationType.label_hu || "").trim();
+        let slug = String(newSettlementLocationType.slug || "")
+            .trim()
+            .toLowerCase();
+        const sort_order = Number(newSettlementLocationType.sort_order) || 0;
+        if (!label_hu) {
+            await showAlert("A megnevezés kötelező.");
+            return;
+        }
+        try {
+            const res = await apiCall(`/api/admin/settlement_location_types`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ slug, label_hu, sort_order }),
+                },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            newSettlementLocationType = { slug: "", label_hu: "", sort_order: 0 };
+            await fetchSettlementLocationTypes();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+
+    /** @param {Record<string, unknown>} t */
+    function startEditSettlementLocationType(t) {
+        editingSettlementLocationType = {
+            id: Number(t.id),
+            slug: String(t.slug || ""),
+            label_hu: String(t.label_hu || ""),
+            sort_order: Number(t.sort_order) || 0,
+        };
+    }
+    function cancelEditSettlementLocationType() {
+        editingSettlementLocationType = null;
+    }
+    async function saveEditSettlementLocationType() {
+        if (!editingSettlementLocationType) return;
+        const id = parseInt(String(editingSettlementLocationType.id || ""), 10);
+        const label_hu = String(
+            editingSettlementLocationType.label_hu || "",
+        ).trim();
+        const sort_order =
+            Number(editingSettlementLocationType.sort_order) || 0;
+        if (!Number.isFinite(id) || id < 1 || !label_hu) return;
+        try {
+            const res = await apiCall(`/api/admin/settlement_location_types`,
+                {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id,
+                        label_hu,
+                        sort_order,
+                    }),
+                },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            editingSettlementLocationType = null;
+            await fetchSettlementLocationTypes();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    async function deleteSettlementLocationTypeRow(id) {
+        const ok = await showConfirm(
+            "Biztosan törlöd ezt a településtípust? (Nem lehetséges, ha van ilyen típusú település.)",
+        );
+        if (!ok) return;
+        try {
+            const res = await apiCall(`/api/admin/settlement_location_types?id=${encodeURIComponent(id)}`,
+                { method: "DELETE" },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            await fetchSettlementLocationTypes();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+
     // Entries/events use settlement_id; filter out counties (type=megye)
     $: settlementsForSelect = locations.filter((l) => l.type !== "megye");
 
     /** @returns {Promise<boolean>} */
     async function setCountySeat(locationId) {
         try {
-            const res = await fetch(`${getBase()}/api/admin/county_seat`, {
+            const res = await apiCall(`/api/admin/county_seat`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ location_id: locationId }),
@@ -752,12 +1273,203 @@
     function fetchEntryTypes() {
         loadData("entry_types", (d) => (entryTypes = d));
     }
-    function fetchEvents() {
-        loadData("events", (d) => (events = d));
+    async function fetchEvents() {
+        await Promise.all([
+            loadData("events", (d) => (events = d)),
+            loadData("catalog_event_types", (d) => (catalogEventTypes = d)),
+            loadData("catalog_event_subtypes", (d) => (catalogEventSubtypes = d)),
+        ]);
+    }
+
+    async function submitCatalogEventType(e) {
+        e.preventDefault();
+        const slug = String(newCatalogEventType.slug || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "-");
+        const label_hu = String(newCatalogEventType.label_hu || "").trim();
+        const sort_order = Number(newCatalogEventType.sort_order) || 0;
+        if (!slug || !label_hu) {
+            await showAlert("Slug és megnevezés kötelező.");
+            return;
+        }
+        try {
+            const res = await apiCall(`/api/admin/catalog_event_types`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ slug, label_hu, sort_order }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            newCatalogEventType = { slug: "", label_hu: "", sort_order: 0 };
+            await fetchEvents();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+
+    /** @param {Record<string, unknown>} t */
+    function startEditCatalogEventType(t) {
+        editingCatalogEventType = {
+            id: Number(t.id),
+            slug: String(t.slug || ""),
+            label_hu: String(t.label_hu || ""),
+            sort_order: Number(t.sort_order) || 0,
+        };
+    }
+    function cancelEditCatalogEventType() {
+        editingCatalogEventType = null;
+    }
+    async function saveEditCatalogEventType() {
+        if (!editingCatalogEventType) return;
+        const id = parseInt(String(editingCatalogEventType.id || ""), 10);
+        const label_hu = String(editingCatalogEventType.label_hu || "").trim();
+        const sort_order = Number(editingCatalogEventType.sort_order) || 0;
+        if (!Number.isFinite(id) || id < 1 || !label_hu) return;
+        try {
+            const res = await apiCall(`/api/admin/catalog_event_types`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id,
+                    label_hu,
+                    sort_order,
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            editingCatalogEventType = null;
+            await fetchEvents();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    async function deleteCatalogEventTypeRow(id) {
+        const ok = await showConfirm(
+            "Biztosan törlöd ezt az eseménytípust? (Csak akkor sikerül, ha nincs hozzá esemény.)",
+        );
+        if (!ok) return;
+        try {
+            const res = await apiCall(`/api/admin/catalog_event_types?id=${encodeURIComponent(id)}`,
+                { method: "DELETE" },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            await fetchEvents();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+
+    async function submitCatalogEventSubtype(e) {
+        e.preventDefault();
+        const event_type_id = parseInt(
+            String(newCatalogEventSubtype.event_type_id || ""),
+            10,
+        );
+        const slug = String(newCatalogEventSubtype.slug || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, "-");
+        const label_hu = String(newCatalogEventSubtype.label_hu || "").trim();
+        const sort_order = Number(newCatalogEventSubtype.sort_order) || 0;
+        if (!Number.isFinite(event_type_id) || event_type_id < 1 || !slug || !label_hu) {
+            await showAlert("Típus, slug és megnevezés kötelező.");
+            return;
+        }
+        try {
+            const res = await apiCall(`/api/admin/catalog_event_subtypes`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event_type_id,
+                    slug,
+                    label_hu,
+                    sort_order,
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            newCatalogEventSubtype = {
+                event_type_id: "",
+                slug: "",
+                label_hu: "",
+                sort_order: 0,
+            };
+            await fetchEvents();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+
+    /** @param {Record<string, unknown>} s */
+    function startEditCatalogEventSubtype(s) {
+        editingCatalogEventSubtype = {
+            id: Number(s.id),
+            event_type_id: Number(s.event_type_id),
+            slug: String(s.slug || ""),
+            label_hu: String(s.label_hu || ""),
+            sort_order: Number(s.sort_order) || 0,
+        };
+    }
+    function cancelEditCatalogEventSubtype() {
+        editingCatalogEventSubtype = null;
+    }
+    async function saveEditCatalogEventSubtype() {
+        if (!editingCatalogEventSubtype) return;
+        const id = parseInt(String(editingCatalogEventSubtype.id || ""), 10);
+        const label_hu = String(editingCatalogEventSubtype.label_hu || "").trim();
+        const sort_order = Number(editingCatalogEventSubtype.sort_order) || 0;
+        if (!Number.isFinite(id) || id < 1 || !label_hu) return;
+        try {
+            const res = await apiCall(`/api/admin/catalog_event_subtypes`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    id,
+                    label_hu,
+                    sort_order,
+                }),
+            });
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            editingCatalogEventSubtype = null;
+            await fetchEvents();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
+    }
+    async function deleteCatalogEventSubtypeRow(id) {
+        const ok = await showConfirm(
+            "Biztosan törlöd ezt az altípust? (Csak akkor sikerül, ha nincs hozzá esemény.)",
+        );
+        if (!ok) return;
+        try {
+            const res = await apiCall(`/api/admin/catalog_event_subtypes?id=${encodeURIComponent(id)}`,
+                { method: "DELETE" },
+            );
+            if (!res.ok) {
+                await showAlert(await res.text());
+                return;
+            }
+            await fetchEvents();
+        } catch (err) {
+            await showAlert(String(err.message || err));
+        }
     }
     async function fetchVenuesCatalog() {
         try {
-            const res = await fetch(`${getBase()}/api/admin/venues`);
+            const res = await apiCall(`/api/admin/venues`);
             if (res.ok) venuesCatalog = await res.json();
         } catch (e) {
             console.error(e);
@@ -765,7 +1477,7 @@
     }
     async function fetchVenueTypes() {
         try {
-            const res = await fetch(`${getBase()}/api/admin/venue_types`);
+            const res = await apiCall(`/api/admin/venue_types`);
             if (res.ok) {
                 venueTypesList = await res.json();
                 if (venueTypesList.length) {
@@ -798,7 +1510,7 @@
             return;
         }
         try {
-            const res = await fetch(`${getBase()}/api/admin/venue_types`, {
+            const res = await apiCall(`/api/admin/venue_types`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -831,7 +1543,7 @@
         const id = parseInt(String(editingVenueType.id || ""), 10);
         if (!Number.isFinite(id) || id < 1) return;
         try {
-            const res = await fetch(`${getBase()}/api/admin/venue_types`, {
+            const res = await apiCall(`/api/admin/venue_types`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -855,8 +1567,7 @@
         );
         if (!ok) return;
         try {
-            const res = await fetch(
-                `${getBase()}/api/admin/venue_types?id=${encodeURIComponent(id)}`,
+            const res = await apiCall(`/api/admin/venue_types?id=${encodeURIComponent(id)}`,
                 { method: "DELETE" },
             );
             if (!res.ok) {
@@ -875,8 +1586,7 @@
             return;
         }
         try {
-            const res = await fetch(
-                `${getBase()}/api/venues?settlement_id=${sid}`,
+            const res = await apiCall(`/api/venues?settlement_id=${sid}`,
             );
             venueOptionsNew = res.ok ? await res.json() : [];
         } catch (e) {
@@ -891,8 +1601,7 @@
             return;
         }
         try {
-            const res = await fetch(
-                `${getBase()}/api/venues?settlement_id=${sid}`,
+            const res = await apiCall(`/api/venues?settlement_id=${sid}`,
             );
             venueOptionsEdit = res.ok ? await res.json() : [];
         } catch (e) {
@@ -940,7 +1649,7 @@
             return;
         }
         try {
-            const res = await fetch(`${getBase()}/api/admin/venues`, {
+            const res = await apiCall(`/api/admin/venues`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1016,7 +1725,7 @@
             return;
         }
         try {
-            const res = await fetch(`${getBase()}/api/admin/venues`, {
+            const res = await apiCall(`/api/admin/venues`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1052,8 +1761,7 @@
         const ok = await showConfirm("Biztosan törlöd ezt a helyszínt?");
         if (!ok) return;
         try {
-            const res = await fetch(
-                `${getBase()}/api/admin/venues?id=${encodeURIComponent(id)}`,
+            const res = await apiCall(`/api/admin/venues?id=${encodeURIComponent(id)}`,
                 { method: "DELETE" },
             );
             if (!res.ok) {
@@ -1101,6 +1809,12 @@
             return "A kezdő időpont (óra:perc) kötelező.";
         if (!String(ev.end_time ?? "").trim())
             return "A befejező időpont (óra:perc) kötelező.";
+        const etid =
+            typeof ev.event_type_id === "number"
+                ? ev.event_type_id
+                : parseInt(String(ev.event_type_id ?? "").trim(), 10);
+        if (!Number.isFinite(etid) || etid < 1)
+            return "Válassz eseménytípust.";
         return null;
     }
 
@@ -1111,9 +1825,9 @@
 
     async function fetchCountyRegions() {
         try {
-            const r1 = await fetch(`${getBase()}/api/counties`);
+            const r1 = await apiCall(`/api/counties`);
             if (r1.ok) countiesFromAPI = await r1.json();
-            const r2 = await fetch(`${getBase()}/api/historical_seats`);
+            const r2 = await apiCall(`/api/historical_seats`);
             if (r2.ok) historicalSeatsFromAPI = await r2.json();
         } catch (e) {
             console.error(e);
@@ -1210,7 +1924,7 @@
         const ec = editingCounty;
         if (!ec) return;
         try {
-            const res = await fetch(`${getBase()}/api/admin/counties`, {
+            const res = await apiCall(`/api/admin/counties`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1268,7 +1982,7 @@
         const h = editingHistoricalSeat;
         if (!h) return;
         try {
-            const res = await fetch(`${getBase()}/api/admin/historical_seats`, {
+            const res = await apiCall(`/api/admin/historical_seats`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -1296,7 +2010,7 @@
     // generic create
     async function createRecord(endpoint, data, reloadFunc, resetFormFunc) {
         try {
-            const res = await fetch(`${getBase()}/api/admin/${endpoint}`, {
+            const res = await apiCall(`/api/admin/${endpoint}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
@@ -1317,7 +2031,7 @@
     // generic update (PUT)
     async function updateRecord(endpoint, data, reloadFunc) {
         try {
-            const res = await fetch(`${getBase()}/api/admin/${endpoint}`, {
+            const res = await apiCall(`/api/admin/${endpoint}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
@@ -1339,8 +2053,7 @@
         const ok = await showConfirm("Biztosan törölni szeretnéd?");
         if (!ok) return;
         try {
-            const res = await fetch(
-                `${getBase()}/api/admin/${endpoint}?id=${id}`,
+            const res = await apiCall(`/api/admin/${endpoint}?id=${id}`,
                 { method: "DELETE" },
             );
             if (res.ok) reloadFunc();
@@ -1402,10 +2115,9 @@
         loadingFeeds = new Set(loadingFeeds);
 
         try {
-            const proxiedUrl =
-                `${getBase()}/api/proxy?url=` +
-                encodeURIComponent(feed.feed_url);
-            const res = await fetch(proxiedUrl);
+            const res = await apiCall(
+                `/api/proxy?url=${encodeURIComponent(feed.feed_url)}`,
+            );
             if (res.ok) {
                 feedTimestamps[feed.feed_url] = Date.now();
                 localStorage.setItem(
@@ -1444,15 +2156,71 @@
                 }),
         );
     }
+    /**
+     * @param {File} file
+     * @param {boolean} isEdit
+     */
+    async function uploadEventFeaturedImage(file, isEdit) {
+        if (!file) return;
+        const fd = new FormData();
+        fd.append("file", file);
+        if (isEdit && editingEvent?.id) {
+            fd.append("event_id", String(editingEvent.id));
+        }
+        try {
+            const res = await apiCall(`/api/admin/event-images`, {
+                method: "POST",
+                body: fd,
+            });
+            if (!res.ok) {
+                await showAlert(
+                    (await res.text()) || "Feltöltés sikertelen.",
+                );
+                return;
+            }
+            const data = await res.json();
+            const url = data.url || "";
+            if (isEdit) {
+                editingEvent = { ...editingEvent, featured_image: url };
+            } else {
+                newEvent = { ...newEvent, featured_image: url };
+            }
+        } catch (err) {
+            await showAlert("Feltöltés hiba: " + err.message);
+        }
+    }
+
     async function submitEvent(e) {
         e.preventDefault();
-        const lid = parseInt(String(newEvent.location_id), 10);
+        const rawLid = newEvent.location_id;
+        const lid =
+            typeof rawLid === "number" && Number.isFinite(rawLid)
+                ? rawLid
+                : parseInt(String(rawLid ?? "").trim(), 10);
         const dv = parseInt(String(newEvent.default_venue_id || ""), 10);
+        const etid = parseInt(String(newEvent.event_type_id || ""), 10);
+        const stRaw = newEvent.event_subtype_id;
+        let event_subtype_id = null;
+        if (stRaw !== "" && stRaw != null && String(stRaw).trim() !== "") {
+            const s = parseInt(String(stRaw), 10);
+            if (Number.isFinite(s) && s > 0) event_subtype_id = s;
+        }
         const payload = {
-            ...newEvent,
             location_id: Number.isFinite(lid) && lid > 0 ? lid : 0,
             default_venue_id:
                 Number.isFinite(dv) && dv > 0 ? dv : null,
+            title: String(newEvent.title ?? "").trim(),
+            description: String(newEvent.description ?? ""),
+            featured_image: String(newEvent.featured_image ?? "").trim(),
+            start_date: normalizeYmdInput(newEvent.start_date),
+            end_date: normalizeYmdInput(newEvent.end_date),
+            start_time: String(newEvent.start_time ?? "").trim(),
+            end_time: String(newEvent.end_time ?? "").trim(),
+            event_type_id: etid,
+            event_subtype_id,
+            access_type: String(newEvent.access_type || "public"),
+            organizer: String(newEvent.organizer ?? "").trim(),
+            entry_price: String(newEvent.entry_price ?? "").trim(),
         };
         const err = validateEventFields(payload);
         if (err) {
@@ -1473,8 +2241,14 @@
                     start_time: "",
                     end_date: "",
                     end_time: "",
-                    event_type: "cultural",
+                    event_type_id:
+                        catalogEventTypes.find((t) => t.slug === "cultural")
+                            ?.id ?? catalogEventTypes[0]?.id ?? "",
+                    event_subtype_id: "",
+                    access_type: "public",
                     organizer: "",
+                    featured_image: "",
+                    entry_price: "",
                 }),
         );
     }
@@ -1502,7 +2276,7 @@
                 phone: "",
                 address: "",
                 notes: "",
-                type: "entry",
+                type: ENTRY_TYPE_SERVICE,
                 languages: ["HU"],
                 tags: "",
             };
@@ -1651,10 +2425,21 @@
         const et = ev.end_time ? String(ev.end_time) : "";
         editingEvent = {
             ...ev,
+            entry_price: ev.entry_price != null ? String(ev.entry_price) : "",
+            featured_image: ev.featured_image || "",
             default_venue_id:
                 ev.default_venue_id != null && ev.default_venue_id !== ""
                     ? String(ev.default_venue_id)
                     : "",
+            event_type_id:
+                ev.event_type_id != null && ev.event_type_id !== ""
+                    ? String(ev.event_type_id)
+                    : "",
+            event_subtype_id:
+                ev.event_subtype_id != null && ev.event_subtype_id !== ""
+                    ? String(ev.event_subtype_id)
+                    : "",
+            access_type: ev.access_type || "public",
             start_time: st.length >= 5 ? st.slice(0, 5) : "",
             end_time: et.length >= 5 ? et.slice(0, 5) : "",
         };
@@ -1669,8 +2454,7 @@
 
     async function loadScheduleForEditing(eventId) {
         try {
-            const res = await fetch(
-                `${getBase()}/api/admin/events/schedule?event_id=${eventId}`,
+            const res = await apiCall(`/api/admin/events/schedule?event_id=${eventId}`,
             );
             if (!res.ok) {
                 scheduleDraftDays = [];
@@ -1793,7 +2577,7 @@
                             }),
                     })),
             };
-            const res = await fetch(`${getBase()}/api/admin/events/schedule`, {
+            const res = await apiCall(`/api/admin/events/schedule`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
@@ -1823,10 +2607,39 @@
             String(editingEvent.default_venue_id || ""),
             10,
         );
+        const rawLid = editingEvent.location_id;
+        const lid =
+            typeof rawLid === "number" && Number.isFinite(rawLid)
+                ? rawLid
+                : parseInt(String(rawLid ?? "").trim(), 10);
+        const etidE = parseInt(String(editingEvent.event_type_id || ""), 10);
+        const stRawE = editingEvent.event_subtype_id;
+        let event_subtype_id_e = null;
+        if (
+            stRawE !== "" &&
+            stRawE != null &&
+            String(stRawE).trim() !== ""
+        ) {
+            const s = parseInt(String(stRawE), 10);
+            if (Number.isFinite(s) && s > 0) event_subtype_id_e = s;
+        }
         const payload = {
-            ...editingEvent,
+            id: editingEvent.id,
+            location_id: Number.isFinite(lid) && lid > 0 ? lid : null,
             default_venue_id:
                 Number.isFinite(dv) && dv > 0 ? dv : null,
+            title: String(editingEvent.title ?? "").trim(),
+            description: String(editingEvent.description ?? ""),
+            featured_image: String(editingEvent.featured_image ?? "").trim(),
+            start_date: normalizeYmdInput(editingEvent.start_date),
+            end_date: normalizeYmdInput(editingEvent.end_date),
+            start_time: String(editingEvent.start_time ?? "").trim(),
+            end_time: String(editingEvent.end_time ?? "").trim(),
+            event_type_id: etidE,
+            event_subtype_id: event_subtype_id_e,
+            access_type: String(editingEvent.access_type || "public"),
+            organizer: String(editingEvent.organizer ?? "").trim(),
+            entry_price: String(editingEvent.entry_price ?? "").trim(),
         };
         await updateRecord("events", payload, fetchEvents);
         editingEvent = null;
@@ -1861,6 +2674,10 @@
                 ? parseInt(newEntry.category_id)
                 : null,
             tags: tagsFromStr(newEntry.tags),
+            verified: Boolean(newEntry.verified),
+            hours: normalizeHours(newEntry.hours),
+            delivery_hours: normalizeHours(newEntry.delivery_hours),
+            photos: normalizePhotos(newEntry.photos),
         };
         createRecord(
             "entries",
@@ -1875,9 +2692,13 @@
                     phone: "",
                     address: "",
                     notes: "",
-                    type: "entry",
+                    type: ENTRY_TYPE_SERVICE,
                     languages: ["HU"],
                     tags: "",
+                    verified: false,
+                    hours: emptyWeekHours(),
+                    delivery_hours: emptyWeekHours(),
+                    photos: emptyPhotos(),
                 }),
         );
     }
@@ -1889,6 +2710,10 @@
         editingEntry = {
             ...entry,
             languages: entry.languages ? [...entry.languages] : ["HU"],
+            verified: Boolean(entry.verified),
+            hours: normalizeHours(entry.hours),
+            delivery_hours: normalizeHours(entry.delivery_hours),
+            photos: normalizePhotos(entry.photos),
         };
         editTagsStr = tagsToStr(entry.tags);
     }
@@ -1907,6 +2732,10 @@
                 ? parseInt(editingEntry.category_id)
                 : null,
             tags: tagsFromStr(editTagsStr),
+            verified: Boolean(editingEntry.verified),
+            hours: normalizeHours(editingEntry.hours),
+            delivery_hours: normalizeHours(editingEntry.delivery_hours),
+            photos: normalizePhotos(editingEntry.photos),
         };
         await updateRecord("entries", payload, fetchEntries);
         closeEdit();
@@ -1990,7 +2819,7 @@
     async function deleteAttraction(id) {
         if (!confirm("Biztosan törölni szeretnéd ezt a látnivalót?")) return;
         try {
-            const res = await fetch(`${getBase()}/api/admin/attractions?id=${id}`, { method: "DELETE" });
+            const res = await apiCall(`/api/admin/attractions?id=${id}`, { method: "DELETE" });
             if (res.ok) fetchAttractions();
         } catch (e) {
             console.error(e);
@@ -2006,25 +2835,40 @@
     <div class="container">
         <div class="admin-login-wrapper">
             <div class="admin-container login-box">
-                <h2>Adminisztráció Belépés</h2>
-                <form
-                    class="admin-form mt-lg"
-                    on:submit={login}
-                    autocomplete="on"
-                >
-                    <input
-                        id="admin-login-password"
-                        name="password"
-                        type="password"
-                        bind:value={password}
-                        placeholder="Jelszó..."
-                        autocomplete="current-password"
-                        required
-                    />
-                    <button type="submit" class="admin-submit-btn"
-                        >Belépés</button
+                {#if !authReady}
+                    <h2>Adminisztráció</h2>
+                    <p>Ellenőrzés…</p>
+                {:else if authDenied}
+                    <h2>Nincs jogosultság</h2>
+                    <p>
+                        Ez a Google-fiók be van jelentkezve, de nem
+                        adminisztrátor.
+                    </p>
+                    <button
+                        type="button"
+                        class="admin-submit-btn"
+                        on:click={logout}>Kijelentkezés</button
                     >
-                </form>
+                {:else}
+                    <h2>Adminisztráció Belépés</h2>
+                    <p>
+                        Jelentkezz be Google-fiókkal. Csak az admin e-mail
+                        érheti el ezt a felületet.
+                    </p>
+                    {#if googleClientId}
+                        {#key googleClientId}
+                            <GoogleSignIn
+                                clientId={googleClientId}
+                                onSignedIn={onGoogleSignedIn}
+                            />
+                        {/key}
+                    {:else}
+                        <p>
+                            A Google belépés nincs beállítva
+                            (GOOGLE_CLIENT_ID).
+                        </p>
+                    {/if}
+                {/if}
             </div>
         </div>
     </div>
@@ -2079,27 +2923,39 @@
                 <AdminNavIcon name="quicklinks" />
             </button>
 
-            <button
-                class="admin-sidebar-btn {activeTab === 'newsfeeds'
-                    ? 'active'
-                    : ''}"
-                on:click={() => goToAdminTab("newsfeeds")}
-                title="Hírfolyamok"
-            >
-                <AdminNavIcon name="newsfeeds" />
-            </button>
-
             <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
-                class="admin-sidebar-btn {activeTab === 'counties'
+                class="admin-sidebar-btn {activeTab === 'entries'
                     ? 'active'
                     : ''}"
-                on:click={() => goToAdminTab("counties")}
-                title="Megyék"
+                on:click={() => goToAdminTab("entries")}
+                title="Index"
             >
-                <AdminNavIcon name="counties" />
+                <AdminNavIcon name="entries" />
             </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'entry_categories'
+                    ? 'active'
+                    : ''}"
+                on:click={() => goToAdminTab("entry_categories")}
+                title="Bejegyzés Kategóriák"
+            >
+                <AdminNavIcon name="entry_categories" />
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'entry_types'
+                    ? 'active'
+                    : ''}"
+                on:click={() => goToAdminTab("entry_types")}
+                title="Bejegyzés típusok"
+            >
+                <AdminNavIcon name="entry_types" />
+            </button>
+
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
                 class="admin-sidebar-btn {activeTab === 'locations'
@@ -2109,6 +2965,16 @@
                 title="Települések"
             >
                 <AdminNavIcon name="locations" />
+            </button>
+
+            <button
+                class="admin-sidebar-btn {activeTab === 'counties'
+                    ? 'active'
+                    : ''}"
+                on:click={() => goToAdminTab("counties")}
+                title="Megyék"
+            >
+                <AdminNavIcon name="counties" />
             </button>
 
             <button
@@ -2144,35 +3010,12 @@
             <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
-                class="admin-sidebar-btn {activeTab === 'entry_categories'
-                    ? 'active'
-                    : ''}"
-                on:click={() => goToAdminTab("entry_categories")}
-                title="Bejegyzés Kategóriák"
+                class="admin-sidebar-btn {activeTab === 'pages' ? 'active' : ''}"
+                on:click={() => goToAdminTab('pages')}
+                title="Oldalak"
             >
-                <AdminNavIcon name="entry_categories" />
+                <AdminNavIcon name="pages" />
             </button>
-
-            <button
-                class="admin-sidebar-btn {activeTab === 'entry_types'
-                    ? 'active'
-                    : ''}"
-                on:click={() => goToAdminTab("entry_types")}
-                title="Bejegyzés típusok"
-            >
-                <AdminNavIcon name="entry_types" />
-            </button>
-            <button
-                class="admin-sidebar-btn {activeTab === 'entries'
-                    ? 'active'
-                    : ''}"
-                on:click={() => goToAdminTab("entries")}
-                title="Index"
-            >
-                <AdminNavIcon name="entries" />
-            </button>
-
-            <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
                 class="admin-sidebar-btn {activeTab === 'weather_translations' ? 'active' : ''}"
@@ -2182,15 +3025,20 @@
                 <AdminNavIcon name="weather_translations" />
             </button>
 
+            <hr class="admin-sidebar-sep" aria-hidden="true" />
+
             <button
-                class="admin-sidebar-btn {activeTab === 'pages' ? 'active' : ''}"
-                on:click={() => goToAdminTab('pages')}
-                title="Oldalak"
+                class="admin-sidebar-btn {activeTab === 'newsfeeds'
+                    ? 'active'
+                    : ''}"
+                on:click={() => goToAdminTab("newsfeeds")}
+                title="Hírfolyamok"
             >
-                <AdminNavIcon name="pages" />
+                <AdminNavIcon name="newsfeeds" />
             </button>
 
             <hr class="admin-sidebar-sep" aria-hidden="true" />
+
 
             <button
                 class="admin-sidebar-btn {activeTab === 'settings'
@@ -2205,47 +3053,54 @@
         </aside>
 
         <main class="admin-main">
-            <div class="admin-header">
-                <h2>
-                    {#if activeTab === "welcome"}Dashboard{/if}
-                    {#if activeTab === "mondasok"}Mondások Kezelése{/if}
-                    {#if activeTab === "quicklinks"}Gyorslinkek Kezelése{/if}
-                    {#if activeTab === "newsfeeds"}Hírfolyamok Kezelése{/if}
-                    {#if activeTab === "locations"}Települések Kezelése{/if}
-                    {#if activeTab === "venues"}Helyszínek Kezelése{/if}
-                    {#if activeTab === "entry_categories"}Bejegyzés Kategóriák
-                        Kezelése{/if}
-                    {#if activeTab === "entries"}Bejegyzések Kezelése{/if}
-                    {#if activeTab === "entry_types"}Bejegyzés Típusok Kezelése{/if}
-                    {#if activeTab === "attractions"}Látnivalók Kezelése{/if}
-                    {#if activeTab === "counties"}Megyék Kezelése{/if}
-                    {#if activeTab === "settings"}Beállítások{/if}
-                    {#if activeTab === "weather_translations"}Időjárás fordítások{/if}
-                    {#if activeTab === "pages"}Oldalak{/if}
-                    {#if activeTab === "events"}Események Kezelése{/if}
-                </h2>
+            <header class="admin-header">
+                <div class="admin-header-text">
+                    <h1 class="admin-page-title">{adminPageHead.title}</h1>
+                    {#if adminPageHead.greeting}
+                        <p class="admin-page-greeting">{adminPageHead.greeting}</p>
+                    {/if}
+                </div>
                 <button class="btn-logout" on:click={logout}
                     >Kijelentkezés</button
                 >
-            </div>
+            </header>
 
             <div class="admin-container w-full">
+                {#if activeTab === "welcome" && dashboardStatsError}
+                    <div class="admin-alert admin-alert--error" role="alert">
+                        Nem sikerült betölteni a táblaszámlálókat: {dashboardStatsError}
+                    </div>
+                {/if}
                 {#if activeTab === "welcome"}
                     <div class="admin-welcome" role="navigation" aria-label="Admin sections">
                         <div class="admin-welcome-grid">
                             {#each ADMIN_WELCOME_ITEMS as item}
+                                {@const cnt = adminWelcomeCount(item.id)}
                                 <button
                                     type="button"
                                     class="admin-welcome-card"
                                     on:click={() => goToAdminTab(item.id)}
                                     aria-label={item.label}
                                 >
-                                    <AdminNavIcon name={item.id} size={56} />
+                                    <div class="admin-welcome-card-body">
+                                        <AdminNavIcon name={item.id} size={56} />
+                                    </div>
+                                    <div class="admin-welcome-card-footer">
+                                        <span class="admin-welcome-card-footer-left"
+                                            title={dashboardStatsFetched
+                                                ? "Rekordok száma az adatbázisban"
+                                                : "Betöltés…"}
+                                            >{dashboardStatsFetched ? cnt : "…"}</span
+                                        >
+                                        <span class="admin-welcome-card-footer-right"
+                                            title="Sorok típusa ebben a táblában"
+                                            >{item.footerHint}</span
+                                        >
+                                    </div>
                                 </button>
                             {/each}
                         </div>
                     </div>
-
                     <section class="admin-listing-queue" aria-labelledby="listing-queue-title">
                         <h3 id="listing-queue-title">Bejegyzés-jóváhagyások</h3>
                         {#if listingQueueError}
@@ -2338,9 +3193,16 @@
                             jelenik meg mondás-blokk.
                         </p>
                     {/if}
+                    {#if mondasok.length > 0 && mondasokTodayCount === 0}
+                        <div class="admin-alert admin-alert--warning" role="status">
+                            Ma ({mondasTodayYmd}) nincs beütemezett mondás, ezért a kezdőlapon
+                            a mondás-blokk rejtve marad. Állítsd egy idézet
+                            <strong>megjelenés napját</strong> a mai dátumra.
+                        </div>
+                    {/if}
                     <details class="admin-create-panel">
                         <summary class="admin-create-summary"
-                            >Új mondás hozzáadása</summary
+                            ><span>Új mondás hozzáadása</span><AdminPlusIcon /></summary
                         >
                         <form class="admin-form admin-create-form" on:submit={submitMondas}>
                             <label for="mondas_text">Mondás szövege</label>
@@ -2352,13 +3214,22 @@
                                 rows="3"
                             ></textarea>
                             <label for="mondas_day">Megjelenés napja</label>
-                            <input
-                                id="mondas_day"
-                                name="display_date"
-                                type="date"
-                                bind:value={newMondas.display_date}
-                                required
-                            />
+                            <div class="admin-date-field">
+                                <input
+                                    id="mondas_day"
+                                    name="display_date"
+                                    type="date"
+                                    bind:value={newMondas.display_date}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    class="btn btn-sm"
+                                    on:click={() =>
+                                        (newMondas.display_date = localISODate())}
+                                    >Mai nap</button
+                                >
+                            </div>
                             <button type="submit" class="admin-submit-btn"
                                 >Hozzáadás</button
                             >
@@ -2374,10 +3245,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchMondasok}
+                                on:input={() => (pageMondasok = 1)}
                                 placeholder="Szöveg vagy ID…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgMondasok.total}
+                        page={pgMondasok.page}
+                        totalPages={pgMondasok.totalPages}
+                        from={pgMondasok.from}
+                        to={pgMondasok.to}
+                        on:prev={() =>
+                            (pageMondasok = Math.max(1, pageMondasok - 1))}
+                        on:next={() =>
+                            (pageMondasok = Math.min(
+                                pgMondasok.totalPages,
+                                pageMondasok + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -2390,10 +3276,20 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(mondasok, searchMondasok, (m) => [m.id, m.text, m.display_date]) as m}
-                                    <tr>
+                                {#each pgMondasok.rows as m (m.id)}
+                                    {@const isToday =
+                                        normalizeYmdInput(m.display_date) ===
+                                        mondasTodayYmd}
+                                    <tr class:admin-row-today={isToday}>
                                         <td>{m.id}</td>
-                                        <td>{m.display_date ?? "—"}</td>
+                                        <td>
+                                            {m.display_date ?? "—"}
+                                            {#if isToday}
+                                                <span class="admin-date-today-badge"
+                                                    >ma</span
+                                                >
+                                            {/if}
+                                        </td>
                                         <td>{m.text}</td>
                                         <td>
                                             <button
@@ -2424,6 +3320,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgMondasok.total}
+                        page={pgMondasok.page}
+                        totalPages={pgMondasok.totalPages}
+                        from={pgMondasok.from}
+                        to={pgMondasok.to}
+                        on:prev={() =>
+                            (pageMondasok = Math.max(1, pageMondasok - 1))}
+                        on:next={() =>
+                            (pageMondasok = Math.min(
+                                pgMondasok.totalPages,
+                                pageMondasok + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Quick Links Tab -->
@@ -2440,7 +3350,7 @@
                     {/if}
                     <details class="admin-create-panel">
                         <summary class="admin-create-summary"
-                            >Új gyorslink hozzáadása</summary
+                            ><span>Új gyorslink hozzáadása</span><AdminPlusIcon /></summary
                         >
                         <form class="admin-form admin-create-form" on:submit={submitLink}>
                             <label for="link_title">Cím</label>
@@ -2452,7 +3362,7 @@
                                 required
                             />
 
-                            <label for="link_url">URL</label>
+                            <label for="link_url">Weblap URL</label>
                             <input
                                 id="link_url"
                                 name="url"
@@ -2485,23 +3395,38 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchQuickLinks}
+                                on:input={() => (pageQuickLinks = 1)}
                                 placeholder="Cím, URL…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgQuickLinks.total}
+                        page={pgQuickLinks.page}
+                        totalPages={pgQuickLinks.totalPages}
+                        from={pgQuickLinks.from}
+                        to={pgQuickLinks.to}
+                        on:prev={() =>
+                            (pageQuickLinks = Math.max(1, pageQuickLinks - 1))}
+                        on:next={() =>
+                            (pageQuickLinks = Math.min(
+                                pgQuickLinks.totalPages,
+                                pageQuickLinks + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>Szín</th>
                                     <th>Cím</th>
-                                    <th>URL</th>
+                                    <th>Weblap URL</th>
                                     <th class="admin-table-col--action">Szerk.</th>
                                     <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(quickLinks, searchQuickLinks, (q) => [q.title, q.url, q.bg_color]) as q}
+                                {#each pgQuickLinks.rows as q}
                                     <tr>
                                         <td>
                                             <span
@@ -2543,6 +3468,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgQuickLinks.total}
+                        page={pgQuickLinks.page}
+                        totalPages={pgQuickLinks.totalPages}
+                        from={pgQuickLinks.from}
+                        to={pgQuickLinks.to}
+                        on:prev={() =>
+                            (pageQuickLinks = Math.max(1, pageQuickLinks - 1))}
+                        on:next={() =>
+                            (pageQuickLinks = Math.min(
+                                pgQuickLinks.totalPages,
+                                pageQuickLinks + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- News Feeds Tab -->
@@ -2559,7 +3498,7 @@
                     {/if}
                     <details class="admin-create-panel">
                         <summary class="admin-create-summary"
-                            >Új RSS hírfolyam hozzáadása</summary
+                            ><span>Új RSS hírfolyam hozzáadása</span><AdminPlusIcon /></summary
                         >
                         <form class="admin-form admin-create-form" on:submit={submitNews}>
                             <label for="news_title">Hírportál neve</label>
@@ -2604,10 +3543,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchNewsFeeds}
+                                on:input={() => (pageNewsFeeds = 1)}
                                 placeholder="Név, URL…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgNewsFeeds.total}
+                        page={pgNewsFeeds.page}
+                        totalPages={pgNewsFeeds.totalPages}
+                        from={pgNewsFeeds.from}
+                        to={pgNewsFeeds.to}
+                        on:prev={() =>
+                            (pageNewsFeeds = Math.max(1, pageNewsFeeds - 1))}
+                        on:next={() =>
+                            (pageNewsFeeds = Math.min(
+                                pgNewsFeeds.totalPages,
+                                pageNewsFeeds + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -2621,7 +3575,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(newsFeeds, searchNewsFeeds, (nf) => [nf.title, nf.feed_url, String(nf.id)]) as nf}
+                                {#each pgNewsFeeds.rows as nf}
                                     <tr>
                                         <td>{nf.title}</td>
                                         <td>{nf.feed_url}</td>
@@ -2684,6 +3638,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgNewsFeeds.total}
+                        page={pgNewsFeeds.page}
+                        totalPages={pgNewsFeeds.totalPages}
+                        from={pgNewsFeeds.from}
+                        to={pgNewsFeeds.to}
+                        on:prev={() =>
+                            (pageNewsFeeds = Math.max(1, pageNewsFeeds - 1))}
+                        on:next={() =>
+                            (pageNewsFeeds = Math.min(
+                                pgNewsFeeds.totalPages,
+                                pageNewsFeeds + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Locations Tab -->
@@ -2699,7 +3667,7 @@
                         </p>
                     {/if}
                     <details class="admin-create-panel">
-                        <summary class="admin-create-summary">Új település</summary>
+                        <summary class="admin-create-summary"><span>Új település</span><AdminPlusIcon /></summary>
                         <form class="admin-form admin-create-form" on:submit={submitLocation}>
                         <label for="loc_name">Település neve (HU)</label>
                         <input
@@ -2735,8 +3703,8 @@
                         <label for="loc_type">Típus</label>
                         <select id="loc_type" bind:value={newLocation.type}>
                             <option value="">Válassz...</option>
-                            {#each LOCATION_TYPES as t}<option value={t}
-                                    >{t}</option
+                            {#each settlementLocationTypes as t}<option value={t.slug}
+                                    >{t.label_hu}</option
                                 >{/each}
                         </select>
 
@@ -2805,10 +3773,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchLocations}
+                                on:input={() => (pageLocations = 1)}
                                 placeholder="Név, megye, típus, ir.sz…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgLocations.total}
+                        page={pgLocations.page}
+                        totalPages={pgLocations.totalPages}
+                        from={pgLocations.from}
+                        to={pgLocations.to}
+                        on:prev={() =>
+                            (pageLocations = Math.max(1, pageLocations - 1))}
+                        on:next={() =>
+                            (pageLocations = Math.min(
+                                pgLocations.totalPages,
+                                pageLocations + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -2830,19 +3813,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(locations, searchLocations, (l) => [
-                                        l.id,
-                                        l.name,
-                                        l.name_ro,
-                                        l.name_de,
-                                        l.county,
-                                        l.type,
-                                        l.post_code,
-                                        l.coordinates,
-                                        l.population,
-                                        l.area,
-                                        getLocationName(l.parent_id),
-                                    ]) as l}
+                                {#each pgLocations.rows as l}
                                     <tr>
                                         <td>{l.id}</td>
                                         <td>{l.name}</td>
@@ -2851,7 +3822,7 @@
                                         <td>{l.county || "-"}</td>
                                         <td>
                                             <span class="badge"
-                                                >{l.type || "-"}</span
+                                                >{settlementTypeLabel(l.type)}</span
                                             >
                                         </td>
                                         <td>{l.post_code || "-"}</td>
@@ -2896,6 +3867,144 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgLocations.total}
+                        page={pgLocations.page}
+                        totalPages={pgLocations.totalPages}
+                        from={pgLocations.from}
+                        to={pgLocations.to}
+                        on:prev={() =>
+                            (pageLocations = Math.max(1, pageLocations - 1))}
+                        on:next={() =>
+                            (pageLocations = Math.min(
+                                pgLocations.totalPages,
+                                pageLocations + 1,
+                            ))}
+                    />
+
+                    <h3 class="admin-subsection-title">Településtípusok</h3>
+                    <p class="admin-form-hint" style="margin: 0 0 0.75rem">
+                        A típus <strong>slug</strong>ja szerepel a település rekordban; a megnevezés a listákban és űrlapokban
+                        jelenik meg. Új slug: opcionálisan megadható; üresen a megnevezésből képződik.
+                    </p>
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            ><span>Új településtípus</span><AdminPlusIcon /></summary
+                        >
+                        <form
+                            class="admin-form admin-create-form"
+                            on:submit|preventDefault={submitNewSettlementLocationType}
+                        >
+                            <label for="slt-slug">Slug (opcionális)</label>
+                            <input
+                                id="slt-slug"
+                                type="text"
+                                bind:value={newSettlementLocationType.slug}
+                                placeholder="pl. varos — üresen automatikus"
+                            />
+                            <label for="slt-label">Megnevezés (HU) *</label>
+                            <input
+                                id="slt-label"
+                                type="text"
+                                bind:value={newSettlementLocationType.label_hu}
+                                required
+                            />
+                            <label for="slt-order">Sorrend</label>
+                            <input
+                                id="slt-order"
+                                type="number"
+                                bind:value={newSettlementLocationType.sort_order}
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Típus hozzáadása</button
+                            >
+                        </form>
+                    </details>
+
+                    {#if editingSettlementLocationType}
+                        <form
+                            class="admin-form admin-venues-type-edit"
+                            on:submit|preventDefault={saveEditSettlementLocationType}
+                        >
+                            <p class="admin-form-hint">
+                                Slug (azonosító, nem módosítható):
+                                <code>{editingSettlementLocationType.slug}</code>
+                            </p>
+                            <label for="slt-edit-label">Megnevezés (HU)</label>
+                            <input
+                                id="slt-edit-label"
+                                type="text"
+                                bind:value={editingSettlementLocationType.label_hu}
+                                required
+                            />
+                            <label for="slt-edit-order">Sorrend</label>
+                            <input
+                                id="slt-edit-order"
+                                type="number"
+                                bind:value={editingSettlementLocationType.sort_order}
+                            />
+                            <div class="flex gap-md">
+                                <button type="submit" class="admin-submit-btn"
+                                    >Mentés</button
+                                >
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    on:click={cancelEditSettlementLocationType}
+                                    >Mégse</button
+                                >
+                            </div>
+                        </form>
+                    {/if}
+
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table admin-table--compact">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Slug</th>
+                                    <th>Megnevezés (HU)</th>
+                                    <th>Sorrend</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each settlementLocationTypes as t}
+                                    <tr>
+                                        <td>{t.id}</td>
+                                        <td><code>{t.slug}</code></td>
+                                        <td>{t.label_hu}</td>
+                                        <td>{t.sort_order}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditSettlementLocationType(t)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteSettlementLocationTypeRow(t.id)}
+                                                >Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="6"
+                                            >Nincs típus (futtasd a backend migrációt).</td
+                                        ></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
                 {/if}
 
                 <!-- Venues Tab -->
@@ -2906,131 +4015,17 @@
                         </div>
                     {:else}
                         <p class="admin-info">
-                            Rendezvényhelyszínek (csarnokok, terek, pályák) településhez kötve. Felül a
-                            <strong>helyszíntípusok</strong> (a slug a megnevezésből képződik, megjelenített név, sorrend) — ezek
-                            szerepelnek a listákban és a nyilvános helyszín-oldalakon. Alatta a konkrét
-                            helyszínek; az <strong>Események</strong> napi programjában itt választhatók.
+                            Rendezvényhelyszínek (csarnokok, terek, pályák) településhez kötve. Előbb add meg az
+                            <strong>új helyszínt</strong> (ha szükséges), alatta a <strong>helyszíntípusok</strong>
+                            katalógusa (slug a megnevezésből, sorrend), majd az összes helyszín listája — az
+                            <strong>Események</strong> napi programjában itt választhatók.
                         </p>
                     {/if}
 
-                    <h3 class="admin-subsection-title">Helyszín típusok</h3>
+                    <h3 class="admin-subsection-title">Helyszínek</h3>
                     <details class="admin-create-panel">
                         <summary class="admin-create-summary"
-                            >Új helyszíntípus</summary
-                        >
-                        <form
-                            class="admin-form admin-create-form"
-                            on:submit|preventDefault={submitNewVenueType}
-                        >
-                            <label for="vt-label">Megnevezés (HU) *</label>
-                            <input
-                                id="vt-label"
-                                type="text"
-                                bind:value={newVenueType.label_hu}
-                                required
-                            />
-                            <button type="submit" class="admin-submit-btn"
-                                >Típus hozzáadása</button
-                            >
-                        </form>
-                    </details>
-
-                    {#if editingVenueType}
-                        <form
-                            class="admin-form admin-venues-type-edit"
-                            on:submit|preventDefault={saveEditVenueType}
-                        >
-                            <p class="admin-form-hint">
-                                Slug (automatikusan a megnevezésből; mentéskor frissül, és a hozzá tartozó
-                                helyszínek <code>kind</code> mezője is ehhez igazodik):
-                                <code>{editingVenueType.slug}</code>
-                            </p>
-                            <label for="vt-edit-label">Megnevezés (HU)</label>
-                            <input
-                                id="vt-edit-label"
-                                type="text"
-                                bind:value={editingVenueType.label_hu}
-                                required
-                            />
-                            <div class="flex gap-md">
-                                <button type="submit" class="admin-submit-btn"
-                                    >Mentés</button
-                                >
-                                <button
-                                    type="button"
-                                    class="btn-update"
-                                    on:click={cancelEditVenueType}>Mégse</button
-                                >
-                            </div>
-                        </form>
-                    {/if}
-
-                    <div class="admin-table-toolbar">
-                        <label class="admin-search-label"
-                            >Keresés (típusok)
-                            <input
-                                id="search_venue_types"
-                                name="search_venue_types"
-                                type="search"
-                                class="admin-search-input"
-                                bind:value={searchVenueTypes}
-                                placeholder="Slug, megnevezés…"
-                            /></label
-                        >
-                    </div>
-                    <div class="admin-table-wrapper">
-                        <table class="admin-table admin-table--compact">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Slug</th>
-                                    <th>Megnevezés (HU)</th>
-                                    <th class="admin-table-col--action">Szerk.</th>
-                                    <th class="admin-table-col--action">Törlés</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {#each filterRows(venueTypesList, searchVenueTypes, (t) => [t.id, t.slug, t.label_hu]) as t}
-                                    <tr>
-                                        <td>{t.id}</td>
-                                        <td><code>{t.slug}</code></td>
-                                        <td>{t.label_hu}</td>
-                                        <td>
-                                            <button
-                                                type="button"
-                                                class="btn-update"
-                                                on:click={() =>
-                                                    startEditVenueType(t)}
-                                                >Szerk.</button
-                                            >
-                                        </td>
-                                        <td>
-                                            <button
-                                                type="button"
-                                                class="btn-delete"
-                                                on:click={() =>
-                                                    deleteVenueTypeRow(t.id)}
-                                                >Törlés</button
-                                            >
-                                        </td>
-                                    </tr>
-                                {:else}
-                                    <tr
-                                        ><td colspan="5"
-                                            >Nincs típus (futtasd a migrációt).</td
-                                        ></tr
-                                    >
-                                {/each}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <h3 class="admin-subsection-title" style="margin-top:2rem"
-                        >Helyszínek</h3
-                    >
-                    <details class="admin-create-panel">
-                        <summary class="admin-create-summary"
-                            >Új helyszín hozzáadása</summary
+                            ><span>Új helyszín hozzáadása</span><AdminPlusIcon /></summary
                         >
                     <form
                         class="admin-form admin-venues-form admin-create-form"
@@ -3158,6 +4153,147 @@
                     </form>
                     </details>
 
+                    <h3 class="admin-subsection-title">Helyszíntípusok</h3>
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"
+                            ><span>Új helyszíntípus</span><AdminPlusIcon /></summary
+                        >
+                        <form
+                            class="admin-form admin-create-form"
+                            on:submit|preventDefault={submitNewVenueType}
+                        >
+                            <label for="vt-label">Megnevezés (HU) *</label>
+                            <input
+                                id="vt-label"
+                                type="text"
+                                bind:value={newVenueType.label_hu}
+                                required
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Típus hozzáadása</button
+                            >
+                        </form>
+                    </details>
+
+                    {#if editingVenueType}
+                        <form
+                            class="admin-form admin-venues-type-edit"
+                            on:submit|preventDefault={saveEditVenueType}
+                        >
+                            <p class="admin-form-hint">
+                                Slug (automatikusan a megnevezésből; mentéskor frissül, és a hozzá tartozó
+                                helyszínek <code>kind</code> mezője is ehhez igazodik):
+                                <code>{editingVenueType.slug}</code>
+                            </p>
+                            <label for="vt-edit-label">Megnevezés (HU)</label>
+                            <input
+                                id="vt-edit-label"
+                                type="text"
+                                bind:value={editingVenueType.label_hu}
+                                required
+                            />
+                            <div class="flex gap-md">
+                                <button type="submit" class="admin-submit-btn"
+                                    >Mentés</button
+                                >
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    on:click={cancelEditVenueType}>Mégse</button
+                                >
+                            </div>
+                        </form>
+                    {/if}
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (típusok)
+                            <input
+                                id="search_venue_types"
+                                name="search_venue_types"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchVenueTypes}
+                                on:input={() => (pageVenueTypes = 1)}
+                                placeholder="Slug, megnevezés…"
+                            /></label
+                        >
+                    </div>
+                    <AdminPaginationBar
+                        total={pgVenueTypes.total}
+                        page={pgVenueTypes.page}
+                        totalPages={pgVenueTypes.totalPages}
+                        from={pgVenueTypes.from}
+                        to={pgVenueTypes.to}
+                        on:prev={() =>
+                            (pageVenueTypes = Math.max(1, pageVenueTypes - 1))}
+                        on:next={() =>
+                            (pageVenueTypes = Math.min(
+                                pgVenueTypes.totalPages,
+                                pageVenueTypes + 1,
+                            ))}
+                    />
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table admin-table--compact">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Slug</th>
+                                    <th>Megnevezés (HU)</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each pgVenueTypes.rows as t}
+                                    <tr>
+                                        <td>{t.id}</td>
+                                        <td><code>{t.slug}</code></td>
+                                        <td>{t.label_hu}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditVenueType(t)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteVenueTypeRow(t.id)}
+                                                >Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="5"
+                                            >Nincs típus (futtasd a migrációt).</td
+                                        ></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgVenueTypes.total}
+                        page={pgVenueTypes.page}
+                        totalPages={pgVenueTypes.totalPages}
+                        from={pgVenueTypes.from}
+                        to={pgVenueTypes.to}
+                        on:prev={() =>
+                            (pageVenueTypes = Math.max(1, pageVenueTypes - 1))}
+                        on:next={() =>
+                            (pageVenueTypes = Math.min(
+                                pgVenueTypes.totalPages,
+                                pageVenueTypes + 1,
+                            ))}
+                    />
+
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (helyszínek)
@@ -3167,10 +4303,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchVenues}
+                                on:input={() => (pageVenues = 1)}
                                 placeholder="Név, település, típus…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgVenuesCatalog.total}
+                        page={pgVenuesCatalog.page}
+                        totalPages={pgVenuesCatalog.totalPages}
+                        from={pgVenuesCatalog.from}
+                        to={pgVenuesCatalog.to}
+                        on:prev={() =>
+                            (pageVenues = Math.max(1, pageVenues - 1))}
+                        on:next={() =>
+                            (pageVenues = Math.min(
+                                pgVenuesCatalog.totalPages,
+                                pageVenues + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table admin-table--compact">
                             <thead>
@@ -3192,20 +4343,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(venuesCatalog, searchVenues, (v) => [
-                                        v.id,
-                                        v.name,
-                                        v.name_ro,
-                                        v.name_de,
-                                        v.settlement_name,
-                                        v.county_name,
-                                        v.kind,
-                                        v.kind_label,
-                                        v.slug,
-                                        v.address,
-                                        v.description,
-                                        v.notes,
-                                    ]) as v}
+                                {#each pgVenuesCatalog.rows as v}
                                     <tr>
                                         <td>{v.id}</td>
                                         <td
@@ -3258,6 +4396,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgVenuesCatalog.total}
+                        page={pgVenuesCatalog.page}
+                        totalPages={pgVenuesCatalog.totalPages}
+                        from={pgVenuesCatalog.from}
+                        to={pgVenuesCatalog.to}
+                        on:prev={() =>
+                            (pageVenues = Math.max(1, pageVenues - 1))}
+                        on:next={() =>
+                            (pageVenues = Math.min(
+                                pgVenuesCatalog.totalPages,
+                                pageVenues + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Events Tab -->
@@ -3282,7 +4434,7 @@
                         </p>
                     {/if}
                     <details class="admin-create-panel">
-                        <summary class="admin-create-summary">Új esemény</summary>
+                        <summary class="admin-create-summary"><span>Új esemény</span><AdminPlusIcon /></summary>
                         <p class="admin-form-hint">
                             A <strong>kezdő és befejező dátum</strong> és a hozzájuk tartozó
                             <strong>időpontok (óra:perc)</strong> mind kötelezőek — a mentés nélkülük nem lehetséges.
@@ -3337,6 +4489,49 @@
                             id="event_desc"
                             bind:value={newEvent.description}
                         ></textarea>
+
+                        <div class="admin-event-image-block">
+                            <label for="event_featured_upload">Kiemelt kép</label>
+                            {#if newEvent.featured_image}
+                                <img
+                                    class="admin-event-image-preview"
+                                    src={absoluteMediaUrl(
+                                        newEvent.featured_image,
+                                        getApiBase(),
+                                    )}
+                                    alt=""
+                                />
+                            {/if}
+                            <input
+                                id="event_featured_upload"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                on:change={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) uploadEventFeaturedImage(f, false);
+                                    e.target.value = "";
+                                }}
+                            />
+                            <label for="event_featured_url" class="admin-sublabel"
+                                >Vagy kép URL (külső)</label
+                            >
+                            <input
+                                id="event_featured_url"
+                                type="url"
+                                bind:value={newEvent.featured_image}
+                                placeholder="https://…"
+                            />
+                            {#if newEvent.featured_image}
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    style="align-self: flex-start"
+                                    on:click={() =>
+                                        (newEvent.featured_image = "")}
+                                    >Kép törlése</button
+                                >
+                            {/if}
+                        </div>
 
                         <div class="flex gap-lg">
                             <div class="flex-1">
@@ -3398,16 +4593,44 @@
                             </div>
                         </div>
 
-                        <label for="event_type">Típus</label>
-                        <select
-                            id="event_type"
-                            bind:value={newEvent.event_type}
+                        <label for="event_type_id"
+                            >Eseménytípus <span class="admin-req" title="Kötelező">*</span></label
                         >
-                            <option value="cultural">Kulturális</option>
-                            <option value="sports">Sport</option>
-                            <option value="festival">Fesztivál</option>
-                            <option value="religious">Vallási</option>
-                            <option value="other">Egyéb</option>
+                        <select
+                            id="event_type_id"
+                            bind:value={newEvent.event_type_id}
+                            on:change={() => (newEvent.event_subtype_id = "")}
+                            required
+                        >
+                            <option value="">— válassz —</option>
+                            {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as t}
+                                <option value={String(t.id)}
+                                    >{t.label_hu} ({t.slug})</option
+                                >
+                            {/each}
+                        </select>
+
+                        <label for="event_subtype_id">Altípus (opcionális)</label>
+                        <select
+                            id="event_subtype_id"
+                            bind:value={newEvent.event_subtype_id}
+                        >
+                            <option value="">— nincs —</option>
+                            {#each subtypesForNewEvent as s}
+                                <option value={String(s.id)}
+                                    >{s.label_hu} ({s.slug})</option
+                                >
+                            {/each}
+                        </select>
+
+                        <label for="event_access_type">Hozzáférés</label>
+                        <select
+                            id="event_access_type"
+                            bind:value={newEvent.access_type}
+                        >
+                            <option value="public">{ACCESS_TYPE_LABELS.public}</option>
+                            <option value="members_only">{ACCESS_TYPE_LABELS.members_only}</option>
+                            <option value="invitation_only">{ACCESS_TYPE_LABELS.invitation_only}</option>
                         </select>
 
                         <label for="event_org">Szervező</label>
@@ -3451,6 +4674,17 @@
                             {/if}
                         </div>
 
+                        <label for="event_entry_price">Belépő / jegyár (opcionális)</label>
+                        <input
+                            id="event_entry_price"
+                            name="entry_price"
+                            type="text"
+                            bind:value={newEvent.entry_price}
+                            placeholder="pl. 99 RON, 15 EUR, ingyenes"
+                            maxlength="128"
+                            autocomplete="off"
+                        />
+
                         <button type="submit" class="admin-submit-btn"
                             >Hozzáadás</button
                         >
@@ -3466,42 +4700,65 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchEvents}
+                                on:input={() => (pageEvents = 1)}
                                 placeholder="Cím, szervező, helyszín…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgEvents.total}
+                        page={pgEvents.page}
+                        totalPages={pgEvents.totalPages}
+                        from={pgEvents.from}
+                        to={pgEvents.to}
+                        on:prev={() =>
+                            (pageEvents = Math.max(1, pageEvents - 1))}
+                        on:next={() =>
+                            (pageEvents = Math.min(
+                                pgEvents.totalPages,
+                                pageEvents + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
+                                    <th>Kép</th>
                                     <th>Cím</th>
                                     <th>Kezdés</th>
                                     <th>Befejezés</th>
                                     <th>Típus</th>
+                                    <th>Altípus</th>
+                                    <th>Hozzáférés</th>
                                     <th>Település</th>
                                     <th>Alapért. helyszín</th>
                                     <th>Szervező</th>
+                                    <th>Belépő</th>
                                     <th>Leírás</th>
                                     <th class="admin-table-col--action">Szerk.</th>
                                     <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(events, searchEvents, (e) => [
-                                        e.title,
-                                        e.description,
-                                        e.organizer,
-                                        getLocationName(e.location_id),
-                                        e.default_venue_name,
-                                        e.event_type,
-                                        e.start_date,
-                                        e.end_date,
-                                    ]) as e}
+                                {#each pgEvents.rows as e}
                                     <tr
                                         class:admin-row-warn={!eventDateTimeComplete(
                                             e,
                                         )}
                                     >
+                                        <td class="admin-event-thumb-cell">
+                                            {#if e.featured_image}
+                                                <img
+                                                    src={absoluteMediaUrl(
+                                                        e.featured_image,
+                                                        getApiBase(),
+                                                    )}
+                                                    alt=""
+                                                />
+                                            {:else}
+                                                <span class="admin-thumb-empty">—</span>
+                                            {/if}
+                                        </td>
                                         <td>
                                             {#if !eventDateTimeComplete(e)}
                                                 <span
@@ -3530,10 +4787,13 @@
                                                 -
                                             {/if}
                                         </td>
-                                        <td>{({cultural: "Kulturális", sports: "Sport", festival: "Fesztivál", religious: "Vallási", other: "Egyéb"})[e.event_type] || e.event_type}</td>
+                                        <td>{eventTypeLabelFromCatalog(e.event_type)}</td>
+                                        <td>{eventSubtypeLabelFromCatalog(Number(e.event_type_id), e.event_subtype || "")}</td>
+                                        <td>{accessTypeLabel(e.access_type)}</td>
                                         <td>{getLocationName(e.location_id)}</td>
                                         <td class="admin-table-cell-preview" title={e.default_venue_name || ""}>{contentPreview(e.default_venue_name || "")}</td>
                                         <td>{e.organizer || "—"}</td>
+                                        <td>{e.entry_price && String(e.entry_price).trim() ? e.entry_price : "—"}</td>
                                         <td class="admin-table-cell-preview" title={e.description || ""}>{contentPreview(e.description)}</td>
                                         <td>
                                             <button
@@ -3557,7 +4817,7 @@
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="10"
+                                        ><td colspan="14"
                                             >Nincsenek események.</td
                                         ></tr
                                     >
@@ -3565,6 +4825,356 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgEvents.total}
+                        page={pgEvents.page}
+                        totalPages={pgEvents.totalPages}
+                        from={pgEvents.from}
+                        to={pgEvents.to}
+                        on:prev={() =>
+                            (pageEvents = Math.max(1, pageEvents - 1))}
+                        on:next={() =>
+                            (pageEvents = Math.min(
+                                pgEvents.totalPages,
+                                pageEvents + 1,
+                            ))}
+                    />
+
+                    <h3 class="admin-subsection-title">Eseménytípusok (katalógus)</h3>
+                    <p class="admin-hint">
+                        A típusok és altípusok itt szerkeszthetők. Az események <code>event_type_id</code> értéke ezekre
+                        mutat.
+                    </p>
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"><span>Új eseménytípus</span><AdminPlusIcon /></summary>
+                        <form
+                            class="admin-form admin-create-form"
+                            on:submit|preventDefault={submitCatalogEventType}
+                        >
+                            <label for="cet-slug">Slug (URL, egyedi, pl. <code>sports</code>) *</label>
+                            <input
+                                id="cet-slug"
+                                type="text"
+                                bind:value={newCatalogEventType.slug}
+                                required
+                                placeholder="pl. workshop"
+                            />
+                            <label for="cet-label">Megnevezés (HU) *</label>
+                            <input
+                                id="cet-label"
+                                type="text"
+                                bind:value={newCatalogEventType.label_hu}
+                                required
+                            />
+                            <label for="cet-sort">Sorrend</label>
+                            <input
+                                id="cet-sort"
+                                type="number"
+                                bind:value={newCatalogEventType.sort_order}
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Típus hozzáadása</button
+                            >
+                        </form>
+                    </details>
+
+                    {#if editingCatalogEventType}
+                        <form
+                            class="admin-form admin-venues-type-edit"
+                            on:submit|preventDefault={saveEditCatalogEventType}
+                        >
+                            <p class="admin-form-hint">
+                                Slug: <code>{editingCatalogEventType.slug}</code> (nem változtatható)
+                            </p>
+                            <label for="cet-edit-label">Megnevezés (HU)</label>
+                            <input
+                                id="cet-edit-label"
+                                type="text"
+                                bind:value={editingCatalogEventType.label_hu}
+                                required
+                            />
+                            <label for="cet-edit-sort">Sorrend</label>
+                            <input
+                                id="cet-edit-sort"
+                                type="number"
+                                bind:value={editingCatalogEventType.sort_order}
+                            />
+                            <div class="flex gap-md">
+                                <button type="submit" class="admin-submit-btn"
+                                    >Mentés</button
+                                >
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    on:click={cancelEditCatalogEventType}>Mégse</button
+                                >
+                            </div>
+                        </form>
+                    {/if}
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (típusok)
+                            <input
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchCatalogTypes}
+                                on:input={() => (pageCatalogTypes = 1)}
+                                placeholder="Slug, név…"
+                            /></label
+                        >
+                    </div>
+                    <AdminPaginationBar
+                        total={pgCatalogTypes.total}
+                        page={pgCatalogTypes.page}
+                        totalPages={pgCatalogTypes.totalPages}
+                        from={pgCatalogTypes.from}
+                        to={pgCatalogTypes.to}
+                        on:prev={() =>
+                            (pageCatalogTypes = Math.max(1, pageCatalogTypes - 1))}
+                        on:next={() =>
+                            (pageCatalogTypes = Math.min(
+                                pgCatalogTypes.totalPages,
+                                pageCatalogTypes + 1,
+                            ))}
+                    />
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table admin-table--compact">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Slug</th>
+                                    <th>Megnevezés (HU)</th>
+                                    <th>Sorrend</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each pgCatalogTypes.rows as t}
+                                    <tr>
+                                        <td>{t.id}</td>
+                                        <td><code>{t.slug}</code></td>
+                                        <td>{t.label_hu}</td>
+                                        <td>{t.sort_order}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditCatalogEventType(t)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteCatalogEventTypeRow(t.id)}
+                                                >Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="6">Nincs típus.</td></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgCatalogTypes.total}
+                        page={pgCatalogTypes.page}
+                        totalPages={pgCatalogTypes.totalPages}
+                        from={pgCatalogTypes.from}
+                        to={pgCatalogTypes.to}
+                        on:prev={() =>
+                            (pageCatalogTypes = Math.max(1, pageCatalogTypes - 1))}
+                        on:next={() =>
+                            (pageCatalogTypes = Math.min(
+                                pgCatalogTypes.totalPages,
+                                pageCatalogTypes + 1,
+                            ))}
+                    />
+
+                    <h3 class="admin-subsection-title">Esemény altípusok</h3>
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"><span>Új altípus</span><AdminPlusIcon /></summary>
+                        <form
+                            class="admin-form admin-create-form"
+                            on:submit|preventDefault={submitCatalogEventSubtype}
+                        >
+                            <label for="ces-type">Főtípus *</label>
+                            <select
+                                id="ces-type"
+                                bind:value={newCatalogEventSubtype.event_type_id}
+                                required
+                            >
+                                <option value="">— válassz —</option>
+                                {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as ct}
+                                    <option value={String(ct.id)}
+                                        >{ct.label_hu} ({ct.slug})</option
+                                    >
+                                {/each}
+                            </select>
+                            <label for="ces-slug">Slug *</label>
+                            <input
+                                id="ces-slug"
+                                type="text"
+                                bind:value={newCatalogEventSubtype.slug}
+                                required
+                                placeholder="pl. hockey"
+                            />
+                            <label for="ces-label">Megnevezés (HU) *</label>
+                            <input
+                                id="ces-label"
+                                type="text"
+                                bind:value={newCatalogEventSubtype.label_hu}
+                                required
+                            />
+                            <label for="ces-sort">Sorrend</label>
+                            <input
+                                id="ces-sort"
+                                type="number"
+                                bind:value={newCatalogEventSubtype.sort_order}
+                            />
+                            <button type="submit" class="admin-submit-btn"
+                                >Altípus hozzáadása</button
+                            >
+                        </form>
+                    </details>
+
+                    {#if editingCatalogEventSubtype}
+                        <form
+                            class="admin-form admin-venues-type-edit"
+                            on:submit|preventDefault={saveEditCatalogEventSubtype}
+                        >
+                            <p class="admin-form-hint">
+                                Slug: <code>{editingCatalogEventSubtype.slug}</code> · főtípus ID:
+                                {editingCatalogEventSubtype.event_type_id}
+                            </p>
+                            <label for="ces-edit-label">Megnevezés (HU)</label>
+                            <input
+                                id="ces-edit-label"
+                                type="text"
+                                bind:value={editingCatalogEventSubtype.label_hu}
+                                required
+                            />
+                            <label for="ces-edit-sort">Sorrend</label>
+                            <input
+                                id="ces-edit-sort"
+                                type="number"
+                                bind:value={editingCatalogEventSubtype.sort_order}
+                            />
+                            <div class="flex gap-md">
+                                <button type="submit" class="admin-submit-btn"
+                                    >Mentés</button
+                                >
+                                <button
+                                    type="button"
+                                    class="btn-update"
+                                    on:click={cancelEditCatalogEventSubtype}>Mégse</button
+                                >
+                            </div>
+                        </form>
+                    {/if}
+
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés (altípusok)
+                            <input
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchCatalogSubtypes}
+                                on:input={() => (pageCatalogSubtypes = 1)}
+                                placeholder="Slug, név, típus ID…"
+                            /></label
+                        >
+                    </div>
+                    <AdminPaginationBar
+                        total={pgCatalogSubtypes.total}
+                        page={pgCatalogSubtypes.page}
+                        totalPages={pgCatalogSubtypes.totalPages}
+                        from={pgCatalogSubtypes.from}
+                        to={pgCatalogSubtypes.to}
+                        on:prev={() =>
+                            (pageCatalogSubtypes = Math.max(
+                                1,
+                                pageCatalogSubtypes - 1,
+                            ))}
+                        on:next={() =>
+                            (pageCatalogSubtypes = Math.min(
+                                pgCatalogSubtypes.totalPages,
+                                pageCatalogSubtypes + 1,
+                            ))}
+                    />
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table admin-table--compact">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Főtípus ID</th>
+                                    <th>Slug</th>
+                                    <th>Megnevezés (HU)</th>
+                                    <th>Sorrend</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each pgCatalogSubtypes.rows as s}
+                                    <tr>
+                                        <td>{s.id}</td>
+                                        <td>{s.event_type_id}</td>
+                                        <td><code>{s.slug}</code></td>
+                                        <td>{s.label_hu}</td>
+                                        <td>{s.sort_order}</td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-update"
+                                                on:click={() =>
+                                                    startEditCatalogEventSubtype(s)}
+                                                >Szerk.</button
+                                            >
+                                        </td>
+                                        <td>
+                                            <button
+                                                type="button"
+                                                class="btn-delete"
+                                                on:click={() =>
+                                                    deleteCatalogEventSubtypeRow(s.id)}
+                                                >Törlés</button
+                                            >
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr
+                                        ><td colspan="7">Nincs altípus.</td></tr
+                                    >
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgCatalogSubtypes.total}
+                        page={pgCatalogSubtypes.page}
+                        totalPages={pgCatalogSubtypes.totalPages}
+                        from={pgCatalogSubtypes.from}
+                        to={pgCatalogSubtypes.to}
+                        on:prev={() =>
+                            (pageCatalogSubtypes = Math.max(
+                                1,
+                                pageCatalogSubtypes - 1,
+                            ))}
+                        on:next={() =>
+                            (pageCatalogSubtypes = Math.min(
+                                pgCatalogSubtypes.totalPages,
+                                pageCatalogSubtypes + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Entry Categories Tab -->
@@ -3580,7 +5190,7 @@
                         </p>
                     {/if}
                     <details class="admin-create-panel">
-                        <summary class="admin-create-summary">Új kategória</summary>
+                        <summary class="admin-create-summary"><span>Új kategória</span><AdminPlusIcon /></summary>
                         <form class="admin-form admin-create-form" on:submit={submitEntryCategory}>
                             <label for="cat_name">Kategória neve</label>
                             <input
@@ -3606,10 +5216,28 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchEntryCategories}
+                                on:input={() => (pageEntryCategories = 1)}
                                 placeholder="Név, ID…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgEntryCategories.total}
+                        page={pgEntryCategories.page}
+                        totalPages={pgEntryCategories.totalPages}
+                        from={pgEntryCategories.from}
+                        to={pgEntryCategories.to}
+                        on:prev={() =>
+                            (pageEntryCategories = Math.max(
+                                1,
+                                pageEntryCategories - 1,
+                            ))}
+                        on:next={() =>
+                            (pageEntryCategories = Math.min(
+                                pgEntryCategories.totalPages,
+                                pageEntryCategories + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -3621,7 +5249,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(entryCategories, searchEntryCategories, (cat) => [cat.id, cat.name]) as cat}
+                                {#each pgEntryCategories.rows as cat}
                                     <tr>
                                         <td>{cat.id}</td>
                                         <td>{cat.name}</td>
@@ -3655,6 +5283,23 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgEntryCategories.total}
+                        page={pgEntryCategories.page}
+                        totalPages={pgEntryCategories.totalPages}
+                        from={pgEntryCategories.from}
+                        to={pgEntryCategories.to}
+                        on:prev={() =>
+                            (pageEntryCategories = Math.max(
+                                1,
+                                pageEntryCategories - 1,
+                            ))}
+                        on:next={() =>
+                            (pageEntryCategories = Math.min(
+                                pgEntryCategories.totalPages,
+                                pageEntryCategories + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Entries Tab -->
@@ -3671,7 +5316,7 @@
                         </p>
                     {/if}
                     <details class="admin-create-panel">
-                        <summary class="admin-create-summary">Új bejegyzés</summary>
+                        <summary class="admin-create-summary"><span>Új bejegyzés</span><AdminPlusIcon /></summary>
                     <form class="admin-form admin-create-form" on:submit={submitEntry}>
                         <label for="serv_type">Típus</label>
                         <select id="serv_type" bind:value={newEntry.type}>
@@ -3710,7 +5355,7 @@
                             required
                         />
 
-                        <label for="serv_url">URL / Weblap</label>
+                        <label for="serv_url">Weblap URL</label>
                         <input
                             id="serv_url"
                             type="url"
@@ -3773,6 +5418,28 @@
                             {/each}
                         </div>
 
+                        <label class="flex items-center gap-xs font-normal">
+                            <input
+                                type="checkbox"
+                                bind:checked={newEntry.verified}
+                                class="w-auto"
+                            />
+                            Igényelt
+                        </label>
+                        <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény).</p>
+
+                        <span class="form-group-label">Nyitvatartás</span>
+                        <EntryHoursEditor bind:hours={newEntry.hours} />
+
+                        <span class="form-group-label">Kiszállítási idő</span>
+                        <EntryHoursEditor bind:hours={newEntry.delivery_hours} />
+
+                        <span class="form-group-label">Fotók</span>
+                        <EntryPhotosEditor
+                            bind:photos={newEntry.photos}
+                            alertError={(msg) => showAlert(msg)}
+                        />
+
                         <button type="submit" class="admin-submit-btn"
                             >Hozzáadás</button
                         >
@@ -3788,16 +5455,32 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchEntries}
+                                on:input={() => (pageEntries = 1)}
                                 placeholder="Név, URL, címke…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgEntries.total}
+                        page={pgEntries.page}
+                        totalPages={pgEntries.totalPages}
+                        from={pgEntries.from}
+                        to={pgEntries.to}
+                        on:prev={() =>
+                            (pageEntries = Math.max(1, pageEntries - 1))}
+                        on:next={() =>
+                            (pageEntries = Math.min(
+                                pgEntries.totalPages,
+                                pageEntries + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
                                 <tr>
                                     <th>Név</th>
                                     <th>Típus</th>
+                                    <th>Igényelt</th>
                                     <th>URL</th>
                                     <th>Település</th>
                                     <th>Kategória</th>
@@ -3811,18 +5494,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(entries, searchEntries, (s) => [
-                                        s.name,
-                                        s.type,
-                                        s.url,
-                                        s.phone,
-                                        s.address,
-                                        s.notes,
-                                        getLocationName(s.location_id),
-                                        getCategoryName(s.category_id),
-                                        (s.languages || []).join(","),
-                                        (s.tags || []).join(","),
-                                    ]) as s}
+                                {#each pgEntries.rows as s}
                                     <tr>
                                         <td>{s.name}</td>
                                         <td
@@ -3830,6 +5502,7 @@
                                                 >{s.type || "entry"}</span
                                             ></td
                                         >
+                                        <td>{s.verified ? "Ellenőrzött" : "Nem ellenőrzött"}</td>
                                         <td class="admin-table-cell-preview" title={s.url || ""}>{s.url ? urlPreview(s.url) : "—"}</td>
                                         <td>{getLocationName(s.location_id)}</td
                                         >
@@ -3878,6 +5551,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgEntries.total}
+                        page={pgEntries.page}
+                        totalPages={pgEntries.totalPages}
+                        from={pgEntries.from}
+                        to={pgEntries.to}
+                        on:prev={() =>
+                            (pageEntries = Math.max(1, pageEntries - 1))}
+                        on:next={() =>
+                            (pageEntries = Math.min(
+                                pgEntries.totalPages,
+                                pageEntries + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Beállítások (Settings) Tab -->
@@ -3996,7 +5683,7 @@
                         </details>
                     {:else}
                         <details class="admin-create-panel">
-                            <summary class="admin-create-summary">Új fordítás</summary>
+                            <summary class="admin-create-summary"><span>Új fordítás</span><AdminPlusIcon /></summary>
                         <form class="admin-form admin-create-form" on:submit={saveWeatherTranslation} style="max-width: 28rem;">
                             <label for="wt_src">Eredeti szöveg (pl. overcast, partly cloudy)</label>
                             <input id="wt_src" name="source_text" type="text" bind:value={newWeatherTrans.source_text} required placeholder="pl. overcast" />
@@ -4012,7 +5699,7 @@
                         </form>
                         </details>
                     {/if}
-                    <div class="admin-table-toolbar mt-lg">
+                    <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
                             <input
@@ -4021,10 +5708,28 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchWeatherTrans}
+                                on:input={() => (pageWeatherTrans = 1)}
                                 placeholder="Szöveg, nyelv…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgWeatherTrans.total}
+                        page={pgWeatherTrans.page}
+                        totalPages={pgWeatherTrans.totalPages}
+                        from={pgWeatherTrans.from}
+                        to={pgWeatherTrans.to}
+                        on:prev={() =>
+                            (pageWeatherTrans = Math.max(
+                                1,
+                                pageWeatherTrans - 1,
+                            ))}
+                        on:next={() =>
+                            (pageWeatherTrans = Math.min(
+                                pgWeatherTrans.totalPages,
+                                pageWeatherTrans + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -4037,7 +5742,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(weatherTranslations, searchWeatherTrans, (wt) => [wt.source_text, wt.lang, wt.translated_text]) as wt}
+                                {#each pgWeatherTrans.rows as wt}
                                     <tr>
                                         <td>{wt.source_text}</td>
                                         <td>{wt.lang}</td>
@@ -4051,6 +5756,23 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgWeatherTrans.total}
+                        page={pgWeatherTrans.page}
+                        totalPages={pgWeatherTrans.totalPages}
+                        from={pgWeatherTrans.from}
+                        to={pgWeatherTrans.to}
+                        on:prev={() =>
+                            (pageWeatherTrans = Math.max(
+                                1,
+                                pageWeatherTrans - 1,
+                            ))}
+                        on:next={() =>
+                            (pageWeatherTrans = Math.min(
+                                pgWeatherTrans.totalPages,
+                                pageWeatherTrans + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Oldalak (Pages) Tab -->
@@ -4066,8 +5788,11 @@
                             <label for="page_title">Cím</label>
                             <input id="page_title" name="title" type="text" bind:value={editingPage.title} required />
 
+                            <label for="page_greeting">Bevezető (a cím alatt, nyilvános oldalakon)</label>
+                            <textarea id="page_greeting" name="greeting" bind:value={editingPage.greeting} rows="3" placeholder="Rövid bevezető szöveg…"></textarea>
+
                             <label for="page_content">Tartalom (HTML)</label>
-                            <textarea id="page_content" name="content" bind:value={editingPage.content} rows="20" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+                            <textarea id="page_content" name="content" bind:value={editingPage.content} rows="20" class="input-mono"></textarea>
 
                             <div class="flex gap-md mt-md">
                                 <button type="submit" class="admin-submit-btn" disabled={pageSaving}>
@@ -4116,7 +5841,7 @@
                                             name={"faq_answer_" + i}
                                             bind:value={editingPageFaq.faq_items[i].answer}
                                             rows="5"
-                                            style="font-family: monospace; font-size: 0.85rem;"
+                                            class="input-mono"
                                             placeholder="Válasz szövege…"
                                         ></textarea>
                                         <button
@@ -4131,7 +5856,7 @@
                             {/each}
 
                             <label for="pfaq_disc">Disclaimer (Markdown)</label>
-                            <textarea id="pfaq_disc" bind:value={editingPageFaq.disclaimer_markdown} rows="8" style="font-family: monospace; font-size: 0.85rem;"></textarea>
+                            <textarea id="pfaq_disc" bind:value={editingPageFaq.disclaimer_markdown} rows="8" class="input-mono"></textarea>
 
                             <div class="flex gap-md mt-md">
                                 <button type="submit" class="admin-submit-btn" disabled={pageFaqSaving}>
@@ -4143,7 +5868,7 @@
                     {:else}
                         {#if !adminTabError}
                             <p class="admin-info">
-                                Statikus HTML oldalak (pl. irányelvek), valamint oldalankénti <strong>GYIK és disclaimer</strong>
+                                Statikus oldalak: <strong>cím</strong>, <strong>bevezető</strong> (a főcím alatt), <strong>HTML tartalom</strong> (pl. irányelvek), valamint oldalankénti <strong>GYIK és disclaimer</strong>
                                 szekciók. A GYIK a nyilvános oldalon a <code>PageFaqDisclaimer</code> komponensen keresztül
                                 jelenik meg (kérdés–válasz párok, disclaimer).
                             </p>
@@ -4158,33 +5883,50 @@
                                     type="search"
                                     class="admin-search-input"
                                     bind:value={searchAdminPages}
+                                    on:input={() => (pageAdminPages = 1)}
                                     placeholder="Slug, cím…"
                                 /></label
                             >
                         </div>
+                        <AdminPaginationBar
+                            total={pgAdminPages.total}
+                            page={pgAdminPages.page}
+                            totalPages={pgAdminPages.totalPages}
+                            from={pgAdminPages.from}
+                            to={pgAdminPages.to}
+                            on:prev={() =>
+                                (pageAdminPages = Math.max(1, pageAdminPages - 1))}
+                            on:next={() =>
+                                (pageAdminPages = Math.min(
+                                    pgAdminPages.totalPages,
+                                    pageAdminPages + 1,
+                                ))}
+                        />
                         <div class="admin-table-wrapper">
                             <table class="admin-table">
                                 <thead>
                                     <tr>
                                         <th>Slug</th>
                                         <th>Cím</th>
+                                        <th>Bevezető</th>
                                         <th>Utolsó módosítás</th>
                                         <th class="admin-table-col--action">Szerk.</th>
                                         <th class="admin-table-col--action">Törlés</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {#each filterRows(adminPages, searchAdminPages, (pg) => [pg.slug, pg.title, pg.updated_at]) as pg}
+                                    {#each pgAdminPages.rows as pg}
                                         <tr>
-                                            <td><a href="/{pg.slug}" target="_blank">/{pg.slug}</a></td>
+                                            <td><a href={pg.slug === 'home' ? '/' : '/' + pg.slug} target="_blank">{pg.slug === 'home' ? '/' : '/' + pg.slug}</a></td>
                                             <td>{pg.title}</td>
+                                            <td class="admin-table-cell-preview" title={pg.greeting || ''}>{pg.greeting ? contentPreview(pg.greeting) : '—'}</td>
                                             <td>{pg.updated_at ? pg.updated_at.slice(0, 19) : ''}</td>
                                             <td class="admin-table-col--action"><button type="button" class="btn-update" on:click={() => startEditPage(pg)}>Szerk.</button></td>
                                             <td class="admin-table-col--action admin-table-col--action--muted">—</td>
                                         </tr>
                                     {:else}
                                         <tr
-                                            ><td colspan="5"
+                                            ><td colspan="6"
                                                 >{adminPages?.length
                                                     ? "Nincs találat a keresésre."
                                                     : "Nincsenek oldalak."}</td
@@ -4194,6 +5936,20 @@
                                 </tbody>
                             </table>
                         </div>
+                        <AdminPaginationBar
+                            total={pgAdminPages.total}
+                            page={pgAdminPages.page}
+                            totalPages={pgAdminPages.totalPages}
+                            from={pgAdminPages.from}
+                            to={pgAdminPages.to}
+                            on:prev={() =>
+                                (pageAdminPages = Math.max(1, pageAdminPages - 1))}
+                            on:next={() =>
+                                (pageAdminPages = Math.min(
+                                    pgAdminPages.totalPages,
+                                    pageAdminPages + 1,
+                                ))}
+                        />
 
                         <h3 class="admin-subtab-heading">GYIK és felelősségkizárások (oldalanként)</h3>
                         <p class="admin-info">
@@ -4210,10 +5966,25 @@
                                     type="search"
                                     class="admin-search-input"
                                     bind:value={searchPageFaqRows}
+                                    on:input={() => (pagePageFaqRows = 1)}
                                     placeholder="Kulcs, név, cím…"
                                 /></label
                             >
                         </div>
+                        <AdminPaginationBar
+                            total={pgPageFaqRows.total}
+                            page={pgPageFaqRows.page}
+                            totalPages={pgPageFaqRows.totalPages}
+                            from={pgPageFaqRows.from}
+                            to={pgPageFaqRows.to}
+                            on:prev={() =>
+                                (pagePageFaqRows = Math.max(1, pagePageFaqRows - 1))}
+                            on:next={() =>
+                                (pagePageFaqRows = Math.min(
+                                    pgPageFaqRows.totalPages,
+                                    pagePageFaqRows + 1,
+                                ))}
+                        />
                         <div class="admin-table-wrapper">
                             <table class="admin-table">
                                 <thead>
@@ -4228,7 +5999,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {#each filterRows(pageFaqSections, searchPageFaqRows, (row) => [row.section_key, row.label_hu, row.faq_title, String((row.faq_items || []).length), row.updated_at]) as row}
+                                    {#each pgPageFaqRows.rows as row}
                                         <tr>
                                             <td><code>{row.section_key}</code></td>
                                             <td>{row.label_hu}</td>
@@ -4250,6 +6021,20 @@
                                 </tbody>
                             </table>
                         </div>
+                        <AdminPaginationBar
+                            total={pgPageFaqRows.total}
+                            page={pgPageFaqRows.page}
+                            totalPages={pgPageFaqRows.totalPages}
+                            from={pgPageFaqRows.from}
+                            to={pgPageFaqRows.to}
+                            on:prev={() =>
+                                (pagePageFaqRows = Math.max(1, pagePageFaqRows - 1))}
+                            on:next={() =>
+                                (pagePageFaqRows = Math.min(
+                                    pgPageFaqRows.totalPages,
+                                    pagePageFaqRows + 1,
+                                ))}
+                        />
                     {/if}
                 {/if}
 
@@ -4266,7 +6051,7 @@
                         </p>
                     {/if}
                     <details class="admin-create-panel">
-                        <summary class="admin-create-summary">Új típus</summary>
+                        <summary class="admin-create-summary"><span>Új típus</span><AdminPlusIcon /></summary>
                         <form class="admin-form admin-create-form" on:submit={submitEntryType}>
                             <label for="etype_name">Típus neve</label>
                             <input
@@ -4292,10 +6077,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchEntryTypes}
+                                on:input={() => (pageEntryTypes = 1)}
                                 placeholder="Név, ID…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgEntryTypes.total}
+                        page={pgEntryTypes.page}
+                        totalPages={pgEntryTypes.totalPages}
+                        from={pgEntryTypes.from}
+                        to={pgEntryTypes.to}
+                        on:prev={() =>
+                            (pageEntryTypes = Math.max(1, pageEntryTypes - 1))}
+                        on:next={() =>
+                            (pageEntryTypes = Math.min(
+                                pgEntryTypes.totalPages,
+                                pageEntryTypes + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -4307,7 +6107,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(entryTypes, searchEntryTypes, (et) => [et.id, et.name]) as et}
+                                {#each pgEntryTypes.rows as et}
                                     <tr>
                                         <td>{et.id}</td>
                                         <td>{et.name}</td>
@@ -4340,6 +6140,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgEntryTypes.total}
+                        page={pgEntryTypes.page}
+                        totalPages={pgEntryTypes.totalPages}
+                        from={pgEntryTypes.from}
+                        to={pgEntryTypes.to}
+                        on:prev={() =>
+                            (pageEntryTypes = Math.max(1, pageEntryTypes - 1))}
+                        on:next={() =>
+                            (pageEntryTypes = Math.min(
+                                pgEntryTypes.totalPages,
+                                pageEntryTypes + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Attractions Tab -->
@@ -4355,7 +6169,7 @@
                         </p>
                     {/if}
                     <details class="admin-create-panel">
-                        <summary class="admin-create-summary">Új látnivaló</summary>
+                        <summary class="admin-create-summary"><span>Új látnivaló</span><AdminPlusIcon /></summary>
                     <form class="admin-form admin-create-form mb-lg" on:submit|preventDefault={submitNewAttraction}>
                         <div class="form-row">
                             <label for="att_county">Megye</label>
@@ -4402,10 +6216,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchAttractions}
+                                on:input={() => (pageAttractions = 1)}
                                 placeholder="Név, slug, megye…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgAttractions.total}
+                        page={pgAttractions.page}
+                        totalPages={pgAttractions.totalPages}
+                        from={pgAttractions.from}
+                        to={pgAttractions.to}
+                        on:prev={() =>
+                            (pageAttractions = Math.max(1, pageAttractions - 1))}
+                        on:next={() =>
+                            (pageAttractions = Math.min(
+                                pgAttractions.totalPages,
+                                pageAttractions + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -4423,17 +6252,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each filterRows(attractions, searchAttractions, (att) => [
-                                        att.name,
-                                        att.slug,
-                                        att.county_name,
-                                        att.description,
-                                        att.featured_image,
-                                        att.content,
-                                        (att.images || []).join(" "),
-                                        String(att.latitude ?? ""),
-                                        String(att.longitude ?? ""),
-                                    ]) as att}
+                                {#each pgAttractions.rows as att}
                                     <tr>
                                         <td>{att.name}</td>
                                         <td>{att.county_name}</td>
@@ -4456,6 +6275,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgAttractions.total}
+                        page={pgAttractions.page}
+                        totalPages={pgAttractions.totalPages}
+                        from={pgAttractions.from}
+                        to={pgAttractions.to}
+                        on:prev={() =>
+                            (pageAttractions = Math.max(1, pageAttractions - 1))}
+                        on:next={() =>
+                            (pageAttractions = Math.min(
+                                pgAttractions.totalPages,
+                                pageAttractions + 1,
+                            ))}
+                    />
                 {/if}
 
                 <!-- Counties Tab -->
@@ -4483,10 +6316,25 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchCounties}
+                                on:input={() => (pageCounties = 1)}
                                 placeholder="Név, slug, székhely…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgCounties.total}
+                        page={pgCounties.page}
+                        totalPages={pgCounties.totalPages}
+                        from={pgCounties.from}
+                        to={pgCounties.to}
+                        on:prev={() =>
+                            (pageCounties = Math.max(1, pageCounties - 1))}
+                        on:next={() =>
+                            (pageCounties = Math.min(
+                                pgCounties.totalPages,
+                                pageCounties + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -4502,7 +6350,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each displayCounties as c (c.id)}
+                                {#each pgCounties.rows as c (c.id)}
                                     {#if editingCounty?.id === c.id}
                                         <tr class="admin-table-edit-row">
                                             <td colspan="8">
@@ -4593,6 +6441,20 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgCounties.total}
+                        page={pgCounties.page}
+                        totalPages={pgCounties.totalPages}
+                        from={pgCounties.from}
+                        to={pgCounties.to}
+                        on:prev={() =>
+                            (pageCounties = Math.max(1, pageCounties - 1))}
+                        on:next={() =>
+                            (pageCounties = Math.min(
+                                pgCounties.totalPages,
+                                pageCounties + 1,
+                            ))}
+                    />
 
                     <h3 class="admin-region-heading">Történelmi székek</h3>
                     <p class="admin-hint">
@@ -4608,10 +6470,28 @@
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchHistoricalSeats}
+                                on:input={() => (pageHistoricalSeats = 1)}
                                 placeholder="Név, slug…"
                             /></label
                         >
                     </div>
+                    <AdminPaginationBar
+                        total={pgHistoricalSeats.total}
+                        page={pgHistoricalSeats.page}
+                        totalPages={pgHistoricalSeats.totalPages}
+                        from={pgHistoricalSeats.from}
+                        to={pgHistoricalSeats.to}
+                        on:prev={() =>
+                            (pageHistoricalSeats = Math.max(
+                                1,
+                                pageHistoricalSeats - 1,
+                            ))}
+                        on:next={() =>
+                            (pageHistoricalSeats = Math.min(
+                                pgHistoricalSeats.totalPages,
+                                pageHistoricalSeats + 1,
+                            ))}
+                    />
                     <div class="admin-table-wrapper">
                         <table class="admin-table">
                             <thead>
@@ -4626,7 +6506,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {#each displayHistoricalSeats as h (h.id)}
+                                {#each pgHistoricalSeats.rows as h (h.id)}
                                     {#if editingHistoricalSeat?.id === h.id}
                                         <tr class="admin-table-edit-row">
                                             <td colspan="7">
@@ -4705,6 +6585,23 @@
                             </tbody>
                         </table>
                     </div>
+                    <AdminPaginationBar
+                        total={pgHistoricalSeats.total}
+                        page={pgHistoricalSeats.page}
+                        totalPages={pgHistoricalSeats.totalPages}
+                        from={pgHistoricalSeats.from}
+                        to={pgHistoricalSeats.to}
+                        on:prev={() =>
+                            (pageHistoricalSeats = Math.max(
+                                1,
+                                pageHistoricalSeats - 1,
+                            ))}
+                        on:next={() =>
+                            (pageHistoricalSeats = Math.min(
+                                pgHistoricalSeats.totalPages,
+                                pageHistoricalSeats + 1,
+                            ))}
+                    />
                 {/if}
             </div>
         </main>
@@ -4736,14 +6633,23 @@
                         class="w-full"
                     ></textarea>
                     <label for="emondas_day_edit">Megjelenés napja</label>
-                    <input
-                        id="emondas_day_edit"
-                        name="display_date"
-                        type="date"
-                        bind:value={editingMondas.display_date}
-                        required
-                        class="w-full"
-                    />
+                    <div class="admin-date-field">
+                        <input
+                            id="emondas_day_edit"
+                            name="display_date"
+                            type="date"
+                            bind:value={editingMondas.display_date}
+                            required
+                            class="w-full"
+                        />
+                        <button
+                            type="button"
+                            class="btn btn-sm"
+                            on:click={() =>
+                                (editingMondas.display_date = localISODate())}
+                            >Mai nap</button
+                        >
+                    </div>
 
                     <div class="modal-actions">
                         <button type="submit" class="admin-submit-btn"
@@ -4924,7 +6830,7 @@
                         bind:value={editingEntry.slug}
                     />
 
-                    <label for="edit_url">URL / Weblap</label>
+                    <label for="edit_url">Weblap URL</label>
                     <input
                         id="edit_url"
                         type="url"
@@ -4982,8 +6888,31 @@
                                 />
                                 {lang}
                             </label>
-                        {/each}
-                    </div>
+                            {/each}
+                        </div>
+
+                    <label class="flex items-center gap-xs font-normal">
+                        <input
+                            type="checkbox"
+                            bind:checked={editingEntry.verified}
+                            class="w-auto"
+                        />
+                        Igényelt
+                    </label>
+                    <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény).</p>
+
+                    <span class="form-group-label">Nyitvatartás</span>
+                    <EntryHoursEditor bind:hours={editingEntry.hours} />
+
+                    <span class="form-group-label">Kiszállítási idő</span>
+                    <EntryHoursEditor bind:hours={editingEntry.delivery_hours} />
+
+                    <span class="form-group-label">Fotók</span>
+                    <EntryPhotosEditor
+                        bind:photos={editingEntry.photos}
+                        entryId={editingEntry.id}
+                        alertError={(msg) => showAlert(msg)}
+                    />
 
                     <div class="modal-actions">
                         <button type="submit" class="admin-submit-btn"
@@ -5051,7 +6980,8 @@
                     <label for="eloc_type">Típus</label>
                     <select id="eloc_type" bind:value={editingLocation.type}>
                         <option value="">-</option>
-                        {#each LOCATION_TYPES as t}<option value={t}>{t}</option
+                        {#each settlementLocationTypes as t}<option value={t.slug}
+                                >{t.label_hu}</option
                             >{/each}
                     </select>
 
@@ -5469,6 +7399,49 @@
                         bind:value={editingEvent.description}
                     ></textarea>
 
+                    <div class="admin-event-image-block">
+                        <label for="edit_ev_featured_upload">Kiemelt kép</label>
+                        {#if editingEvent.featured_image}
+                            <img
+                                class="admin-event-image-preview"
+                                src={absoluteMediaUrl(
+                                    editingEvent.featured_image,
+                                    getApiBase(),
+                                )}
+                                alt=""
+                            />
+                        {/if}
+                        <input
+                            id="edit_ev_featured_upload"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            on:change={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) uploadEventFeaturedImage(f, true);
+                                e.target.value = "";
+                            }}
+                        />
+                        <label for="edit_ev_featured_url" class="admin-sublabel"
+                            >Vagy kép URL (külső)</label
+                        >
+                        <input
+                            id="edit_ev_featured_url"
+                            type="url"
+                            bind:value={editingEvent.featured_image}
+                            placeholder="https://…"
+                        />
+                        {#if editingEvent.featured_image}
+                            <button
+                                type="button"
+                                class="btn-update"
+                                style="align-self: flex-start"
+                                on:click={() =>
+                                    (editingEvent.featured_image = "")}
+                                >Kép törlése</button
+                            >
+                        {/if}
+                    </div>
+
                     <div class="flex gap-lg">
                         <div class="flex-1">
                             <label for="edit_ev_start_date"
@@ -5540,17 +7513,47 @@
                         </div>
                     </div>
 
-                    <label for="edit_ev_type">Típus</label>
-                    <select
-                        id="edit_ev_type"
-                        name="event_type"
-                        bind:value={editingEvent.event_type}
+                    <label for="edit_ev_type_id"
+                        >Eseménytípus <span class="admin-req" title="Kötelező">*</span></label
                     >
-                        <option value="cultural">Kulturális</option>
-                        <option value="sports">Sport</option>
-                        <option value="festival">Fesztivál</option>
-                        <option value="religious">Vallási</option>
-                        <option value="other">Egyéb</option>
+                    <select
+                        id="edit_ev_type_id"
+                        name="event_type_id"
+                        bind:value={editingEvent.event_type_id}
+                        on:change={() => (editingEvent.event_subtype_id = "")}
+                        required
+                    >
+                        <option value="">— válassz —</option>
+                        {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as t}
+                            <option value={String(t.id)}
+                                >{t.label_hu} ({t.slug})</option
+                            >
+                        {/each}
+                    </select>
+
+                    <label for="edit_ev_subtype_id">Altípus (opcionális)</label>
+                    <select
+                        id="edit_ev_subtype_id"
+                        name="event_subtype_id"
+                        bind:value={editingEvent.event_subtype_id}
+                    >
+                        <option value="">— nincs —</option>
+                        {#each subtypesForEditEvent as s}
+                            <option value={String(s.id)}
+                                >{s.label_hu} ({s.slug})</option
+                            >
+                        {/each}
+                    </select>
+
+                    <label for="edit_ev_access">Hozzáférés</label>
+                    <select
+                        id="edit_ev_access"
+                        name="access_type"
+                        bind:value={editingEvent.access_type}
+                    >
+                        <option value="public">{ACCESS_TYPE_LABELS.public}</option>
+                        <option value="members_only">{ACCESS_TYPE_LABELS.members_only}</option>
+                        <option value="invitation_only">{ACCESS_TYPE_LABELS.invitation_only}</option>
                     </select>
 
                     <label for="edit_ev_org">Szervező</label>
@@ -5593,6 +7596,17 @@
                             </ul>
                         {/if}
                     </div>
+
+                    <label for="edit_ev_entry_price">Belépő / jegyár (opcionális)</label>
+                    <input
+                        id="edit_ev_entry_price"
+                        name="entry_price"
+                        type="text"
+                        bind:value={editingEvent.entry_price}
+                        placeholder="pl. 99 RON, 15 EUR, ingyenes"
+                        maxlength="128"
+                        autocomplete="off"
+                    />
 
                     <details class="admin-schedule-details">
                         <summary>Napi program (opcionális)</summary>
@@ -5868,7 +7882,6 @@
         display: inline-block;
         padding: 0.15rem 0.5rem;
         border-radius: 999px;
-        font-size: 0.75rem;
         background: var(--accent-bg, #2a2a3e);
         color: var(--muted, #aaa);
         border: 1px solid var(--border-color, #444);
@@ -5892,7 +7905,6 @@
     }
     .admin-dialog p {
         margin: 0 0 1.25rem;
-        font-size: 1rem;
         line-height: 1.5;
     }
     .admin-dialog-actions {
@@ -5960,15 +7972,40 @@
         color: var(--text-faint, #666);
         margin-bottom: 1rem;
     }
+    .admin-date-field {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .admin-date-field input[type="date"] {
+        min-width: 12rem;
+    }
+    .admin-date-today-badge {
+        display: inline-block;
+        margin-left: 0.35rem;
+        padding: 0.1rem 0.45rem;
+        border-radius: 999px;
+        background: var(--szekely-red, #c8102e);
+        color: #fff;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    tr.admin-row-today {
+        background: color-mix(
+            in srgb,
+            var(--szekely-green, #2f4f4f) 10%,
+            transparent
+        );
+    }
     .admin-region-heading {
         margin-top: 2.5rem;
         margin-bottom: 0.5rem;
-        font-size: 1.1rem;
     }
     .admin-subtab-heading {
         margin-top: 1.75rem;
         margin-bottom: 0.5rem;
-        font-size: 1rem;
         font-weight: 600;
     }
     .admin-subtab-heading:first-of-type {
@@ -5992,7 +8029,6 @@
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
-        font-size: 0.85rem;
     }
     .admin-region-edit-grid input,
     .admin-region-edit-grid select {
@@ -6012,12 +8048,9 @@
         flex-direction: column;
         gap: 0.25rem;
         margin-bottom: 0.75rem;
-        font-size: 0.85rem;
     }
     .admin-region-edit-full textarea {
         width: 100%;
-        font-family: ui-monospace, monospace;
-        font-size: 0.9rem;
     }
     .admin-region-edit-actions {
         display: flex;
@@ -6035,7 +8068,6 @@
     }
     .admin-faq-toolbar-label {
         font-weight: 600;
-        font-size: 0.95rem;
     }
     .admin-faq-pair {
         margin-bottom: 0.75rem;
@@ -6055,9 +8087,8 @@
         gap: 0.5rem;
         margin-top: 0.35rem;
     }
-    .admin-faq-pair-fields label {
-        font-size: 0.85rem;
-    }
+    /* .admin-faq-pair-fields label {
+    } */
 
     .org-autosuggest-wrapper {
         position: relative;
@@ -6093,14 +8124,12 @@
         background: none;
         color: var(--text-color, #ccc);
         cursor: pointer;
-        font-size: 0.9rem;
         text-align: left;
     }
     .org-suggestions li button:hover {
         background: var(--accent-bg, #2a2a3e);
     }
     .org-sug-meta {
-        font-size: 0.8rem;
         color: var(--text-faint, #888);
     }
 </style>

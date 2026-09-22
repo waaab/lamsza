@@ -2,6 +2,8 @@
     export let label = "";
     export let parentLabel = "Index";
     export let parentUrl = "/index";
+    export let extraLabel = "";
+    export let extraUrl = "";
     export let countySlug = "";
     export let countyName = "";
     export let settlementSlug = "";
@@ -14,6 +16,10 @@
     {#if parentLabel && parentUrl}
         &rsaquo;
         <a href={parentUrl}>{parentLabel}</a>
+    {/if}
+    {#if extraLabel && extraUrl}
+        &rsaquo;
+        <a href={extraUrl}>{extraLabel}</a>
     {/if}
     &rsaquo;
     {#if countyName && countySlug}

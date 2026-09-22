@@ -140,7 +140,6 @@
 
     .datetime-digital {
         font-variant-numeric: tabular-nums;
-        font-size: 1.8rem;
         font-weight: 600;
         line-height: 1.1;
         color: var(--text-primary);
@@ -154,7 +153,6 @@
     }
 
     .datetime-text {
-        font-size: 0.9rem;
         color: var(--text-secondary);
         margin: 0;
         line-height: 1;

@@ -14,6 +14,12 @@ Run these tests against the live development server (`npm run dev` on port 5173)
 - [ ] Search bar is visible and focused
 - [ ] Quick-link buttons render with correct colors
 - [ ] Clicking a quick link opens the URL in a new tab
+- [ ] Gyorslinkek default slot count is 7 (including Új); − is disabled; date/time and weather sit on the same row immediately beside it
+- [ ] Increasing slots above 7 moves date/time and weather to the next row, still adjacent (not opposite edges)
+- [ ] Slot stepper clamps at 7 and 14; chosen N persists after reload (`localStorage` `quick_links_display_count`)
+- [ ] All personal and admin quicklinks remain visible; extras wrap inside the widget; no scroll arrows
+- [ ] While promoted links load and the visitor has no personal links, Új plus 6 skeletons fill 7 slots
+- [ ] Admin/promoted cards show the star badge and cannot be edited or deleted on the homepage
 - [ ] Weather widget loads (or shows graceful fallback)
 - [ ] News widget loads headlines
 - [ ] "Mondás" quote widget shows a random quote
@@ -37,7 +43,8 @@ Run these tests against the live development server (`npm run dev` on port 5173)
 
 ### 1.4 Directory Category (`/index/[category]`)
 
-- [ ] Navigating to `/index/szolgaltatasok` shows filtered entries
+- [ ] Navigating to `/index/egeszsegugy` (or another **category** slug) shows filtered entries
+- [ ] `/index/szolgaltatasok` is **not** a category: it lists type Szolgáltatás (including legacy `service`), not Cég / Egyéb
 - [ ] URL updates correctly
 - [ ] Browser back button returns to previous category/page
 - [ ] Switching between categories re-fetches and updates the list

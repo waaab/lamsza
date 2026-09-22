@@ -82,7 +82,6 @@
 
 <style>
     .faq-item-body :global(.markdown-content p) {
-        font-size: 0.8rem;
         color: var(--text-secondary);
         margin: 0.65rem 0 0;
         line-height: 1.6;
@@ -92,7 +91,6 @@
         margin: 0.65rem 0 0 0.25rem;
         padding: 0 0 0 1rem;
         color: var(--text-secondary);
-        font-size: 0.8rem;
     }
     .faq-item-body :global(.markdown-content li) {
         line-height: 1.6;

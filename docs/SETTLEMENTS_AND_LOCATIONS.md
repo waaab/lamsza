@@ -15,8 +15,7 @@ After `backend/migrations/migration_settlements_attractions.sql` (and prerequisi
 | Settlement | `settlements` | Belongs to `counties`; `location_id`, `slug`, types (város, falu, …), `parent_id`, `content` |
 | Attraction | `attractions` | Belongs to county; `location_id`, `slug`, gallery via `attraction_images` |
 | Historical seat (szék) | `historical_seats` | e.g. Csíkszék; `content` (Markdown); linked to counties via `county_historical_seats` |
-| Legacy compatibility | `locations` **view** | `UNION` of county rows + settlement rows so existing `/api/locations` consumers keep working |
-| Legacy table | `locations_legacy` | Renamed from the old `locations` table after data migration |
+| Compatibility | `locations` **view** | `UNION` of county rows + settlement rows so existing `/api/locations` consumers keep working. The pre-migration table (`locations_legacy`) was dropped. |
 
 **Foreign keys:** `entries.location_id` and `events.location_id` reference **`settlements(id)`** (column name kept as `location_id` for historical reasons).
 

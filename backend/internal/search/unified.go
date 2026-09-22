@@ -33,12 +33,12 @@ type HistoricalSeatSearchHit struct {
 }
 
 type UnifiedSearchResult struct {
-	Locations         []models.Location         `json:"locations"`
-	Entries           []models.Entry            `json:"entries"`
-	Events            []models.Event            `json:"events"`
-	News              []newsSearchItem          `json:"news"`
-	Attractions       []AttractionSearchHit     `json:"attractions"`
-	HistoricalSeats   []HistoricalSeatSearchHit `json:"historical_seats"`
+	Locations       []models.Location         `json:"locations"`
+	Entries         []models.Entry            `json:"entries"`
+	Events          []models.Event            `json:"events"`
+	News            []newsSearchItem          `json:"news"`
+	Attractions     []AttractionSearchHit     `json:"attractions"`
+	HistoricalSeats []HistoricalSeatSearchHit `json:"historical_seats"`
 }
 
 type newsSearchItem struct {
@@ -167,7 +167,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		rows, err := db.DB.Query(`
-			SELECT e.id, COALESCE(e.type,''), COALESCE(ec.name,''), e.name, e.slug,
+			SELECT e.id, COALESCE(typ.name,''), COALESCE(ec.name,''), e.name, e.slug,
 				s.name, s.slug, c.name, c.slug, s.type,
 				COALESCE(s.name_ro,''), COALESCE(s.name_de,''),
 				COALESCE(e.phone,''), COALESCE(e.address,''), COALESCE(e.notes,''),
@@ -175,6 +175,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
 			FROM entries e
+			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
 			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
@@ -182,7 +183,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
 			  AND e.published = true
-			GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de
+			GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de
 			ORDER BY is_direct_match DESC, rank DESC, e.name ASC
 			LIMIT 20
 		`, q, normalizedQ)
@@ -197,6 +198,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			var rank float64
 			if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.IsDirectMatch, &rank); err == nil {
 				e.Languages = pqLanguages
+				e.Type = utils.CanonicalEntryType(e.Type)
 				entries = append(entries, e)
 			}
 		}
@@ -209,11 +211,15 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			defer wg.Done()
 			rows, err := db.DB.Query(`
 				SELECT e.id, e.location_id, s.name, s.slug, c.name, c.slug,
-					e.title, COALESCE(e.description, ''), e.start_date::text, COALESCE(e.start_time::text, ''),
-					e.end_date::text, COALESCE(e.end_time::text, ''), e.event_type, COALESCE(e.organizer, '')
+					e.title, COALESCE(e.description, ''), COALESCE(e.featured_image, ''), e.start_date::text, COALESCE(e.start_time::text, ''),
+					e.end_date::text, COALESCE(e.end_time::text, ''),
+					COALESCE(et.slug, ''), COALESCE(et.label_hu, ''), COALESCE(es.slug, ''), COALESCE(es.label_hu, ''),
+					COALESCE(e.access_type, 'public'), COALESCE(e.organizer, ''), COALESCE(e.entry_price, '')
 				FROM events e
 				JOIN settlements s ON e.location_id = s.id
 				JOIN counties c ON s.county_id = c.id
+				JOIN catalog_event_types et ON e.event_type_id = et.id
+				LEFT JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
 				WHERE e.end_date >= CURRENT_DATE
 				  AND (
 					unaccent(LOWER(e.title)) ILIKE unaccent($1)
@@ -231,7 +237,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			defer rows.Close()
 			for rows.Next() {
 				var ev models.Event
-				if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.Organizer); err == nil {
+				if err := rows.Scan(&ev.ID, &ev.LocationID, &ev.LocationName, &ev.LocationSlug, &ev.County, &ev.CountySlug, &ev.Title, &ev.Description, &ev.FeaturedImage, &ev.StartDate, &ev.StartTime, &ev.EndDate, &ev.EndTime, &ev.EventType, &ev.EventTypeLabel, &ev.EventSubtype, &ev.EventSubtypeLabel, &ev.AccessType, &ev.Organizer, &ev.EntryPrice); err == nil {
 					events = append(events, ev)
 				}
 			}

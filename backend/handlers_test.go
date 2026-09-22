@@ -210,9 +210,12 @@ func TestGetEvents(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET /api/events: expected 200, got %d", rr.Code)
 	}
-	var ev []map[string]interface{}
-	if err := json.Unmarshal(rr.Body.Bytes(), &ev); err != nil {
-		t.Fatalf("Response is not valid JSON array: %v", err)
+	var payload struct {
+		Events []map[string]interface{} `json:"events"`
+		Total  int                      `json:"total"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("Response is not {events,total}: %v body=%s", err, rr.Body.String())
 	}
 }
 

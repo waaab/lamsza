@@ -23,12 +23,28 @@ CREATE TABLE IF NOT EXISTS entry_types (
     name VARCHAR(100) NOT NULL UNIQUE
 );
 
+INSERT INTO entry_types (name) VALUES
+    ('Szolgáltatás'),
+    ('Cég'),
+    ('Egyéb')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO entry_categories (name, slug) VALUES
+    ('Egészségügy', 'egeszsegugy'),
+    ('Oktatás', 'oktatas'),
+    ('Mesteremberek', 'mesteremberek'),
+    ('Hivatalok', 'hivatalok'),
+    ('Vendéglő', 'vendeglo'),
+    ('Bolt', 'bolt'),
+    ('Sportegyesület', 'sportegyesulet'),
+    ('Egyéb', 'egyeb')
+ON CONFLICT (name) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS entries (
     id SERIAL PRIMARY KEY,
     location_id INTEGER REFERENCES locations(id),
-    category_id INTEGER REFERENCES entry_categories(id),
-    type VARCHAR(50) NOT NULL DEFAULT 'entry',
-    category VARCHAR(100),
+    category_id INTEGER NOT NULL REFERENCES entry_categories(id),
+    type_id INTEGER NOT NULL REFERENCES entry_types(id),
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255),
     url VARCHAR(255),
@@ -36,6 +52,10 @@ CREATE TABLE IF NOT EXISTS entries (
     address TEXT,
     notes TEXT,
     languages VARCHAR(10)[] DEFAULT '{"HU"}',
+    claimed BOOLEAN NOT NULL DEFAULT false,
+    hours JSONB NOT NULL DEFAULT '{}'::jsonb,
+    delivery_hours JSONB NOT NULL DEFAULT '{}'::jsonb,
+    photos JSONB NOT NULL DEFAULT '[]'::jsonb,
     CONSTRAINT unique_entry UNIQUE (name, location_id)
 );
 

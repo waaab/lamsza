@@ -18,13 +18,13 @@ type FAQItem struct {
 
 // Section is FAQ + disclaimer copy for one logical site area (e.g. hirek).
 type Section struct {
-	ID                   int       `json:"id"`
-	SectionKey           string    `json:"section_key"`
-	LabelHu              string    `json:"label_hu"`
-	FAQTitle             string    `json:"faq_title"`
-	FAQItems             []FAQItem `json:"faq_items"`
-	DisclaimerMarkdown   string    `json:"disclaimer_markdown"`
-	UpdatedAt            string    `json:"updated_at"`
+	ID                 int       `json:"id"`
+	SectionKey         string    `json:"section_key"`
+	LabelHu            string    `json:"label_hu"`
+	FAQTitle           string    `json:"faq_title"`
+	FAQItems           []FAQItem `json:"faq_items"`
+	DisclaimerMarkdown string    `json:"disclaimer_markdown"`
+	UpdatedAt          string    `json:"updated_at"`
 }
 
 var mdFAQHeading = regexp.MustCompile(`(?m)^###\s+(.+)$`)
@@ -79,6 +79,9 @@ func migrateLegacyMarkdownToItems() {
 		}
 		_, _ = db.DB.Exec(`UPDATE page_faq_sections SET faq_items = $1::jsonb WHERE id = $2`, raw, id)
 	}
+	if rows.Err() != nil {
+		return
+	}
 	_, _ = db.DB.Exec(`ALTER TABLE page_faq_sections DROP COLUMN IF EXISTS faq_markdown`)
 }
 
@@ -108,11 +111,11 @@ func parseMarkdownToFAQItems(md string) []FAQItem {
 }
 
 func seedAllSections() {
-	genericDisc := "A Lámsza tartalma tájékoztató jellegű; a pontosságért és a harmadik féltől származó adatokért nem vállalunk felelősséget. A szövegek az admin felületen szerkeszthetők."
+	genericDisc := "A Lámsza tartalma tájékoztató jellegű; a pontosságért és a harmadik féltől származó adatokért nem vállalunk felelősséget."
 	genericOne := []FAQItem{
 		{
 			Question: "Mire való ez az oldal?",
-			Answer:   "A Lámsza erdélyi magyar közösségi információkat és szolgáltatásokat gyűjt. A GYIK és a felelősségkizárás szövege az admin „Oldalak” menüben szerkeszthető.",
+			Answer:   "A lamsza.com erdélyi magyar közösségi oldalakat gyűjt össze és közösségi média csatornákat biztosít az erdélyi magyar közösség számára.",
 		},
 	}
 
@@ -136,8 +139,8 @@ func seedAllSections() {
 
 	seeds := []struct {
 		key, label, title string
-		items              []FAQItem
-		disc               string
+		items             []FAQItem
+		disc              string
 	}{
 		{"home", "Főoldal (/)", "Gyakori kérdések", genericOne, genericDisc},
 		{"index", "Index (/index)", "Gyakori kérdések", indexItems, indexDisc},
@@ -240,6 +243,10 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 			}
 			list = append(list, s)
 		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if list == nil {
 			list = []Section{}
 		}
@@ -248,11 +255,11 @@ func HandleAdmin(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPut:
 		var body struct {
-			ID                   int       `json:"id"`
-			LabelHu              string    `json:"label_hu"`
-			FAQTitle             string    `json:"faq_title"`
-			FAQItems             []FAQItem `json:"faq_items"`
-			DisclaimerMarkdown   string    `json:"disclaimer_markdown"`
+			ID                 int       `json:"id"`
+			LabelHu            string    `json:"label_hu"`
+			FAQTitle           string    `json:"faq_title"`
+			FAQItems           []FAQItem `json:"faq_items"`
+			DisclaimerMarkdown string    `json:"disclaimer_markdown"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)

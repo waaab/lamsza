@@ -3,6 +3,7 @@
     import { onMount, onDestroy } from "svelte";
     import { apiFetch } from "$lib/api";
     import { formatDateShort, venuePageUrl } from "$lib/utils";
+    import { kindLabel } from "$lib/venueKindLabels.js";
     import EventDateBadge from "$lib/components/EventDateBadge.svelte";
 
     export let settlementSlug = null;
@@ -150,8 +151,8 @@
 
 <section id="esemenyek">
     <div class="event-widget component-box widget">
-        <div class="widget-header">
-            <h3 class="widget-title">Események{#if !loading} <span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel} <span class="type-label">· {typeLabel}</span>{/if}</h3>
+        <div class="widget-header" title="{filteredItems.length} {typeLabel ? typeLabel + 'i Esemény' : 'Esemény'}">
+            <h3 class="widget-title">Események{#if !loading} <span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel} <span class="type-label"> · {typeLabel}</span>{/if}</h3>
             {#if !loading && (availableTypes.length > 1 || availableLocTypes.length > 1)}
                 <div class="event-type-badges">
                     {#if hasAnyFilter}
@@ -187,7 +188,7 @@
                     </span>
                 </div>
                 <div class="widget-nav">
-                    <a href="/esemenyek" class="nav-btn">Összes esemény</a>
+                    <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
                 </div>
             {:else if loading}
                 <div class="event-cards-row">
@@ -202,7 +203,7 @@
                     {/each}
                 </div>
                 <div class="widget-nav">
-                    <a href="/esemenyek" class="nav-btn">Összes esemény</a>
+                    <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
                 </div>
             {:else if error || items.length === 0}
                 <span class="info-box"><p>Nincsenek közeli események.</p></span>
@@ -218,7 +219,12 @@
                                 on:mouseleave={startTicker}
                             >
                                 <a href="/esemenyek/{event.id}" class="event-ticker-title">
-                                    {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
+                                    {#if event.event_type || event.event_subtype_label || event.event_subtype}
+                                        <span class="event-widget-badges">
+                                            {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
+                                            {#if event.event_subtype_label || event.event_subtype}<span class="event-subtype-inline">{event.event_subtype_label || event.event_subtype}</span>{/if}
+                                        </span>
+                                    {/if}
                                     {event.title}
                                 </a>
                                 <span class="event-ticker-meta">
@@ -254,9 +260,17 @@
                                         <span class="event-location-venue">
                                             <span class="event-location-venue-label sr-only">Helyszín:</span>
                                             {#if venuePageUrl(event, event.default_venue_slug)}
-                                                <a href={venuePageUrl(event, event.default_venue_slug)} title="Helyszín részletei">{event.default_venue_name}</a>
+                                                <a href={venuePageUrl(event, event.default_venue_slug)} title="Helyszín részletei">
+                                                    {event.default_venue_name}
+                                                    {#if event.default_venue_kind || event.default_venue_kind_label}
+                                                        {' '}{kindLabel(event.default_venue_kind, event.default_venue_kind_label)}
+                                                    {/if}
+                                                </a>
                                             {:else}
                                                 {event.default_venue_name}
+                                                {#if event.default_venue_kind || event.default_venue_kind_label}
+                                                    {' '}{kindLabel(event.default_venue_kind, event.default_venue_kind_label)}
+                                                {/if}
                                             {/if}
                                         </span>
                                     {/if}
@@ -267,10 +281,10 @@
                     {/key}
                     <div class="widget-nav">
                         <div class="arrows-container">
-                            <button class="scroll-arrow left" on:click={() => handleArrowClick(-1)} aria-label="Előző esemény">&#8249;</button>
-                            <button class="scroll-arrow right" on:click={() => handleArrowClick(1)} aria-label="Következő esemény">&#8250;</button>
+                            <button class="btn btn-xs scroll-arrow left" on:click={() => handleArrowClick(-1)} aria-label="Előző esemény">&#8249;</button>
+                            <button class="btn btn-xs scroll-arrow right" on:click={() => handleArrowClick(1)} aria-label="Következő esemény">&#8250;</button>
                         </div>
-                        <a href="/esemenyek" class="nav-btn">Összes esemény</a>
+                        <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
                     </div>
                 </div>
             {:else}
@@ -279,7 +293,12 @@
                         <article href="/esemenyek/{event.id}" class="card sm">
                             <div class="event-card-date-row">
                                 <span class="event-card-date">
-                                    {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
+                                    {#if event.event_type || event.event_subtype_label || event.event_subtype}
+                                        <span class="event-widget-badges">
+                                            {#if event.event_type}<span class="event-type-inline">{EVENT_TYPES[event.event_type] || event.event_type}</span>{/if}
+                                            {#if event.event_subtype_label || event.event_subtype}<span class="event-subtype-inline">{event.event_subtype_label || event.event_subtype}</span>{/if}
+                                        </span>
+                                    {/if}
                                     {formatDateShort(event.start_date)}
                                     {#if event.start_time} · {event.start_time.slice(0, 5)}{/if}
                                 </span>
@@ -294,9 +313,23 @@
                                     - {event.end_time.slice(0, 5)}
                                 {/if}
                                 {#if event.location_name}
-                                    · {#if event.county_slug && event.location_slug}<a href="/{event.county_slug}-megye/{event.location_slug}" title="Település">{event.location_name}</a>{:else}{event.location_name}{/if}
+                                <span class="separator"> · </span>
+                                {#if event.county_slug && event.location_slug}<a href="/{event.county_slug}-megye/{event.location_slug}" title="Település">{event.location_name}</a>{:else}{event.location_name}{/if}
                                 {/if}{#if event.default_venue_name}
-                                    · {#if venuePageUrl(event, event.default_venue_slug)}<a href={venuePageUrl(event, event.default_venue_slug)} title="Helyszín részletei">{event.default_venue_name}</a>{:else}{event.default_venue_name}{/if}
+                                <span class="separator"> · </span>
+                                {#if venuePageUrl(event, event.default_venue_slug)}
+                                        <a href={venuePageUrl(event, event.default_venue_slug)} title="Helyszín részletei">
+                                            {event.default_venue_name}
+                                            {#if event.default_venue_kind || event.default_venue_kind_label}
+                                                {' '}{kindLabel(event.default_venue_kind, event.default_venue_kind_label)}
+                                            {/if}
+                                        </a>
+                                    {:else}
+                                        {event.default_venue_name}
+                                        {#if event.default_venue_kind || event.default_venue_kind_label}
+                                            {' '}{kindLabel(event.default_venue_kind, event.default_venue_kind_label)}
+                                        {/if}
+                                    {/if}
                                 {/if}
                             </span>
                         </article>
@@ -306,20 +339,20 @@
                     {#if showArrows}
                         <div class="arrows-container">
                         <button
-                            class="scroll-arrow left"
+                            class="btn btn-xs scroll-arrow left"
                             disabled={!canPrev}
                             on:click={() => { pageStart = Math.max(0, pageStart - limit); }}
                             aria-label="Előző események"
                         >&#8249;</button>
                         <button
-                            class="scroll-arrow right"
+                            class="btn btn-xs scroll-arrow right"
                             disabled={!canNext}
                             on:click={() => { pageStart = pageStart + limit; }}
                             aria-label="Következő események"
                         >&#8250;</button>
                         </div>
                     {/if}
-                    <a href="/esemenyek" class="nav-btn">Összes esemény</a>
+                    <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
                 </div>
             {/if}
         </div>
@@ -349,7 +382,6 @@
         min-width: 0;
     }
     .event-card-date {
-        font-size: 0.75rem;
         font-weight: 600;
         color: var(--text-faint);
         text-transform: uppercase;
@@ -357,14 +389,16 @@
     }
     .event-card-title {
         font-weight: 600;
-        font-size: 0.9rem;
-        color: var(--text-color);
         line-height: 1.3;
         margin: 0.2rem 0;
     }
     .event-card-meta {
-        font-size: 0.75rem;
         color: var(--text-faint);
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 0.2rem;
+        flex-wrap: wrap;
     }
 
     .event-ticker {
@@ -400,14 +434,12 @@
     }
     .event-ticker-title {
         font-weight: 500;
-        font-size: 1.1rem;
         transition: color 0.15s;
     }
     .event-ticker-meta {
         display: flex;
         flex-direction: column;
         gap: 0.2rem;
-        font-size: 0.9em;
         color: var(--text-faint);
         margin-top: 0.2rem;
     }
@@ -451,24 +483,35 @@
     }
     .event-type-badge--clear {
         padding: 0.15rem 0.35rem;
-        font-size: 0.4rem;
     }
     .badge-separator {
         color: var(--text-faint);
-        font-size: 0.8rem;
         align-self: center;
     }
-    .event-loc-badge {
-        border-style: dashed;
+    .event-widget-badges {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.35rem;
+        margin-right: 0.35rem;
+        vertical-align: baseline;
     }
     .event-type-inline {
         display: inline-block;
-        font-size: 0.65rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.03em;
         color: var(--szekely-red, #c0392b);
-        margin-right: 0.3rem;
+    }
+    .event-subtype-inline {
+        display: inline-block;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        color: #fff;
+        background: color-mix(in srgb, var(--primary-color, #375f8c) 88%, #000);
+        padding: 0.08rem 0.38rem;
+        border-radius: 4px;
     }
 
     @media (max-width: 992px) {

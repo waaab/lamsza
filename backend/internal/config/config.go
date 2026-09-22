@@ -11,6 +11,8 @@ type Config struct {
 	Port              string
 	WeatherAPIKey     string
 	WeatherAPIComKey  string
+	GoogleClientID    string
+	AdminGoogleEmails []string
 	Features          struct {
 		Weather    bool
 		Events     bool
@@ -38,12 +40,33 @@ func Load() {
 	AppConfig.WeatherAPIKey = getEnv("WEATHER_API_KEY", "")
 	AppConfig.WeatherAPIComKey = getEnv("WEATHER_API_COM_KEY", "")
 
+	AppConfig.GoogleClientID = getEnv("GOOGLE_CLIENT_ID", "")
+	AppConfig.AdminGoogleEmails = parseEmailList(getEnv("ADMIN_GOOGLE_EMAILS", "attila.bogozi@gmail.com"))
+
 	AppConfig.Features.Weather = getBoolEnv("FEATURE_WEATHER", true)
 	AppConfig.Features.Events = getBoolEnv("FEATURE_EVENTS", true)
 	AppConfig.Features.News = getBoolEnv("FEATURE_NEWS", true)
 	AppConfig.Features.Mondasok = getBoolEnv("FEATURE_MONDASOK", true)
 	AppConfig.Features.QuickLinks = getBoolEnv("FEATURE_QUICKLINKS", true)
 	AppConfig.Features.Search = getBoolEnv("FEATURE_SEARCH", true)
+}
+
+func parseEmailList(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	seen := map[string]bool{}
+	for _, p := range parts {
+		email := strings.ToLower(strings.TrimSpace(p))
+		if email == "" || seen[email] {
+			continue
+		}
+		seen[email] = true
+		out = append(out, email)
+	}
+	if len(out) == 0 {
+		return []string{"attila.bogozi@gmail.com"}
+	}
+	return out
 }
 
 func getEnv(key, fallback string) string {

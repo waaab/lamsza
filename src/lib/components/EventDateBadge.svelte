@@ -45,7 +45,6 @@
 <style>
     .event-date-badge {
         display: inline-block;
-        font-size: 0.65rem;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;

@@ -3,6 +3,14 @@
     import { get } from "svelte/store";
     import { auth } from "$lib/stores/auth";
     import { apiFetch } from "$lib/api";
+    import SearchEngine from "$lib/components/SearchEngine.svelte";
+    import MondasWidget from "$lib/components/MondasWidget.svelte";
+    import WeatherWidget from "$lib/components/WeatherWidget.svelte";
+    import DateTimeWidget from "$lib/components/DateTimeWidget.svelte";
+    import NewsWidget from "$lib/components/NewsWidget.svelte";
+    import EventsWidget from "$lib/components/EventsWidget.svelte";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import {
         clampSlotCount,
         DEFAULT_QUICKLINK_SLOTS,
@@ -12,12 +20,6 @@
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
     import { homepageAttractionWeather, homepageSettlements } from "$lib/favoriteHomepage.js";
-    import SearchEngine from "$lib/components/SearchEngine.svelte";
-    import MondasWidget from "$lib/components/MondasWidget.svelte";
-    import WeatherWidget from "$lib/components/WeatherWidget.svelte";
-    import DateTimeWidget from "$lib/components/DateTimeWidget.svelte";
-    import NewsWidget from "$lib/components/NewsWidget.svelte";
-    import EventsWidget from "$lib/components/EventsWidget.svelte";
 
     const USER_LINKS_KEY = "user_quick_links";
     const PROMOTED_CACHE_KEY = "promoted_links_cache";
@@ -31,24 +33,28 @@
     let linkDialogOpen = false;
     let linkDialogMode = "add";
     let linkDialogData = { id: "", title: "", url: "", bg_color: "#e6f0ff" };
+    
     let slotCount = DEFAULT_QUICKLINK_SLOTS;
-    let canScrollLeft = false;
-    let canScrollRight = false;
-    let quickLinksContainer;
-    const LINKS_BEFORE_ARROWS = 7;
 
-    let myLocationSlug = "csikszereda";
+    let myLocationSlug = "";
     let myLocationName = "";
     let myLocationCountySlug = "";
 
     let favorites = { settlements: [], attractions: [], entries: [], events: [] };
 
-    $: allLinksCount = userLinks.length + promotedLinks.length;
-    $: showArrows = !promotedLoading && allLinksCount > LINKS_BEFORE_ARROWS;
+    let pageHeader = initialPageHeader("home");
+    let pageHeaderLoading = false;
+
+    $: quicklinksExpanded = slotCount > DEFAULT_QUICKLINK_SLOTS;
+    $: skeletonCount = promotedLoading
+        ? Math.max(0, DEFAULT_QUICKLINK_SLOTS - 1 - userLinks.length)
+        : 0;
     $: siteDefault = { slug: myLocationSlug, name: myLocationName };
     $: settlementPlaces = $auth.loggedIn
         ? homepageSettlements(favorites, siteDefault)
-        : [{ slug: myLocationSlug, name: myLocationName }];
+        : myLocationSlug
+            ? [{ slug: myLocationSlug, name: myLocationName }]
+            : [];
     $: attractionWeatherPlaces = $auth.loggedIn ? homepageAttractionWeather(favorites) : [];
 
     function truncateTitle(title, maxLen = 8) {
@@ -83,72 +89,6 @@
 
     function increaseSlots() {
         setSlotCount(slotCount + 1);
-    }
-
-    function checkScroll(node) {
-        if (!node) return;
-        canScrollLeft = node.scrollLeft > 5;
-        canScrollRight = node.scrollLeft < node.scrollWidth - node.clientWidth - 5;
-    }
-
-    function dragScroll(node) {
-        let isDown = false;
-        let startX;
-        let scrollLeft;
-
-        const onMouseDown = (e) => {
-            isDown = true;
-            node.classList.add("active");
-            startX = e.pageX - node.offsetLeft;
-            scrollLeft = node.scrollLeft;
-        };
-
-        const onMouseLeave = () => {
-            isDown = false;
-            node.classList.remove("active");
-        };
-
-        const onMouseUp = () => {
-            isDown = false;
-            node.classList.remove("active");
-        };
-
-        const onMouseMove = (e) => {
-            if (!isDown) return;
-            e.preventDefault();
-            const x = e.pageX - node.offsetLeft;
-            const walk = (x - startX) * 2;
-            node.scrollLeft = scrollLeft - walk;
-            checkScroll(node);
-        };
-
-        const onScroll = () => checkScroll(node);
-        const onResize = () => checkScroll(node);
-
-        node.addEventListener("mousedown", onMouseDown);
-        node.addEventListener("mouseleave", onMouseLeave);
-        node.addEventListener("mouseup", onMouseUp);
-        node.addEventListener("mousemove", onMouseMove);
-        node.addEventListener("scroll", onScroll);
-        window.addEventListener("resize", onResize);
-        setTimeout(() => checkScroll(node), 100);
-
-        return {
-            destroy() {
-                node.removeEventListener("mousedown", onMouseDown);
-                node.removeEventListener("mouseleave", onMouseLeave);
-                node.removeEventListener("mouseup", onMouseUp);
-                node.removeEventListener("mousemove", onMouseMove);
-                node.removeEventListener("scroll", onScroll);
-                window.removeEventListener("resize", onResize);
-            },
-        };
-    }
-
-    function scrollLinks(amount) {
-        if (quickLinksContainer) {
-            quickLinksContainer.scrollBy({ left: amount, behavior: "smooth" });
-        }
     }
 
     function generateId() {
@@ -275,6 +215,8 @@
 
     onMount(async () => {
         await initQuicklinks();
+        pageHeader = await loadPageMeta("home");
+        pageHeaderLoading = false;
 
         let cacheVersion = null;
         try {
@@ -316,7 +258,7 @@
         }
 
         try {
-            const data = await apiFetch("/api/admin/quick_links");
+            const data = await apiFetch("/api/quick_links");
             promotedLinks = data || [];
             localStorage.setItem(
                 PROMOTED_CACHE_KEY,
@@ -335,15 +277,27 @@
 </script>
 
 <section id="home main" class="home-main">
-    <h1 class="page-title">{$auth.loggedIn ? `Szerussz, ${$auth.user}!` : "Na Lámsza!"}</h1>
-    <p class="greeting">Erdélyi magyar startlap és kereső. Az internet székely kapuja.</p>
+    <PublicPageHero
+        title={pageHeader.title}
+        greeting={pageHeader.greeting}
+        loading={pageHeaderLoading}
+        titleOverride={$auth.loggedIn ? `Szerussz, ${$auth.user}!` : null}
+        showBreadcrumbs={false}
+    />
 
     <SearchEngine />
 </section>
 
 <section id="home widgets" class="widgets-columns">
-    <div class="widgets-box--three-col">
-        <div id="gyorslinkek" class="widget">
+    <div
+        class="widgets-box--three-col"
+        class:widgets-box--quicklinks-expanded={quicklinksExpanded}
+    >
+        <div
+            id="gyorslinkek"
+            class="widget"
+            style:--quicklink-slots={slotCount}
+        >
             <div class="widget-header">
                 <h3 class="widget-title">Gyorslinkek</h3>
                 <div
@@ -368,89 +322,80 @@
                     >+</button>
                 </div>
             </div>
-                <div
-                    class="quick-links-wrapper"
-                    class:can-left={showArrows && canScrollLeft}
-                    class:can-right={showArrows && canScrollRight}
-                >
-                    {#if showArrows}
-                        <button class="scroll-arrow left" aria-label="Görgetés balra" on:click={() => scrollLinks(-200)}>&#8249;</button>
-                    {/if}
-                    <div class="quick-links widget-content" use:dragScroll bind:this={quickLinksContainer}>
-                        <button
-                            type="button"
-                            class="link-card link-card-add"
-                            on:click={openAddLink}
-                            title="Új gyorslink hozzáadása"
-                            aria-label="Új gyorslink hozzáadása"
-                        >
-                            <span class="link-card-icon link-card-icon-add">
-                                <span class="link-card-add-plus">+</span>
-                            </span>
-                            <span class="link-card-title">Új</span>
-                        </button>
+            <div class="quick-links-wrapper">
+                <div class="quick-links widget-content">
+                    <button
+                        type="button"
+                        class="link-card link-card-add"
+                        on:click={openAddLink}
+                        title="Új gyorslink hozzáadása"
+                        aria-label="Új gyorslink hozzáadása"
+                    >
+                        <span class="link-card-icon link-card-icon-add">
+                            <span class="link-card-add-plus">+</span>
+                        </span>
+                        <span class="link-card-title">Új</span>
+                    </button>
 
-                        {#each userLinks as q}
-                            <div class="link-card">
+                    {#each userLinks as q (q.id)}
+                        <div class="link-card">
+                            <a
+                                href={q.url}
+                                target="_blank"
+                                rel="nofollow noopener"
+                                class="link-card-link"
+                                title={q.title}
+                            >
+                                <span class="link-card-icon" style:background={q.bg_color || "#2f4f4f"}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                </span>
+                                <span class="link-card-title">{truncateTitle(q.title)}</span>
+                            </a>
+                            <button
+                                type="button"
+                                class="link-card-edit"
+                                on:click={(e) => openEditLink(q, e)}
+                                title="Szerkesztés"
+                                aria-label="Szerkesztés"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    {/each}
+
+                    {#if promotedLoading}
+                        {#each { length: skeletonCount } as _, i (i)}
+                            <div class="link-card link-card--skeleton" aria-hidden="true">
+                                <span class="link-card-icon skeleton"></span>
+                                <span class="link-card-title skeleton"></span>
+                            </div>
+                        {/each}
+                    {:else if !promotedError}
+                        {#each promotedLinks as q (q.id)}
+                            <div class="link-card link-card--promoted">
                                 <a
                                     href={q.url}
                                     target="_blank"
                                     rel="nofollow noopener"
                                     class="link-card-link"
-                                    title={q.title}>
+                                    title={q.title}
+                                >
                                     <span class="link-card-icon" style:background={q.bg_color || "#2f4f4f"}>
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                     </span>
                                     <span class="link-card-title">{truncateTitle(q.title)}</span>
                                 </a>
-                                <button
-                                    type="button"
-                                    class="link-card-edit"
-                                    on:click={(e) => openEditLink(q, e)}
-                                    title="Szerkesztés"
-                                    aria-label="Szerkesztés"
-                                >
-                                <svg xmlns="http://www.w3.org/2000/svg"
-                                width="10"
-                                height="10" 
-                                viewBox="0 0 24 24" 
-                                fill="none" 
-                                stroke="currentColor" 
-                                stroke-width="2" 
-                                stroke-linecap="round" 
-                                stroke-linejoin="round" >
-                                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                                </svg>
-                            </button>
+                                <span class="link-card-promoted-badge" title="Promóciós link" aria-label="Promóciós link">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                </span>
                             </div>
                         {/each}
-
-                        {#if !promotedError}
-                            {#each promotedLinks as q}
-                                <div class="link-card link-card--promoted">
-                                    <a
-                                        href={q.url}
-                                        target="_blank"
-                                        rel="nofollow noopener"
-                                        class="link-card-link"
-                                        title={q.title}>
-                                        <span class="link-card-icon" style:background={q.bg_color || "#2f4f4f"}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--border-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                                        </span>
-                                        <span class="link-card-title">{truncateTitle(q.title)}</span>
-                                    </a>
-                                    <span class="link-card-promoted-badge" title="Promóciós link" aria-label="Promóciós link">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                                    </span>
-                                </div>
-                            {/each}
-                        {/if}
-                    </div>
-                    {#if showArrows}
-                        <button class="scroll-arrow right" aria-label="Görgetés jobbra" on:click={() => scrollLinks(200)}>&#8250;</button>
                     {/if}
                 </div>
             </div>
+        </div>
         <DateTimeWidget />
         {#each settlementPlaces as place (place.slug)}
             <WeatherWidget settlementSlug={place.slug} />

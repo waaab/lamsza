@@ -10,7 +10,7 @@
 
 ### P0.1 – Verify migration on all environments
 
-- **Do:** Run `backend/migrations/migration_settlements_attractions.sql` (and any prerequisite patches) on staging and production DBs; confirm `locations` is a view, `locations_legacy` exists, seed attraction(s) present if expected.
+- **Do:** Run `backend/migrations/migration_settlements_attractions.sql` (and any prerequisite patches) on staging and production DBs; confirm `locations` is a view, `locations_legacy` is absent (`drop_locations_legacy.sql` / app startup), seed attraction(s) present if expected.
 - **Done when:** App starts, county and settlement pages load, `/api/attractions` returns data where seeded.
 
 ### P0.2 – Manual smoke pass

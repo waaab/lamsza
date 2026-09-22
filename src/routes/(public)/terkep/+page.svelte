@@ -1,15 +1,24 @@
 <script>
-    import { page } from "$app/stores";
+    import { onMount } from "svelte";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+
+    let pageHeader = initialPageHeader("terkep");
+    let pageHeaderLoading = false;
+
+    onMount(async () => {
+        pageHeader = await loadPageMeta("terkep");
+        pageHeaderLoading = false;
+    });
 </script>
 
-<svelte:head>
-    <title>Szekely Gugel - Székelyföld Térkép</title>
-</svelte:head>
-
-<h1 class="page-title">Székelyföld Térkép</h1>
-<p class="greeting">
-    Hamarosan érkezik az interaktív térképünk helyi adatokkal!
-</p>
+<PublicPageHero
+    title={pageHeader.title}
+    greeting={pageHeader.greeting}
+    loading={pageHeaderLoading}
+    showBreadcrumbs={false}
+    documentTitleSuffix=" - Székely Gugel"
+/>
 
 <div class="map-container">
     <!-- Placeholder SVG for Map -->

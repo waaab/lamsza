@@ -18,8 +18,12 @@
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
     import NewsWidget from "$lib/components/NewsWidget.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
-    import { apiFetch } from "$lib/api";
+    import { apiFetch, getApiBase } from "$lib/api";
     import Markdown from "$lib/components/Markdown.svelte";
+    import CrestShieldPlaceholder from "$lib/components/CrestShieldPlaceholder.svelte";
+    import EntryPhotoGallery from "$lib/components/EntryPhotoGallery.svelte";
+    import { attractionGallerySlides } from "$lib/entryPhotos.js";
+    import { kindLabel } from "$lib/venueKindLabels.js";
 
     let settlementData = null;
     let attractionData = null;
@@ -85,6 +89,12 @@
 
     const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
 
+    /** @param {unknown} crest */
+    function hasCrestUrl(crest) {
+        const s = String(crest ?? "").trim();
+        return s.length > 5 && s !== "–";
+    }
+
     function setSortMode(mode) {
         sortMode = mode;
         sortOpen = false;
@@ -108,6 +118,9 @@
 
     $: pageTitle = settlementData?.name || attractionData?.name || town;
     $: isAttraction = !!attractionData;
+    $: attractionSlides = attractionData
+        ? attractionGallerySlides(attractionData, { apiBase: getApiBase() })
+        : [];
 
     async function fetchData() {
         loading = true;
@@ -197,9 +210,9 @@
                 )}
         />
     </div>
-    <p class="greeting">
+    <h2 class="greeting">
         Látnivaló {attractionData.county_name} megyében.
-    </p>
+    </h2>
 
     <div class="widgets-box">
         <div id="attekintes" class="widget">
@@ -228,13 +241,14 @@
         />
     </div>
 
-    {#if attractionData.featured_image}
-        <div class="attraction-featured">
-            <img
-                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(attractionData.featured_image)}`}
-                alt={attractionData.name}
+    {#if attractionSlides.length}
+        <section class="attraction-photos" aria-labelledby="attraction-photos-title">
+            <h3 id="attraction-photos-title" class="widget-title">Fotók</h3>
+            <EntryPhotoGallery
+                slides={attractionSlides}
+                label={`${attractionData.name} fotói`}
             />
-        </div>
+        </section>
     {/if}
 
     {#if attractionData.description}
@@ -244,25 +258,6 @@
     {#if attractionData.content}
         <div class="attraction-content">
             <Markdown source={attractionData.content} />
-        </div>
-    {/if}
-
-    {#if attractionData.images && attractionData.images.length > 0}
-        <h3 class="widget-title">Galéria</h3>
-        <div class="attraction-gallery">
-            {#each attractionData.images as url}
-                <a
-                    href={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(url)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="gallery-item"
-                >
-                    <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(url)}`}
-                        alt=""
-                    />
-                </a>
-            {/each}
         </div>
     {/if}
 {:else if settlementData}
@@ -291,7 +286,7 @@
         />
     </div>
     <p class="greeting">
-        Helyi hírek, időjárás és címtár {settlementData.name} területén.
+        Helyi események, hírek, időjárás és címtár {settlementData.name} területén.
     </p>
 
     <div class="widgets-box">
@@ -313,18 +308,22 @@
         </div>
 
         <div id="cimer" class="crest-card widget">
-            {#if settlementData.crest && settlementData.crest !== "–" && settlementData.crest.length > 5}
-                <div class="widget-header">
-                    <h3 class="widget-title">{settlementData.name} címere</h3>
-                </div>
-                <div class="crest-container">
+            <div class="widget-header">
+                <h3 class="widget-title">{settlementData.name} címere</h3>
+            </div>
+            <div class="crest-container">
+                {#if hasCrestUrl(settlementData.crest)}
                     <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(settlementData.crest)}`}
+                        src={`${getApiBase()}/api/proxy?url=${encodeURIComponent(settlementData.crest)}`}
                         alt="{settlementData.name} címere"
                         class="crest-img"
                     />
-                </div>
-            {/if}
+                {:else}
+                    <CrestShieldPlaceholder
+                        label="{settlementData.name} címere - nincs feltöltött kép, helyőrző pajzs"
+                    />
+                {/if}
+            </div>
         </div>
 
         <WeatherWidget settlementSlug={town} advanced={true} />
@@ -333,28 +332,42 @@
     <EventsWidget settlementSlug={town} locationName={settlementData.name} />
 
     {#if settlementVenues.length > 0}
-        <section
-            class="settlement-venues component-box"
-            aria-label="Rendezvényhelyszínek"
+        <section id="helyszinek" class="widget settlement-venues component-box"
+            aria-label="Helyszínek"
         >
-            <h2 class="aside-title">Rendezvényhelyszínek</h2>
-            <ul class="settlement-venues-list">
-                {#each settlementVenues as ven (ven.id)}
-                    <li>
+            <div class="widget-header" title="{settlementData.name}i helyszínek">
+                <h3 class="widget-title">Helyszínek</h3>
+            </div>
+
+            <div class="widget-content">
+                {#if loading}
+                    <span class="info-box"><p>Betöltés...</p></span>
+                {:else if settlementVenues.length === 0}
+                    <span class="info-box"><p>Nincs megjeleníthető rendezvényhelyszín.</p></span>
+                {:else}
+                
+                <ul class="settlements-grid">
+                    {#each settlementVenues as ven (ven.id)}
                         <a
                             href="/{$page.params.countySlug}-megye/{town}/helyszin/{ven.slug}"
-                            class="settlement-venue-link">{ven.name}</a
+                            class="card sm settlement"
                         >
-                    </li>
-                {/each}
-            </ul>
+                            {ven.name}
+                            {#if kindLabel(ven.kind, ven.kind_label)}
+                                {' '}{kindLabel(ven.kind, ven.kind_label)}
+                            {/if}
+                        </a>
+                    {/each}
+                </ul>
+                {/if}
+            </div>
         </section>
     {/if}
 
     <NewsWidget settlementSlug={town} ticker={true} />
 
     {#if countyAttractions.length > 0}
-        <aside class="settlements-aside component-box">
+        <section class="component-box">
             <h2 class="aside-title">
                 Látnivalók {settlementData.county} megyében
             </h2>
@@ -362,13 +375,13 @@
                 {#each countyAttractions as att (att.id)}
                     <a
                         href="/{$page.params.countySlug}-megye/{att.slug}"
-                        class="badge settlement-badge"
+                        class="card sm settlement"
                     >
                         {att.name}
                     </a>
                 {/each}
             </div>
-        </aside>
+        </section>
     {/if}
 
     <h2>{settlementData.name}i címtár - Helyi Index</h2>
@@ -504,20 +517,20 @@
 
         <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
             {#each displayItems as entry}
-                <EntryCard {entry} showBadge={false} />
+                <EntryCard {entry} showBadge={false} layout={viewMode === "grid" ? "grid" : "list"} />
             {/each}
         </div>
 
         {#if visibleCount < totalCount}
             <div class="load-more">
-                <button class="nav-btn" on:click={loadMore}
+                <button class="btn nav-btn" on:click={loadMore}
                     >Több betöltése ↓</button
                 >
             </div>
         {/if}
     {/if}
 {:else if loading}
-    <p class="greeting">Betöltés...</p>
+    <p class="greeting">...</p>
 {:else}
     <p class="greeting">A keresett oldal nem található.</p>
 {/if}
@@ -560,24 +573,15 @@
     }
     .entry-placeholder-cat,
     .entry-placeholder-loc {
-        font-size: 0.75rem;
         color: var(--text-faint);
     }
     .entry-placeholder-title {
-        font-size: 0.95rem;
         color: var(--text-faint);
         margin-top: 0.5rem;
     }
 
-    .attraction-featured {
-        margin: 1.5rem 0;
-        border-radius: 0.5rem;
-        overflow: hidden;
-    }
-    .attraction-featured img {
-        width: 100%;
-        max-height: 300px;
-        object-fit: cover;
+    .attraction-photos {
+        margin: 1.5rem 0 1rem;
     }
     .attraction-desc {
         margin: 1rem 0;
@@ -586,18 +590,6 @@
     .attraction-content {
         margin: 1.5rem 0;
     }
-    .attraction-gallery {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 1rem;
-        margin: 1rem 0;
-    }
-    .attraction-gallery .gallery-item img {
-        width: 100%;
-        height: 120px;
-        object-fit: cover;
-        border-radius: 0.25rem;
-    }
 
     .component-box {
         padding: 1.5rem;
@@ -605,43 +597,19 @@
         border-radius: 12px;
         border: 1px solid var(--border-color);
     }
-    .settlements-aside {
-        margin-bottom: 2rem;
-    }
     .aside-title {
         margin-top: 0;
-        font-size: 1.25rem;
     }
     .settlements-grid {
         display: flex;
         flex-wrap: wrap;
         gap: 0.8rem;
+        margin: 0;
+        padding: 0;
     }
-    .settlement-badge {
-        text-decoration: none;
-        color: var(--primary-color);
+    .settlement {
         background: var(--bg-body);
         font-weight: 500;
-        padding: 0.5rem 1rem;
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-    }
-
-    .settlement-venues {
-        margin-bottom: 2rem;
-    }
-    .settlement-venues-list {
-        margin: 0;
-        padding-left: 1.25rem;
-        line-height: 1.75;
-    }
-    .settlement-venue-link {
-        color: var(--primary-color);
-        text-decoration: none;
-        font-weight: 500;
-    }
-    .settlement-venue-link:hover {
-        text-decoration: underline;
     }
     .location-title-row {
         display: flex;

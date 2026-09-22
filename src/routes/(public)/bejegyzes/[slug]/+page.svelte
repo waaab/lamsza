@@ -14,14 +14,25 @@
     } from "$lib/favorites.js";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
+    import EntryHistoryStrip from "$lib/components/EntryHistoryStrip.svelte";
+    import EntryProfile from "$lib/components/EntryProfile.svelte";
+    import EntryRelatedLinks from "$lib/components/EntryRelatedLinks.svelte";
     import { apiFetch } from "$lib/api";
-    import { recordAccountHistory } from "$lib/entryHistory.js";
-    import { normalizePhotos } from "$lib/entryPhotos.js";
+    import {
+        historyForDisplay,
+        readHistory,
+        recordAccountHistory,
+    } from "$lib/entryHistory.js";
     import { auth } from "$lib/stores/auth";
+    import { normalizePhotos } from "$lib/entryPhotos.js";
 
     let entry = null;
     let loading = true;
     let error = null;
+    let nearby = [];
+    let related = [];
+    let historyItems = [];
+    let fetchGen = 0;
     /** @type {{ type: string, id: number }[]} */
     let favoriteList = [];
     /** @type {{ owned: Array<{ id: number }>, member: Array<{ id: number }>, pending: Array<{ id: number }> }} */
@@ -153,33 +164,63 @@
     }
 
     async function fetchEntry() {
+        const requested = slug;
+        const gen = ++fetchGen;
         loading = true;
         error = null;
         try {
             const data = await apiFetch(
-                `/api/entry?slug=${encodeURIComponent(slug)}`,
+                `/api/entry?slug=${encodeURIComponent(requested)}`,
             );
+            if (gen !== fetchGen) return;
+
             if (!data || !data.name) {
                 error = "A bejegyzés nem található.";
+                entry = null;
+                nearby = [];
+                related = [];
+                historyItems = [];
             } else {
                 entry = data;
+                loading = false;
                 await auth.init();
                 await recordAccountHistory(
                     {
                         slug: data.slug,
                         name: data.name,
-                        category: data.category || "",
-                        location: data.location || "",
+                        category: data.category,
+                        location: data.location,
                         photo: normalizePhotos(data.photos)[0]?.url || "",
                     },
                     get(auth),
                 );
+                historyItems = historyForDisplay(readHistory(), data.slug);
+
+                nearby = [];
+                related = [];
+                try {
+                    const rel = await apiFetch(
+                        `/api/entry/related?slug=${encodeURIComponent(data.slug || requested)}`,
+                    );
+                    if (gen !== fetchGen) return;
+                    nearby = Array.isArray(rel?.nearby) ? rel.nearby : [];
+                    related = Array.isArray(rel?.related) ? rel.related : [];
+                } catch {
+                    if (gen !== fetchGen) return;
+                    nearby = [];
+                    related = [];
+                }
             }
         } catch (err) {
+            if (gen !== fetchGen) return;
             console.error(err);
             error = "Hiba történt a szerver kapcsolat közben.";
+            entry = null;
+            nearby = [];
+            related = [];
+            historyItems = [];
         } finally {
-            loading = false;
+            if (gen === fetchGen) loading = false;
         }
     }
 </script>
@@ -189,7 +230,20 @@
 </svelte:head>
 
 {#if loading}
-    <p class="loading-placeholder">adat betöltés...</p>
+    <div aria-busy="true" aria-label="Bejegyzés betöltése">
+        <div class="entry-page-skel-crumbs">
+            {#each { length: 4 }}
+                <span class="skeleton skeleton-text entry-page-skel-crumb"></span>
+            {/each}
+        </div>
+        <article class="profile-detail">
+            <EntryProfile placeholder />
+            <section class="entry-page-skel-events" aria-hidden="true">
+                <div class="skeleton skeleton-text entry-page-skel-events-title"></div>
+                <div class="skeleton entry-page-skel-events-card"></div>
+            </section>
+        </article>
+    </div>
 {:else if error}
     <span class="info-box error">
         <p>{error}</p>
@@ -199,29 +253,14 @@
     <Breadcrumbs
         label={entry.name}
         countySlug={entry.county_slug}
-        countyName={entry.county}
+        countyName={entry.location_county || entry.county}
         settlementSlug={entry.location_slug}
         settlementName={entry.location}
         settlementType={entry.location_type}
     />
 
-    <div class="entry-content">
-        <div class="entry-header">
-            <div class="badge">Index: {entry.category}</div>
-            <h1 class="entry-title">{entry.name}</h1>
-
-            {#if entry.url}
-                <div class="entry-url-row">
-                    <span class="entry-url-label">🔗 Weboldal:</span>
-                    <a
-                        href={entry.url}
-                        target="_blank"
-                        rel="nofollow noopener"
-                        class="entry-url-link">{entry.url}</a
-                    >
-                </div>
-            {/if}
-        </div>
+    <article class="profile-detail">
+        <EntryProfile {entry} />
 
         <div class="page-actions">
             <FavoriteButton
@@ -260,156 +299,46 @@
             <p class="entry-claim-error">{claimError}</p>
         {/if}
 
-        <div class="contact-card">
-            <h3 class="contact-title">Kapcsolat</h3>
-            <div class="contact-grid">
-                {#if entry.location || entry.address}
-                    <div class="contact-item">
-                        <span class="contact-icon">📍</span>
-                        <div>
-                            {#if entry.location || entry.location_ro || entry.location_de}
-                                <strong
-                                    >{[
-                                        entry.location,
-                                        entry.location_ro,
-                                        entry.location_de,
-                                    ]
-                                        .filter(Boolean)
-                                        .join(" | ")}</strong
-                                >
-                            {/if}
-                            {#if (entry.location || entry.location_ro || entry.location_de) && entry.address}
-                                -
-                            {/if}
-                            {#if entry.address}{entry.address}{/if}
-                        </div>
-                    </div>
-                {/if}
-
-                {#if entry.phone}
-                    <div class="contact-item-center">
-                        <span class="contact-icon">📞</span>
-                        <a
-                            href={`tel:${entry.phone.replace(/[^0-9+]/g, "")}`}
-                            class="contact-link">{entry.phone}</a
-                        >
-                    </div>
-                {/if}
-            </div>
-        </div>
-
-        <div class="details-section">
-            <h3 class="details-title">Részletek & Megjegyzések</h3>
-            {#if entry.notes}
-                <div class="entry-notes">{entry.notes}</div>
-            {/if}
-
-            {#if entry.tags && entry.tags.length > 0}
-                <div class="entry-tags">
-                    {#each entry.tags as t}
-                        <span class="entry-tag tag-padded"
-                            >{t.startsWith("#") ? t : "#" + t}</span
-                        >
-                    {/each}
-                </div>
-            {/if}
-        </div>
-
         <EventsWidget organizerName={entry.name} />
-    </div>
+        <EntryRelatedLinks {nearby} {related} currentLocationSlug={entry.location_slug} />
+        <EntryHistoryStrip items={historyItems} />
+    </article>
 {/if}
 
 <style>
-    .loading-placeholder {
-        color: var(--text-faint);
-        margin-bottom: 2rem;
-    }
     .back-to-home {
         margin-top: 1rem;
         display: inline-block;
     }
-    .entry-content {
-        margin-top: 2rem;
-    }
-    .entry-header {
-        margin-bottom: 2rem;
-    }
-    .entry-title {
-        margin: 0 0 1rem;
-    }
-    .entry-url-row {
-        margin-bottom: 1.5rem;
-        font-size: 1.1rem;
-    }
-    .entry-url-label {
-        color: var(--text-faint);
-        margin-right: 0.5rem;
-    }
-    .entry-url-link {
-        color: var(--primary-color);
-        text-decoration: none;
-        font-weight: 500;
-    }
-
-    .contact-card {
-        padding: 1.5rem;
-        background: var(--card-bg);
-        border-radius: 12px;
-        border: 1px solid var(--border-color);
-        margin-bottom: 2rem;
-    }
-    .contact-title {
-        margin-top: 0;
-        color: var(--text-color);
-        font-size: 1.2rem;
-        margin-bottom: 1rem;
-    }
-    .contact-grid {
-        display: grid;
-        gap: 1rem;
-    }
-    .contact-item {
+    .profile-detail {
         display: flex;
-        align-items: flex-start;
-        gap: 0.8rem;
-        font-size: 1.1rem;
+        flex-direction: column;
+        gap: 2rem;
     }
-    .contact-item-center {
+    .entry-page-skel-crumbs {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: 0.8rem;
-        font-size: 1.1rem;
+        gap: 0.45rem;
+        margin-bottom: 1.25rem;
     }
-    .contact-icon {
-        font-size: 1.3rem;
+    .entry-page-skel-crumb {
+        width: 5.5rem;
+        height: 0.85rem;
+        margin: 0;
     }
-    .contact-link {
-        color: var(--text-color);
-        text-decoration: none;
+    .entry-page-skel-events-title {
+        width: 10rem;
+        height: 1.1rem;
+        margin: 0 0 0.85rem;
     }
-
-    .details-section {
-        margin-bottom: 2rem;
-    }
-    .details-title {
-        margin-top: 0;
-        color: var(--text-color);
-        font-size: 1.2rem;
-        margin-bottom: 1rem;
-    }
-    .entry-notes {
-        font-size: 1rem;
-        line-height: 1.6;
-        margin-bottom: 1.5rem;
-        white-space: pre-wrap;
-        color: var(--text-faint);
-    }
-    .tag-padded {
-        padding: 0.4rem 0.8rem;
-        font-size: 0.95rem;
+    .entry-page-skel-events-card {
+        width: 100%;
+        height: 7.5rem;
+        border-radius: 12px;
     }
     .entry-claim-error {
-        margin: 0 0 1rem;
+        margin: 0;
         color: #b00020;
     }
 </style>

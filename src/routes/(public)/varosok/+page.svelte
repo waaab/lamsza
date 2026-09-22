@@ -1,66 +1,69 @@
 <script>
     import { onMount } from "svelte";
-    import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
+    import { apiFetch } from "$lib/api";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+
+    let pageHeader = initialPageHeader("varosok");
+    let pageHeaderLoading = false;
 
     let locations = [];
     let loading = true;
 
     onMount(async () => {
+        pageHeader = await loadPageMeta("varosok");
+        pageHeaderLoading = false;
         try {
-            const apiBase =
-                import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-            const res = await fetch(`${apiBase}/api/locations`);
-            if (res.ok) {
-                const all = await res.json();
-                locations = all
-                    .filter((l) =>
-                        ["város", "municípium"].includes(l.type?.toLowerCase() ?? ""),
-                    )
-                    .sort((a, b) => a.name.localeCompare(b.name));
-            }
+            const all = await apiFetch("/api/locations");
+            locations = all
+                .filter((l) =>
+                    ["város", "municípium"].includes(l.type?.toLowerCase() ?? ""),
+                )
+                .sort((a, b) => a.name.localeCompare(b.name));
         } catch (e) {
             console.error(e);
+        } finally {
+            loading = false;
         }
-        loading = false;
     });
 </script>
 
-<svelte:head>
-    <title>Székelyföldi Városok - Lámsza Index</title>
-</svelte:head>
-
-<Breadcrumbs label="Székelyföldi Városok" />
-<h1 class="page-title">Székelyföldi Városok</h1>
+<PublicPageHero
+    title={pageHeader.title}
+    greeting={pageHeader.greeting}
+    loading={pageHeaderLoading}
+    breadcrumbLabel="Székelyföldi Városok"
+    documentTitleSuffix=" - Lámsza Index"
+/>
 
 <div class="page-inner">
     {#if loading}
-        <span class="badge location-badge" style="opacity:0.5">adat betöltés...</span>
+        <div class="info-box"><p>Betöltés…</p></div>
+    {:else if locations.length === 0}
+        <div class="info-box"><p>Nincs megjeleníthető adat.</p></div>
     {:else}
         {#each locations as loc}
             <a
                 href="/{loc.county_slug}-megye/{loc.slug}"
-                class="badge location-badge"
+                class="card sm location"
             >
-                {loc.name}
-                <span class="location-county">{loc.county}</span>
+                <span class="location-name">{loc.name}</span>
+                <span class="location-type">{loc.type}</span>
             </a>
         {/each}
     {/if}
 </div>
+<nav class="page-nav">
+    <h4 class="page-nav-title">Oldal navigáció</h4>
+    <ul>
+        <li><a class="btn nav-btn" href="/megyek">Székelyföldi megyék</a></li>
+        <li><a class="btn nav-btn" href="/szekek">Történelmi székek</a></li>
+        <li><a class="btn nav-btn" href="/falvak">Székelyföldi falvak</a></li>
+    </ul>
+</nav>
 
 <style>
-    .location-badge {
-        text-decoration: none;
-        color: var(--primary-color);
-        background: var(--card-bg);
-        font-weight: 500;
-        padding: 0.8rem 1.5rem;
-        border: 1px solid var(--border-color);
-        font-size: 1.1rem;
-    }
-    .location-county {
-        font-size: 0.8em;
+    .location-type {
         color: var(--text-faint);
-        margin-left: 0.5rem;
     }
 </style>

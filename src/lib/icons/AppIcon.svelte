@@ -31,15 +31,17 @@
             <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
         </svg>
     {:else if name === "mondasok"}
-        <!-- Single Hungarian „ — large weight to match stroke icons (see admin.css .app-icon-quote) -->
+        <!-- Hungarian „ — scaled to match visual weight of 24×24 stroke icons -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" overflow="visible" class="app-icon-quote">
-            <text
-                x="12"
-                y="18"
-                text-anchor="middle"
-                font-size="24"
-                font-weight="700"
-                font-family="Georgia, 'Times New Roman', Times, serif">„</text>
+            <g transform="translate(12 17.5) scale(1.62) translate(-12 -17.5)">
+                <text
+                    x="12"
+                    y="18"
+                    text-anchor="middle"
+                    font-size="24"
+                    font-weight="800"
+                    font-family="Georgia, 'Times New Roman', Times, serif">„</text>
+            </g>
         </svg>
     {:else if name === "quicklinks"}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"

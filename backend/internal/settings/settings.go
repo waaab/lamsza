@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"backend/internal/config"
 	"backend/internal/db"
 	"encoding/json"
 	"log"
@@ -55,6 +56,7 @@ type PublicConfig struct {
 	MyLocationCounty       string `json:"my_location_county"`
 	MyLocationCountySlug   string `json:"my_location_county_slug"`
 	MyLocationType         string `json:"my_location_type"`
+	GoogleClientID         string `json:"google_client_id"`
 }
 
 // HandlePublicConfig returns weather cache config for frontend
@@ -90,6 +92,7 @@ func HandlePublicConfig(w http.ResponseWriter, r *http.Request) {
 		MyLocationCounty:       myLocCounty,
 		MyLocationCountySlug:   myLocCountySlug,
 		MyLocationType:         myLocType,
+		GoogleClientID:         config.AppConfig.GoogleClientID,
 	})
 }
 
@@ -163,12 +166,8 @@ func HandleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
 
-// ClearWeatherCache increments weather_cache_version (admin)
-func ClearWeatherCache(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
+// IncrementWeatherCacheVersion bumps weather_cache_version so frontend weather cache is invalidated.
+func IncrementWeatherCacheVersion() {
 	var val string
 	_ = db.DB.QueryRow("SELECT value FROM site_settings WHERE key = 'weather_cache_version'").Scan(&val)
 	next := 1
@@ -180,6 +179,15 @@ func ClearWeatherCache(w http.ResponseWriter, r *http.Request) {
 		 ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
 		strconv.Itoa(next),
 	)
+}
+
+// ClearWeatherCache increments weather_cache_version (admin)
+func ClearWeatherCache(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	IncrementWeatherCacheVersion()
 	w.WriteHeader(http.StatusOK)
 }
 

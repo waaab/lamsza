@@ -8,7 +8,8 @@ import (
 //go:embed historical_seats_seed.sql
 var historicalSeatsSeedSQL string
 
-// SeedHistoricalSeatsContent upserts the five default székek with Markdown bodies.
+// SeedHistoricalSeatsContent inserts the five default székek if they are missing.
+// Existing rows (admin name/content edits) are left alone.
 // Skips quietly if historical_seats does not exist (run migration_settlements_attractions.sql first).
 func SeedHistoricalSeatsContent() {
 	if DB == nil {

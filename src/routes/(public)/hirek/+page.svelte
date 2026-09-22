@@ -1,5 +1,11 @@
 <script>
     import { onMount } from "svelte";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+    import { apiFetch } from "$lib/api.js";
+
+    let pageHeader = initialPageHeader("hirek");
+    let pageHeaderLoading = false;
 
     let allNewsItems = [];
     let visibleCount = 9;
@@ -202,6 +208,9 @@
     }
 
     onMount(async () => {
+        pageHeader = await loadPageMeta("hirek");
+        pageHeaderLoading = false;
+
         const isMobile = window.innerWidth < 768;
         sourcesOpen = !isMobile;
 
@@ -209,9 +218,6 @@
         const NEWS_TTL = 30 * 60 * 1000;
 
         try {
-            const apiBase =
-                import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-
             // Try cache first
             const cached = localStorage.getItem(NEWS_CACHE_KEY);
             if (cached) {
@@ -226,15 +232,14 @@
             }
 
             // Fetch sources list for sidebar
-            const feedsRes = await fetch(`${apiBase}/api/admin/news_feeds`);
-            if (feedsRes.ok) {
-                sources = (await feedsRes.json()) || [];
+            try {
+                sources = (await apiFetch("/api/news/feeds")) || [];
+            } catch {
+                sources = [];
             }
 
             // Fetch parsed news from backend
-            const newsRes = await fetch(`${apiBase}/api/news?limit=100`);
-            if (!newsRes.ok) throw new Error(`News API: ${newsRes.status}`);
-            const allItems = await newsRes.json();
+            const allItems = await apiFetch("/api/news?limit=100");
 
             if (allItems.length > 0) {
                 allNewsItems = allItems;
@@ -353,35 +358,33 @@
 </script>
 
 <svelte:head>
-    <title>Friss hírek erdélyi forrásból - Lámsza</title>
     <meta
         name="description"
         content="Friss hírek erdélyi forrásból - helyi hírcsatornák legfrissebb hírei időrendben."
     />
 </svelte:head>
 
-<h1 class="page-title">Friss hírek erdélyi forrásból</h1>
-<p class="greeting">Helyi hírcsatornák legfrissebb hírei időrendben.</p>
+<PublicPageHero
+    title={pageHeader.title}
+    greeting={pageHeader.greeting}
+    loading={pageHeaderLoading}
+    breadcrumbLabel="Hírek"
+    breadcrumbParentLabel=""
+    breadcrumbParentUrl=""
+    documentTitleSuffix=" - Lámsza"
+/>
 
-{#if loading}
-    <div class="header-tabs chips">
-        <span class="header-tabs-label">Leggyakoribb témák:</span>
-        <div class="chips-scroll-wrapper">
-            <div class="chips-list">
-                <span class="btn btn-md" style="opacity:0.5">adat betöltés...</span>
-            </div>
-        </div>
-    </div>
-{:else if allNewsItems.length > 0}
-    <div class="header-tabs chips">
-        <span class="header-tabs-label">Leggyakoribb témák:</span>
-        <div
-            class="chips-scroll-wrapper"
+<div class="header-tabs chips">
+    <span class="header-tabs-label" aria-label="Leggyakoribb témák">Leggyakoribb témák:</span>
+    {#if loading}
+        <span class="btn btn--loading">Szűrők betöltése…</span>
+    {:else if allNewsItems.length > 0}
+        <div class="header-tabs-filters-row"
             class:can-left={canScrollLeft}
             class:can-right={canScrollRight}
         >
             <button
-                class="scroll-arrow left"
+                class="btn btn-xs scroll-arrow left"
                 aria-label="Görgetés balra"
                 on:click={() => scrollChips(-200)}>‹</button
             >
@@ -396,19 +399,19 @@
                             scrollToTop();
                         }}
                     >
-                        {word} <span class="news-word-count">{count}</span>
+                    <span class="btn-label">{word}</span>
+                    <span class="btn-label-count">{count}</span>
                     </button>
                 {/each}
             </div>
             <button
-                class="scroll-arrow right"
+                class="btn btn-xs scroll-arrow right"
                 aria-label="Görgetés jobbra"
                 on:click={() => scrollChips(200)}>›</button
             >
         </div>
-    </div>
-{/if}
-
+    {/if}
+</div>
 {#if selectedSource || selectedWord}
     <div class="filter-actions">
         <span class="info-box">
@@ -574,9 +577,9 @@
     </div>
 {/if}
 
-<div class="news-page-layout">
+<div class="list-page-layout">
     <!-- Main news grid -->
-    <section class="news-list">
+    <section class="list">
         {#if loading}
             <div class="list grid">
                 {#each Array(9) as _}
@@ -596,7 +599,7 @@
                 <p>Hírek jelenleg nem elérhetők. Próbáld újra hamarosan.</p>
             </span>
         {:else}
-            <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
+            <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}" id="hirek-lista">
                 {#each displayItems as item}
                     <article class="card news">
                         <a
@@ -609,7 +612,7 @@
                                 <img
                                     src={item.image || DEFAULT_IMAGE}
                                     alt={item.title}
-                                    class="news-img"
+                                    class="img"
                                     loading="lazy"
                                     on:error={handleImgError}
                                 />
@@ -632,7 +635,7 @@
 
             {#if visibleCount < totalCount}
                 <div class="load-more">
-                    <button class="nav-btn" on:click={showMore}>
+                    <button class="btn nav-btn" on:click={showMore}>
                         Mutasd a következő híreket ↓
                     </button>
                 </div>
@@ -641,10 +644,10 @@
     </section>
 
     <!-- Sidebar -->
-    <aside class="news-sidebar">
-        <div class="news-sidebar-box">
-            <div class="news-sidebar-header">
-                <h4 class="news-sidebar-heading">Erdélyi hírforrások</h4>
+    <aside class="sidebar">
+        <div class="sidebar-box">
+            <div class="sidebar-header">
+                <h4 class="sidebar-heading">Erdélyi hírforrások</h4>
                 <button
                     class="sidebar-toggle-btn"
                     class:open={sourcesOpen}
@@ -654,23 +657,23 @@
                     ▾
                 </button>
             </div>
-            {#if sourcesOpen}
-                {#if loading}
-                    <ul class="news-sidebar-sources">
-                        {#each Array(5) as _}
-                            <div class="news-sidebar-source-item sidebar-loader-item">
-                                <span class="news-source-dot" style:background="var(--border-color)"></span>
-                                <span>adat betöltés...</span>
-                            </div>
-                        {/each}
-                    </ul>
-                    <small class="news-cache-timestamp" style="opacity:0.5">
-                        &#128336; Utoljára frissítve: ...
-                    </small>
-                {:else if sources.length > 0}
-                    <ul class="news-sidebar-sources">
+            {#if loading}
+                <ul class="sidebar-sources">
+                    {#each Array(5) as _}
+                        <div class="sidebar-source-item sidebar-loader-item">
+                            <span class="news-source-dot" style:background="var(--border-color)"></span>
+                            <span>adat betöltés...</span>
+                        </div>
+                    {/each}
+                </ul>
+                <small class="news-cache-timestamp" style="opacity:0.5">
+                    &#128336; Utoljára frissítve: ...
+                </small>
+            {:else if sourcesOpen}
+                {#if sources.length > 0}
+                    <ul class="sidebar-sources">
                         <button
-                            class="news-sidebar-source-item news-sidebar-source-all"
+                            class="sidebar-source-item sidebar-source-all"
                             class:active={selectedSource === null}
                             on:click={() => {
                                 selectedSource = null;
@@ -683,7 +686,7 @@
                         </button>
                         {#each sources as src}
                             <button
-                                class="news-sidebar-source-item"
+                                class="sidebar-source-item"
                                 class:active={selectedSource === src.title}
                                 on:click={() => {
                                     selectedSource =
@@ -706,7 +709,7 @@
                         <p>Nincsenek elérhető hírforrások. Szerver lekérési hiba.</p>
                     </span>
                 {/if}
-                {#if !loading && cacheTimestamp}
+                {#if cacheTimestamp}
                     <small class="news-cache-timestamp">
                         &#128336; Utoljára frissítve: {new Date(
                             cacheTimestamp,
@@ -891,11 +894,6 @@
 {/if}
 
 <style>
-    .news-word-count {
-        opacity: 0.6;
-        font-size: 0.85em;
-        margin-left: 0.3rem;
-    }
     .sidebar-loader-item {
         pointer-events: none;
     }

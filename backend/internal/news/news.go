@@ -242,6 +242,31 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(allItems)
 }
 
+func HandlePublicNewsFeeds(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	rows, err := db.DB.Query("SELECT id, title, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY LOWER(title) ASC, id ASC")
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	defer rows.Close()
+	var res []models.NewsFeed
+	for rows.Next() {
+		var nf models.NewsFeed
+		if err := rows.Scan(&nf.ID, &nf.Title, &nf.BgColor); err == nil {
+			res = append(res, nf)
+		}
+	}
+	if res == nil {
+		res = []models.NewsFeed{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
+}
+
 func HandleAdminNewsFeeds(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -303,4 +328,3 @@ func HandleAdminNewsFeeds(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}
 }
-

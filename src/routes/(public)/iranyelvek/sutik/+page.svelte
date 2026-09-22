@@ -1,57 +1,52 @@
 <script>
     import { onMount } from "svelte";
-    import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
-    import { apiFetch } from "$lib/api";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { initialPageHeader, loadPageMeta } from "$lib/loadPageMeta.js";
 
+    const fb = initialPageHeader("iranyelvek/sutik");
     let page = null;
     let loading = true;
     let error = false;
 
     onMount(async () => {
         try {
-            page = await apiFetch("/api/pages?slug=iranyelvek/sutik");
+            page = await loadPageMeta("iranyelvek/sutik");
         } catch {
             error = true;
+            page = { ...fb, content: "" };
         } finally {
             loading = false;
         }
     });
 </script>
 
-<svelte:head>
-    <title>{page?.title || "Sütik"} – Lámsza</title>
-</svelte:head>
-
-<Breadcrumbs label="Sütik" parentLabel="Irányelvek" parentUrl="/iranyelvek" />
-
 <section class="page-section">
-    <h1 class="page-title">{page?.title || "Sütik"}</h1>
+    <PublicPageHero
+        title={page?.title ?? fb.title}
+        greeting={page?.greeting ?? fb.greeting}
+        loading={false}
+        breadcrumbLabel="Sütik"
+        breadcrumbParentLabel="Irányelvek"
+        breadcrumbParentUrl="/iranyelvek"
+        documentTitleSuffix=" – Lámsza"
+    />
+
     <div class="page-inner">
         {#if loading}
-            <span class="info-box">
-                <p>Betöltés...</p>
-            </span>
+            <div class="info-box"><p>Betöltés…</p></div>
         {:else if error}
-            <span class="info-box">
-                <p>Az oldal nem elérhető.</p>
-            </span>
+            <div class="info-box"><p>Az oldal nem elérhető.</p></div>
         {:else if page?.content}
             <div class="page-content">{@html page.content}</div>
         {:else}
-            <span class="info-box">
-                <p>Az oldal tartalma még nem lett hozzáadva.</p>
-            </span>
+            <div class="info-box"><p>Az oldal tartalma még nem lett hozzáadva.</p></div>
         {/if}
-        <nav class="page-nav">
-            <a class="nav-btn" href="/iranyelvek">Irányelvek</a>
-            <a class="nav-btn" href="/iranyelvek/feltetelek">Feltételek</a>
-        </nav>
     </div>
+    <nav class="page-nav">
+        <h4 class="page-nav-title">Oldal navigáció</h4>
+        <ul>
+            <li><a class="btn nav-btn" href="/iranyelvek">Irányelvek</a></li>
+            <li><a class="btn nav-btn" href="/iranyelvek/feltetelek">Feltételek</a></li>
+        </ul>
+    </nav>
 </section>
-
-<style>
-    .page-nav {
-        display: flex;
-        gap: 0.5rem;
-    }
-</style>

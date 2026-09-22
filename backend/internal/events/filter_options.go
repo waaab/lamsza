@@ -6,10 +6,18 @@ import (
 	"net/http"
 )
 
+// eventSubtypeOption is a distinct (type slug, subtype slug) among upcoming events.
+type eventSubtypeOption struct {
+	TypeSlug string `json:"type_slug"`
+	Slug     string `json:"slug"`
+	LabelHu  string `json:"label_hu"`
+}
+
 // filterOptionsResponse drives the /esemenyek filters (types, locations, month list).
 type filterOptionsResponse struct {
-	EventTypes []string         `json:"event_types"`
-	Locations  []locationOption `json:"locations"`
+	EventTypes    []string             `json:"event_types"`
+	EventSubtypes []eventSubtypeOption `json:"event_subtypes"`
+	Locations     []locationOption     `json:"locations"`
 	// Months are YYYY-MM values that have at least one upcoming event (by start_date).
 	Months []string `json:"months"`
 	// EventDays are YYYY-MM-DD start dates of upcoming events (distinct calendar days).
@@ -35,12 +43,13 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 	var out filterOptionsResponse
 
 	rows, err := db.DB.Query(`
-		SELECT DISTINCT e.event_type
+		SELECT DISTINCT et.slug
 		FROM events e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
+		JOIN catalog_event_types et ON e.event_type_id = et.id
 		WHERE e.end_date >= CURRENT_DATE
-		ORDER BY e.event_type`)
+		ORDER BY et.slug`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -57,6 +66,29 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	rows.Close()
+
+	// ORDER BY must use columns from the SELECT list when DISTINCT is used (PostgreSQL 42P10).
+	rowsSub, err := db.DB.Query(`
+		SELECT DISTINCT et.slug, es.slug, es.label_hu
+		FROM events e
+		JOIN catalog_event_types et ON e.event_type_id = et.id
+		JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
+		WHERE e.end_date >= CURRENT_DATE
+		ORDER BY et.slug, es.label_hu`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for rowsSub.Next() {
+		var o eventSubtypeOption
+		if err := rowsSub.Scan(&o.TypeSlug, &o.Slug, &o.LabelHu); err != nil {
+			rowsSub.Close()
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out.EventSubtypes = append(out.EventSubtypes, o)
+	}
+	rowsSub.Close()
 
 	rows2, err := db.DB.Query(`
 		SELECT DISTINCT s.name, s.slug, c.slug, c.name

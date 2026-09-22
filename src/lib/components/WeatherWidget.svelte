@@ -18,10 +18,12 @@
     let error = false;
     /** "emoji" | "svg" from admin setting */
     let weatherIconStyle = "emoji";
+    let fetchGen = 0;
 
     async function fetchWeather() {
         const useCoords = lat != null && lon != null && !isNaN(lat) && !isNaN(lon);
         if (!settlementSlug && !useCoords) return;
+        const gen = ++fetchGen;
         const cacheKey = useCoords ? `weather_cache_${lat}_${lon}` : "weather_cache_" + settlementSlug;
         loading = true;
         error = false;
@@ -41,6 +43,8 @@
             }
         } catch (e) {}
 
+        if (gen !== fetchGen) return;
+
         if (browser) {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
@@ -49,6 +53,7 @@
                     const ageOk = Date.now() - (data.timestamp || 0) < ttlMs;
                     const versionOk = !cacheVersion || data.cache_version === cacheVersion;
                     if (ageOk && versionOk && data.temp != null) {
+                        if (gen !== fetchGen) return;
                         weatherData = {
                             temp: data.temp,
                             tempMin: data.temp_min,
@@ -72,6 +77,7 @@
                 ? `/api/weather?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`
                 : `/api/weather?slug=${encodeURIComponent(settlementSlug)}`;
             const data = await apiFetch(url);
+            if (gen !== fetchGen) return;
 
             const ts = data.fetched_at ? data.fetched_at * 1000 : Date.now();
             weatherData = {
@@ -104,9 +110,10 @@
                 );
             }
         } catch (err) {
+            if (gen !== fetchGen) return;
             error = true;
         } finally {
-            loading = false;
+            if (gen === fetchGen) loading = false;
         }
     }
 
@@ -128,15 +135,15 @@
             </span>
             {:else}
                 <div class="weather-temp-row">
-                    <span class="weather-temp">{weatherData ? weatherData.temp : '--'}</span><span class="weather-temp-unit">°C</span>
-                    <span class="weather-temp-min">/ {weatherData?.tempMin != null ? weatherData.tempMin : '--'}°C</span>
+                    <span class="weather-temp">{weatherData ? weatherData.temp : '-'}</span><span class="weather-temp-unit">°C</span>
+                    <span class="weather-temp-min">/ {weatherData?.tempMin != null ? weatherData.tempMin : '-'}°C</span>
                 </div>
 
                 {#if loading}
-                    <span class="weather-desc capitalize">adat betöltés...</span>
+                    <span class="weather-desc">adat betöltés...</span>
                 {/if}
                 {#if weatherData}
-                    <span class="weather-desc capitalize">
+                    <span class="weather-desc">
                         {weatherData.desc || 'nincs adat'}
                     </span>
                 {/if}
@@ -182,12 +189,13 @@
         color: var(--text-faint);
         margin: 0.5rem 0 0;
     }
-    .weather-skeleton-icon {
-        width: 5rem;
-        height: 5rem;
-        min-width: 5rem;
-        min-height: 5rem;
+    .weather-skeleton-icon{
+        width: 5.5rem;
+        height: 5.5rem;
+        min-width: 5.5rem;
+        min-height: 5.5rem;
         border-radius: 50%;
+        display: block;
     }
     .weather-details {
         display: flex;
@@ -195,7 +203,6 @@
         gap: 0.15rem;
     }
     .weather-detail {
-        font-size: 0.75rem;
         color: var(--text-faint);
         white-space: nowrap;
     }

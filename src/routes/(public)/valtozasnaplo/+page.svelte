@@ -1,13 +1,31 @@
+<script>
+    import { onMount } from "svelte";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+
+    let pageHeader = initialPageHeader("valtozasnaplo");
+    let pageHeaderLoading = false;
+
+    onMount(async () => {
+        pageHeader = await loadPageMeta("valtozasnaplo");
+        pageHeaderLoading = false;
+    });
+</script>
+
 <svelte:head>
-    <title>Változásnapló - Székely Gugel</title>
     <meta
         name="description"
         content="Székely Gugel változásnapló - új funkciók és fejlesztések listája."
     />
 </svelte:head>
 
-<h1 class="page-title">Változásnapló</h1>
-<p class="greeting">Újítások, javítások - emberi nyelven.</p>
+<PublicPageHero
+    title={pageHeader.title}
+    greeting={pageHeader.greeting}
+    loading={pageHeaderLoading}
+    showBreadcrumbs={false}
+    documentTitleSuffix=" - Székely Gugel"
+/>
 
 <section class="faq" id="gyik">
     <h2 class="faq-title">Aplikáció verziók</h2>

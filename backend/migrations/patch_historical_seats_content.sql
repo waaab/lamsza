@@ -1,4 +1,4 @@
--- Seed / refresh történelmi székek tartalma (Markdown).
+-- Insert the five historical seats if missing. Does not overwrite admin edits.
 -- Futtatás: psql "$DATABASE_URL" -f backend/migrations/patch_historical_seats_content.sql
 -- Előfeltétel: migration_settlements_attractions.sql (historical_seats tábla létezik).
 
@@ -75,7 +75,4 @@ Ma Románia **Kolozs** és **Fehér** megyéinek határán felel meg; a székely
 
 Ez a szék nem esik egybe a mai három székelyföldi megyével (Hargita, Kovászna, Maros), de a Lámsza a teljes székely szék-hagyományt szeretné bemutatni.$$
 )
-ON CONFLICT (slug) DO UPDATE SET
-    name = EXCLUDED.name,
-    name_ro = EXCLUDED.name_ro,
-    content = EXCLUDED.content;
+ON CONFLICT (slug) DO NOTHING;

@@ -139,14 +139,14 @@
                 {/key}
                 <div class="widget-nav">
                     <div class="arrows-container">
-                        <button class="scroll-arrow left" on:click={() => { tickerIndex = (tickerIndex - 1 + displayItems.length) % displayItems.length; }} aria-label="Előző hír">&#8249;</button>
-                        <button class="scroll-arrow right" on:click={() => { tickerIndex = (tickerIndex + 1) % displayItems.length; }} aria-label="Következő hír">&#8250;</button>
+                        <button class="btn btn-xs scroll-arrow left" on:click={() => { tickerIndex = (tickerIndex - 1 + displayItems.length) % displayItems.length; }} aria-label="Előző hír">&#8249;</button>
+                        <button class="btn btn-xs scroll-arrow right" on:click={() => { tickerIndex = (tickerIndex + 1) % displayItems.length; }} aria-label="Következő hír">&#8250;</button>
                     </div>
-                    <a href="/hirek" class="nav-btn">Összes hír</a>
+                    <a href="/hirek" class="btn nav-btn">Összes hír</a>
                 </div>
             </div>
         {:else}
-            <ul class="news-list">
+            <ul class="list">
                 {#each displayItems as item}
                     <li>
                         <a
@@ -182,7 +182,7 @@
         padding: 0.5rem 0;
     }
 
-    .news-list {
+    .list {
         list-style: none;
         padding: 0;
         margin: 0;
@@ -194,10 +194,8 @@
         text-decoration: none;
         color: inherit;
         font-weight: 500;
-        font-size: 1rem;
     }
     .news-meta {
-        font-size: 0.8em;
         color: var(--text-faint);
         margin-top: 0.2rem;
     }
@@ -208,9 +206,6 @@
     }
     .news-ticker-item {
         animation: ticker-slide-in 0.35s ease-out;
-    }
-    .news-ticker-item a:hover, .news-list a:hover {
-        color: var(--szekely-red);
     }
     @keyframes ticker-slide-in {
         from {

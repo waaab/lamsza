@@ -4,18 +4,7 @@
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import { apiFetch } from "$lib/api";
     import { formatDateShort } from "$lib/utils";
-
-    const KIND_LABELS = {
-        sports_arena: "Sportcsarnok / pálya",
-        indoor_hall: "Fedett csarnok",
-        outdoor_area: "Szabadtéri terület",
-        market_square: "Piac / tér",
-        park: "Park",
-        street: "Utca / felvonulás",
-        mixed: "Több helyszín",
-        temporary: "Ideiglenes",
-        other: "Egyéb",
-    };
+    import { kindLabel } from "$lib/venueKindLabels.js";
 
     /** @type {Record<string, unknown> | null} */
     let venue = null;
@@ -104,11 +93,6 @@
         religious: "Vallási",
         other: "Egyéb",
     };
-
-    function kindLabel(k, labelFromApi) {
-        if (labelFromApi && String(labelFromApi).trim()) return String(labelFromApi);
-        return KIND_LABELS[/** @type {keyof typeof KIND_LABELS} */ (k)] || k;
-    }
 </script>
 
 <svelte:head>
@@ -133,7 +117,12 @@
     />
 
     <article class="venue-detail card-like">
-        <h1 class="page-title">{venue.name}</h1>
+        <h1 class="page-title">
+            {venue.name}
+            {#if kindLabel(venue.kind, venue.kind_label)}
+                {' '}{kindLabel(venue.kind, venue.kind_label)}
+            {/if}
+        </h1>
         <p class="venue-sub">
             <a href="/{countySlug}-megye/{settlementSlug}" class="parent-city-link"
                 >{venue.settlement_name}</a
@@ -160,14 +149,22 @@
                 <span class="venue-meta-label">Típus</span>
                 <span>{kindLabel(venue.kind, venue.kind_label)}</span>
             </div>
+
+            {#if venue.seating_capacity != null}
+                <div class="venue-meta-item">
+                    <span class="venue-meta-label">Férőhely</span>
+                    <span>{venue.seating_capacity}</span>
+                </div>
+            {/if}
+
             {#if venue.address}
-                <div class="venue-meta-item venue-meta-item--wide">
+                <div class="venue-meta-item">
                     <span class="venue-meta-label">Cím</span>
                     <span>{venue.address}</span>
                 </div>
             {/if}
             {#if venue.latitude != null && venue.longitude != null}
-                <div class="venue-meta-item venue-meta-item--wide">
+                <div class="venue-meta-item">
                     <span class="venue-meta-label">Koordináták</span>
                     <span
                         >{Number(venue.latitude).toFixed(5)}, {Number(
@@ -176,20 +173,33 @@
                     >
                 </div>
             {/if}
-            {#if venue.seating_capacity != null}
-                <div class="venue-meta-item">
-                    <span class="venue-meta-label">Férőhely</span>
-                    <span>{venue.seating_capacity}</span>
-                </div>
-            {/if}
+            
+
+            <div class="venue-meta-item">
+                <span class="venue-meta-label">Infrastruktúra és hasznosítás</span>
+                <span class="venue-meta-value" title="A jégpálya fedett, így az időjárástól függetlenül biztosítja a sportolási lehetőséget a téli szezonban.">Fedett pálya</span>
+            </div>
+
+            <div class="venue-meta-item venue-meta-item--wide">
+                <span class="venue-meta-label">Sportágak</span>
+                <span class="venue-meta-value" title="Hokimeccsek, műkorcsolya, közönségkorcsolya, sportolás, stb.">Hokimeccsek, műkorcsolya, közönségkorcsolya, sportolás, egyéb.</span>
+            </div>
+
+            <div class="venue-meta-item">
+                <span class="venue-meta-label">Hazai csapatok</span>
+                <span class="venue-meta-value" title="Hokimeccsek, műkorcsolya, közönségkorcsolya, sportolás, stb.">Bikák, ágyusok, műkorcsolyaklub, stb.</span>
+            </div>
         </div>
 
         {#if venue.description}
             <div class="venue-description">
-                <h2 class="venue-section-title">Leírás</h2>
+                <h2 class="venue-section-title">Története és elnevezése</h2>
                 <p class="venue-desc-text">{venue.description}</p>
             </div>
         {/if}
+        <span class="note info">
+            <p>Megjegyzés: A pontos nyitvatartásról és a közönségkorcsolya órarendjéről érdemes a város hivatalos oldalán vagy a pálya közösségi felületein tájékozódni, mivel ezek a jégminőség és a hokimeccsek függvényében változhatnak.</p>
+        </span>
     </article>
 
     {#if venueEvents.length > 0}
@@ -243,7 +253,12 @@
                                 <span class="venue-events-date">{formatDateShort(ev.start_date)}</span>
                             {/if}
                             {#if ev.default_venue_name}
-                                <span class="venue-events-venue-name">{ev.default_venue_name}</span>
+                                <span class="venue-events-venue-name">
+                                    {ev.default_venue_name}
+                                    {#if kindLabel(ev.default_venue_kind, ev.default_venue_kind_label)}
+                                        {' '}{kindLabel(ev.default_venue_kind, ev.default_venue_kind_label)}
+                                    {/if}
+                                </span>
                             {/if}
                         </span>
                     </li>
@@ -263,7 +278,6 @@
     }
     .venue-sub {
         margin: 0 0 1.5rem;
-        font-size: 0.95rem;
         color: var(--text-faint);
     }
     .parent-city-link {
@@ -278,38 +292,39 @@
         grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
         gap: 1rem;
         margin-bottom: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 2rem;
+    }
+    .venue-description{
+        padding: 1rem 2em;
     }
     .venue-meta-item {
         display: flex;
         flex-direction: column;
         gap: 0.25rem;
-        font-size: 0.95rem;
     }
     .venue-meta-item--wide {
         grid-column: 1 / -1;
     }
     .venue-meta-label {
-        font-size: 0.75rem;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.04em;
         color: var(--text-faint);
     }
     .venue-section-title {
-        font-size: 1.1rem;
         margin: 0 0 0.75rem;
         color: var(--primary-color);
     }
     .venue-desc-text {
         margin: 0;
         line-height: 1.65;
-        color: var(--text-color);
+        
         white-space: pre-wrap;
     }
 
     .venue-events-hint {
         margin: 0 0 1rem;
-        font-size: 0.88rem;
         color: var(--text-faint);
         line-height: 1.5;
     }
@@ -336,7 +351,6 @@
         font-weight: 600;
         color: var(--primary-color);
         text-decoration: none;
-        font-size: 1rem;
     }
     .venue-events-link:hover {
         text-decoration: underline;
@@ -345,13 +359,11 @@
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem 0.75rem;
-        font-size: 0.85rem;
         color: var(--text-faint);
     }
     .venue-events-type {
         font-weight: 600;
         text-transform: uppercase;
-        font-size: 0.72rem;
         letter-spacing: 0.03em;
         color: var(--szekely-red, #c0392b);
     }

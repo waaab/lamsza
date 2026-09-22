@@ -1,0 +1,2 @@
+-- Superseded by entry_type_id.sql (varchar type replaced by type_id FK).
+-- Kept so older notes still resolve; do not apply this file on a migrated DB.

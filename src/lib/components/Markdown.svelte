@@ -26,7 +26,6 @@
         padding-left: 1.5rem;
     }
     .markdown-content :global(a) {
-        color: var(--link-color, #2563eb);
         text-decoration: underline;
     }
 </style>

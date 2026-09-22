@@ -1,0 +1,2 @@
+-- Seed a short entry_categories catalog, remap entries.category_id, drop varchar category.
+-- Applied on backend start by handlers.MigrateEntryCategories (idempotent).

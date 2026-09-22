@@ -10,7 +10,7 @@
     <!-- Simple header specifically for the root error page when it doesn't get the public layout -->
     <header class="toolbar error-toolbar">
         <div class="nav">
-            <a href="/" class="nav-btn" title="Vissza a főoldalra">
+            <a href="/" class="btn nav-btn" title="Vissza a főoldalra">
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="24"

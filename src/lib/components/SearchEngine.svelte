@@ -197,18 +197,6 @@
 
             {#if !loading && searchResults && totalCount > 0}
                 <div class="discover-sections">
-                    {#if searchResults.locations?.length > 0}
-                        <div class="discover-section">
-                            <h4 class="discover-section-title">📍 Települések</h4>
-                            <div class="list flex">
-                                {#each searchResults.locations as loc}
-                                    {@const entry = locationToEntry(loc)}
-                                    <EntryCard entry={entry} />
-                                {/each}
-                            </div>
-                        </div>
-                    {/if}
-
                     {#if searchResults.entries?.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📋 Index</h4>
@@ -252,6 +240,18 @@
                                             <span class="discover-attraction-desc">{att.description}</span>
                                         {/if}
                                     </a>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if searchResults.locations?.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title">📍 Települések</h4>
+                            <div class="list flex">
+                                {#each searchResults.locations as loc}
+                                    {@const entry = locationToEntry(loc)}
+                                    <EntryCard entry={entry} />
                                 {/each}
                             </div>
                         </div>
@@ -316,7 +316,6 @@
 }
 
 .external-search-links .ext-label {
-    font-size: 0.8rem;
     color: var(--text-muted);
     flex-basis: 100%;
     margin-bottom: 1rem;
@@ -368,22 +367,31 @@
     margin-bottom: 0.5rem;
 }
 
+.btn-primary {
+  background-color: var(--szekely-red);
+  color: var(--white);
+  border-color: var(--szekely-red);
+}
+
+.btn-primary:hover {
+  background: var(--szekely-red);
+  color: var(--white);
+  border-color: var(--szekely-red);
+}
+
 .btn-kapu:hover {
     background: var(--tab-hover-bg);
-    color: var(--text-primary);
 }
 .btn-kapu--active {
     background: var(--tab-hover-bg);
-    color: var(--text-primary);
-    border-color: var(--text-muted);
+    color: var(--szekely-red);
+    border-color: var(--szekely-red);
 }
 
 /* Discover: hidden by default, revealed smoothly */
 .discover-container {
     visibility: hidden;
     opacity: 0;
-    max-height: 0;
-    overflow: hidden;
     padding: 0;
     border: none;
     box-shadow: none;
@@ -392,8 +400,6 @@
 .discover-container--visible {
     visibility: visible;
     opacity: 1;
-    max-height: 100vh;
-    overflow-y: auto;
     border: 1px solid var(--border-color);
     border-top: 0;
     box-shadow: 0 4px 12px var(--shadow-md);
@@ -431,7 +437,6 @@
     margin-bottom: 0;
 }
 .discover-section-title {
-    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-secondary);
     margin: 0 0 0.75rem 0;
@@ -466,7 +471,6 @@
 }
 .discover-event-meta,
 .discover-news-source {
-    font-size: 0.85rem;
     color: var(--text-faint);
 }
 
@@ -497,12 +501,10 @@
     font-weight: 500;
 }
 .discover-attraction-meta {
-    font-size: 0.85rem;
     color: var(--text-faint);
 }
 .discover-attraction-desc {
     display: block;
-    font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 0.25rem;
     overflow: hidden;
@@ -532,6 +534,5 @@
     background: var(--tab-hover-bg);
 }
 .discover-szek-title {
-    font-size: 0.95rem;
 }
 </style>

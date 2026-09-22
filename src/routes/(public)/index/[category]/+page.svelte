@@ -4,11 +4,37 @@
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
+    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import IndexTagAside from "$lib/components/IndexTagAside.svelte";
+    import {
+        entryMatchesAsideFilters,
+        normalizeTagKey,
+        displayTagLabel,
+    } from "$lib/directoryTagCloud.js";
+    import {
+        canonicalEntryType,
+        canonicalEntryTypeKey,
+    } from "$lib/entryType.js";
+    import {
+        canonicalEntryCategory,
+        directoryCategoryTabs,
+        entryMatchesCategory,
+    } from "$lib/entryCategory.js";
+    import { apiFetch } from "$lib/api.js";
+    import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+
+    let pageHeader = initialPageHeader("index");
+    let pageHeaderLoading = false;
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
     let entries = [];
     let loading = true;
     let error = null;
+
+    /** @type {string | null} */
+    let selectedTypeKey = null;
+    /** @type {string | null} */
+    let selectedTagKey = null;
 
     let viewMode = "grid";
     let currentCategory = "";
@@ -23,11 +49,44 @@
         sortOpen = false;
     }
 
-    $: filteredEntries = entries.filter(
-        (e) =>
-            currentCategory === "osszes" ||
-            e.category.toLowerCase() === currentCategory.toLowerCase(),
+    function scrollToTop() {
+        if (typeof window !== "undefined") {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    }
+
+    function clearAllFilters() {
+        selectedTypeKey = null;
+        selectedTagKey = null;
+        goto("/index");
+    }
+
+    $: filteredEntries = entries.filter((e) =>
+        entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey),
     );
+
+    $: categoryFilterLabel =
+        canonicalEntryCategory(currentCategory) || currentCategory;
+
+    $: typeFilterLabel =
+        selectedTypeKey &&
+        canonicalEntryType(
+            entries.find(
+                (e) => canonicalEntryTypeKey(e.type) === selectedTypeKey,
+            )?.type,
+        );
+
+    $: tagFilterLabel = (() => {
+        if (!selectedTagKey) return null;
+        for (const e of entries) {
+            for (const raw of e.tags || []) {
+                if (normalizeTagKey(raw) === selectedTagKey) {
+                    return displayTagLabel(raw);
+                }
+            }
+        }
+        return selectedTagKey;
+    })();
     $: sortedEntries = [...filteredEntries].sort((a, b) => {
         if (sortMode === "newest") return b.id - a.id;
         return a.name.localeCompare(b.name);
@@ -39,7 +98,10 @@
         visibleCount += 12;
     }
 
-    $: if (currentCategory) {
+    $: {
+        currentCategory;
+        selectedTypeKey;
+        selectedTagKey;
         visibleCount = 12;
     }
 
@@ -49,45 +111,22 @@
         fetchData(categoryId);
     }
 
+    onMount(() => {
+        loadPageMeta("index").then((p) => {
+            pageHeader = p;
+            pageHeaderLoading = false;
+        });
+    });
+
     async function fetchData(categoryId) {
         loading = true;
         error = null;
         try {
-            const apiBase = import.meta.env.VITE_API_BASE_URL;
-            const baseUrl = apiBase || "http://localhost:3000";
-            const res = await fetch(`${baseUrl}/api/directory`);
-            if (!res.ok) throw new Error("Hálózati hiba");
-            const allEntries = (await res.json()) || [];
-
-            const uniqueCats = new Set(
-                allEntries.map((e) => e.category).filter((c) => c),
+            const allEntries = (await apiFetch("/api/directory")) || [];
+            dynamicCategories = directoryCategoryTabs(allEntries);
+            entries = allEntries.filter((e) =>
+                entryMatchesCategory(e, categoryId),
             );
-            const generatedCats = Array.from(uniqueCats).map((catName) => {
-                return {
-                    id: catName,
-                    label: catName,
-                    url: "/index/" + encodeURIComponent(catName),
-                };
-            });
-            dynamicCategories = [
-                { id: "osszes", label: "Összes", url: "/index" },
-                ...generatedCats,
-            ];
-
-            entries = allEntries.filter((e) => {
-                return (
-                    e.category.toLowerCase() === categoryId.toLowerCase() ||
-                    (categoryId === "egeszsegugy" &&
-                        e.category === "Egészségügy") ||
-                    (categoryId === "oktatas" && e.category === "Oktatás") ||
-                    (categoryId === "mesteremberek" &&
-                        e.category === "Mesteremberek") ||
-                    (categoryId === "hivatalok" &&
-                        e.category === "Hivatalok") ||
-                    (categoryId === "egyeb" && e.category === "Egyéb") ||
-                    e.category_id === categoryId
-                );
-            });
         } catch (err) {
             console.error(err);
             error = "Hiba történt az adatok betöltésekor.";
@@ -97,12 +136,15 @@
     }
 </script>
 
-<svelte:head>
-    <title>Szekely Gugel - Index</title>
-</svelte:head>
-
-<h1 class="page-title">Index</h1>
-<p class="greeting">Keresd meg a helyi szakembereket és intézményeket!</p>
+<PublicPageHero
+    title={pageHeader.title}
+    greeting={pageHeader.greeting}
+    loading={pageHeaderLoading}
+    breadcrumbLabel="Index"
+    breadcrumbParentLabel=""
+    breadcrumbParentUrl=""
+    documentTitleSuffix=" - Székely Gugel"
+/>
 
 <div class="header-tabs">
     <span class="header-tabs-label">Kiemelt Kategóriák:</span>
@@ -121,21 +163,76 @@
     {/if}
 </div>
 
-<div class="filter-actions">
-    <span class="info-box">
-        <p>
-            💡 Leszűrve: <span class="active">{currentCategory}</span>
-            <button
-                on:click={() => goto("/index")}
-                class="clear-filters btn btn-xs">Szűrő törlése</button
-            >
-        </p>
-        <p>({displayItems.length}/{totalCount})</p>
-    </span>
+{#snippet categoryFilterBar()}
+    <div class="filter-actions">
+        <span class="info-box">
+            <p>
+                🔍 Szűrők:
+                <span class="active">{categoryFilterLabel}</span>
+                {#if typeFilterLabel}
+                    <span class="filter-sep">·</span>
+                    <span class="active">{typeFilterLabel}</span>
+                {/if}
+                {#if tagFilterLabel}
+                    <span class="filter-sep">·</span>
+                    <span class="active">{tagFilterLabel}</span>
+                {/if}
+                <button
+                    type="button"
+                    class="clear-filters btn btn-xs"
+                    aria-label="Szűrők törlése"
+                    title="Szűrők törlése"
+                    on:click={clearAllFilters}>Szűrő törlése</button
+                >
+            </p>
+            <p>({displayItems.length}/{totalCount})</p>
+        </span>
 
-    <div class="view-mode-toggle">
-        <div class="sort-toggle">
-            <button class="btn btn-sm" on:click={() => (sortOpen = !sortOpen)}>
+        <div class="view-mode-toggle">
+            <div class="sort-toggle">
+                <button class="btn btn-sm" on:click={() => (sortOpen = !sortOpen)}>
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        ><line x1="4" y1="6" x2="16" y2="6"></line><line
+                            x1="4"
+                            y1="12"
+                            x2="12"
+                            y2="12"
+                        ></line><line x1="4" y1="18" x2="8" y2="18"></line><polyline
+                            points="15 15 18 18 21 15"
+                        ></polyline><line x1="18" y1="10" x2="18" y2="18"
+                        ></line></svg
+                    >
+                    <span>{sortLabels[sortMode]}</span>
+                </button>
+                {#if sortOpen}
+                    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+                    <div class="sort-toggle-menu" on:click|stopPropagation>
+                        <button
+                            class:active={sortMode === "title"}
+                            on:click={() => setSortMode("title")}>Név (A→Z)</button
+                        >
+                        <button
+                            class:active={sortMode === "newest"}
+                            on:click={() => setSortMode("newest")}>Legújabb</button
+                        >
+                    </div>
+                {/if}
+            </div>
+
+            <button
+                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
+                on:click={() => (viewMode = "grid")}
+                title="Rács nézet"
+            >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
                     width="16"
@@ -146,146 +243,159 @@
                     stroke-width="2"
                     stroke-linecap="round"
                     stroke-linejoin="round"
-                    ><line x1="4" y1="6" x2="16" y2="6"></line><line
-                        x1="4"
+                    ><rect x="3" y="3" width="7" height="7"></rect><rect
+                        x="14"
+                        y="3"
+                        width="7"
+                        height="7"
+                    ></rect><rect x="14" y="14" width="7" height="7"></rect><rect
+                        x="3"
+                        y="14"
+                        width="7"
+                        height="7"
+                    ></rect></svg
+                >
+                <span>Rács</span>
+            </button>
+            <button
+                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
+                on:click={() => (viewMode = "flex")}
+                title="Lista nézet"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    ><line x1="8" y1="6" x2="21" y2="6"></line><line
+                        x1="8"
                         y1="12"
-                        x2="12"
+                        x2="21"
                         y2="12"
-                    ></line><line x1="4" y1="18" x2="8" y2="18"></line><polyline
-                        points="15 15 18 18 21 15"
-                    ></polyline><line x1="18" y1="10" x2="18" y2="18"
+                    ></line><line x1="8" y1="18" x2="21" y2="18"></line><line
+                        x1="3"
+                        y1="6"
+                        x2="3.01"
+                        y2="6"
+                    ></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line
+                        x1="3"
+                        y1="18"
+                        x2="3.01"
+                        y2="18"
                     ></line></svg
                 >
-                <span>{sortLabels[sortMode]}</span>
+                <span>Lista</span>
             </button>
-            {#if sortOpen}
-                <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-                <div class="sort-toggle-menu" on:click|stopPropagation>
-                    <button
-                        class:active={sortMode === "title"}
-                        on:click={() => setSortMode("title")}>Név (A→Z)</button
-                    >
-                    <button
-                        class:active={sortMode === "newest"}
-                        on:click={() => setSortMode("newest")}>Legújabb</button
+        </div>
+    </div>
+{/snippet}
+
+{@render categoryFilterBar()}
+
+<div class="list-page-layout">
+    <section class="list">
+        {#if loading}
+            <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
+                {#each Array(6) as _, i (i)}
+                    <EntryCard placeholder layout={viewMode === "grid" ? "grid" : "list"} />
+                {/each}
+            </div>
+        {:else if error}
+            <span class="info-box error">
+                <p>{error}</p>
+            </span>
+        {:else if entries.length === 0}
+            <span class="info-box info">
+                <p>Nincs megjeleníthető bejegyzés ebben a kategóriában.</p>
+            </span>
+        {:else if displayItems.length === 0}
+            <span class="info-box info"
+                ><p>Nincs a szűrőknek megfelelő bejegyzés.</p></span
+            >
+        {:else}
+            <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
+                {#each displayItems as entry}
+                    <EntryCard {entry} layout={viewMode === "grid" ? "grid" : "list"} />
+                {/each}
+            </div>
+            {#if visibleCount < totalCount}
+                <div class="load-more">
+                    <button class="btn nav-btn" on:click={loadMore}
+                        >Több betöltése ↓</button
                     >
                 </div>
             {/if}
-        </div>
+        {/if}
+    </section>
 
-        <button
-            class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
-            on:click={() => (viewMode = "grid")}
-            title="Rács nézet"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><rect x="3" y="3" width="7" height="7"></rect><rect
-                    x="14"
-                    y="3"
-                    width="7"
-                    height="7"
-                ></rect><rect x="14" y="14" width="7" height="7"></rect><rect
-                    x="3"
-                    y="14"
-                    width="7"
-                    height="7"
-                ></rect></svg
-            >
-            <span>Rács</span>
-        </button>
-        <button
-            class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
-            on:click={() => (viewMode = "flex")}
-            title="Lista nézet"
-        >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><line x1="8" y1="6" x2="21" y2="6"></line><line
-                    x1="8"
-                    y1="12"
-                    x2="21"
-                    y2="12"
-                ></line><line x1="8" y1="18" x2="21" y2="18"></line><line
-                    x1="3"
-                    y1="6"
-                    x2="3.01"
-                    y2="6"
-                ></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line
-                    x1="3"
-                    y1="18"
-                    x2="3.01"
-                    y2="18"
-                ></line></svg
-            >
-            <span>Lista</span>
-        </button>
-    </div>
+    <aside class="sidebar index-tags-sidebar" aria-label="Címkék">
+        <div class="sidebar-box">
+            <div class="sidebar-header">
+                <h4 class="sidebar-heading">Címkék</h4>
+            </div>
+            {#if loading}
+                <div
+                    class="index-tags-aside-skeleton"
+                    aria-busy="true"
+                    aria-label="Címkék betöltése"
+                >
+                    <div class="index-tags-aside-skeleton__row">
+                        {#each Array(8) as _}
+                            <span class="skeleton index-tags-aside-skeleton__chip"></span>
+                        {/each}
+                    </div>
+                    <div class="index-tags-aside-skeleton__row">
+                        {#each Array(6) as _}
+                            <span class="skeleton index-tags-aside-skeleton__chip"></span>
+                        {/each}
+                    </div>
+                </div>
+            {:else if error}
+                <p class="index-tags-aside__empty">Nem sikerült betölteni a címkéket.</p>
+            {:else}
+                <IndexTagAside
+                    bind:selectedTypeKey
+                    bind:selectedTagKey
+                    {entries}
+                />
+            {/if}
+        </div>
+    </aside>
 </div>
 
-{#if loading}
-    <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-        {#each Array(6) as _}
-            <article class="card entry-placeholder">
-                <span class="entry-placeholder-cat">adat betöltés...</span>
-                <span class="entry-placeholder-title">adat betöltés...</span>
-                <span class="entry-placeholder-loc">adat betöltés...</span>
-            </article>
-        {/each}
-    </div>
-{:else if error}
-    <span class="info-box error">
-        <p>{error}</p>
-    </span>
-{:else if entries.length === 0}
-    <span class="info-box info">
-        <p>Nincs megjeleníthető bejegyzés ebben a kategóriában.</p>
-    </span>
-{:else}
-    <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-        {#each displayItems as entry}
-            <EntryCard {entry} />
-        {/each}
-    </div>
-    {#if visibleCount < totalCount}
-        <div class="load-more">
-            <button class="nav-btn" on:click={loadMore}>Több betöltése ↓</button
-            >
-        </div>
-    {/if}
-{/if}
+{@render categoryFilterBar()}
 
 <style>
-    .entry-placeholder {
+    .index-tags-aside-skeleton {
         display: flex;
         flex-direction: column;
-        padding: 1rem;
-        gap: 0.5rem;
+        gap: 0.75rem;
+        padding: 0.25rem 0 0.5rem;
     }
-    .entry-placeholder-cat,
-    .entry-placeholder-loc {
-        font-size: 0.75rem;
-        color: var(--text-faint);
+
+    .index-tags-aside-skeleton__row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
     }
-    .entry-placeholder-title {
-        font-size: 0.95rem;
-        color: var(--text-faint);
-        margin-top: 0.5rem;
+
+    .index-tags-aside-skeleton__chip {
+        display: inline-block;
+        height: 1.85rem;
+        border-radius: 999px;
+        min-width: 3.5rem;
+    }
+
+    .index-tags-aside-skeleton__row :nth-child(3n) {
+        min-width: 4.75rem;
+    }
+
+    .index-tags-aside-skeleton__row :nth-child(4n) {
+        min-width: 5.25rem;
     }
 </style>

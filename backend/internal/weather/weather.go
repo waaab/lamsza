@@ -3,6 +3,7 @@ package weather
 import (
 	"backend/internal/config"
 	"backend/internal/db"
+	"backend/internal/settings"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,9 +17,9 @@ import (
 )
 
 const (
-	providerOpenMeteo       = "open_meteo"
-	providerWeatherAPICom   = "weatherapi_com"
-	providerOpenWeatherMap  = "openweathermap"
+	providerOpenMeteo      = "open_meteo"
+	providerWeatherAPICom  = "weatherapi_com"
+	providerOpenWeatherMap = "openweathermap"
 )
 
 // fallbackDescHU: if an API returns English, we show Hungarian (admin can extend via site_settings later)
@@ -88,9 +89,9 @@ type UnifiedWeatherResponse struct {
 func getProviderOrder() []string {
 	defaultProv, _ := getSetting("weather_provider_default", "open_meteo")
 	enabled := map[string]bool{
-		providerOpenMeteo:       getSettingBool("weather_provider_open_meteo_enabled", true),
-		providerWeatherAPICom:   getSettingBool("weather_provider_weatherapi_enabled", true),
-		providerOpenWeatherMap:  getSettingBool("weather_provider_openweathermap_enabled", true),
+		providerOpenMeteo:      getSettingBool("weather_provider_open_meteo_enabled", true),
+		providerWeatherAPICom:  getSettingBool("weather_provider_weatherapi_enabled", true),
+		providerOpenWeatherMap: getSettingBool("weather_provider_openweathermap_enabled", true),
 	}
 	var order []string
 	if enabled[defaultProv] {
@@ -356,8 +357,12 @@ func wmoToOwmIcon(code int) string {
 	switch {
 	case code == 0:
 		return "01d"
-	case code >= 1 && code <= 3:
+	case code == 1:
 		return "02d"
+	case code == 2:
+		return "03d"
+	case code == 3:
+		return "04d"
 	case code == 45 || code == 48:
 		return "50d"
 	case code >= 51 && code <= 67:
@@ -379,8 +384,12 @@ func wmoToDesc(code int) string {
 	switch {
 	case code == 0:
 		return "tiszta ég"
-	case code >= 1 && code <= 3:
+	case code == 1:
+		return "majdnem derült"
+	case code == 2:
 		return "részben felhős"
+	case code == 3:
+		return "borult"
 	case code == 45 || code == 48:
 		return "köd"
 	case code >= 51 && code <= 67:
@@ -456,10 +465,10 @@ func parseWeatherAPIComCurrentJSON(body []byte) (*UnifiedWeatherResponse, error)
 	windKph := wa.Current.WindKph
 	precipMm := wa.Current.PrecipMm
 	return &UnifiedWeatherResponse{
-		Temp:    temp,
-		TempMin: &temp,
-		Desc:    wa.Current.Condition.Text,
-		Icon:    icon,
+		Temp:     temp,
+		TempMin:  &temp,
+		Desc:     wa.Current.Condition.Text,
+		Icon:     icon,
 		Humidity: &humidity,
 		WindKph:  &windKph,
 		PrecipMm: &precipMm,
@@ -557,10 +566,10 @@ func parseOpenWeatherMapCurrentJSON(body []byte) (*UnifiedWeatherResponse, error
 		precipMm = owm.Rain.OneH
 	}
 	return &UnifiedWeatherResponse{
-		Temp:    temp,
-		TempMin: &tmin,
-		Desc:    owm.Weather[0].Description,
-		Icon:    owm.Weather[0].Icon,
+		Temp:     temp,
+		TempMin:  &tmin,
+		Desc:     owm.Weather[0].Description,
+		Icon:     owm.Weather[0].Icon,
 		Humidity: &humidity,
 		WindKph:  &windKph,
 		PrecipMm: &precipMm,
@@ -740,6 +749,7 @@ func HandleAdminWeatherTranslations(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		settings.IncrementWeatherCacheVersion()
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(t)
 		return
@@ -762,6 +772,7 @@ func HandleAdminWeatherTranslations(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		settings.IncrementWeatherCacheVersion()
 		w.WriteHeader(http.StatusOK)
 		return
 	case http.MethodDelete:
@@ -775,6 +786,7 @@ func HandleAdminWeatherTranslations(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		settings.IncrementWeatherCacheVersion()
 		w.WriteHeader(http.StatusOK)
 		return
 	default:

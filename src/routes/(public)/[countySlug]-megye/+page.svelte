@@ -7,6 +7,8 @@
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
     import Markdown from "$lib/components/Markdown.svelte";
+    import CrestShieldPlaceholder from "$lib/components/CrestShieldPlaceholder.svelte";
+    import { getApiBase } from "$lib/api.js";
 
     const locType = "megye"; // Hardcoded type for this route
     let town = "";
@@ -34,6 +36,12 @@
     let sortOpen = false;
 
     const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
+
+    /** @param {unknown} crest */
+    function hasCrestUrl(crest) {
+        const s = String(crest ?? "").trim();
+        return s.length > 5 && s !== "–";
+    }
 
     function setSortMode(mode) {
         sortMode = mode;
@@ -77,8 +85,7 @@
         weatherLoading = true;
         newsLoading = true;
 
-        const apiBase =
-            import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+        const apiBase = getApiBase();
 
         // 0. Public config (weather icon style)
         try {
@@ -202,9 +209,9 @@
 <Breadcrumbs label={displayTown} type="Megye" />
 
 <h1 class="page-title">{displayTown} Megye</h1>
-<p class="greeting">
-    Helyi hírek, időjárás és címtár {displayTown} megye területén.
-</p>
+<h2 class="greeting">
+    Helyi események, hírek, időjárás és címtár {displayTown} megye területén.
+</h2>
 
 {#if countyRecord?.content?.trim()}
     <div class="county-markdown markdown-region">
@@ -231,18 +238,22 @@
     </div>
 
     <div id="cimer" class="crest-card widget">
-        {#if displayTownCrest && displayTownCrest !== "–" && displayTownCrest.length > 5}
         <div class="widget-header">
             <h3 class="widget-title">{displayTown} címere</h3>
         </div>
         <div class="crest-container">
-            <img
-                src={`${import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
-                alt="{displayTown} címere"
-                class="crest-img"
-            />
+            {#if hasCrestUrl(displayTownCrest)}
+                <img
+                    src={`${getApiBase()}/api/proxy?url=${encodeURIComponent(displayTownCrest)}`}
+                    alt="{displayTown} címere"
+                    class="crest-img"
+                />
+            {:else}
+                <CrestShieldPlaceholder
+                    label="{displayTown} címere — nincs feltöltött kép, helyőrző pajzs"
+                />
+            {/if}
         </div>
-        {/if}
     </div>
 
     <!-- Weather = 3rd grid element (same card structure as homepage) -->
@@ -302,7 +313,7 @@
 
 <EventsWidget countySlug={town} locationName={displayTown} />
 
-<section id="hirek" class="widget component-box">
+<section id="hirek" class="widget component-box county-news">
     <div class="widget-header">
         <h3 class="widget-title">Helyi hírek</h3>
     </div>
@@ -332,9 +343,9 @@
                 {/if}
             {/key}
             <div class="news-ticker-nav">
-                <button class="scroll-arrow left" on:click={() => { newsTickerIndex = (newsTickerIndex - 1 + newsItems.length) % newsItems.length; }} aria-label="Előző hír">&#8249;</button>
-                <button class="scroll-arrow right" on:click={() => { newsTickerIndex = (newsTickerIndex + 1) % newsItems.length; }} aria-label="Következő hír">&#8250;</button>
-                <a href="/hirek" class="nav-btn">Összes hír</a>
+                <button class="btn btn-xs scroll-arrow left" on:click={() => { newsTickerIndex = (newsTickerIndex - 1 + newsItems.length) % newsItems.length; }} aria-label="Előző hír">&#8249;</button>
+                <button class="btn btn-xs scroll-arrow right" on:click={() => { newsTickerIndex = (newsTickerIndex + 1) % newsItems.length; }} aria-label="Következő hír">&#8250;</button>
+                <a href="/hirek" class="btn nav-btn">Összes hír</a>
             </div>
         </div>
     {:else}
@@ -344,40 +355,44 @@
 
 <!-- County Settlements Aside -->
 {#if childSettlements.length > 0}
-    <aside class="settlements-aside component-box">
-        <h2 class="aside-title">
-            Települések {displayTown} megyében
-        </h2>
+    <section id="telepulesek" class="component-box widget">
+        <div class="widget-header">
+            <h3 class="widget-title">
+                Települések {displayTown} megyében
+            </h3>
+        </div>
         <div class="settlements-grid">
             {#each childSettlements as child (child.id)}
                 <a
                     href="/{$page.params.countySlug}-megye/{child.slug}"
-                    class="badge settlement-badge"
+                    class="card sm settlement"
                 >
                     {child.name}
                 </a>
             {/each}
         </div>
-    </aside>
+    </section>
 {/if}
 
 <!-- County Attractions -->
 {#if attractions.length > 0}
-    <aside class="settlements-aside component-box">
-        <h2 class="aside-title">
-            Látnivalók {displayTown} megyében
-        </h2>
+    <section id="latnivalok" class="component-box widget">
+        <div class="widget-header">
+            <h3 class="widget-title">
+                Látnivalók {displayTown} megyében
+            </h3>
+        </div>
         <div class="settlements-grid">
             {#each attractions as att (att.id)}
                 <a
                     href="/{$page.params.countySlug}-megye/{att.slug}"
-                    class="badge settlement-badge"
+                    class="card sm settlement"
                 >
                     {att.name}
                 </a>
             {/each}
         </div>
-    </aside>
+    </section>
 {/if}
 
 <!-- Directory Section -->
@@ -521,13 +536,13 @@
 
     <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
         {#each displayItems as entry}
-            <EntryCard {entry} />
+            <EntryCard {entry} layout={viewMode === "grid" ? "grid" : "list"} />
         {/each}
     </div>
 
     {#if visibleCount < totalCount}
         <div class="load-more">
-            <button class="nav-btn" on:click={loadMore}>
+            <button class="btn nav-btn" on:click={loadMore}>
                 Több betöltése ↓
             </button>
         </div>
@@ -583,10 +598,8 @@
         text-decoration: none;
         color: inherit;
         font-weight: 500;
-        font-size: 1rem;
     }
     .news-meta {
-        font-size: 0.8em;
         color: var(--text-faint);
         margin-top: 0.2rem;
     }
@@ -596,24 +609,15 @@
         border-radius: 12px;
         border: 1px solid var(--border-color);
     }
-    .settlements-aside {
-        margin-bottom: 2rem;
-    }
-    .aside-title {
-        margin-top: 0;
-    }
     .settlements-grid {
         display: flex;
         flex-wrap: wrap;
         gap: 0.8rem;
     }
-    .settlement-badge {
-        text-decoration: none;
-        color: var(--primary-color);
+    .settlement {
         background: var(--bg-body);
         font-weight: 500;
-        padding: 0.5rem 1rem;
-        border: 1px solid var(--border-color);
+        font-size: var(--text-base);
     }
     .widgets-box {
         display: grid;
@@ -643,11 +647,9 @@
     }
     .entry-placeholder-cat,
     .entry-placeholder-loc {
-        font-size: 0.75rem;
         color: var(--text-faint);
     }
     .entry-placeholder-title {
-        font-size: 0.95rem;
         color: var(--text-faint);
         margin-top: 0.5rem;
     }
@@ -663,7 +665,6 @@
         gap: 0.5rem;
     }
     .cw-name {
-        font-size: 0.9rem;
         line-height: 1.2;
     }
     .cw-temp-row {
@@ -673,22 +674,18 @@
         align-items: flex-end;
     }
     .cw-temp {
-        font-size: 1.15rem;
         font-weight: 700;
         line-height: 1;
     }
     .cw-temp-min {
-        font-size: 0.75rem;
         color: var(--text-faint, #999);
         font-weight: 400;
     }
     .cw-icon {
-        font-size: 1.4rem;
         line-height: 1;
         margin-left: auto;
     }
     .cw-desc {
-        font-size: 0.75rem;
         color: var(--text-faint, #666);
         font-style: italic;
     }

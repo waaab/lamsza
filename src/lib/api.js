@@ -10,8 +10,11 @@
 export function getApiBase() {
     const env = import.meta.env.VITE_API_BASE_URL;
     if (env) return String(env).replace(/\/$/, "");
-    if (typeof window !== "undefined") return "";
-    return "http://localhost:3000";
+    /** Same tab as the Svelte app — absolute origin so fetches always resolve (Vite proxy / reverse proxy). */
+    if (typeof window !== "undefined" && window.location?.origin) {
+        return window.location.origin;
+    }
+    return "http://127.0.0.1:3000";
 }
 
 /**
@@ -27,7 +30,7 @@ export async function apiFetch(endpoint, options = {}) {
         : `${base}${endpoint}`;
 
     try {
-        const response = await fetch(url, options);
+        const response = await fetch(url, { credentials: "include", ...options });
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(errorText || `API Error: ${response.status}`);
@@ -37,6 +40,17 @@ export async function apiFetch(endpoint, options = {}) {
         console.error(`Fetch error for ${url}:`, error);
         throw error;
     }
+}
+
+/**
+ * Same-origin API fetch that returns the raw Response (for admin calls that
+ * inspect status / text themselves). Always sends the session cookie.
+ * @param {string} path
+ * @param {RequestInit} [options]
+ */
+export function apiCall(path, options = {}) {
+    const url = path.startsWith("http") ? path : `${getApiBase()}${path}`;
+    return fetch(url, { credentials: "include", ...options });
 }
 
 /**
