@@ -430,3 +430,64 @@ func TestReviewUnpublishedListingStrangerFails(t *testing.T) {
 		t.Fatalf("unpublished stranger POST: expected 404, got %d; body: %s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestMemberPatchRatingsEnabled(t *testing.T) {
+	locID := mustLocID(t)
+	entryID, slug := createEntry(t, "PatchRatings A", locID)
+	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+
+	var typeID, categoryID, locationID int
+	err := db.DB.QueryRow(`
+		SELECT type_id, category_id, location_id
+		FROM entries WHERE id = $1
+	`, int(entryID.(float64))).Scan(&typeID, &categoryID, &locationID)
+	if err != nil {
+		t.Fatalf("entry baseline: %v", err)
+	}
+
+	ownerCookie := mustLogin("owner-ratings@test.lamsza")
+	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	patchBody := map[string]interface{}{
+		"name":            "PatchRatings A",
+		"location_id":     locationID,
+		"category_id":     categoryID,
+		"type_id":         typeID,
+		"ratings_enabled": true,
+	}
+	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), patchBody, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("PATCH ratings_enabled: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry after PATCH: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var entry map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &entry)
+	if entry["ratings_enabled"] != true {
+		t.Fatalf("ratings_enabled: expected true, got %v", entry["ratings_enabled"])
+	}
+
+	strangerCookie := mustLogin("stranger-ratings@test.lamsza")
+	patchBody["ratings_enabled"] = false
+	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), patchBody, strangerCookie)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("stranger PATCH: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry after forbidden PATCH: expected 200, got %d", rr.Code)
+	}
+	json.Unmarshal(rr.Body.Bytes(), &entry)
+	if entry["ratings_enabled"] != true {
+		t.Fatalf("ratings_enabled should stay true after forbidden PATCH, got %v", entry["ratings_enabled"])
+	}
+}

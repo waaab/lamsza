@@ -50,6 +50,7 @@
             hours: emptyWeekHours(),
             delivery_hours: emptyWeekHours(),
             photos: [],
+            ratings_enabled: false,
         };
     }
 
@@ -358,6 +359,7 @@
                 hours: normalizeHours(detail.hours),
                 delivery_hours: normalizeHours(detail.delivery_hours),
                 photos: normalizePhotos(detail.photos),
+                ratings_enabled: Boolean(detail.ratings_enabled),
             };
         } catch {
             listingsError = "A mentés nem sikerült";
@@ -389,6 +391,7 @@
             hours: normalizeHours(form.hours),
             delivery_hours: normalizeHours(form.delivery_hours),
             photos: normalizePhotos(form.photos),
+            ratings_enabled: Boolean(form.ratings_enabled),
         };
     }
 
@@ -1341,6 +1344,11 @@
                             </div>
                         {/if}
                     </div>
+
+                    <label class="profile-listing-flag">
+                        <input type="checkbox" bind:checked={listingForm.ratings_enabled} />
+                        Értékelések
+                    </label>
 
                     <div class="link-dialog-actions">
                         <button type="submit" class="link-dialog-submit">Mentés</button>

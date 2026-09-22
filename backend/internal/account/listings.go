@@ -66,18 +66,19 @@ type createListingBody struct {
 }
 
 type updateListingBody struct {
-	Name          string          `json:"name"`
-	LocationID    int             `json:"location_id"`
-	CategoryID    int             `json:"category_id"`
-	TypeID        int             `json:"type_id"`
-	URL           string          `json:"url"`
-	Phone         string          `json:"phone"`
-	Address       string          `json:"address"`
-	Notes         string          `json:"notes"`
-	Languages     []string        `json:"languages"`
-	Hours         json.RawMessage `json:"hours"`
-	DeliveryHours json.RawMessage `json:"delivery_hours"`
-	Photos        json.RawMessage `json:"photos"`
+	Name           string          `json:"name"`
+	LocationID     int             `json:"location_id"`
+	CategoryID     int             `json:"category_id"`
+	TypeID         int             `json:"type_id"`
+	URL            string          `json:"url"`
+	Phone          string          `json:"phone"`
+	Address        string          `json:"address"`
+	Notes          string          `json:"notes"`
+	Languages      []string        `json:"languages"`
+	Hours          json.RawMessage `json:"hours"`
+	DeliveryHours  json.RawMessage `json:"delivery_hours"`
+	Photos         json.RawMessage `json:"photos"`
+	RatingsEnabled bool            `json:"ratings_enabled"`
 }
 
 type listingItem struct {
@@ -453,21 +454,22 @@ func HandleListingCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 type listingDetailResponse struct {
-	ID            int             `json:"id"`
-	Name          string          `json:"name"`
-	Slug          string          `json:"slug"`
-	LocationID    int             `json:"location_id"`
-	CategoryID    int             `json:"category_id"`
-	TypeID        int             `json:"type_id"`
-	URL           string          `json:"url"`
-	Phone         string          `json:"phone"`
-	Address       string          `json:"address"`
-	Notes         string          `json:"notes"`
-	Languages     []string        `json:"languages"`
-	Hours         json.RawMessage `json:"hours"`
-	DeliveryHours json.RawMessage `json:"delivery_hours"`
-	Photos        json.RawMessage `json:"photos"`
-	Published     bool            `json:"published"`
+	ID             int             `json:"id"`
+	Name           string          `json:"name"`
+	Slug           string          `json:"slug"`
+	LocationID     int             `json:"location_id"`
+	CategoryID     int             `json:"category_id"`
+	TypeID         int             `json:"type_id"`
+	URL            string          `json:"url"`
+	Phone          string          `json:"phone"`
+	Address         string          `json:"address"`
+	Notes          string          `json:"notes"`
+	Languages      []string        `json:"languages"`
+	Hours          json.RawMessage `json:"hours"`
+	DeliveryHours  json.RawMessage `json:"delivery_hours"`
+	Photos         json.RawMessage `json:"photos"`
+	Published      bool            `json:"published"`
+	RatingsEnabled bool            `json:"ratings_enabled"`
 }
 
 func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, idStr string) {
@@ -494,12 +496,12 @@ func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, 
 		SELECT e.id, e.name, COALESCE(e.slug, ''), e.location_id, e.category_id, e.type_id,
 			COALESCE(e.url, ''), COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''),
 			e.languages, COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
-			COALESCE(e.photos, '[]'::jsonb), e.published
+			COALESCE(e.photos, '[]'::jsonb), e.published, COALESCE(e.ratings_enabled, false)
 		FROM entries e
 		WHERE e.id = $1
 	`, entryID).Scan(&detail.ID, &detail.Name, &detail.Slug, &detail.LocationID, &detail.CategoryID, &detail.TypeID,
 		&detail.URL, &detail.Phone, &detail.Address, &detail.Notes, pq.Array(&pqLanguages),
-		&hours, &delivery, &photos, &detail.Published)
+		&hours, &delivery, &photos, &detail.Published, &detail.RatingsEnabled)
 	if err == sql.ErrNoRows {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -820,11 +822,12 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		UPDATE entries SET
 			type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5,
 			url = $6, phone = $7, address = $8, notes = $9, languages = $10,
-			hours = $11::jsonb, delivery_hours = $12::jsonb, photos = $13::jsonb
-		WHERE id = $14
+			hours = $11::jsonb, delivery_hours = $12::jsonb, photos = $13::jsonb,
+			ratings_enabled = $14
+		WHERE id = $15
 	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
 		strings.TrimSpace(body.URL), body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
-		hours, delivery, photos, entryID)
+		hours, delivery, photos, body.RatingsEnabled, entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
