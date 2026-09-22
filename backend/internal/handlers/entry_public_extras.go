@@ -47,7 +47,7 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 		SELECT 
 			r.id,
 			COALESCE(NULLIF(u.name, ''), 'Felhasználó'),
-			COALESCE(u.photo, ''),
+			COALESCE(u.picture, ''),
 			r.score,
 			r.body,
 			r.created_at,
@@ -83,7 +83,7 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 			SELECT 
 				r.id,
 				COALESCE(NULLIF(u.name, ''), 'Felhasználó'),
-				COALESCE(u.photo, ''),
+				COALESCE(u.picture, ''),
 				r.score,
 				r.body,
 				r.created_at,

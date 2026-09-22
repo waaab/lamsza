@@ -54,6 +54,7 @@ func main() {
 	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	mux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	mux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
+	mux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))
 	mux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
 	mux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	mux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
