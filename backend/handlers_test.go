@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/internal/account"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/events"
@@ -24,8 +25,11 @@ func init() {
 	config.Load()
 	db.InitDB()
 	mondasok.Migrate()
+	account.Migrate()
 
 	testMux = http.NewServeMux()
+	testMux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
+	testMux.HandleFunc("/api/account/import", middleware.ApplyCORS(account.HandleImport))
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))

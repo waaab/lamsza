@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"backend/internal/account"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/events"
@@ -29,8 +30,12 @@ func main() {
 	weather.MigrateWeatherTranslations()
 	pages.MigratePages()
 	pagefaq.Migrate()
+	account.Migrate()
 
 	mux := http.DefaultServeMux
+
+	mux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
+	mux.HandleFunc("/api/account/import", middleware.ApplyCORS(account.HandleImport))
 
 	// Core Module (Always Enabled)
 	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
