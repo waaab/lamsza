@@ -9,17 +9,18 @@
     } from "$lib/entryHours.js";
     import {
         ENTRY_PHOTO_SLOTS,
-        demoGallerySlides,
     } from "$lib/entryDemoPhotos.js";
     import { gallerySlides } from "$lib/entryPhotos.js";
+    import {
+        showListingPhotos,
+        showListingHours,
+        showListingDeliveryHours,
+        showListingRatings,
+        showListingTodayHours,
+    } from "$lib/entryPublicExtras.js";
     import EntryStars from "$lib/components/EntryStars.svelte";
     import EntryPhotoGallery from "$lib/components/EntryPhotoGallery.svelte";
-
-    const RECOMMEND_OPTIONS = [
-        { id: "yes", label: "Igen" },
-        { id: "no", label: "Nem" },
-        { id: "maybe", label: "Talán" },
-    ];
+    import EntryReviews from "$lib/components/EntryReviews.svelte";
 
     /** @type {{ entry?: Record<string, any> | null, placeholder?: boolean }} */
     let { entry = null, placeholder = false } = $props();
@@ -82,16 +83,7 @@
     let deliveryHours = $derived(normalizeHours(entry?.delivery_hours));
     let status = $derived(openStatus(hours));
     let deliveryStatus = $derived(openStatus(deliveryHours));
-    let recommend = $state("");
-    let slides = $derived.by(() => {
-        const real = gallerySlides(entry);
-        if (real.length || placeholder) return real;
-        return demoGallerySlides(entry);
-    });
-
-    function setRecommend(id) {
-        recommend = recommend === id ? "" : id;
-    }
+    let slides = $derived(gallerySlides(entry));
 </script>
 
 {#snippet suggestEdit()}
@@ -102,29 +94,6 @@
         </svg>
         Javaslat módosításra
     </button>
-{/snippet}
-
-{#snippet recommendBlock()}
-    <div class="entry-profile__recommend" role="group" aria-labelledby="entry-recommend-label">
-        <p id="entry-recommend-label" class="entry-profile__recommend-label">
-            Ajánlja ezt a vállalkozást?
-        </p>
-        <div class="entry-profile__recommend-opts">
-            {#each RECOMMEND_OPTIONS as option (option.id)}
-                <button
-                    type="button"
-                    class={[
-                        "entry-profile__recommend-btn",
-                        recommend === option.id && "entry-profile__recommend-btn--on",
-                    ]}
-                    aria-pressed={recommend === option.id}
-                    onclick={() => setRecommend(option.id)}
-                >
-                    {option.label}
-                </button>
-            {/each}
-        </div>
-    </div>
 {/snippet}
 
 {#if placeholder}
@@ -219,35 +188,41 @@
                 <span class="entry-profile__dot" aria-hidden="true">·</span>
                 <span class="entry-profile__owned">Foglalt</span>
             {/if}
-            <span class="entry-profile__dot" aria-hidden="true">·</span>
-            <span class="entry-profile__today">Nyitvatartás ma</span>
-            <span
-                class={[
-                    "entry-profile__open",
-                    `entry-profile__open--${status.state}`,
-                ]}
-            >
-                {#if status.state === "unknown"}
-                    <span class="entry-profile__open-detail">—</span>
-                {:else}
-                    <span>{status.label}</span>
-                    <span class="entry-profile__open-detail">{status.detail}</span>
-                {/if}
-            </span>
+            {#if showListingTodayHours(entry)}
+                <span class="entry-profile__dot" aria-hidden="true">·</span>
+                <span class="entry-profile__today">Nyitvatartás ma</span>
+                <span
+                    class={[
+                        "entry-profile__open",
+                        `entry-profile__open--${status.state}`,
+                    ]}
+                >
+                    {#if status.state === "unknown"}
+                        <span class="entry-profile__open-detail">—</span>
+                    {:else}
+                        <span>{status.label}</span>
+                        <span class="entry-profile__open-detail">{status.detail}</span>
+                    {/if}
+                </span>
+            {/if}
         </p>
-        <div class="entry-profile__rating">
-            <EntryStars {rating} size={18} />
-            <span class="entry-profile__score">{ratingLabel}</span>
-            <span class="entry-profile__count">({reviewCountLabel})</span>
-        </div>
+        {#if showListingRatings(entry)}
+            <div class="entry-profile__rating">
+                <EntryStars {rating} size={18} />
+                <span class="entry-profile__score">{ratingLabel}</span>
+                <span class="entry-profile__count">({reviewCountLabel})</span>
+            </div>
+        {/if}
     </header>
 
     <div class="entry-profile__layout">
         <div class="entry-profile__main">
-            <section class="entry-profile__section" aria-labelledby="entry-photos-title">
-                <h2 id="entry-photos-title" class="entry-profile__section-title">Fotók</h2>
-                <EntryPhotoGallery slides={slides} label={`${entry.name} fotói`} />
-            </section>
+            {#if showListingPhotos(entry)}
+                <section class="entry-profile__section" aria-labelledby="entry-photos-title">
+                    <h2 id="entry-photos-title" class="entry-profile__section-title">Fotók</h2>
+                    <EntryPhotoGallery slides={slides} label={`${entry.name} fotói`} />
+                </section>
+            {/if}
 
             <section class="entry-profile__section" aria-labelledby="entry-services-title">
                 <h2 id="entry-services-title" class="entry-profile__section-title">
@@ -307,65 +282,51 @@
                         >Útvonal</a>
                     {/if}
                 </div>
-                <div class="entry-profile__hours-block">
-                    <h3 class="entry-profile__hours-title">Nyitvatartás</h3>
-                    <p class={["entry-profile__hours-now", `entry-profile__open--${status.state}`]}>
-                        {status.state === "unknown" ? "Nyitvatartás ma" : status.label}
-                        <span class="entry-profile__open-detail">{status.detail}</span>
-                    </p>
-                    <table class="entry-profile__hours">
-                        <tbody>
-                            {#each WEEKDAYS as day (day.key)}
-                                <tr>
-                                    <th scope="row">{day.label}</th>
-                                    <td>{formatDayHours(hours[day.key])}</td>
-                                </tr>
-                            {/each}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="entry-profile__hours-block">
-                    <h3 class="entry-profile__hours-title">Kiszállítás</h3>
-                    <p class={["entry-profile__hours-now", `entry-profile__open--${deliveryStatus.state}`]}>
-                        {deliveryStatus.state === "unknown" ? "Kiszállítási idő" : deliveryStatus.label}
-                        <span class="entry-profile__open-detail">{deliveryStatus.detail}</span>
-                    </p>
-                    <table class="entry-profile__hours">
-                        <tbody>
-                            {#each WEEKDAYS as day (day.key)}
-                                <tr>
-                                    <th scope="row">{day.label}</th>
-                                    <td>{formatDayHours(deliveryHours[day.key])}</td>
-                                </tr>
-                            {/each}
-                        </tbody>
-                    </table>
-                </div>
+                {#if showListingHours(entry)}
+                    <div class="entry-profile__hours-block">
+                        <h3 class="entry-profile__hours-title">Nyitvatartás</h3>
+                        <p class={["entry-profile__hours-now", `entry-profile__open--${status.state}`]}>
+                            {status.state === "unknown" ? "Nyitvatartás ma" : status.label}
+                            <span class="entry-profile__open-detail">{status.detail}</span>
+                        </p>
+                        <table class="entry-profile__hours">
+                            <tbody>
+                                {#each WEEKDAYS as day (day.key)}
+                                    <tr>
+                                        <th scope="row">{day.label}</th>
+                                        <td>{formatDayHours(hours[day.key])}</td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
+                {#if showListingDeliveryHours(entry)}
+                    <div class="entry-profile__hours-block">
+                        <h3 class="entry-profile__hours-title">Kiszállítás</h3>
+                        <p class={["entry-profile__hours-now", `entry-profile__open--${deliveryStatus.state}`]}>
+                            {deliveryStatus.state === "unknown" ? "Kiszállítási idő" : deliveryStatus.label}
+                            <span class="entry-profile__open-detail">{deliveryStatus.detail}</span>
+                        </p>
+                        <table class="entry-profile__hours">
+                            <tbody>
+                                {#each WEEKDAYS as day (day.key)}
+                                    <tr>
+                                        <th scope="row">{day.label}</th>
+                                        <td>{formatDayHours(deliveryHours[day.key])}</td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                {/if}
             </section>
 
-            <section class="entry-profile__section" aria-labelledby="entry-reviews-title">
-                <h2 id="entry-reviews-title" class="entry-profile__section-title">
-                    Értékelések
-                </h2>
-                <div class="entry-profile__review-card">
-                    <div class="entry-profile__review-avatar" aria-hidden="true">
-                        {initials.slice(0, 1)}
-                    </div>
-                    <div class="entry-profile__review-body">
-                        <div class="entry-profile__rating">
-                            <EntryStars {rating} />
-                            <span class="entry-profile__count">{reviewCountLabel}</span>
-                        </div>
-                        {#if featuredReview}
-                            <p class="entry-profile__review-text">„{featuredReview}”</p>
-                        {:else}
-                            <p class="entry-profile__empty">
-                                Még nincs értékelés. A vélemények később itt jelennek meg.
-                            </p>
-                        {/if}
-                    </div>
-                </div>
-            </section>
+            {#if showListingRatings(entry)}
+                <section class="entry-profile__section" aria-labelledby="entry-reviews-title">
+                    <EntryReviews {entry} />
+                </section>
+            {/if}
         </div>
 
         <aside class="entry-profile__aside" aria-label="Elérhetőség">
@@ -466,7 +427,6 @@
                 <div class="entry-profile__contact-row entry-profile__contact-row--static">
                     {@render suggestEdit()}
                 </div>
-                {@render recommendBlock()}
             </div>
         </aside>
     </div>
@@ -555,41 +515,6 @@
     }
     .entry-profile__count {
         color: var(--text-muted);
-    }
-    .entry-profile__recommend {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.55rem;
-        padding: 0.9rem 1rem 1rem;
-        border-top: 1px solid var(--border-color);
-    }
-    .entry-profile__recommend-label {
-        margin: 0;
-        font-weight: 600;
-        color: var(--text-primary);
-    }
-    .entry-profile__recommend-opts {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.45rem;
-    }
-    .entry-profile__recommend-btn {
-        appearance: none;
-        border: 1px solid var(--border-color);
-        background: var(--card-bg);
-        color: var(--text-secondary);
-        border-radius: 999px;
-        padding: 0.28rem 0.85rem;
-        font: inherit;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    .entry-profile__recommend-btn--on,
-    .entry-profile__recommend-btn:hover {
-        border-color: var(--szekely-green);
-        color: var(--szekely-green);
-        background: color-mix(in srgb, var(--szekely-green) 10%, var(--card-bg));
     }
     .entry-profile__layout {
         display: grid;
