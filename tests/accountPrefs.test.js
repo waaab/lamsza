@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildImportPayload, meToAuthState } from "../src/lib/accountPrefs.js";
+import {
+    buildImportPayload,
+    meToAuthState,
+    profileTabIds,
+} from "../src/lib/accountPrefs.js";
 
 test("buildImportPayload copies browser prefs", () => {
     const payload = buildImportPayload({
@@ -45,6 +49,10 @@ test("buildImportPayload drops history rows missing slug or name", () => {
     });
     assert.equal(payload.history.length, 1);
     assert.equal(payload.history[0].slug, "kavezo");
+});
+
+test("profileTabIds are the account tabs", () => {
+    assert.deepEqual(profileTabIds, ["profil", "beallitasok", "linkjeim", "elozmenyek"]);
 });
 
 test("meToAuthState maps google fields", () => {

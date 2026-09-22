@@ -9,6 +9,7 @@
     import { auth } from "$lib/stores/auth";
     import { theme, cycleTheme, LABELS } from "$lib/stores/theme";
     import { fade } from "svelte/transition";
+    import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
 
     let settingsOpen = false;
     let scrollY = 0;
@@ -19,7 +20,9 @@
     const ADMIN_PASSWORD = "szekely123";
 
     onMount(() => {
+        const stopLoginListener = listenForOpenLogin(openLoginDialog);
         auth.init();
+        return stopLoginListener;
     });
 
     function toggleSettings() {
@@ -281,7 +284,7 @@
     </div>
     <div class="nav">
         {#if $auth.loggedIn}
-            <span class="nav-admin-user" title="{$auth.user} bejelentkezve">{$auth.user}</span>
+            <a class="nav-admin-user" href="/profil" title="{$auth.user} bejelentkezve">{$auth.user}</a>
             {#if $auth.isAdmin}
             <button
                 type="button"
@@ -333,7 +336,7 @@
                 type="button"
                 class="nav-btn"
                 title="Belépés"
-                on:click={openLoginDialog}
+                on:click={openLogin}
             >
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
