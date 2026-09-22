@@ -731,6 +731,122 @@ func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	}
 }
 
+func TestMemberCanPatchListing(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/locations", nil)
+	var locs []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &locs)
+	if len(locs) == 0 {
+		t.Skip("No locations in DB; cannot test patch")
+	}
+	locID := locs[0]["id"]
+
+	payload := map[string]interface{}{
+		"name":        "Patch Test Entry",
+		"location_id": locID,
+		"type":        "entry",
+		"category":    "Egyéb",
+		"verified":    true,
+	}
+	rr = doRequest(t, "POST", "/api/admin/entries", payload)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	entryID := created["id"]
+	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+
+	var typeID, categoryID, locationID int
+	var published, verified bool
+	err := db.DB.QueryRow(`
+		SELECT type_id, category_id, location_id, published, verified
+		FROM entries WHERE id = $1
+	`, int(entryID.(float64))).Scan(&typeID, &categoryID, &locationID, &published, &verified)
+	if err != nil {
+		t.Fatalf("entry baseline: %v", err)
+	}
+
+	ownerCookie := mustLogin("owner@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	memberCookie := mustLogin("member@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, memberCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("member claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	var memberUserID int
+	err = db.DB.QueryRow(`SELECT id FROM users WHERE email = $1`, "member@test.lamsza").Scan(&memberUserID)
+	if err != nil {
+		t.Fatalf("member user id: %v", err)
+	}
+	_, err = db.DB.Exec(`UPDATE entry_members SET status = 'active' WHERE entry_id = $1 AND user_id = $2`, int(entryID.(float64)), memberUserID)
+	if err != nil {
+		t.Fatalf("activate member: %v", err)
+	}
+
+	patchBody := map[string]interface{}{
+		"name":          "Patched Member Name",
+		"location_id":   locationID,
+		"category_id":   categoryID,
+		"type_id":       typeID,
+		"photos":        []map[string]interface{}{{"url": "javascript:alert(1)", "alt": "x"}},
+	}
+	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), patchBody, memberCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("member PATCH listing: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doRequest(t, "GET", "/api/admin/entries", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET admin entries: expected 200, got %d", rr.Code)
+	}
+	var entries []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &entries)
+	var found map[string]interface{}
+	for _, e := range entries {
+		if e["id"] == entryID {
+			found = e
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("patched entry not found in admin list")
+	}
+	if found["name"] != "Patched Member Name" {
+		t.Fatalf("patched name: expected Patched Member Name, got %v", found["name"])
+	}
+
+	var gotPublished, gotVerified bool
+	var photosJSON string
+	err = db.DB.QueryRow(`SELECT published, verified, photos::text FROM entries WHERE id = $1`, int(entryID.(float64))).Scan(&gotPublished, &gotVerified, &photosJSON)
+	if err != nil {
+		t.Fatalf("entry after patch: %v", err)
+	}
+	if gotPublished != published {
+		t.Fatalf("published should stay %v, got %v", published, gotPublished)
+	}
+	if gotVerified != verified {
+		t.Fatalf("verified should stay %v, got %v", verified, gotVerified)
+	}
+	if photosJSON != "[]" {
+		t.Fatalf("javascript photo should be dropped, got photos %s", photosJSON)
+	}
+
+	strangerCookie := mustLogin("stranger@test.lamsza")
+	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), patchBody, strangerCookie)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("non-member PATCH listing: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestMemberCannotDeleteListing(t *testing.T) {
 	rr := doRequest(t, "GET", "/api/locations", nil)
 	var locs []map[string]interface{}

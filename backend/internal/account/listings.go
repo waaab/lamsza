@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/lib/pq"
 )
@@ -121,11 +123,92 @@ func isActiveOwner(role, status string) bool {
 	return role == "owner" && status == "active"
 }
 
+const maxListingPhotos = 24
+const maxListingPhotoTextRunes = 500
+const defaultListingPhotoWidth = 1200
+const defaultListingPhotoHeight = 800
+
+type listingPhoto struct {
+	URL         string `json:"url"`
+	Alt         string `json:"alt"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Width       int    `json:"width"`
+	Height      int    `json:"height"`
+}
+
 func photosOrEmpty(raw json.RawMessage) string {
-	if len(raw) == 0 {
-		return "[]"
+	return string(sanitizeListingPhotos(raw))
+}
+
+func sanitizeListingPhotos(raw json.RawMessage) json.RawMessage {
+	raw = photosArrayOrEmpty(raw)
+	var in []listingPhoto
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return json.RawMessage(`[]`)
 	}
-	return string(raw)
+	out := make([]listingPhoto, 0, len(in))
+	for _, p := range in {
+		if len(out) >= maxListingPhotos {
+			break
+		}
+		url := strings.TrimSpace(p.URL)
+		if !validListingPhotoURL(url) {
+			continue
+		}
+		w, h := p.Width, p.Height
+		if w < 1 || w > 10000 {
+			w = defaultListingPhotoWidth
+		}
+		if h < 1 || h > 10000 {
+			h = defaultListingPhotoHeight
+		}
+		out = append(out, listingPhoto{
+			URL:         url,
+			Alt:         clipListingPhotoRunes(strings.TrimSpace(p.Alt), maxListingPhotoTextRunes),
+			Title:       clipListingPhotoRunes(strings.TrimSpace(p.Title), maxListingPhotoTextRunes),
+			Description: clipListingPhotoRunes(strings.TrimSpace(p.Description), maxListingPhotoTextRunes),
+			Width:       w,
+			Height:      h,
+		})
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return json.RawMessage(`[]`)
+	}
+	return json.RawMessage(b)
+}
+
+func photosArrayOrEmpty(b []byte) json.RawMessage {
+	s := strings.TrimSpace(string(b))
+	if s == "" || s == "null" {
+		return json.RawMessage(`[]`)
+	}
+	if !json.Valid(b) || !strings.HasPrefix(s, "[") {
+		return json.RawMessage(`[]`)
+	}
+	return json.RawMessage(b)
+}
+
+func validListingPhotoURL(u string) bool {
+	if u == "" {
+		return false
+	}
+	lower := strings.ToLower(u)
+	if strings.HasPrefix(lower, "javascript:") || strings.HasPrefix(lower, "data:") {
+		return false
+	}
+	if strings.Contains(u, "://") && !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return false
+	}
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") || !strings.Contains(u, "://")
+}
+
+func clipListingPhotoRunes(s string, max int) string {
+	if utf8.RuneCountInString(s) <= max {
+		return s
+	}
+	return string([]rune(s)[:max])
 }
 
 func scanMembership(tx *sql.Tx, entryID, userID int) (membershipResponse, bool, error) {
