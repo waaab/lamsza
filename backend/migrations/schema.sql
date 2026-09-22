@@ -101,3 +101,29 @@ INSERT INTO news_feeds (title, feed_url, bg_color) VALUES
 ('Erdély.ma', 'https://www.erdely.ma/rss', '#ffe6e6'),
 ('Bihari Napló', 'https://biharinaplo.ro/rss', '#f5e6ff')
 ON CONFLICT DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    google_sub VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL DEFAULT '',
+    given_name VARCHAR(255) NOT NULL DEFAULT '',
+    family_name VARCHAR(255) NOT NULL DEFAULT '',
+    picture TEXT NOT NULL DEFAULT '',
+    locale VARCHAR(35) NOT NULL DEFAULT '',
+    theme VARCHAR(16),
+    quicklink_slots INTEGER,
+    prefs_imported_at TIMESTAMP,
+    last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash CHAR(64) PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
