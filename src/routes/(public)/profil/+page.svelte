@@ -96,9 +96,6 @@
     }
 
     onMount(() => {
-        if (!get(auth).loggedIn) {
-            openLogin();
-        }
         let accountDataLoaded = false;
         const unsubscribe = auth.subscribe((state) => {
             if (!state.loggedIn) {
@@ -111,6 +108,14 @@
             void loadLinks();
             void loadHistory();
         });
+
+        void (async () => {
+            await auth.init();
+            if (!get(auth).loggedIn) {
+                openLogin();
+            }
+        })();
+
         return unsubscribe;
     });
 
