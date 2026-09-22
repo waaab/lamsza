@@ -22,14 +22,23 @@ function persistThemeToAccount(newTheme) {
     }).catch(() => {});
 }
 
-export function applyTheme(newTheme) {
-    if (newTheme === "system") {
-        document.documentElement.removeAttribute("data-theme");
-    } else {
-        document.documentElement.setAttribute("data-theme", newTheme);
+/** Apply theme in the browser without persisting to the account. */
+export function applyThemeLocal(newTheme) {
+    if (typeof document !== "undefined") {
+        if (newTheme === "system") {
+            document.documentElement.removeAttribute("data-theme");
+        } else {
+            document.documentElement.setAttribute("data-theme", newTheme);
+        }
     }
     theme.set(newTheme);
-    localStorage.setItem("theme", newTheme);
+    if (typeof localStorage !== "undefined") {
+        localStorage.setItem("theme", newTheme);
+    }
+}
+
+export function applyTheme(newTheme) {
+    applyThemeLocal(newTheme);
     persistThemeToAccount(newTheme);
 }
 

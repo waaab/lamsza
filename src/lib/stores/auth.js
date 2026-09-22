@@ -3,6 +3,7 @@ import { getApiBase } from "$lib/api.js";
 import { buildImportPayload, meToAuthState } from "$lib/accountPrefs.js";
 import { readHistory } from "$lib/entryHistory.js";
 import { readSlotCount } from "$lib/quickLinksDisplay.js";
+import { applyThemeLocal } from "$lib/stores/theme.js";
 
 const empty = {
     loggedIn: false,
@@ -21,6 +22,8 @@ const empty = {
     prefsImportedAt: null,
     adminQueueCount: 0,
 };
+
+const ACCOUNT_THEMES = new Set(["light", "dark", "system"]);
 
 function clearLegacyStorage() {
     if (typeof window === "undefined") return;
@@ -55,61 +58,81 @@ function readBrowserImportInput() {
     };
 }
 
+function applyAccountTheme(themeValue) {
+    if (themeValue && ACCOUNT_THEMES.has(themeValue)) {
+        applyThemeLocal(themeValue);
+    }
+}
+
 function createAuthStore() {
     const { subscribe, set } = writable(empty);
+    /** @type {Promise<typeof empty> | null} */
+    let refreshPromise = null;
 
     async function refresh() {
         if (typeof window === "undefined") {
             set(empty);
             return empty;
         }
-        clearLegacyStorage();
-        try {
-            const res = await fetch(`${getApiBase()}/api/auth/me`, {
-                credentials: "include",
-            });
-            if (!res.ok) {
+        if (refreshPromise) {
+            return refreshPromise;
+        }
+
+        refreshPromise = (async () => {
+            clearLegacyStorage();
+            try {
+                const res = await fetch(`${getApiBase()}/api/auth/me`, {
+                    credentials: "include",
+                });
+                if (!res.ok) {
+                    set(empty);
+                    return empty;
+                }
+                const me = await res.json();
+                const next = meToAuthState(me);
+                set(next);
+                applyAccountTheme(next.theme);
+
+                if (next.prefsImportedAt == null && typeof localStorage !== "undefined") {
+                    try {
+                        const importRes = await fetch(`${getApiBase()}/api/account/import`, {
+                            method: "POST",
+                            credentials: "include",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(
+                                buildImportPayload(readBrowserImportInput()),
+                            ),
+                        });
+                        if (importRes.ok) {
+                            try {
+                                const meRes = await fetch(`${getApiBase()}/api/auth/me`, {
+                                    credentials: "include",
+                                });
+                                if (meRes.ok) {
+                                    const updated = meToAuthState(await meRes.json());
+                                    set(updated);
+                                    applyAccountTheme(updated.theme);
+                                    return updated;
+                                }
+                            } catch {
+                                /* keep pre-import session */
+                            }
+                        }
+                    } catch {
+                        /* keep session; prefsImportedAt stays null */
+                    }
+                }
+
+                return next;
+            } catch {
                 set(empty);
                 return empty;
+            } finally {
+                refreshPromise = null;
             }
-            const me = await res.json();
-            const next = meToAuthState(me);
-            set(next);
+        })();
 
-            if (next.prefsImportedAt == null && typeof localStorage !== "undefined") {
-                try {
-                    const importRes = await fetch(`${getApiBase()}/api/account/import`, {
-                        method: "POST",
-                        credentials: "include",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(
-                            buildImportPayload(readBrowserImportInput()),
-                        ),
-                    });
-                    if (importRes.ok) {
-                        try {
-                            const meRes = await fetch(`${getApiBase()}/api/auth/me`, {
-                                credentials: "include",
-                            });
-                            if (meRes.ok) {
-                                const updated = meToAuthState(await meRes.json());
-                                set(updated);
-                                return updated;
-                            }
-                        } catch {
-                            /* keep pre-import session */
-                        }
-                    }
-                } catch {
-                    /* keep session; prefsImportedAt stays null */
-                }
-            }
-
-            return next;
-        } catch {
-            set(empty);
-            return empty;
-        }
+        return refreshPromise;
     }
 
     return {

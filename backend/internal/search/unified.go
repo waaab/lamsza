@@ -181,6 +181,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+			  AND e.published = true
 			GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de
 			ORDER BY is_direct_match DESC, rank DESC, e.name ASC
 			LIMIT 20

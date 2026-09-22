@@ -424,6 +424,10 @@
 
     /** @param {Record<string, unknown>} row */
     async function deleteListingRow(row) {
+        const label = String(row.name ?? "").trim() || "ezt a bejegyzést";
+        if (!confirm(`Biztosan törlöd: ${label}?`)) {
+            return;
+        }
         listingsError = "";
         const prev = accountListings;
         const entryId = Number(row.id);

@@ -120,14 +120,27 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var body importBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
 	var (
 		theme           sql.NullString
 		quicklinkSlots  sql.NullInt64
 		prefsImportedAt sql.NullTime
 	)
-	err = db.DB.QueryRow(`
+	err = tx.QueryRow(`
 		SELECT theme, quicklink_slots, prefs_imported_at
-		FROM users WHERE id = $1
+		FROM users WHERE id = $1 FOR UPDATE
 	`, u.ID).Scan(&theme, &quicklinkSlots, &prefsImportedAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -135,15 +148,13 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if prefsImportedAt.Valid {
+		if err := tx.Commit(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 		if err := auth.WriteMe(w, u.ID); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		return
-	}
-
-	var body importBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
 
@@ -163,13 +174,6 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 		args = append(args, ClampSlots(*body.QuicklinkSlots))
 		argN++
 	}
-
-	tx, err := db.DB.Begin()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback()
 
 	var linkCount int
 	if err := tx.QueryRow(`SELECT COUNT(*) FROM user_links WHERE user_id = $1`, u.ID).Scan(&linkCount); err != nil {

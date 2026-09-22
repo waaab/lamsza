@@ -6,6 +6,7 @@ import (
 	"backend/internal/utils"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -189,6 +190,37 @@ func photosArrayOrEmpty(b []byte) json.RawMessage {
 		return json.RawMessage(`[]`)
 	}
 	return json.RawMessage(b)
+}
+
+func validListingURL(u string) bool {
+	u = strings.TrimSpace(u)
+	if u == "" {
+		return true
+	}
+	lower := strings.ToLower(u)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
+}
+
+func nextUniqueEntrySlug(tx *sql.Tx, base string) (string, error) {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		return "", fmt.Errorf("empty slug")
+	}
+	for i := 0; i < 100; i++ {
+		candidate := base
+		if i > 0 {
+			candidate = fmt.Sprintf("%s-%d", base, i+1)
+		}
+		var existingID int
+		err := tx.QueryRow(`SELECT id FROM entries WHERE slug = $1`, candidate).Scan(&existingID)
+		if err == sql.ErrNoRows {
+			return candidate, nil
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	return "", fmt.Errorf("could not allocate unique slug")
 }
 
 func validListingPhotoURL(u string) bool {
@@ -660,6 +692,10 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	if len(body.Languages) == 0 {
 		body.Languages = []string{"HU"}
 	}
+	if !validListingURL(body.URL) {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
 
 	var catName string
 	err := db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
@@ -672,7 +708,11 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
-	slug := utils.Slugify(body.Name)
+	baseSlug := utils.Slugify(body.Name)
+	if baseSlug == "" {
+		http.Error(w, "invalid name", http.StatusBadRequest)
+		return
+	}
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
 
@@ -683,12 +723,18 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 	defer tx.Rollback()
 
+	slug, err := nextUniqueEntrySlug(tx, baseSlug)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	var entryID int
 	err = tx.QueryRow(`
 		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, delivery_hours, photos)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, '[]'::jsonb)
 		RETURNING id
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, body.URL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery).Scan(&entryID)
+	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, strings.TrimSpace(body.URL), body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery).Scan(&entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -750,6 +796,10 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	if len(body.Languages) == 0 {
 		body.Languages = []string{"HU"}
 	}
+	if !validListingURL(body.URL) {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
 
 	var catName string
 	err = db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
@@ -762,19 +812,18 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
-	slug := utils.Slugify(body.Name)
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
 	photos := photosOrEmpty(body.Photos)
 
 	_, err = db.DB.Exec(`
 		UPDATE entries SET
-			type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5, slug = $6,
-			url = $7, phone = $8, address = $9, notes = $10, languages = $11,
-			hours = $12::jsonb, delivery_hours = $13::jsonb, photos = $14::jsonb
-		WHERE id = $15
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug,
-		body.URL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
+			type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5,
+			url = $6, phone = $7, address = $8, notes = $9, languages = $10,
+			hours = $11::jsonb, delivery_hours = $12::jsonb, photos = $13::jsonb
+		WHERE id = $14
+	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
+		strings.TrimSpace(body.URL), body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
 		hours, delivery, photos, entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

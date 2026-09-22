@@ -1037,6 +1037,76 @@ func TestMemberCannotDeleteListing(t *testing.T) {
 	}
 }
 
+func TestListingRejectsInvalidURL(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/locations", nil)
+	var locs []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &locs)
+	if len(locs) == 0 {
+		t.Skip("No locations in DB; cannot test listing url validation")
+	}
+	locID := locs[0]["id"]
+
+	var categoryID, typeID int
+	if err := db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skip("No entry categories in DB; cannot test listing url validation")
+	}
+	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {
+		t.Skip("No entry types in DB; cannot test listing url validation")
+	}
+
+	userCookie := mustLogin("url-test@test.lamsza")
+	createBody := map[string]interface{}{
+		"name":        "URL Test Entry",
+		"location_id": locID,
+		"category_id": categoryID,
+		"type_id":     typeID,
+		"url":         "javascript:alert(1)",
+	}
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings", createBody, userCookie)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("POST with javascript url: expected 400, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	createBody["url"] = "https://example.com"
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings", createBody, userCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST with https url: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	entryID := created["id"]
+	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+
+	var storedURL string
+	err := db.DB.QueryRow(`SELECT COALESCE(url, '') FROM entries WHERE id = $1`, int(entryID.(float64))).Scan(&storedURL)
+	if err != nil {
+		t.Fatalf("select url: %v", err)
+	}
+	if storedURL != "https://example.com" {
+		t.Fatalf("stored url: expected https://example.com, got %q", storedURL)
+	}
+
+	patchBody := map[string]interface{}{
+		"name":        "URL Test Entry",
+		"location_id": locID,
+		"category_id": categoryID,
+		"type_id":     typeID,
+		"url":         "javascript:alert(1)",
+	}
+	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), patchBody, userCookie)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("PATCH with javascript url: expected 400, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	err = db.DB.QueryRow(`SELECT COALESCE(url, '') FROM entries WHERE id = $1`, int(entryID.(float64))).Scan(&storedURL)
+	if err != nil {
+		t.Fatalf("select url after patch reject: %v", err)
+	}
+	if storedURL != "https://example.com" {
+		t.Fatalf("url should be unchanged after rejected PATCH, got %q", storedURL)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
