@@ -318,6 +318,18 @@ func WriteMe(w http.ResponseWriter, userID int) error {
 	} else {
 		resp["prefs_imported_at"] = nil
 	}
+	if IsAdmin(email) {
+		var queueCount int
+		err = db.DB.QueryRow(`
+			SELECT
+			  (SELECT COUNT(*) FROM entries WHERE published = false) +
+			  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending')
+		`).Scan(&queueCount)
+		if err != nil {
+			return err
+		}
+		resp["admin_queue_count"] = queueCount
+	}
 	w.Header().Set("Content-Type", "application/json")
 	return json.NewEncoder(w).Encode(resp)
 }

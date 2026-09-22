@@ -19,6 +19,7 @@ const empty = {
     theme: null,
     quicklinkSlots: null,
     prefsImportedAt: null,
+    adminQueueCount: 0,
 };
 
 function clearLegacyStorage() {

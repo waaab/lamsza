@@ -288,10 +288,13 @@
             {#if $auth.isAdmin}
             <button
                 type="button"
-                class="nav-btn {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
+                class="nav-btn nav-btn--admin {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
                 title="Admin panel"
                 on:click={() => goto('/admin')}
             >
+                {#if $auth.adminQueueCount > 0}
+                    <span class="nav-admin-badge" aria-label="{$auth.adminQueueCount} jóváhagyásra vár">{$auth.adminQueueCount}</span>
+                {/if}
                 <span class="sr-only">Admin</span>
                 <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -486,3 +489,25 @@
         ↑
     </button>
 {/if}
+<style>
+    .nav-btn--admin {
+        position: relative;
+    }
+
+    .nav-admin-badge {
+        position: absolute;
+        top: -0.35rem;
+        right: -0.35rem;
+        min-width: 1.1rem;
+        height: 1.1rem;
+        padding: 0 0.25rem;
+        border-radius: 999px;
+        background: var(--szekely-red, #c8102e);
+        color: #fff;
+        font-size: 0.65rem;
+        font-weight: 700;
+        line-height: 1.1rem;
+        text-align: center;
+        pointer-events: none;
+    }
+</style>

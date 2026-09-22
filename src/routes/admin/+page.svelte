@@ -256,7 +256,10 @@
     let editingPage = null;
     let pageSaving = false;
     let editingPageFaq = null;
-    let pageFaqSaving = false;
+
+    let listingQueueUnpublished = [];
+    let listingQueueMembers = [];
+    let listingQueueError = "";
 
     function filterOrganizers(query, target) {
         if (!query || query.length < 2) return [];
@@ -389,6 +392,69 @@
         password = "";
         auth.logout();
         window.location.href = "/";
+    }
+
+
+    async function fetchListingQueue() {
+        listingQueueError = "";
+        try {
+            const res = await fetch(`${getBase()}/api/admin/listing-queue`, { credentials: "include" });
+            if (!res.ok) {
+                listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+                return;
+            }
+            const data = await res.json();
+            listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
+            listingQueueMembers = Array.isArray(data.members) ? data.members : [];
+        } catch (e) {
+            listingQueueError = String(e?.message || e);
+            console.error(e);
+        }
+    }
+
+    async function publishListingQueueEntry(entryId) {
+        const res = await fetch(`${getBase()}/api/admin/listing-queue/publish`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    async function approveListingQueueMember(entryId, userId) {
+        const res = await fetch(`${getBase()}/api/admin/listing-queue/member`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "approve" }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    async function rejectListingQueueMember(entryId, userId) {
+        const res = await fetch(`${getBase()}/api/admin/listing-queue/member`, {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "reject" }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
     }
 
     async function fetchAll() {
@@ -2177,6 +2243,82 @@
                             {/each}
                         </div>
                     </div>
+
+                    <section class="admin-listing-queue" aria-labelledby="listing-queue-title">
+                        <h3 id="listing-queue-title">Bejegyzés-jóváhagyások</h3>
+                        {#if listingQueueError}
+                            <div class="admin-alert admin-alert--error" role="alert">
+                                {listingQueueError}
+                            </div>
+                        {/if}
+                        {#if listingQueueUnpublished.length === 0 && listingQueueMembers.length === 0}
+                            <p class="admin-info">Nincs jóváhagyásra váró bejegyzés vagy tag.</p>
+                        {:else}
+                            {#if listingQueueUnpublished.length > 0}
+                                <h4>Közzétételre váró bejegyzések</h4>
+                                <div class="admin-table-wrapper">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Név</th>
+                                                <th>Tulajdonos</th>
+                                                <th class="admin-table-col--action">Művelet</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each listingQueueUnpublished as row}
+                                                <tr>
+                                                    <td>{row.name}</td>
+                                                    <td>{row.owner_email || "—"}</td>
+                                                    <td class="admin-table-col--action">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={() => publishListingQueueEntry(row.id)}
+                                                        >Közzététel</button>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {/if}
+                            {#if listingQueueMembers.length > 0}
+                                <h4>Tag-jelentkezések</h4>
+                                <div class="admin-table-wrapper">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Bejegyzés</th>
+                                                <th>Felhasználó</th>
+                                                <th class="admin-table-col--action">Művelet</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each listingQueueMembers as row}
+                                                <tr>
+                                                    <td>{row.entry_name}</td>
+                                                    <td>{row.email}</td>
+                                                    <td class="admin-table-col--action">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={() => approveListingQueueMember(row.entry_id, row.user_id)}
+                                                        >Elfogadás</button>
+                                                        <button
+                                                            type="button"
+                                                            class="btn-logout"
+                                                            on:click={() => rejectListingQueueMember(row.entry_id, row.user_id)}
+                                                        >Elutasítás</button>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {/if}
+                        {/if}
+                    </section>
                 {/if}
 
                 <!-- Mondások Tab -->

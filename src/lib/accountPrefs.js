@@ -59,5 +59,6 @@ export function meToAuthState(me) {
         theme: me.theme ?? null,
         quicklinkSlots: me.quicklink_slots ?? null,
         prefsImportedAt: me.prefs_imported_at ?? null,
+        adminQueueCount: me.admin_queue_count ?? 0,
     };
 }

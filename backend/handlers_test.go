@@ -21,6 +21,7 @@ import (
 )
 
 var testMux *http.ServeMux
+var testAdminCookie *http.Cookie
 
 func init() {
 	config.Load()
@@ -32,6 +33,10 @@ func init() {
 	handlers.MigrateEntryVerified()
 	auth.Migrate()
 	account.Migrate()
+
+	admin := func(h http.HandlerFunc) http.HandlerFunc {
+		return middleware.ApplyCORS(auth.RequireAdmin(h))
+	}
 
 	testMux = http.NewServeMux()
 	testMux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
@@ -49,6 +54,9 @@ func init() {
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	testMux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
+	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
+	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
 	testMux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
 	testMux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	testMux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
@@ -64,6 +72,8 @@ func init() {
 	testMux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
+
+	testAdminCookie = mustLogin("admin@test.lamsza")
 }
 
 func mustLogin(email string) *http.Cookie {
@@ -654,6 +664,109 @@ func TestProxyMissingURL(t *testing.T) {
 	rr := doRequest(t, "GET", "/api/proxy", nil)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("Proxy without url: expected 400, got %d", rr.Code)
+	}
+}
+
+
+func TestAdminPublishDoesNotVerify(t *testing.T) {
+	rr := doRequestWithCookie(t, "GET", "/api/locations", nil, testAdminCookie)
+	var locs []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &locs)
+	if len(locs) == 0 {
+		t.Skip("No locations in DB; cannot test admin publish queue")
+	}
+	locID := locs[0]["id"]
+
+	var categoryID, typeID int
+	if err := db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
+		t.Skip("No entry categories in DB; cannot test admin publish queue")
+	}
+	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {
+		t.Skip("No entry types in DB; cannot test admin publish queue")
+	}
+
+	userCookie := mustLogin("queue-owner@test.lamsza")
+	createBody := map[string]interface{}{
+		"name":        "Queue Publish Test Entry",
+		"location_id": locID,
+		"category_id": categoryID,
+		"type_id":     typeID,
+	}
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings", createBody, userCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST /api/account/listings: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	entryID := created["id"]
+	slug, _ := created["slug"].(string)
+	if created["published"] != false {
+		t.Fatalf("created listing should be unpublished, got %v", created["published"])
+	}
+	defer doRequestWithCookie(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil, testAdminCookie)
+
+	rr = doRequestWithCookie(t, "GET", "/api/admin/listing-queue", nil, testAdminCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/admin/listing-queue: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var queue map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &queue)
+	unpublished, _ := queue["unpublished"].([]interface{})
+	found := false
+	for _, item := range unpublished {
+		m, _ := item.(map[string]interface{})
+		if formatID(m["id"]) == formatID(entryID) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("listing-queue unpublished should include created entry, got %#v", unpublished)
+	}
+
+	rr = doRequestWithCookie(t, "GET", "/api/auth/me", nil, testAdminCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/auth/me: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var meBefore map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &meBefore)
+	countBefore, ok := meBefore["admin_queue_count"].(float64)
+	if !ok {
+		t.Fatalf("admin_queue_count missing before publish: %#v", meBefore)
+	}
+
+	rr = doRequestWithCookie(t, "POST", "/api/admin/listing-queue/publish", map[string]interface{}{
+		"entry_id": entryID,
+	}, testAdminCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST /api/admin/listing-queue/publish: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("public GET /api/entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var pub map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &pub)
+	if pub["verified"] != false {
+		t.Fatalf("public entry verified should stay false, got %v", pub["verified"])
+	}
+	if pub["claimed"] != true {
+		t.Fatalf("public entry claimed should be true, got %v", pub["claimed"])
+	}
+
+	rr = doRequestWithCookie(t, "GET", "/api/auth/me", nil, testAdminCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/auth/me after publish: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var meAfter map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &meAfter)
+	countAfter, ok := meAfter["admin_queue_count"].(float64)
+	if !ok {
+		t.Fatalf("admin_queue_count missing after publish: %#v", meAfter)
+	}
+	if countAfter != countBefore-1 {
+		t.Fatalf("admin_queue_count should drop by 1: before %v after %v", countBefore, countAfter)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"backend/internal/account"
+	"backend/internal/auth"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/events"
@@ -34,6 +35,9 @@ func main() {
 	account.Migrate()
 
 	mux := http.DefaultServeMux
+	admin := func(h http.HandlerFunc) http.HandlerFunc {
+		return middleware.ApplyCORS(auth.RequireAdmin(h))
+	}
 
 	mux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
 	mux.HandleFunc("/api/account/import", middleware.ApplyCORS(account.HandleImport))
@@ -49,6 +53,9 @@ func main() {
 	mux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	mux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	mux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	mux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
+	mux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
+	mux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
 	mux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
 	mux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	mux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
