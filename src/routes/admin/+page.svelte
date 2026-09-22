@@ -256,6 +256,7 @@
     let editingPage = null;
     let pageSaving = false;
     let editingPageFaq = null;
+    let pageFaqSaving = false;
 
     let listingQueueUnpublished = [];
     let listingQueueMembers = [];
@@ -458,6 +459,7 @@
     }
 
     async function fetchAll() {
+        fetchListingQueue();
         fetchMondasok();
         fetchQuickLinks();
         fetchNewsFeeds();
