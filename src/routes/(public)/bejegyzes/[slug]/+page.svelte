@@ -24,6 +24,80 @@
     let error = null;
     /** @type {{ type: string, id: number }[]} */
     let favoriteList = [];
+    /** @type {{ owned: Array<{ id: number }>, member: Array<{ id: number }>, pending: Array<{ id: number }> }} */
+    let accountListings = {
+        owned: [],
+        member: [],
+        pending: [],
+    };
+    let claimError = "";
+    let claimBusy = false;
+
+    /** @param {number | null | undefined} entryId */
+    function listingMembership(entryId) {
+        const id = Number(entryId);
+        if (!id) return null;
+        if (accountListings.owned.some((row) => Number(row.id) === id)) {
+            return "owner";
+        }
+        if (accountListings.member.some((row) => Number(row.id) === id)) {
+            return "member";
+        }
+        if (accountListings.pending.some((row) => Number(row.id) === id)) {
+            return "pending";
+        }
+        return null;
+    }
+
+    async function loadAccountListings() {
+        await auth.init();
+        if (!get(auth).loggedIn) {
+            accountListings = { owned: [], member: [], pending: [] };
+            return;
+        }
+        try {
+            const payload = (await apiFetch("/api/account/listings")) || {};
+            accountListings = {
+                owned: Array.isArray(payload.owned) ? payload.owned : [],
+                member: Array.isArray(payload.member) ? payload.member : [],
+                pending: Array.isArray(payload.pending) ? payload.pending : [],
+            };
+        } catch {
+            accountListings = { owned: [], member: [], pending: [] };
+        }
+    }
+
+    async function submitListingClaim() {
+        if (!entry?.id) return;
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        claimError = "";
+        claimBusy = true;
+        try {
+            await apiFetch("/api/account/listings/claim", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ entry_id: entry.id }),
+            });
+            await loadAccountListings();
+            await fetchEntry();
+        } catch {
+            claimError = "A mentés nem sikerült";
+        } finally {
+            claimBusy = false;
+        }
+    }
+
+    $: membership = entry ? listingMembership(entry.id) : null;
+    $: showClaimButton =
+        $auth.loggedIn && entry && !entry.claimed && membership == null;
+    $: showJoinButton =
+        $auth.loggedIn &&
+        entry &&
+        entry.claimed &&
+        membership == null;
 
     async function initFavorites() {
         await auth.init();
@@ -69,6 +143,7 @@
 
     onMount(() => {
         initFavorites();
+        loadAccountListings();
     });
 
     $: slug = $page.params.slug;
@@ -160,7 +235,30 @@
                         isFavorite(favoriteList, "entry", entry.id),
                     )}
             />
+            {#if showClaimButton}
+                <button
+                    type="button"
+                    class="btn"
+                    disabled={claimBusy}
+                    onclick={() => submitListingClaim()}
+                >
+                    Sajátnak jelölöm
+                </button>
+            {/if}
+            {#if showJoinButton}
+                <button
+                    type="button"
+                    class="btn"
+                    disabled={claimBusy}
+                    onclick={() => submitListingClaim()}
+                >
+                    Tagság kérése
+                </button>
+            {/if}
         </div>
+        {#if claimError}
+            <p class="entry-claim-error">{claimError}</p>
+        {/if}
 
         <div class="contact-card">
             <h3 class="contact-title">Kapcsolat</h3>
@@ -309,5 +407,9 @@
     .tag-padded {
         padding: 0.4rem 0.8rem;
         font-size: 0.95rem;
+    }
+    .entry-claim-error {
+        margin: 0 0 1rem;
+        color: #b00020;
     }
 </style>

@@ -2,8 +2,11 @@
     import { onMount } from "svelte";
     import { get } from "svelte/store";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
     import { profileTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
+    import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import { normalizePhotos } from "$lib/entryPhotos.js";
     import { removeFavorite } from "$lib/favorites.js";
     import { openLogin } from "$lib/openLogin.js";
     import {
@@ -20,10 +23,30 @@
     const TAB_LABELS = {
         profil: "Profil",
         beallitasok: "Beállítások",
+        bejegyzeseim: "Bejegyzéseim",
         linkjeim: "Linkjeim",
         elozmenyek: "Előzmények",
         kedvencek: "Kedvenc helyek",
     };
+
+    /** @returns {Record<string, unknown>} */
+    function emptyListingForm() {
+        return {
+            id: 0,
+            name: "",
+            location_id: 0,
+            category_id: 0,
+            type_id: 0,
+            url: "",
+            phone: "",
+            address: "",
+            notes: "",
+            languages: "HU",
+            hours: emptyWeekHours(),
+            delivery_hours: emptyWeekHours(),
+            photos: [],
+        };
+    }
 
     /** @param {unknown} value */
     function hasField(value) {
@@ -61,6 +84,27 @@
         events: [],
     });
     let favoritesLoading = $state(false);
+    let listingsError = $state("");
+    /** @type {{ owned: Array<Record<string, unknown>>, member: Array<Record<string, unknown>>, pending: Array<Record<string, unknown>>, unpublished: Array<Record<string, unknown>> }} */
+    let accountListings = $state({
+        owned: [],
+        member: [],
+        pending: [],
+        unpublished: [],
+    });
+    /** @type {Record<number, Array<{ user_id: number, email: string }>>} */
+    let listingMembersByEntry = $state({});
+    let listingsLoading = $state(false);
+    let listingCatalogLoading = $state(false);
+    /** @type {Array<{ id: number, name: string }>} */
+    let listingLocations = $state([]);
+    /** @type {Array<{ id: number, name: string }>} */
+    let listingCategories = $state([]);
+    /** @type {Array<{ id: number, name: string }>} */
+    let listingTypes = $state([]);
+    let listingDialogOpen = $state(false);
+    let listingDialogMode = $state(/** @type {"create" | "edit"} */ ("create"));
+    let listingForm = $state(emptyListingForm());
     let linkDialogOpen = $state(false);
     let linkDialogMode = $state(/** @type {"add" | "edit"} */ ("add"));
     let linkDialogData = $state({
@@ -124,7 +168,233 @@
         }
     }
 
-    /** @param {{ slug?: string | null, county_slug?: string | null }} item */
+    /** @param {unknown} payload */
+    function normalizeListingsPayload(payload) {
+        const data = payload && typeof payload === "object" ? payload : {};
+        return {
+            owned: Array.isArray(data.owned) ? data.owned : [],
+            member: Array.isArray(data.member) ? data.member : [],
+            pending: Array.isArray(data.pending) ? data.pending : [],
+            unpublished: Array.isArray(data.unpublished) ? data.unpublished : [],
+        };
+    }
+
+    async function loadListingCatalog() {
+        if (listingCategories.length > 0 && listingTypes.length > 0 && listingLocations.length > 0) {
+            return;
+        }
+        listingCatalogLoading = true;
+        try {
+            const [locations, catalog] = await Promise.all([
+                apiFetch("/api/locations"),
+                apiFetch("/api/account/listings/catalog"),
+            ]);
+            listingLocations = (Array.isArray(locations) ? locations : [])
+                .map((row) => ({
+                    id: Number(row.id),
+                    name: String(row.name ?? "").trim(),
+                }))
+                .filter((row) => row.id > 0 && row.name)
+                .sort((a, b) => a.name.localeCompare(b.name, "hu"));
+            listingCategories = (Array.isArray(catalog?.categories) ? catalog.categories : [])
+                .map((row) => ({
+                    id: Number(row.id),
+                    name: String(row.name ?? "").trim(),
+                }))
+                .filter((row) => row.id > 0 && row.name);
+            listingTypes = (Array.isArray(catalog?.types) ? catalog.types : [])
+                .map((row) => ({
+                    id: Number(row.id),
+                    name: String(row.name ?? "").trim(),
+                }))
+                .filter((row) => row.id > 0 && row.name);
+        } catch {
+            listingLocations = [];
+            listingCategories = [];
+            listingTypes = [];
+        } finally {
+            listingCatalogLoading = false;
+        }
+    }
+
+    /** @param {number} entryId */
+    async function loadListingMembers(entryId) {
+        try {
+            const rows =
+                (await apiFetch(
+                    `/api/account/listings/members?entry_id=${encodeURIComponent(String(entryId))}`,
+                )) || [];
+            listingMembersByEntry = {
+                ...listingMembersByEntry,
+                [entryId]: Array.isArray(rows) ? rows : [],
+            };
+        } catch {
+            listingMembersByEntry = {
+                ...listingMembersByEntry,
+                [entryId]: [],
+            };
+        }
+    }
+
+    async function loadListings() {
+        listingsLoading = true;
+        listingsError = "";
+        try {
+            const payload = await apiFetch("/api/account/listings");
+            accountListings = normalizeListingsPayload(payload);
+            const memberLoads = accountListings.owned.map((row) =>
+                loadListingMembers(Number(row.id)),
+            );
+            await Promise.all(memberLoads);
+        } catch {
+            listingsError = "A mentés nem sikerült";
+        } finally {
+            listingsLoading = false;
+        }
+    }
+
+    /** @param {{ slug?: string | null }} item */
+    function listingPublicUrl(item) {
+        const slug = String(item.slug ?? "").trim();
+        if (!slug) return "";
+        return `/bejegyzes/${slug}`;
+    }
+
+    function openCreateListing() {
+        listingDialogMode = "create";
+        listingForm = emptyListingForm();
+        listingDialogOpen = true;
+        void loadListingCatalog();
+    }
+
+    /** @param {Record<string, unknown>} row */
+    async function openEditListing(row) {
+        listingDialogMode = "edit";
+        listingForm = emptyListingForm();
+        listingDialogOpen = true;
+        await loadListingCatalog();
+        try {
+            const detail = await apiFetch(
+                `/api/account/listings?id=${encodeURIComponent(String(row.id))}`,
+            );
+            listingForm = {
+                id: Number(detail.id),
+                name: String(detail.name ?? ""),
+                location_id: Number(detail.location_id),
+                category_id: Number(detail.category_id),
+                type_id: Number(detail.type_id),
+                url: String(detail.url ?? ""),
+                phone: String(detail.phone ?? ""),
+                address: String(detail.address ?? ""),
+                notes: String(detail.notes ?? ""),
+                languages: Array.isArray(detail.languages)
+                    ? detail.languages.join(", ")
+                    : "HU",
+                hours: normalizeHours(detail.hours),
+                delivery_hours: normalizeHours(detail.delivery_hours),
+                photos: normalizePhotos(detail.photos),
+            };
+        } catch {
+            listingsError = "A mentés nem sikerült";
+            listingDialogOpen = false;
+        }
+    }
+
+    function closeListingDialog() {
+        listingDialogOpen = false;
+    }
+
+    /** @param {Record<string, unknown>} form */
+    function listingRequestBody(form) {
+        const languages = String(form.languages ?? "")
+            .split(/[,;]+/)
+            .map((part) => part.trim())
+            .filter(Boolean);
+        return {
+            name: String(form.name ?? "").trim(),
+            location_id: Number(form.location_id),
+            category_id: Number(form.category_id),
+            type_id: Number(form.type_id),
+            url: String(form.url ?? "").trim(),
+            phone: String(form.phone ?? "").trim(),
+            address: String(form.address ?? "").trim(),
+            notes: String(form.notes ?? "").trim(),
+            languages: languages.length ? languages : ["HU"],
+            hours: normalizeHours(form.hours),
+            delivery_hours: normalizeHours(form.delivery_hours),
+            photos: normalizePhotos(form.photos),
+        };
+    }
+
+    async function saveListingDialog(e) {
+        e.preventDefault();
+        listingsError = "";
+        const prev = accountListings;
+        const body = listingRequestBody(listingForm);
+        try {
+            if (listingDialogMode === "create") {
+                await apiFetch("/api/account/listings", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+            } else {
+                await apiFetch(
+                    `/api/account/listings?id=${encodeURIComponent(String(listingForm.id))}`,
+                    {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(body),
+                    },
+                );
+            }
+            closeListingDialog();
+            await loadListings();
+        } catch {
+            accountListings = prev;
+            listingsError = "A mentés nem sikerült";
+        }
+    }
+
+    /** @param {Record<string, unknown>} row */
+    async function deleteListingRow(row) {
+        listingsError = "";
+        const prev = accountListings;
+        const entryId = Number(row.id);
+        try {
+            await apiFetch(
+                `/api/account/listings?id=${encodeURIComponent(String(entryId))}`,
+                { method: "DELETE" },
+            );
+            await loadListings();
+        } catch {
+            accountListings = prev;
+            listingsError = "A mentés nem sikerült";
+        }
+    }
+
+    /** @param {number} entryId @param {number} userId */
+    async function removeListingMember(entryId, userId) {
+        listingsError = "";
+        const prevMembers = listingMembersByEntry;
+        try {
+            await apiFetch(
+                `/api/account/listings/members?entry_id=${encodeURIComponent(String(entryId))}&user_id=${encodeURIComponent(String(userId))}`,
+                { method: "DELETE" },
+            );
+            listingMembersByEntry = {
+                ...prevMembers,
+                [entryId]: (prevMembers[entryId] || []).filter(
+                    (row) => row.user_id !== userId,
+                ),
+            };
+        } catch {
+            listingMembersByEntry = prevMembers;
+            listingsError = "A mentés nem sikerült";
+        }
+    }
+
+    /** @param {Record<string, unknown>} row */
     function countyPlaceUrl(item) {
         const countySlug = String(item.county_slug ?? "").trim();
         const slug = String(item.slug ?? "").trim();
@@ -182,6 +452,7 @@
             void loadLinks();
             void loadHistory();
             void loadFavorites();
+            void loadListings();
         });
         const unsubscribeTheme = theme.subscribe((value) => {
             selectedTheme = value;
@@ -487,6 +758,145 @@
                     Mentés
                 </button>
             </div>
+        {:else if activeTab === "bejegyzeseim"}
+            <div class="profile-listings">
+                {#if listingsError}
+                    <p class="profile-error">{listingsError}</p>
+                {/if}
+                <button type="button" class="btn" onclick={openCreateListing}>
+                    Új bejegyzés
+                </button>
+                {#if listingsLoading}
+                    <p>Betöltés…</p>
+                {:else}
+                    <section class="profile-listings-group">
+                        <h3>Saját</h3>
+                        {#if accountListings.owned.length === 0}
+                            <p class="profile-empty">Nincs saját bejegyzés.</p>
+                        {:else}
+                            <ul class="profile-listings-list">
+                                {#each accountListings.owned as row (row.id)}
+                                    <li class="profile-listings-row">
+                                        {#if listingPublicUrl(row)}
+                                            <a href={listingPublicUrl(row)} class="profile-listings-name">
+                                                {row.name}
+                                            </a>
+                                        {:else}
+                                            <span class="profile-listings-name">{row.name}</span>
+                                        {/if}
+                                        <div class="profile-listings-actions">
+                                            <button
+                                                type="button"
+                                                class="btn btn-xs"
+                                                onclick={() => openEditListing(row)}
+                                            >Szerkesztés</button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-xs"
+                                                onclick={() => deleteListingRow(row)}
+                                            >Törlés</button>
+                                        </div>
+                                        {#if (listingMembersByEntry[Number(row.id)] || []).length > 0}
+                                            <ul class="profile-listings-members">
+                                                {#each listingMembersByEntry[Number(row.id)] || [] as member (member.user_id)}
+                                                    <li class="profile-listings-member-row">
+                                                        <span>{member.email || member.user_id}</span>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-xs"
+                                                            onclick={() =>
+                                                                removeListingMember(
+                                                                    Number(row.id),
+                                                                    Number(member.user_id),
+                                                                )}
+                                                        >Eltávolítás</button>
+                                                    </li>
+                                                {/each}
+                                            </ul>
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </section>
+
+                    <section class="profile-listings-group">
+                        <h3>Tagság</h3>
+                        {#if accountListings.member.length === 0}
+                            <p class="profile-empty">Nincs tagsági bejegyzés.</p>
+                        {:else}
+                            <ul class="profile-listings-list">
+                                {#each accountListings.member as row (row.id)}
+                                    <li class="profile-listings-row">
+                                        {#if listingPublicUrl(row)}
+                                            <a href={listingPublicUrl(row)} class="profile-listings-name">
+                                                {row.name}
+                                            </a>
+                                        {:else}
+                                            <span class="profile-listings-name">{row.name}</span>
+                                        {/if}
+                                        <div class="profile-listings-actions">
+                                            <button
+                                                type="button"
+                                                class="btn btn-xs"
+                                                onclick={() => openEditListing(row)}
+                                            >Szerkesztés</button>
+                                        </div>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </section>
+
+                    <section class="profile-listings-group">
+                        <h3>Jóváhagyásra vár</h3>
+                        {#if accountListings.pending.length === 0}
+                            <p class="profile-empty">Nincs függő tagságkérés.</p>
+                        {:else}
+                            <ul class="profile-listings-list">
+                                {#each accountListings.pending as row (row.id)}
+                                    <li class="profile-listings-row">
+                                        {#if listingPublicUrl(row)}
+                                            <a href={listingPublicUrl(row)} class="profile-listings-name">
+                                                {row.name}
+                                            </a>
+                                        {:else}
+                                            <span class="profile-listings-name">{row.name}</span>
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </section>
+
+                    <section class="profile-listings-group">
+                        <h3>Közzétételre vár</h3>
+                        {#if accountListings.unpublished.length === 0}
+                            <p class="profile-empty">Nincs közzétételre váró bejegyzés.</p>
+                        {:else}
+                            <ul class="profile-listings-list">
+                                {#each accountListings.unpublished as row (row.id)}
+                                    <li class="profile-listings-row">
+                                        <span class="profile-listings-name">{row.name}</span>
+                                        <div class="profile-listings-actions">
+                                            <button
+                                                type="button"
+                                                class="btn btn-xs"
+                                                onclick={() => openEditListing(row)}
+                                            >Szerkesztés</button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-xs"
+                                                onclick={() => deleteListingRow(row)}
+                                            >Törlés</button>
+                                        </div>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    </section>
+                {/if}
+            </div>
         {:else if activeTab === "linkjeim"}
             <div class="profile-links">
                 {#if linksError}
@@ -728,6 +1138,92 @@
     </div>
 {/if}
 
+{#if listingDialogOpen}
+    <div
+        class="link-dialog-overlay"
+        role="dialog"
+        aria-labelledby="profile-listing-dialog-title"
+        tabindex="-1"
+        onclick={(e) => e.target === e.currentTarget && closeListingDialog()}
+        onkeydown={(e) => e.key === "Escape" && closeListingDialog()}
+    >
+        <div class="link-dialog profile-listing-dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
+            <h3 id="profile-listing-dialog-title">
+                {listingDialogMode === "create" ? "Új bejegyzés" : "Bejegyzés szerkesztése"}
+            </h3>
+            {#if listingCatalogLoading}
+                <p>Katalógus betöltése…</p>
+            {:else}
+                <form class="link-dialog-form profile-listing-form" onsubmit={saveListingDialog}>
+                    <label for="profile_listing_name">Név</label>
+                    <input
+                        id="profile_listing_name"
+                        type="text"
+                        bind:value={listingForm.name}
+                        required
+                    />
+
+                    <label for="profile_listing_location">Település</label>
+                    <select id="profile_listing_location" bind:value={listingForm.location_id} required>
+                        <option value={0} disabled>Válassz települést</option>
+                        {#each listingLocations as loc (loc.id)}
+                            <option value={loc.id}>{loc.name}</option>
+                        {/each}
+                    </select>
+
+                    <label for="profile_listing_category">Kategória</label>
+                    <select id="profile_listing_category" bind:value={listingForm.category_id} required>
+                        <option value={0} disabled>Válassz kategóriát</option>
+                        {#each listingCategories as cat (cat.id)}
+                            <option value={cat.id}>{cat.name}</option>
+                        {/each}
+                    </select>
+
+                    <label for="profile_listing_type">Típus</label>
+                    <select id="profile_listing_type" bind:value={listingForm.type_id} required>
+                        <option value={0} disabled>Válassz típust</option>
+                        {#each listingTypes as typ (typ.id)}
+                            <option value={typ.id}>{typ.name}</option>
+                        {/each}
+                    </select>
+
+                    <label for="profile_listing_url">Weblap URL</label>
+                    <input id="profile_listing_url" type="url" bind:value={listingForm.url} />
+
+                    <label for="profile_listing_phone">Telefon</label>
+                    <input id="profile_listing_phone" type="text" bind:value={listingForm.phone} />
+
+                    <label for="profile_listing_address">Cím</label>
+                    <input id="profile_listing_address" type="text" bind:value={listingForm.address} />
+
+                    <label for="profile_listing_notes">Megjegyzés</label>
+                    <textarea id="profile_listing_notes" bind:value={listingForm.notes} rows="3"></textarea>
+
+                    <label for="profile_listing_languages">Nyelvek (vesszővel elválasztva)</label>
+                    <input id="profile_listing_languages" type="text" bind:value={listingForm.languages} />
+
+                    <div class="profile-listing-hours">
+                        <h4>Nyitvatartás</h4>
+                        <EntryHoursEditor bind:hours={listingForm.hours} />
+                    </div>
+
+                    <div class="profile-listing-hours">
+                        <h4>Kiszállítási idő</h4>
+                        <EntryHoursEditor bind:hours={listingForm.delivery_hours} />
+                    </div>
+
+                    <div class="link-dialog-actions">
+                        <button type="submit" class="link-dialog-submit">Mentés</button>
+                        <button type="button" class="link-dialog-cancel" onclick={closeListingDialog}>
+                            Mégse
+                        </button>
+                    </div>
+                </form>
+            {/if}
+        </div>
+    </div>
+{/if}
+
 <style>
     .profile-page {
         display: flex;
@@ -843,5 +1339,78 @@
     }
     .profile-clear-all {
         margin-bottom: 0.5rem;
+    }
+    .profile-listings {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        align-items: flex-start;
+        width: 100%;
+    }
+    .profile-listings-group {
+        width: 100%;
+    }
+    .profile-listings-group h3,
+    .profile-listing-hours h4 {
+        margin: 0.75rem 0 0;
+        font-size: 1rem;
+    }
+    .profile-listings-group h3:first-child {
+        margin-top: 0;
+    }
+    .profile-listings-list {
+        list-style: none;
+        margin: 0.75rem 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+    }
+    .profile-listings-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color, #ddd);
+    }
+    .profile-listings-name {
+        font-weight: 600;
+    }
+    .profile-listings-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-left: auto;
+    }
+    .profile-listings-members {
+        list-style: none;
+        margin: 0.35rem 0 0;
+        padding: 0 0 0 1rem;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .profile-listings-member-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--text-muted, #666);
+    }
+    .profile-listing-dialog {
+        max-width: 42rem;
+        width: min(42rem, 100%);
+    }
+    .profile-listing-form select,
+    .profile-listing-form textarea {
+        width: 100%;
+        max-width: 100%;
+    }
+    .profile-listing-hours {
+        width: 100%;
     }
 </style>

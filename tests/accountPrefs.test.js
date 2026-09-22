@@ -55,6 +55,7 @@ test("profileTabIds are the account tabs", () => {
     assert.deepEqual(profileTabIds, [
         "profil",
         "beallitasok",
+        "bejegyzeseim",
         "linkjeim",
         "elozmenyek",
         "kedvencek",

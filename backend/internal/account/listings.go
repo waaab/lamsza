@@ -343,7 +343,11 @@ func HandleListings(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodGet:
-		handleListListings(w, u.ID)
+		if idStr := strings.TrimSpace(r.URL.Query().Get("id")); idStr != "" {
+			handleGetListingDetail(w, r, u.ID, idStr)
+		} else {
+			handleListListings(w, u.ID)
+		}
 	case http.MethodPost:
 		handleCreateListing(w, r, u.ID)
 	case http.MethodPatch:
@@ -355,8 +359,18 @@ func HandleListings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func HandleListingMembers(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodDelete {
+type catalogItem struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+type listingCatalogResponse struct {
+	Categories []catalogItem `json:"categories"`
+	Types      []catalogItem `json:"types"`
+}
+
+func HandleListingCatalog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -366,6 +380,179 @@ func HandleListingMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	resp := listingCatalogResponse{
+		Categories: []catalogItem{},
+		Types:      []catalogItem{},
+	}
+
+	rows, err := db.DB.Query(`SELECT id, name FROM entry_categories ORDER BY name ASC, id ASC`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for rows.Next() {
+		var item catalogItem
+		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+			rows.Close()
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Categories = append(resp.Categories, item)
+	}
+	rows.Close()
+
+	rows, err = db.DB.Query(`SELECT id, name FROM entry_types ORDER BY name ASC, id ASC`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for rows.Next() {
+		var item catalogItem
+		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+			rows.Close()
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Types = append(resp.Types, item)
+	}
+	rows.Close()
+
+	json.NewEncoder(w).Encode(resp)
+}
+
+type listingDetailResponse struct {
+	ID            int             `json:"id"`
+	Name          string          `json:"name"`
+	Slug          string          `json:"slug"`
+	LocationID    int             `json:"location_id"`
+	CategoryID    int             `json:"category_id"`
+	TypeID        int             `json:"type_id"`
+	URL           string          `json:"url"`
+	Phone         string          `json:"phone"`
+	Address       string          `json:"address"`
+	Notes         string          `json:"notes"`
+	Languages     []string        `json:"languages"`
+	Hours         json.RawMessage `json:"hours"`
+	DeliveryHours json.RawMessage `json:"delivery_hours"`
+	Photos        json.RawMessage `json:"photos"`
+	Published     bool            `json:"published"`
+}
+
+func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, idStr string) {
+	entryID, err := strconv.Atoi(idStr)
+	if err != nil || entryID <= 0 {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	membership, found, err := scanMembershipDB(entryID, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found || !canEditListing(membership.Role, membership.Status) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var detail listingDetailResponse
+	var pqLanguages []string
+	var hours, delivery, photos []byte
+	err = db.DB.QueryRow(`
+		SELECT e.id, e.name, COALESCE(e.slug, ''), e.location_id, e.category_id, e.type_id,
+			COALESCE(e.url, ''), COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''),
+			e.languages, COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+			COALESCE(e.photos, '[]'::jsonb), e.published
+		FROM entries e
+		WHERE e.id = $1
+	`, entryID).Scan(&detail.ID, &detail.Name, &detail.Slug, &detail.LocationID, &detail.CategoryID, &detail.TypeID,
+		&detail.URL, &detail.Phone, &detail.Address, &detail.Notes, pq.Array(&pqLanguages),
+		&hours, &delivery, &photos, &detail.Published)
+	if err == sql.ErrNoRows {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(pqLanguages) == 0 {
+		detail.Languages = []string{"HU"}
+	} else {
+		detail.Languages = pqLanguages
+	}
+	detail.Hours = json.RawMessage(jsonObjectOrEmptyListing(hours))
+	detail.DeliveryHours = json.RawMessage(jsonObjectOrEmptyListing(delivery))
+	detail.Photos = sanitizeListingPhotos(photos)
+	json.NewEncoder(w).Encode(detail)
+}
+
+type listingMemberRow struct {
+	UserID int    `json:"user_id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	Status string `json:"status"`
+}
+
+func HandleListingMembers(w http.ResponseWriter, r *http.Request) {
+	u, err := auth.UserFromRequest(r)
+	if err != nil || u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		handleListListingMembers(w, r, u.ID)
+	case http.MethodDelete:
+		handleDeleteListingMember(w, r, u.ID)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleListListingMembers(w http.ResponseWriter, r *http.Request, ownerUserID int) {
+	entryID, err := strconv.Atoi(r.URL.Query().Get("entry_id"))
+	if err != nil || entryID <= 0 {
+		http.Error(w, "entry_id required", http.StatusBadRequest)
+		return
+	}
+
+	owner, found, err := scanMembershipDB(entryID, ownerUserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found || !isActiveOwner(owner.Role, owner.Status) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	rows, err := db.DB.Query(`
+		SELECT m.user_id, COALESCE(u.email, ''), m.role, m.status
+		FROM entry_members m
+		JOIN users u ON u.id = m.user_id
+		WHERE m.entry_id = $1 AND m.role = 'member' AND m.status = 'active'
+		ORDER BY u.email ASC, m.user_id ASC
+	`, entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	out := []listingMemberRow{}
+	for rows.Next() {
+		var row listingMemberRow
+		if err := rows.Scan(&row.UserID, &row.Email, &row.Role, &row.Status); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		out = append(out, row)
+	}
+	json.NewEncoder(w).Encode(out)
+}
+
+func handleDeleteListingMember(w http.ResponseWriter, r *http.Request, ownerUserID int) {
 	entryID, err := strconv.Atoi(r.URL.Query().Get("entry_id"))
 	if err != nil || entryID <= 0 {
 		http.Error(w, "entry_id required", http.StatusBadRequest)
@@ -377,7 +564,7 @@ func HandleListingMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	owner, found, err := scanMembershipDB(entryID, u.ID)
+	owner, found, err := scanMembershipDB(entryID, ownerUserID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
