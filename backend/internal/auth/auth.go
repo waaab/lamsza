@@ -267,29 +267,34 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	if err := WriteMe(w, u.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func WriteMe(w http.ResponseWriter, userID int) error {
 	var (
-		givenName, familyName, picture, locale, googleSub string
-		theme                                               sql.NullString
-		quicklinkSlots                                      sql.NullInt64
-		prefsImportedAt                                     sql.NullTime
-		lastLoginAt, createdAt                              time.Time
+		email, name, givenName, familyName, picture, locale, googleSub string
+		theme                                                            sql.NullString
+		quicklinkSlots                                                   sql.NullInt64
+		prefsImportedAt                                                  sql.NullTime
+		lastLoginAt, createdAt                                           time.Time
 	)
-	err = db.DB.QueryRow(`
+	err := db.DB.QueryRow(`
 		SELECT email, name, given_name, family_name, picture, locale, google_sub,
 		       last_login_at, created_at, theme, quicklink_slots, prefs_imported_at
 		FROM users WHERE id = $1
-	`, u.ID).Scan(
-		&u.Email, &u.Name, &givenName, &familyName, &picture, &locale, &googleSub,
+	`, userID).Scan(
+		&email, &name, &givenName, &familyName, &picture, &locale, &googleSub,
 		&lastLoginAt, &createdAt, &theme, &quicklinkSlots, &prefsImportedAt,
 	)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return err
 	}
 	resp := map[string]interface{}{
-		"email":         u.Email,
-		"name":          u.Name,
-		"is_admin":      IsAdmin(u.Email),
+		"email":         email,
+		"name":          name,
+		"is_admin":      IsAdmin(email),
 		"given_name":    givenName,
 		"family_name":   familyName,
 		"picture":       picture,
@@ -314,7 +319,7 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 		resp["prefs_imported_at"] = nil
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	return json.NewEncoder(w).Encode(resp)
 }
 
 func HandleLogout(w http.ResponseWriter, r *http.Request) {

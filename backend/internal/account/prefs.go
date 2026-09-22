@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"time"
 )
 
 func Migrate() {
@@ -89,7 +88,9 @@ func HandlePreferences(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(setClauses) == 0 {
-		writeMeResponse(w, u.ID)
+		if err := auth.WriteMe(w, u.ID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -99,7 +100,9 @@ func HandlePreferences(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeMeResponse(w, u.ID)
+	if err := auth.WriteMe(w, u.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func HandleImport(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +131,9 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if prefsImportedAt.Valid {
-		writeMeResponse(w, u.ID)
+		if err := auth.WriteMe(w, u.ID); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -163,7 +168,9 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeMeResponse(w, u.ID)
+	if err := auth.WriteMe(w, u.ID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
 
 func joinSetClauses(clauses []string) string {
@@ -172,55 +179,4 @@ func joinSetClauses(clauses []string) string {
 		out += ", " + clauses[i]
 	}
 	return out
-}
-
-func writeMeResponse(w http.ResponseWriter, userID int) {
-	var (
-		email, name, givenName, familyName, picture, locale, googleSub string
-		theme                                                            sql.NullString
-		quicklinkSlots                                                   sql.NullInt64
-		prefsImportedAt                                                  sql.NullTime
-		lastLoginAt, createdAt                                           time.Time
-	)
-	err := db.DB.QueryRow(`
-		SELECT email, name, given_name, family_name, picture, locale, google_sub,
-		       last_login_at, created_at, theme, quicklink_slots, prefs_imported_at
-		FROM users WHERE id = $1
-	`, userID).Scan(
-		&email, &name, &givenName, &familyName, &picture, &locale, &googleSub,
-		&lastLoginAt, &createdAt, &theme, &quicklinkSlots, &prefsImportedAt,
-	)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	resp := map[string]interface{}{
-		"email":         email,
-		"name":          name,
-		"is_admin":      auth.IsAdmin(email),
-		"given_name":    givenName,
-		"family_name":   familyName,
-		"picture":       picture,
-		"locale":        locale,
-		"google_sub":    googleSub,
-		"last_login_at": lastLoginAt,
-		"created_at":    createdAt,
-	}
-	if theme.Valid {
-		resp["theme"] = theme.String
-	} else {
-		resp["theme"] = nil
-	}
-	if quicklinkSlots.Valid {
-		resp["quicklink_slots"] = quicklinkSlots.Int64
-	} else {
-		resp["quicklink_slots"] = nil
-	}
-	if prefsImportedAt.Valid {
-		resp["prefs_imported_at"] = prefsImportedAt.Time
-	} else {
-		resp["prefs_imported_at"] = nil
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
 }
