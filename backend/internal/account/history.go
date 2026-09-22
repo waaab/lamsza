@@ -205,7 +205,8 @@ func insertImportHistory(tx *sql.Tx, userID int, raw json.RawMessage) error {
 		return err
 	}
 	inserted := 0
-	for _, row := range payload {
+	seen := make(map[string]bool)
+	for i, row := range payload {
 		if inserted >= historyStoreMax {
 			break
 		}
@@ -213,10 +214,14 @@ func insertImportHistory(tx *sql.Tx, userID int, raw json.RawMessage) error {
 		if err != nil {
 			continue
 		}
+		if seen[item.Slug] {
+			continue
+		}
+		seen[item.Slug] = true
 		if _, err := tx.Exec(`
 			INSERT INTO user_entry_history (user_id, slug, name, category, location, photo, viewed_at)
-			VALUES ($1, $2, $3, $4, $5, $6, NOW())
-		`, userID, item.Slug, item.Name, item.Category, item.Location, item.Photo); err != nil {
+			VALUES ($1, $2, $3, $4, $5, $6, NOW() - ($7 * INTERVAL '1 second'))
+		`, userID, item.Slug, item.Name, item.Category, item.Location, item.Photo, i); err != nil {
 			return err
 		}
 		inserted++
