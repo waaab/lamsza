@@ -6,7 +6,12 @@
     import { profileTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
     import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
-    import { normalizePhotos } from "$lib/entryPhotos.js";
+    import {
+        DEFAULT_PHOTO_HEIGHT,
+        DEFAULT_PHOTO_WIDTH,
+        MAX_ENTRY_PHOTOS,
+        normalizePhotos,
+    } from "$lib/entryPhotos.js";
     import { removeFavorite } from "$lib/favorites.js";
     import { openLogin } from "$lib/openLogin.js";
     import {
@@ -105,6 +110,8 @@
     let listingDialogOpen = $state(false);
     let listingDialogMode = $state(/** @type {"create" | "edit"} */ ("create"));
     let listingForm = $state(emptyListingForm());
+    let newListingPhotoUrl = $state("");
+    let newListingPhotoAlt = $state("");
     let linkDialogOpen = $state(false);
     let linkDialogMode = $state(/** @type {"add" | "edit"} */ ("add"));
     let linkDialogData = $state({
@@ -260,9 +267,66 @@
         return `/bejegyzes/${slug}`;
     }
 
+    function clearNewListingPhotoFields() {
+        newListingPhotoUrl = "";
+        newListingPhotoAlt = "";
+    }
+
+    /** @param {string} url */
+    function isHttpPhotoUrl(url) {
+        const s = String(url ?? "").trim();
+        const lower = s.toLowerCase();
+        return lower.startsWith("http://") || lower.startsWith("https://");
+    }
+
+    /** @param {number} index */
+    function removeListingPhoto(index) {
+        listingForm = {
+            ...listingForm,
+            photos: normalizePhotos(listingForm.photos).filter((_, i) => i !== index),
+        };
+    }
+
+    /** @param {number} index @param {string} alt */
+    function updateListingPhotoAlt(index, alt) {
+        listingForm = {
+            ...listingForm,
+            photos: normalizePhotos(listingForm.photos).map((photo, i) =>
+                i === index ? { ...photo, alt } : photo,
+            ),
+        };
+    }
+
+    function addListingPhotoFromUrl() {
+        const url = String(newListingPhotoUrl ?? "").trim();
+        if (!isHttpPhotoUrl(url)) return;
+        const current = normalizePhotos(listingForm.photos);
+        if (current.length >= MAX_ENTRY_PHOTOS) return;
+        if (current.some((photo) => photo.url === url)) {
+            clearNewListingPhotoFields();
+            return;
+        }
+        listingForm = {
+            ...listingForm,
+            photos: [
+                ...current,
+                {
+                    url,
+                    alt: String(newListingPhotoAlt ?? "").trim(),
+                    title: "",
+                    description: "",
+                    width: DEFAULT_PHOTO_WIDTH,
+                    height: DEFAULT_PHOTO_HEIGHT,
+                },
+            ],
+        };
+        clearNewListingPhotoFields();
+    }
+
     function openCreateListing() {
         listingDialogMode = "create";
         listingForm = emptyListingForm();
+        clearNewListingPhotoFields();
         listingDialogOpen = true;
         void loadListingCatalog();
     }
@@ -271,6 +335,7 @@
     async function openEditListing(row) {
         listingDialogMode = "edit";
         listingForm = emptyListingForm();
+        clearNewListingPhotoFields();
         listingDialogOpen = true;
         await loadListingCatalog();
         try {
@@ -302,6 +367,7 @@
 
     function closeListingDialog() {
         listingDialogOpen = false;
+        clearNewListingPhotoFields();
     }
 
     /** @param {Record<string, unknown>} form */
@@ -1212,6 +1278,66 @@
                         <EntryHoursEditor bind:hours={listingForm.delivery_hours} />
                     </div>
 
+                    <div class="profile-listing-photos">
+                        <h4>Fotók</h4>
+                        {#if normalizePhotos(listingForm.photos).length === 0}
+                            <p class="profile-listing-photos-empty">Még nincs fotó.</p>
+                        {:else}
+                            <ul class="profile-listing-photos-list">
+                                {#each normalizePhotos(listingForm.photos) as photo, i (photo.url + i)}
+                                    <li class="profile-listing-photos-row">
+                                        <a
+                                            href={photo.url}
+                                            class="profile-listing-photos-url"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >{photo.url}</a>
+                                        <label class="profile-listing-photos-alt">
+                                            Alt
+                                            <input
+                                                type="text"
+                                                value={photo.alt}
+                                                oninput={(e) =>
+                                                    updateListingPhotoAlt(
+                                                        i,
+                                                        e.currentTarget.value,
+                                                    )}
+                                            />
+                                        </label>
+                                        <button
+                                            type="button"
+                                            class="btn btn-xs"
+                                            onclick={() => removeListingPhoto(i)}
+                                        >Eltávolítás</button>
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                        {#if normalizePhotos(listingForm.photos).length < MAX_ENTRY_PHOTOS}
+                            <div class="profile-listing-photos-add">
+                                <label for="profile_listing_photo_url">Kép URL (http vagy https)</label>
+                                <input
+                                    id="profile_listing_photo_url"
+                                    type="url"
+                                    bind:value={newListingPhotoUrl}
+                                    placeholder="https://..."
+                                />
+                                <label for="profile_listing_photo_alt">Alt (opcionális)</label>
+                                <input
+                                    id="profile_listing_photo_alt"
+                                    type="text"
+                                    bind:value={newListingPhotoAlt}
+                                />
+                                <button
+                                    type="button"
+                                    class="btn btn-xs"
+                                    disabled={!isHttpPhotoUrl(newListingPhotoUrl)}
+                                    onclick={addListingPhotoFromUrl}
+                                >Hozzáadás</button>
+                            </div>
+                        {/if}
+                    </div>
+
                     <div class="link-dialog-actions">
                         <button type="submit" class="link-dialog-submit">Mentés</button>
                         <button type="button" class="link-dialog-cancel" onclick={closeListingDialog}>
@@ -1351,7 +1477,8 @@
         width: 100%;
     }
     .profile-listings-group h3,
-    .profile-listing-hours h4 {
+    .profile-listing-hours h4,
+    .profile-listing-photos h4 {
         margin: 0.75rem 0 0;
         font-size: 1rem;
     }
@@ -1412,5 +1539,48 @@
     }
     .profile-listing-hours {
         width: 100%;
+    }
+    .profile-listing-photos {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .profile-listing-photos-empty {
+        margin: 0;
+        color: var(--text-muted, #666);
+        font-size: 0.9rem;
+    }
+    .profile-listing-photos-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .profile-listing-photos-row {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color, #ddd);
+    }
+    .profile-listing-photos-url {
+        font-size: 0.9rem;
+        word-break: break-all;
+    }
+    .profile-listing-photos-alt {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    .profile-listing-photos-add {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        margin-top: 0.25rem;
     }
 </style>
