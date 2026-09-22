@@ -14,7 +14,7 @@
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
     import { auth } from "$lib/stores/auth";
-    import { applyTheme, LABELS } from "$lib/stores/theme";
+    import { applyTheme, LABELS, theme } from "$lib/stores/theme";
 
     const TAB_LABELS = {
         profil: "Profil",
@@ -60,11 +60,6 @@
     });
     function initSettingsFromAuth() {
         const state = get(auth);
-        selectedTheme =
-            state.theme ||
-            (typeof localStorage !== "undefined"
-                ? localStorage.getItem("theme") || "system"
-                : "system");
         slotCount = clampSlotCount(
             typeof state.quicklinkSlots === "number"
                 ? state.quicklinkSlots
@@ -97,7 +92,8 @@
 
     onMount(() => {
         let accountDataLoaded = false;
-        const unsubscribe = auth.subscribe((state) => {
+        selectedTheme = get(theme);
+        const unsubscribeAuth = auth.subscribe((state) => {
             if (!state.loggedIn) {
                 accountDataLoaded = false;
                 return;
@@ -108,6 +104,9 @@
             void loadLinks();
             void loadHistory();
         });
+        const unsubscribeTheme = theme.subscribe((value) => {
+            selectedTheme = value;
+        });
 
         void (async () => {
             await auth.init();
@@ -116,12 +115,16 @@
             }
         })();
 
-        return unsubscribe;
+        return () => {
+            unsubscribeAuth();
+            unsubscribeTheme();
+        };
     });
 
     async function savePreferences() {
         saveError = "";
-        const prevTheme = selectedTheme;
+        const themeToSave = get(theme);
+        const prevTheme = themeToSave;
         const prevSlots = slotCount;
         const slots = clampSlotCount(slotCount);
         slotCount = slots;
@@ -130,22 +133,22 @@
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    theme: selectedTheme,
+                    theme: themeToSave,
                     quicklink_slots: slots,
                 }),
             });
-            applyTheme(selectedTheme);
+            applyTheme(themeToSave);
             writeSlotCount(slots);
             await auth.refresh();
         } catch {
-            selectedTheme = prevTheme;
+            applyTheme(prevTheme);
             slotCount = prevSlots;
             saveError = "A mentés nem sikerült";
         }
     }
 
     function selectTheme(next) {
-        selectedTheme = next;
+        applyTheme(next);
     }
 
     function decreaseSlots() {
