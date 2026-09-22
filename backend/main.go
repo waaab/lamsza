@@ -33,6 +33,7 @@ func main() {
 	pagefaq.Migrate()
 	handlers.MigrateEntryVerified()
 	handlers.MigrateEntryReviews()
+	auth.Migrate()
 	account.Migrate()
 
 	mux := http.DefaultServeMux
@@ -40,6 +41,9 @@ func main() {
 		return middleware.ApplyCORS(auth.RequireAdmin(h))
 	}
 
+	mux.HandleFunc("/api/auth/google", middleware.ApplyCORS(auth.HandleGoogleLogin))
+	mux.HandleFunc("/api/auth/me", middleware.ApplyCORS(auth.HandleMe))
+	mux.HandleFunc("/api/auth/logout", middleware.ApplyCORS(auth.HandleLogout))
 	mux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
 	mux.HandleFunc("/api/account/import", middleware.ApplyCORS(account.HandleImport))
 	mux.HandleFunc("/api/account/links", middleware.ApplyCORS(account.HandleLinks))

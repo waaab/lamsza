@@ -12,6 +12,13 @@ import (
 // Claimed listings keep stored extras and gain ratings_enabled from the entry struct.
 // ratings_enabled is pre-loaded by the entry SELECT in public.go (list + detail queries).
 func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
+	ApplyPublicEntryExtrasMode(e, viewerUserID, false)
+}
+
+// ApplyPublicEntryExtrasMode enforces public listing vs claimed-extras with optional lite mode.
+// When liteMode is true, only loads rating and review_count (no reviews, no my_review).
+// Use lite mode for list/related views to avoid loading 50 reviews per card.
+func ApplyPublicEntryExtrasMode(e *models.Entry, viewerUserID int, liteMode bool) {
 	if !e.Claimed {
 		// Unclaimed: strip photos, hours, delivery_hours, ratings
 		e.Photos = json.RawMessage("[]")
@@ -40,6 +47,10 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 	if err == nil {
 		e.Rating = avgRating
 		e.ReviewCount = reviewCount
+	}
+
+	if liteMode {
+		return
 	}
 
 	// Load up to 50 reviews, newest first

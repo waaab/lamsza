@@ -1,30 +1,45 @@
 <script>
     import { auth } from "$lib/stores/auth.js";
     import { openLogin } from "$lib/openLogin.js";
+    import { apiCall } from "$lib/api.js";
     import EntryStars from "$lib/components/EntryStars.svelte";
 
     /** @type {{ entry: Record<string, any> }} */
     let { entry: entryProp } = $props();
+
+    let localRating = $state(0);
+    let localReviewCount = $state(0);
+    let localReviews = $state([]);
+    let localMyReview = $state(null);
 
     let score = $state(0);
     let text = $state("");
     let error = $state("");
     let busy = $state(false);
 
+    let propRating = $derived(entryProp?.rating ?? 0);
+    let propReviewCount = $derived(entryProp?.review_count ?? 0);
+    let propReviews = $derived(Array.isArray(entryProp?.reviews) ? entryProp.reviews : []);
+    let propMyReview = $derived(entryProp?.my_review ?? null);
+
     $effect(() => {
-        if (entryProp.my_review) {
-            score = entryProp.my_review.score || 0;
-            text = entryProp.my_review.text || "";
+        localRating = propRating;
+        localReviewCount = propReviewCount;
+        localReviews = propReviews;
+        localMyReview = propMyReview;
+        if (propMyReview) {
+            score = propMyReview.score || 0;
+            text = propMyReview.text || "";
         }
     });
 
     let loggedIn = $derived($auth.loggedIn);
     let rating = $derived.by(() => {
-        const n = Number(entryProp?.rating);
+        const n = Number(localRating);
         return Number.isFinite(n) ? Math.min(5, Math.max(0, n)) : 0;
     });
     let reviewCount = $derived.by(() => {
-        const n = Number(entryProp?.review_count);
+        const n = Number(localReviewCount);
         return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
     });
     let ratingLabel = $derived(
@@ -33,15 +48,15 @@
             maximumFractionDigits: 1,
         }),
     );
-    let reviews = $derived(Array.isArray(entryProp?.reviews) ? entryProp.reviews : []);
-    let hasMyReview = $derived(Boolean(entryProp?.my_review));
+    let reviews = $derived(Array.isArray(localReviews) ? localReviews : []);
+    let hasMyReview = $derived(Boolean(localMyReview));
 
     async function submitReview() {
         if (busy || score < 1 || score > 5) return;
         error = "";
         busy = true;
         try {
-            const response = await fetch("/api/entry/reviews", {
+            const response = await apiCall("/api/entry/reviews", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ slug: entryProp.slug, score, text }),
@@ -50,10 +65,10 @@
                 throw new Error("Failed to save review");
             }
             const data = await response.json();
-            entryProp.rating = data.rating;
-            entryProp.review_count = data.review_count;
-            entryProp.reviews = data.reviews || [];
-            entryProp.my_review = data.my_review;
+            localRating = data.rating;
+            localReviewCount = data.review_count;
+            localReviews = data.reviews || [];
+            localMyReview = data.my_review;
         } catch {
             error = "A mentés nem sikerült";
         } finally {
@@ -66,17 +81,17 @@
         error = "";
         busy = true;
         try {
-            const response = await fetch(`/api/entry/reviews?slug=${encodeURIComponent(entryProp.slug)}`, {
+            const response = await apiCall(`/api/entry/reviews?slug=${encodeURIComponent(entryProp.slug)}`, {
                 method: "DELETE",
             });
             if (!response.ok) {
                 throw new Error("Failed to delete review");
             }
             const data = await response.json();
-            entryProp.rating = data.rating;
-            entryProp.review_count = data.review_count;
-            entryProp.reviews = data.reviews || [];
-            entryProp.my_review = null;
+            localRating = data.rating;
+            localReviewCount = data.review_count;
+            localReviews = data.reviews || [];
+            localMyReview = null;
             score = 0;
             text = "";
         } catch {

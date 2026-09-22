@@ -154,7 +154,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		if entries[i].Tags == nil {
 			entries[i].Tags = []string{}
 		}
-		ApplyPublicEntryExtras(&entries[i], viewerUserID)
+		ApplyPublicEntryExtrasMode(&entries[i], viewerUserID, true)
 	}
 	json.NewEncoder(w).Encode(entries)
 	log.Printf("EntriesHandler found %d entries", len(entries))

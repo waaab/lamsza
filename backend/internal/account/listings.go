@@ -733,8 +733,8 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 
 	var entryID int
 	err = tx.QueryRow(`
-		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, delivery_hours, photos)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, '[]'::jsonb)
+		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, delivery_hours, photos, ratings_enabled)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, '[]'::jsonb, false)
 		RETURNING id
 	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, strings.TrimSpace(body.URL), body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery).Scan(&entryID)
 	if err != nil {
