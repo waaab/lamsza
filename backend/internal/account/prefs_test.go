@@ -37,3 +37,16 @@ func TestNormalizeLink(t *testing.T) {
 		t.Fatal("expected empty title to fail")
 	}
 }
+
+func TestNormalizeFavorite(t *testing.T) {
+	typ, id, err := NormalizeFavorite("attraction", 4)
+	if err != nil || typ != "attraction" || id != 4 {
+		t.Fatalf("got %s %d %v", typ, id, err)
+	}
+	if _, _, err := NormalizeFavorite("county", 1); err == nil {
+		t.Fatal("expected unknown type to fail")
+	}
+	if _, _, err := NormalizeFavorite("entry", 0); err == nil {
+		t.Fatal("expected id 0 to fail")
+	}
+}

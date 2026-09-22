@@ -13,6 +13,7 @@ import (
 func Migrate() {
 	migrateUserLinks()
 	migrateUserHistory()
+	migrateUserFavorites()
 	log.Println("Account preferences ready")
 }
 
