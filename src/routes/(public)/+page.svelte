@@ -11,6 +11,7 @@
         readSlotCount,
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
+    import { homepageAttractionWeather, homepageSettlements } from "$lib/favoriteHomepage.js";
     import SearchEngine from "$lib/components/SearchEngine.svelte";
     import MondasWidget from "$lib/components/MondasWidget.svelte";
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
@@ -40,8 +41,15 @@
     let myLocationName = "";
     let myLocationCountySlug = "";
 
+    let favorites = { settlements: [], attractions: [], entries: [], events: [] };
+
     $: allLinksCount = userLinks.length + promotedLinks.length;
     $: showArrows = !promotedLoading && allLinksCount > LINKS_BEFORE_ARROWS;
+    $: siteDefault = { slug: myLocationSlug, name: myLocationName };
+    $: settlementPlaces = $auth.loggedIn
+        ? homepageSettlements(favorites, siteDefault)
+        : [{ slug: myLocationSlug, name: myLocationName }];
+    $: attractionWeatherPlaces = $auth.loggedIn ? homepageAttractionWeather(favorites) : [];
 
     function truncateTitle(title, maxLen = 8) {
         if (!title || title.length <= maxLen) return title;
@@ -281,6 +289,20 @@
             }
         } catch (_) {}
 
+        if (get(auth).loggedIn) {
+            try {
+                const payload = (await apiFetch("/api/account/favorites")) || {};
+                favorites = {
+                    settlements: Array.isArray(payload.settlements) ? payload.settlements : [],
+                    attractions: Array.isArray(payload.attractions) ? payload.attractions : [],
+                    entries: Array.isArray(payload.entries) ? payload.entries : [],
+                    events: Array.isArray(payload.events) ? payload.events : [],
+                };
+            } catch {
+                favorites = { settlements: [], attractions: [], entries: [], events: [] };
+            }
+        }
+
         const cached = localStorage.getItem(PROMOTED_CACHE_KEY);
         if (cached && cacheVersion) {
             try {
@@ -430,11 +452,22 @@
                 </div>
             </div>
         <DateTimeWidget />
-        <WeatherWidget settlementSlug={myLocationSlug} />
+        {#each settlementPlaces as place (place.slug)}
+            <WeatherWidget settlementSlug={place.slug} />
+        {/each}
+        {#each attractionWeatherPlaces as place (`${place.slug}-${place.lat}-${place.lon}`)}
+            <WeatherWidget lat={place.lat} lon={place.lon} />
+        {/each}
     </div>
 </section>
 
-<EventsWidget ticker={true} settlementSlug={myLocationSlug} locationName={myLocationName} />
+{#if $auth.loggedIn}
+    {#each settlementPlaces as place (place.slug)}
+        <EventsWidget ticker={true} settlementSlug={place.slug} locationName={place.name} />
+    {/each}
+{:else}
+    <EventsWidget ticker={true} settlementSlug={myLocationSlug} locationName={myLocationName} />
+{/if}
 
 <MondasWidget />
 
