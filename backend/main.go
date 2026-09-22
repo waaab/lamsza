@@ -41,6 +41,7 @@ func main() {
 	mux.HandleFunc("/api/account/history", middleware.ApplyCORS(account.HandleHistory))
 	mux.HandleFunc("/api/account/favorites", middleware.ApplyCORS(account.HandleFavorites))
 	mux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
+	mux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	mux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
 
 	// Core Module (Always Enabled)

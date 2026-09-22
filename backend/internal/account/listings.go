@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/lib/pq"
 )
@@ -61,6 +62,21 @@ type createListingBody struct {
 	DeliveryHours  json.RawMessage `json:"delivery_hours"`
 }
 
+type updateListingBody struct {
+	Name          string          `json:"name"`
+	LocationID    int             `json:"location_id"`
+	CategoryID    int             `json:"category_id"`
+	TypeID        int             `json:"type_id"`
+	URL           string          `json:"url"`
+	Phone         string          `json:"phone"`
+	Address       string          `json:"address"`
+	Notes         string          `json:"notes"`
+	Languages     []string        `json:"languages"`
+	Hours         json.RawMessage `json:"hours"`
+	DeliveryHours json.RawMessage `json:"delivery_hours"`
+	Photos        json.RawMessage `json:"photos"`
+}
+
 type listingItem struct {
 	ID         int    `json:"id"`
 	Name       string `json:"name"`
@@ -79,6 +95,37 @@ type listingsResponse struct {
 	Member      []listingItem `json:"member"`
 	Pending     []listingItem `json:"pending"`
 	Unpublished []listingItem `json:"unpublished"`
+}
+
+func scanMembershipDB(entryID, userID int) (membershipResponse, bool, error) {
+	var resp membershipResponse
+	err := db.DB.QueryRow(`
+		SELECT entry_id, role, status
+		FROM entry_members
+		WHERE entry_id = $1 AND user_id = $2
+	`, entryID, userID).Scan(&resp.EntryID, &resp.Role, &resp.Status)
+	if err == sql.ErrNoRows {
+		return resp, false, nil
+	}
+	if err != nil {
+		return resp, false, err
+	}
+	return resp, true, nil
+}
+
+func canEditListing(role, status string) bool {
+	return status == "active" && (role == "owner" || role == "member")
+}
+
+func isActiveOwner(role, status string) bool {
+	return role == "owner" && status == "active"
+}
+
+func photosOrEmpty(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return "[]"
+	}
+	return string(raw)
 }
 
 func scanMembership(tx *sql.Tx, entryID, userID int) (membershipResponse, bool, error) {
@@ -214,9 +261,70 @@ func HandleListings(w http.ResponseWriter, r *http.Request) {
 		handleListListings(w, u.ID)
 	case http.MethodPost:
 		handleCreateListing(w, r, u.ID)
+	case http.MethodPatch:
+		handleUpdateListing(w, r, u.ID)
+	case http.MethodDelete:
+		handleDeleteListing(w, r, u.ID)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func HandleListingMembers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := auth.UserFromRequest(r)
+	if err != nil || u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	entryID, err := strconv.Atoi(r.URL.Query().Get("entry_id"))
+	if err != nil || entryID <= 0 {
+		http.Error(w, "entry_id required", http.StatusBadRequest)
+		return
+	}
+	targetUserID, err := strconv.Atoi(r.URL.Query().Get("user_id"))
+	if err != nil || targetUserID <= 0 {
+		http.Error(w, "user_id required", http.StatusBadRequest)
+		return
+	}
+
+	owner, found, err := scanMembershipDB(entryID, u.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found || !isActiveOwner(owner.Role, owner.Status) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var targetRole string
+	err = db.DB.QueryRow(`
+		SELECT role FROM entry_members WHERE entry_id = $1 AND user_id = $2
+	`, entryID, targetUserID).Scan(&targetRole)
+	if err == sql.ErrNoRows {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if targetRole == "owner" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	_, err = db.DB.Exec(`DELETE FROM entry_members WHERE entry_id = $1 AND user_id = $2`, entryID, targetUserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func handleListListings(w http.ResponseWriter, userID int) {
@@ -339,4 +447,92 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		"role":        "owner",
 		"status":      "active",
 	})
+}
+
+func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
+	entryID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || entryID <= 0 {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	membership, found, err := scanMembershipDB(entryID, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found || !canEditListing(membership.Role, membership.Status) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var body updateListingBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.Name == "" || body.LocationID <= 0 || body.CategoryID <= 0 || body.TypeID <= 0 {
+		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
+		return
+	}
+	if len(body.Languages) == 0 {
+		body.Languages = []string{"HU"}
+	}
+
+	var catName string
+	err = db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
+	if err == sql.ErrNoRows {
+		http.Error(w, "invalid category_id", http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	slug := utils.Slugify(body.Name)
+	hours := jsonObjectOrEmptyListing(body.Hours)
+	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
+	photos := photosOrEmpty(body.Photos)
+
+	_, err = db.DB.Exec(`
+		UPDATE entries SET
+			type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5, slug = $6,
+			url = $7, phone = $8, address = $9, notes = $10, languages = $11,
+			hours = $12::jsonb, delivery_hours = $13::jsonb, photos = $14::jsonb
+		WHERE id = $15
+	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug,
+		body.URL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
+		hours, delivery, photos, entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func handleDeleteListing(w http.ResponseWriter, r *http.Request, userID int) {
+	entryID, err := strconv.Atoi(r.URL.Query().Get("id"))
+	if err != nil || entryID <= 0 {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	membership, found, err := scanMembershipDB(entryID, userID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found || !isActiveOwner(membership.Role, membership.Status) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	_, err = db.DB.Exec(`DELETE FROM entries WHERE id = $1`, entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }

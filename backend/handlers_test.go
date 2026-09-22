@@ -43,6 +43,7 @@ func init() {
 	testMux.HandleFunc("/api/auth/me", middleware.ApplyCORS(auth.HandleMe))
 	testMux.HandleFunc("/api/auth/logout", middleware.ApplyCORS(auth.HandleLogout))
 	testMux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
+	testMux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	testMux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
@@ -730,6 +731,81 @@ func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	}
 }
 
+func TestMemberCannotDeleteListing(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/locations", nil)
+	var locs []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &locs)
+	if len(locs) == 0 {
+		t.Skip("No locations in DB; cannot test delete")
+	}
+	locID := locs[0]["id"]
+
+	payload := map[string]interface{}{
+		"name":        "Delete Test Entry",
+		"location_id": locID,
+		"type":        "entry",
+		"category":    "Egyéb",
+	}
+	rr = doRequest(t, "POST", "/api/admin/entries", payload)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	entryID := created["id"]
+	slug, _ := created["slug"].(string)
+
+	ownerCookie := mustLogin("owner@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	memberCookie := mustLogin("member@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, memberCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("member claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	var memberUserID int
+	err := db.DB.QueryRow(`SELECT id FROM users WHERE email = $1`, "member@test.lamsza").Scan(&memberUserID)
+	if err != nil {
+		t.Fatalf("member user id: %v", err)
+	}
+	_, err = db.DB.Exec(`UPDATE entry_members SET status = 'active' WHERE entry_id = $1 AND user_id = $2`, int(entryID.(float64)), memberUserID)
+	if err != nil {
+		t.Fatalf("activate member: %v", err)
+	}
+
+	rr = doRequestWithCookie(t, "DELETE", "/api/account/listings?id="+formatID(entryID), nil, memberCookie)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("member DELETE listing: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("public GET after member delete attempt: expected 200, got %d", rr.Code)
+	}
+
+	rr = doRequestWithCookie(t, "DELETE", "/api/account/listings/members?entry_id="+formatID(entryID)+"&user_id="+java(memberUserID), nil, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("owner kick member: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doRequestWithCookie(t, "DELETE", "/api/account/listings?id="+formatID(entryID), nil, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("owner DELETE listing: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("public GET after owner delete: expected 404, got %d", rr.Code)
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
