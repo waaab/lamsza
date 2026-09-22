@@ -6,6 +6,7 @@
     import { apiFetch } from "$lib/api.js";
     import { openLogin } from "$lib/openLogin.js";
     import {
+        clampSlotCount,
         DEFAULT_QUICKLINK_SLOTS,
         MAX_QUICKLINK_SLOTS,
         MIN_QUICKLINK_SLOTS,
@@ -57,7 +58,6 @@
         url: "",
         bg_color: "#e6f0ff",
     });
-
     function initSettingsFromAuth() {
         const state = get(auth);
         selectedTheme =
@@ -65,10 +65,11 @@
             (typeof localStorage !== "undefined"
                 ? localStorage.getItem("theme") || "system"
                 : "system");
-        slotCount =
+        slotCount = clampSlotCount(
             typeof state.quicklinkSlots === "number"
                 ? state.quicklinkSlots
-                : readSlotCount();
+                : readSlotCount(),
+        );
     }
 
     async function loadLinks() {
@@ -95,31 +96,41 @@
     }
 
     onMount(() => {
-        const state = get(auth);
-        if (!state.loggedIn) {
+        if (!get(auth).loggedIn) {
             openLogin();
-            return;
         }
-        initSettingsFromAuth();
-        loadLinks();
-        loadHistory();
+        let accountDataLoaded = false;
+        const unsubscribe = auth.subscribe((state) => {
+            if (!state.loggedIn) {
+                accountDataLoaded = false;
+                return;
+            }
+            if (accountDataLoaded) return;
+            accountDataLoaded = true;
+            initSettingsFromAuth();
+            void loadLinks();
+            void loadHistory();
+        });
+        return unsubscribe;
     });
 
     async function savePreferences() {
         saveError = "";
         const prevTheme = selectedTheme;
         const prevSlots = slotCount;
+        const slots = clampSlotCount(slotCount);
+        slotCount = slots;
         try {
             await apiFetch("/api/account/preferences", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     theme: selectedTheme,
-                    quicklink_slots: slotCount,
+                    quicklink_slots: slots,
                 }),
             });
             applyTheme(selectedTheme);
-            writeSlotCount(slotCount);
+            writeSlotCount(slots);
             await auth.refresh();
         } catch {
             selectedTheme = prevTheme;
@@ -133,11 +144,11 @@
     }
 
     function decreaseSlots() {
-        slotCount = Math.max(MIN_QUICKLINK_SLOTS, slotCount - 1);
+        slotCount = clampSlotCount(slotCount - 1);
     }
 
     function increaseSlots() {
-        slotCount = Math.min(MAX_QUICKLINK_SLOTS, slotCount + 1);
+        slotCount = clampSlotCount(slotCount + 1);
     }
 
     function openAddLink() {
@@ -482,7 +493,6 @@
 </section>
 
 {#if linkDialogOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
     <div
         class="link-dialog-overlay"
         role="dialog"
@@ -491,8 +501,7 @@
         onclick={(e) => e.target === e.currentTarget && closeLinkDialog()}
         onkeydown={(e) => e.key === "Escape" && closeLinkDialog()}
     >
-        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-        <div class="link-dialog" onclick={(e) => e.stopPropagation()}>
+        <div class="link-dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
             <h3 id="profile-link-dialog-title">
                 {linkDialogMode === "add" ? "Új gyorslink hozzáadása" : "Gyorslink szerkesztése"}
             </h3>
