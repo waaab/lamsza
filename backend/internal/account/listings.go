@@ -125,8 +125,9 @@ func isActiveOwner(role, status string) bool {
 
 const maxListingPhotos = 24
 const maxListingPhotoTextRunes = 500
-const defaultListingPhotoWidth = 1200
-const defaultListingPhotoHeight = 800
+const listingImageURLPrefix = "/api/media/entry-images/"
+const defaultListingPhotoWidth = 1600
+const defaultListingPhotoHeight = 1200
 
 type listingPhoto struct {
 	URL         string `json:"url"`
@@ -195,13 +196,14 @@ func validListingPhotoURL(u string) bool {
 		return false
 	}
 	lower := strings.ToLower(u)
-	if strings.HasPrefix(lower, "javascript:") || strings.HasPrefix(lower, "data:") {
+	if strings.HasPrefix(lower, "javascript:") || strings.HasPrefix(lower, "data:") || strings.Contains(u, "://") && !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
 		return false
 	}
-	if strings.Contains(u, "://") && !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
-		return false
+	if strings.HasPrefix(u, listingImageURLPrefix) {
+		base := u[len(listingImageURLPrefix):]
+		return base != "" && !strings.Contains(base, "/") && !strings.Contains(base, "..")
 	}
-	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://") || !strings.Contains(u, "://")
+	return strings.HasPrefix(lower, "https://") || strings.HasPrefix(lower, "http://")
 }
 
 func clipListingPhotoRunes(s string, max int) string {
