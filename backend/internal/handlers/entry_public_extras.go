@@ -58,12 +58,13 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 		ORDER BY r.created_at DESC
 		LIMIT 50
 	`, entryIDInt)
+	reviews := []models.PublicReview{}
 	if err != nil {
+		e.Reviews = &reviews
 		return
 	}
 	defer rows.Close()
 
-	reviews := []models.PublicReview{}
 	for rows.Next() {
 		var r models.PublicReview
 		var id int
@@ -72,7 +73,7 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 			reviews = append(reviews, r)
 		}
 	}
-	e.Reviews = reviews
+	e.Reviews = &reviews
 
 	// Load my_review if viewerUserID > 0
 	if viewerUserID > 0 {

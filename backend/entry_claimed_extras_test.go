@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
+
+	"backend/internal/db"
 )
 
 func mustLocID(t *testing.T) interface{} {
@@ -78,5 +81,48 @@ func TestUnclaimedPublicEntryHidesExtras(t *testing.T) {
 	photos, _ := got["photos"].([]interface{})
 	if len(photos) != 0 {
 		t.Fatalf("unclaimed photos must be empty, got %v", got["photos"])
+	}
+}
+
+func TestClaimedRatingsEnabledEmptyReviews(t *testing.T) {
+	locID := mustLocID(t)
+	entryID, slug := createEntry(t, "ClaimedRatingsEmpty A", locID)
+	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+
+	ownerCookie := mustLogin("owner@test.lamsza")
+	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	entryIDInt := int(entryID.(float64))
+	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
+		t.Fatalf("enable ratings: %v", err)
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	body := rr.Body.String()
+	if !strings.Contains(body, `"reviews":[]`) {
+		t.Fatalf("claimed with ratings on must include reviews:[], body: %s", body)
+	}
+	var got map[string]interface{}
+	json.Unmarshal([]byte(body), &got)
+	if got["claimed"] != true {
+		t.Fatalf("expected claimed true, got %v", got["claimed"])
+	}
+	if got["ratings_enabled"] != true {
+		t.Fatalf("expected ratings_enabled true, got %v", got["ratings_enabled"])
+	}
+	reviews, ok := got["reviews"].([]interface{})
+	if !ok {
+		t.Fatalf("reviews must be array, got %T", got["reviews"])
+	}
+	if len(reviews) != 0 {
+		t.Fatalf("reviews must be empty, got len %d", len(reviews))
 	}
 }

@@ -30,7 +30,7 @@ type Entry struct {
 	RatingsEnabled bool            `json:"ratings_enabled"`
 	Rating         *float64        `json:"rating,omitempty"`
 	ReviewCount    int             `json:"review_count,omitempty"`
-	Reviews        []PublicReview  `json:"reviews,omitempty"`
+	Reviews        *[]PublicReview `json:"reviews,omitempty"`
 	MyReview       *PublicReview   `json:"my_review,omitempty"`
 }
 
