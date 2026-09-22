@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { get } from "svelte/store";
     import { auth } from "$lib/stores/auth";
     import { apiFetch } from "$lib/api";
     import SearchEngine from "$lib/components/SearchEngine.svelte";
@@ -137,8 +138,45 @@
         linkDialogOpen = false;
     }
 
-    function saveLinkDialog(e) {
+    async function saveLinkDialog(e) {
         e.preventDefault();
+        if (get(auth).loggedIn) {
+            const prevLinks = userLinks;
+            try {
+                if (linkDialogMode === "add") {
+                    await apiFetch("/api/account/links", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            title: linkDialogData.title,
+                            url: linkDialogData.url,
+                            bg_color: linkDialogData.bg_color,
+                        }),
+                    });
+                    userLinks = (await apiFetch("/api/account/links")) || [];
+                } else {
+                    const next = userLinks.map((l) =>
+                        l.id === linkDialogData.id
+                            ? {
+                                  ...l,
+                                  title: linkDialogData.title,
+                                  url: linkDialogData.url,
+                                  bg_color: linkDialogData.bg_color,
+                              }
+                            : l,
+                    );
+                    userLinks = await apiFetch("/api/account/links", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ links: next }),
+                    });
+                }
+                closeLinkDialog();
+            } catch {
+                userLinks = prevLinks;
+            }
+            return;
+        }
         if (linkDialogMode === "add") {
             userLinks = [...userLinks, { id: generateId(), title: linkDialogData.title, url: linkDialogData.url, bg_color: linkDialogData.bg_color }];
         } else {
@@ -148,16 +186,42 @@
         closeLinkDialog();
     }
 
-    function deleteLinkFromDialog(e) {
+    async function deleteLinkFromDialog(e) {
         e.preventDefault();
         if (!linkDialogData.id) return;
+        if (get(auth).loggedIn) {
+            const prevLinks = userLinks;
+            try {
+                await apiFetch(`/api/account/links?id=${encodeURIComponent(String(linkDialogData.id))}`, {
+                    method: "DELETE",
+                });
+                userLinks = prevLinks.filter((l) => l.id !== linkDialogData.id);
+                closeLinkDialog();
+            } catch {
+                userLinks = prevLinks;
+            }
+            return;
+        }
         userLinks = userLinks.filter(l => l.id !== linkDialogData.id);
         saveUserLinks();
         closeLinkDialog();
     }
 
+    async function initQuicklinks() {
+        await auth.init();
+        if (get(auth).loggedIn) {
+            try {
+                userLinks = (await apiFetch("/api/account/links")) || [];
+            } catch {
+                userLinks = [];
+            }
+        } else {
+            loadUserLinks();
+        }
+    }
+
     onMount(async () => {
-        loadUserLinks();
+        await initQuicklinks();
 
         let cacheVersion = null;
         try {

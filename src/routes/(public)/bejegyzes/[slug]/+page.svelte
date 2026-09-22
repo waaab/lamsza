@@ -1,9 +1,12 @@
 <script>
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
+    import { get } from "svelte/store";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import { apiFetch } from "$lib/api";
+    import { recordAccountHistory } from "$lib/entryHistory.js";
+    import { auth } from "$lib/stores/auth";
 
     let entry = null;
     let loading = true;
@@ -26,6 +29,16 @@
                 error = "A bejegyzés nem található.";
             } else {
                 entry = data;
+                await recordAccountHistory(
+                    {
+                        slug: data.slug,
+                        name: data.name,
+                        category: data.category || "",
+                        location: data.location || "",
+                        photo: "",
+                    },
+                    get(auth),
+                );
             }
         } catch (err) {
             console.error(err);
