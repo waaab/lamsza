@@ -18,6 +18,16 @@ func TestClampSlots(t *testing.T) {
 	}
 }
 
+func TestNormalizeHistoryItem(t *testing.T) {
+	item, err := NormalizeHistoryItem("kavezo", "Kávézó", "Vendéglő", "Csíkszereda", "")
+	if err != nil || item.Slug != "kavezo" || item.Name != "Kávézó" {
+		t.Fatalf("got %+v %v", item, err)
+	}
+	if _, err := NormalizeHistoryItem("", "Kávézó", "", "", ""); err == nil {
+		t.Fatal("expected missing slug to fail")
+	}
+}
+
 func TestNormalizeLink(t *testing.T) {
 	title, url, color, err := NormalizeLink("  RMDSZ ", "https://rmdsz.ro", "")
 	if err != nil || title != "RMDSZ" || url != "https://rmdsz.ro" || color != "#e6f0ff" {

@@ -12,6 +12,7 @@ import (
 
 func Migrate() {
 	migrateUserLinks()
+	migrateUserHistory()
 	log.Println("Account preferences ready")
 }
 
@@ -175,6 +176,18 @@ func HandleImport(w http.ResponseWriter, r *http.Request) {
 	}
 	if linkCount == 0 {
 		if err := insertImportLinks(tx, u.ID, body.Links); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	var historyCount int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM user_entry_history WHERE user_id = $1`, u.ID).Scan(&historyCount); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if historyCount == 0 {
+		if err := insertImportHistory(tx, u.ID, body.History); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
