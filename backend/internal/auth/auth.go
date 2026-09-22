@@ -211,9 +211,6 @@ func HandleGoogleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "google account has no email", http.StatusUnauthorized)
 		return
 	}
-	if ident.Name == "" {
-		ident.Name = ident.Email
-	}
 
 	profile := ApplyGoogleProfile(UserProfile{}, ident)
 

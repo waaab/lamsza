@@ -26,18 +26,19 @@ func TestIsAdminAllowlist(t *testing.T) {
 
 func TestApplyGoogleProfileClearsOmittedFields(t *testing.T) {
 	got := ApplyGoogleProfile(UserProfile{
+		Name:      "Old Name",
 		GivenName: "Anna",
 		Picture:   "https://example.test/old.jpg",
 		Locale:    "hu",
 	}, GoogleIdentity{
 		Sub:   "sub-1",
 		Email: "anna@example.test",
-		Name:  "Anna",
+		Name:  "",
 	})
-	if got.GivenName != "" || got.Picture != "" || got.Locale != "" {
+	if got.Name != "" || got.GivenName != "" || got.Picture != "" || got.Locale != "" {
 		t.Fatalf("omitted fields must clear, got %+v", got)
 	}
-	if got.Email != "anna@example.test" || got.Name != "Anna" || got.Sub != "sub-1" {
+	if got.Email != "anna@example.test" || got.Sub != "sub-1" {
 		t.Fatalf("present fields must overwrite, got %+v", got)
 	}
 }
