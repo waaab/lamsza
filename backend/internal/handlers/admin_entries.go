@@ -21,11 +21,12 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 				e.id, e.type, e.location_id, e.category_id, COALESCE(e.category, ''), e.name, COALESCE(e.slug, ''),
 				COALESCE(e.url, ''), COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages,
+				COALESCE(e.verified, false),
 				COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::VARCHAR[]) as tags
 			FROM entries e
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
-			GROUP BY e.id, e.type, e.location_id, e.category_id, e.category, e.name, e.url, e.phone, e.address, e.notes, e.languages
+			GROUP BY e.id, e.type, e.location_id, e.category_id, e.category, e.name, e.url, e.phone, e.address, e.notes, e.languages, e.verified
 			ORDER BY LOWER(e.name) ASC, e.id ASC
 		`
 		rows, err := db.DB.Query(sqlQuery)
@@ -41,7 +42,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 			var pqLanguages []string
 			var pqTags []string
 			var locID sql.NullInt64
-			if err := rows.Scan(&s.ID, &s.Type, &locID, &s.CategoryID, &s.Category, &s.Name, &s.Slug, &s.URL, &s.Phone, &s.Address, &s.Notes, pq.Array(&pqLanguages), pq.Array(&pqTags)); err == nil {
+			if err := rows.Scan(&s.ID, &s.Type, &locID, &s.CategoryID, &s.Category, &s.Name, &s.Slug, &s.URL, &s.Phone, &s.Address, &s.Notes, pq.Array(&pqLanguages), &s.Verified, pq.Array(&pqTags)); err == nil {
 				if locID.Valid {
 					v := int(locID.Int64)
 					s.LocationID = &v
@@ -77,8 +78,8 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		}
 
 		s.Slug = utils.Slugify(s.Name)
-		err := db.DB.QueryRow("INSERT INTO entries (type, location_id, category_id, category, name, slug, url, phone, address, notes, languages) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
-			s.Type, s.LocationID, catID, s.Category, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages)).Scan(&s.ID)
+		err := db.DB.QueryRow("INSERT INTO entries (type, location_id, category_id, category, name, slug, url, phone, address, notes, languages, verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+			s.Type, s.LocationID, catID, s.Category, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified).Scan(&s.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -116,9 +117,9 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.Slug = utils.Slugify(s.Name)
 		_, err := db.DB.Exec(`UPDATE entries SET 
             type=$1, location_id=$2, category_id=$3, category=$4, name=$5, slug=$6, url=$7, 
-            phone=$8, address=$9, notes=$10, languages=$11 
-            WHERE id=$12`,
-			s.Type, s.LocationID, catID, s.Category, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.ID)
+            phone=$8, address=$9, notes=$10, languages=$11, verified=$12 
+            WHERE id=$13`,
+			s.Type, s.LocationID, catID, s.Category, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified, s.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return

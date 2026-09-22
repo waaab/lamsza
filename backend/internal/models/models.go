@@ -19,6 +19,8 @@ type Entry struct {
 	Tags           []string `json:"tags"`
 	Languages      []string `json:"languages"`
 	URL            string   `json:"url"`
+	Claimed        bool     `json:"claimed"`
+	Verified       bool     `json:"verified"`
 	IsDirectMatch  bool     `json:"is_direct_match"`
 }
 
@@ -174,6 +176,7 @@ type AdminEntry struct {
 	Notes      string   `json:"notes"`
 	Languages  []string `json:"languages"`
 	Tags       []string `json:"tags"`
+	Verified   bool     `json:"verified"`
 }
 
 type EntryCategory struct {

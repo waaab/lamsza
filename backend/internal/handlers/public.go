@@ -38,6 +38,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
+				false, COALESCE(e.verified, false),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
 			FROM entries e
@@ -47,6 +48,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
+				AND e.published = true
 		`
 		params = append(params, q, normalizedQ)
 		paramIdx = 3
@@ -58,6 +60,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
+				false, COALESCE(e.verified, false),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				0 as rank
 			FROM entries e
@@ -66,7 +69,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
-			WHERE 1=1
+			WHERE e.published = true
 		`
 		params = append(params, q)
 		paramIdx = 2
@@ -94,9 +97,9 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if q != "" && normalizedQ != "" {
-		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
 	} else {
-		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de ORDER BY is_direct_match DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified ORDER BY is_direct_match DESC, e.name ASC"
 	}
 
 	log.Printf("EntriesHandler query: %s", sqlQuery)
@@ -115,7 +118,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		var e models.Entry
 		var pqLanguages []string
 		var rank float64
-		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.IsDirectMatch, &rank); err != nil {
+		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &e.IsDirectMatch, &rank); err != nil {
 			log.Printf("EntriesHandler scan error: %v", err)
 			continue
 		}
@@ -141,12 +144,13 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			s.name, s.slug, c.name, c.slug, s.type, 
 			COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
-			e.languages, COALESCE(e.url, '')
+			e.languages, COALESCE(e.url, ''),
+			false, COALESCE(e.verified, false)
 		FROM entries e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
-		WHERE e.slug = $1`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL)
+		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified)
 
 	if err != nil {
 		http.Error(w, "Entry not found", 404)

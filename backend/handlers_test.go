@@ -25,6 +25,7 @@ func init() {
 	config.Load()
 	db.InitDB()
 	mondasok.Migrate()
+	handlers.MigrateEntryVerified()
 	account.Migrate()
 
 	testMux = http.NewServeMux()
@@ -424,6 +425,55 @@ func TestAdminNewsFeedsCRUD(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Admin CRUD: Entries (full cycle)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Admin CRUD: Entries (full cycle)
+// ---------------------------------------------------------------------------
+
+func TestPublicEntryVerifiedSeparateFromClaimed(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/locations", nil)
+	var locs []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &locs)
+	if len(locs) == 0 {
+		t.Skip("No locations in DB; cannot test verified entry")
+	}
+	locID := locs[0]["id"]
+
+	payload := map[string]interface{}{
+		"name":        "Verified Separate Test",
+		"location_id": locID,
+		"type":        "service",
+		"category":    "Egyéb",
+		"verified":    true,
+	}
+
+	rr = doRequest(t, "POST", "/api/admin/entries", payload)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	slug, _ := created["slug"].(string)
+	if slug == "" {
+		t.Fatal("POST entries missing slug")
+	}
+	id := created["id"]
+
+	rr = doRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var got map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &got)
+	if got["verified"] != true {
+		t.Fatalf("public entry verified should be true, got %v", got["verified"])
+	}
+	if got["claimed"] != false {
+		t.Fatalf("public entry claimed should be false until ownership exists, got %v", got["claimed"])
+	}
+
+	doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+}
 
 func TestAdminEntriesCRUD(t *testing.T) {
 	// Need a valid location_id; fetch locations first

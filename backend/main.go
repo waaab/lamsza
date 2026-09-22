@@ -30,6 +30,7 @@ func main() {
 	weather.MigrateWeatherTranslations()
 	pages.MigratePages()
 	pagefaq.Migrate()
+	handlers.MigrateEntryVerified()
 	account.Migrate()
 
 	mux := http.DefaultServeMux
