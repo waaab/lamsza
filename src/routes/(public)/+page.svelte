@@ -3,6 +3,14 @@
     import { get } from "svelte/store";
     import { auth } from "$lib/stores/auth";
     import { apiFetch } from "$lib/api";
+    import {
+        clampSlotCount,
+        DEFAULT_QUICKLINK_SLOTS,
+        MAX_QUICKLINK_SLOTS,
+        MIN_QUICKLINK_SLOTS,
+        readSlotCount,
+        writeSlotCount,
+    } from "$lib/quickLinksDisplay.js";
     import SearchEngine from "$lib/components/SearchEngine.svelte";
     import MondasWidget from "$lib/components/MondasWidget.svelte";
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
@@ -22,6 +30,7 @@
     let linkDialogOpen = false;
     let linkDialogMode = "add";
     let linkDialogData = { id: "", title: "", url: "", bg_color: "#e6f0ff" };
+    let slotCount = DEFAULT_QUICKLINK_SLOTS;
     let canScrollLeft = false;
     let canScrollRight = false;
     let quickLinksContainer;
@@ -37,6 +46,35 @@
     function truncateTitle(title, maxLen = 8) {
         if (!title || title.length <= maxLen) return title;
         return title.slice(0, maxLen) + "...";
+    }
+
+    async function setSlotCount(next) {
+        const slots = clampSlotCount(next);
+        if (get(auth).loggedIn) {
+            const prev = slotCount;
+            slotCount = slots;
+            try {
+                await apiFetch("/api/account/preferences", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ quicklink_slots: slots }),
+                });
+                writeSlotCount(slots);
+                await auth.refresh();
+            } catch {
+                slotCount = prev;
+            }
+        } else {
+            slotCount = writeSlotCount(next);
+        }
+    }
+
+    function decreaseSlots() {
+        setSlotCount(slotCount - 1);
+    }
+
+    function increaseSlots() {
+        setSlotCount(slotCount + 1);
     }
 
     function checkScroll(node) {
@@ -209,14 +247,21 @@
 
     async function initQuicklinks() {
         await auth.init();
-        if (get(auth).loggedIn) {
+        const state = get(auth);
+        if (state.loggedIn) {
             try {
                 userLinks = (await apiFetch("/api/account/links")) || [];
             } catch {
                 userLinks = [];
             }
+            slotCount = clampSlotCount(
+                typeof state.quicklinkSlots === "number"
+                    ? state.quicklinkSlots
+                    : readSlotCount(),
+            );
         } else {
             loadUserLinks();
+            slotCount = readSlotCount();
         }
     }
 
@@ -279,6 +324,27 @@
         <div id="gyorslinkek" class="widget">
             <div class="widget-header">
                 <h3 class="widget-title">Gyorslinkek</h3>
+                <div
+                    class="quicklinks-slot-stepper"
+                    role="group"
+                    aria-label="Megjelenített gyorslinkek száma"
+                >
+                    <button
+                        type="button"
+                        class="btn btn-xs"
+                        disabled={slotCount <= MIN_QUICKLINK_SLOTS}
+                        aria-label="Kevesebb hely"
+                        on:click={decreaseSlots}
+                    >−</button>
+                    <span class="quicklinks-slot-count" aria-live="polite">{slotCount}</span>
+                    <button
+                        type="button"
+                        class="btn btn-xs"
+                        disabled={slotCount >= MAX_QUICKLINK_SLOTS}
+                        aria-label="Több hely"
+                        on:click={increaseSlots}
+                    >+</button>
+                </div>
             </div>
                 <div
                     class="quick-links-wrapper"

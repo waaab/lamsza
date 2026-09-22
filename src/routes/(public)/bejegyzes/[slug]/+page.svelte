@@ -6,6 +6,7 @@
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import { apiFetch } from "$lib/api";
     import { recordAccountHistory } from "$lib/entryHistory.js";
+    import { normalizePhotos } from "$lib/entryPhotos.js";
     import { auth } from "$lib/stores/auth";
 
     let entry = null;
@@ -29,13 +30,14 @@
                 error = "A bejegyzés nem található.";
             } else {
                 entry = data;
+                await auth.init();
                 await recordAccountHistory(
                     {
                         slug: data.slug,
                         name: data.name,
                         category: data.category || "",
                         location: data.location || "",
-                        photo: "",
+                        photo: normalizePhotos(data.photos)[0]?.url || "",
                     },
                     get(auth),
                 );
