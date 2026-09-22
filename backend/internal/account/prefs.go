@@ -14,6 +14,7 @@ func Migrate() {
 	migrateUserLinks()
 	migrateUserHistory()
 	migrateUserFavorites()
+	migrateEntryMembers()
 	log.Println("Account preferences ready")
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend/internal/account"
+	"backend/internal/auth"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/events"
@@ -23,9 +24,13 @@ var testMux *http.ServeMux
 
 func init() {
 	config.Load()
+	config.AppConfig.GoogleClientID = "test-google-client-id"
+	config.AppConfig.AdminGoogleEmails = []string{"admin@test.lamsza"}
+	auth.VerifyIDToken = auth.ParseTestIDToken
 	db.InitDB()
 	mondasok.Migrate()
 	handlers.MigrateEntryVerified()
+	auth.Migrate()
 	account.Migrate()
 
 	testMux = http.NewServeMux()
@@ -34,6 +39,11 @@ func init() {
 	testMux.HandleFunc("/api/account/links", middleware.ApplyCORS(account.HandleLinks))
 	testMux.HandleFunc("/api/account/history", middleware.ApplyCORS(account.HandleHistory))
 	testMux.HandleFunc("/api/account/favorites", middleware.ApplyCORS(account.HandleFavorites))
+	testMux.HandleFunc("/api/auth/google", middleware.ApplyCORS(auth.HandleGoogleLogin))
+	testMux.HandleFunc("/api/auth/me", middleware.ApplyCORS(auth.HandleMe))
+	testMux.HandleFunc("/api/auth/logout", middleware.ApplyCORS(auth.HandleLogout))
+	testMux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
+	testMux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
@@ -54,6 +64,48 @@ func init() {
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
 }
+
+func mustLogin(email string) *http.Cookie {
+	body, _ := json.Marshal(map[string]string{"credential": "test:" + email})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/google", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	testMux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		panic("test google login failed: " + rr.Body.String())
+	}
+	for _, c := range rr.Result().Cookies() {
+		if c.Name == auth.SessionCookieName {
+			return c
+		}
+	}
+	panic("test google login missing session cookie")
+}
+
+func doRequestWithCookie(t *testing.T, method, path string, body interface{}, cookie *http.Cookie) *httptest.ResponseRecorder {
+	t.Helper()
+	var reqBody *bytes.Buffer
+	if body != nil {
+		b, _ := json.Marshal(body)
+		reqBody = bytes.NewBuffer(b)
+	} else {
+		reqBody = bytes.NewBuffer(nil)
+	}
+	req := httptest.NewRequest(method, path, reqBody)
+	req.Header.Set("Content-Type", "application/json")
+	if cookie != nil {
+		req.AddCookie(cookie)
+	}
+	rr := httptest.NewRecorder()
+	testMux.ServeHTTP(rr, req)
+	return rr
+}
+
+func doAnonRequest(t *testing.T, method, path string, body interface{}) *httptest.ResponseRecorder {
+	t.Helper()
+	return doRequestWithCookie(t, method, path, body, nil)
+}
+
 
 func doRequest(t *testing.T, method, path string, body interface{}) *httptest.ResponseRecorder {
 	t.Helper()
@@ -603,6 +655,81 @@ func TestProxyMissingURL(t *testing.T) {
 		t.Fatalf("Proxy without url: expected 400, got %d", rr.Code)
 	}
 }
+
+func TestClaimFreeListingBecomesOwner(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/locations", nil)
+	var locs []map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &locs)
+	if len(locs) == 0 {
+		t.Skip("No locations in DB; cannot test claim")
+	}
+	locID := locs[0]["id"]
+
+	payload := map[string]interface{}{
+		"name":        "Claim Test Entry",
+		"location_id": locID,
+		"type":        "entry",
+		"category":    "Egyéb",
+	}
+	rr = doRequest(t, "POST", "/api/admin/entries", payload)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	entryID := created["id"]
+	slug, _ := created["slug"].(string)
+	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+
+	ownerCookie := mustLogin("owner@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, ownerCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var claimResp map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &claimResp)
+	if claimResp["role"] != "owner" {
+		t.Fatalf("claim role: expected owner, got %v", claimResp["role"])
+	}
+	if claimResp["status"] != "active" {
+		t.Fatalf("claim status: expected active, got %v", claimResp["status"])
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry: expected 200, got %d", rr.Code)
+	}
+	var pub map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &pub)
+	if pub["claimed"] != true {
+		t.Fatalf("public claimed should be true after owner claim, got %v", pub["claimed"])
+	}
+
+	memberCookie := mustLogin("member@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, memberCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("second claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var claim2 map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &claim2)
+	if claim2["role"] != "member" {
+		t.Fatalf("second claim role: expected member, got %v", claim2["role"])
+	}
+	if claim2["status"] != "pending" {
+		t.Fatalf("second claim status: expected pending, got %v", claim2["status"])
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	json.Unmarshal(rr.Body.Bytes(), &pub)
+	if pub["claimed"] != true {
+		t.Fatalf("public claimed should stay true with pending member, got %v", pub["claimed"])
+	}
+}
+
 
 // ---------------------------------------------------------------------------
 // Helpers

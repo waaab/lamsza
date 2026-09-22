@@ -38,7 +38,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
-				false, COALESCE(e.verified, false),
+				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
 			FROM entries e
@@ -60,7 +60,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
-				false, COALESCE(e.verified, false),
+				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				0 as rank
 			FROM entries e
@@ -145,7 +145,7 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 			e.languages, COALESCE(e.url, ''),
-			false, COALESCE(e.verified, false)
+			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false)
 		FROM entries e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
