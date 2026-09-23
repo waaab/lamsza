@@ -57,6 +57,7 @@ func main() {
 	mux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
 	mux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	mux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
+	mux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
 
 	// Core Module (Always Enabled)
 	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
