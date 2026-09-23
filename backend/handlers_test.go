@@ -39,6 +39,7 @@ func init() {
 	events.Migrate()
 	auth.Migrate()
 	account.Migrate()
+	account.MigrateWebsites()
 
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
 		return middleware.ApplyCORS(auth.RequireAdmin(h))

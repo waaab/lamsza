@@ -38,6 +38,7 @@ func main() {
 	events.Migrate()
 	auth.Migrate()
 	account.Migrate()
+	account.MigrateWebsites()
 
 	mux := http.DefaultServeMux
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
