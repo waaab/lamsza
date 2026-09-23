@@ -5,6 +5,7 @@ import (
 	"backend/internal/db"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -193,6 +194,56 @@ func TestWebsiteApproveRejectAndBan(t *testing.T) {
 		t.Fatalf("banned resubmit %d", rr.Code)
 	}
 	mustLogin("website-review@test.lamsza")
+}
+
+func searchJSON(t *testing.T, q string) map[string]interface{} {
+	t.Helper()
+	rr := doRequest(t, "GET", "/api/search?q="+url.QueryEscape(q), nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("search %q: %d %s", q, rr.Code, rr.Body.String())
+	}
+	var resp map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("search decode: %v", err)
+	}
+	return resp
+}
+
+func TestWebsiteSearchDomainAndTitle(t *testing.T) {
+	defer func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "search-example.com"); err != nil {
+			t.Errorf("cleanup search-example.com: %v", err)
+		}
+	}()
+
+	user := mustLogin("website-search@test.lamsza")
+	admin := mustLogin("admin@test.lamsza")
+	id := submitWebsite(t, user, "search-example.com", "Search Title", "Unique blurb zzq")
+	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "approve"}, admin)
+
+	domain := searchJSON(t, "https://www.search-example.com/path")
+	if domain["website_query"] != true {
+		t.Fatalf("expected domain query %#v", domain["website_query"])
+	}
+	sites := domain["websites"].([]interface{})
+	if len(sites) != 1 {
+		t.Fatalf("sites %#v", sites)
+	}
+	hit := sites[0].(map[string]interface{})
+	if hit["url"] != "https://search-example.com" || hit["title"] != "Search Title" {
+		t.Fatalf("hit %#v", hit)
+	}
+	if ents, ok := domain["entries"].([]interface{}); ok && len(ents) != 0 {
+		t.Fatalf("unclaimed domain query returned entries %#v", ents)
+	}
+
+	title := searchJSON(t, "Unique blurb zzq")
+	if title["website_query"] == true {
+		t.Fatal("title query was treated as a domain")
+	}
+	if len(title["websites"].([]interface{})) != 1 {
+		t.Fatalf("title sites %#v", title["websites"])
+	}
 }
 
 func adminQueueCount(t *testing.T, cookie *http.Cookie) int {

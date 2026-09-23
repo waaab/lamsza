@@ -91,6 +91,7 @@ func init() {
 	testMux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
+	testMux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
 
 	testAdminCookie = mustLogin("admin@test.lamsza")
 }

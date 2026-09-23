@@ -12,6 +12,15 @@ import (
 	"strings"
 )
 
+// WebsiteHit is a public website search result.
+type WebsiteHit struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Domain      string `json:"domain"`
+	URL         string `json:"url"`
+}
+
 type websiteListItem struct {
 	ID          int    `json:"id"`
 	Title       string `json:"title"`
@@ -36,6 +45,64 @@ type submitWebsiteResponse struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
+}
+
+func SearchWebsites(q string) (hits []WebsiteHit, domainQuery bool, publishedEntryID int) {
+	hits = []WebsiteHit{}
+	domainKey, err := webdomain.CanonicalDomain(q)
+	if err == nil {
+		var (
+			id                      int
+			title, description, key string
+			entryID                 sql.NullInt64
+			published               sql.NullBool
+		)
+		err = db.DB.QueryRow(`
+			SELECT w.id, w.title, w.description, w.domain_key, w.entry_id, e.published
+			FROM websites w
+			LEFT JOIN entries e ON e.id = w.entry_id
+			WHERE w.domain_key = $1 AND w.status = 'approved'
+		`, domainKey).Scan(&id, &title, &description, &key, &entryID, &published)
+		if err == nil {
+			domainQuery = true
+			hits = append(hits, WebsiteHit{
+				ID:          id,
+				Title:       title,
+				Description: description,
+				Domain:      key,
+				URL:         "https://" + key,
+			})
+			if entryID.Valid && published.Valid && published.Bool {
+				publishedEntryID = int(entryID.Int64)
+			}
+			return hits, domainQuery, publishedEntryID
+		}
+	}
+
+	pattern := "%" + strings.ToLower(q) + "%"
+	rows, err := db.DB.Query(`
+		SELECT w.id, w.title, w.description, w.domain_key
+		FROM websites w
+		LEFT JOIN entries e ON e.id = w.entry_id
+		WHERE w.status = 'approved'
+		  AND (unaccent(lower(w.title)) ILIKE unaccent($1) OR unaccent(lower(w.description)) ILIKE unaccent($1))
+		  AND (w.entry_id IS NULL OR e.published = false)
+		ORDER BY w.title ASC, w.id ASC
+		LIMIT 8
+	`, pattern)
+	if err != nil {
+		return hits, false, 0
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var hit WebsiteHit
+		if err := rows.Scan(&hit.ID, &hit.Title, &hit.Description, &hit.Domain); err != nil {
+			continue
+		}
+		hit.URL = "https://" + hit.Domain
+		hits = append(hits, hit)
+	}
+	return hits, false, 0
 }
 
 func HandleWebsites(w http.ResponseWriter, r *http.Request) {
