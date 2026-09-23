@@ -246,6 +246,109 @@ func TestWebsiteSearchDomainAndTitle(t *testing.T) {
 	}
 }
 
+func cleanupClaimTestDomains(t *testing.T) {
+	for _, d := range []string{"claim-example.com", "claim-free.com", "evil.example"} {
+		if _, err := db.DB.Exec(`DELETE FROM entries WHERE url = $1`, "https://"+d); err != nil {
+			t.Errorf("cleanup entry url %s: %v", d, err)
+		}
+		if _, err := db.DB.Exec(`
+			DELETE FROM entries WHERE id IN (SELECT entry_id FROM websites WHERE domain_key = $1 AND entry_id IS NOT NULL)
+		`, d); err != nil {
+			t.Errorf("cleanup entries %s: %v", d, err)
+		}
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, d); err != nil {
+			t.Errorf("cleanup website %s: %v", d, err)
+		}
+	}
+	for _, name := range []string{"Manifesto", "Second", "Banned claim"} {
+		if _, err := db.DB.Exec(`DELETE FROM entries WHERE name = $1`, name); err != nil {
+			t.Errorf("cleanup entry name %s: %v", name, err)
+		}
+	}
+	if _, err := db.DB.Exec(`UPDATE users SET website_banned = false WHERE email = $1`, "website-claim-ban@test.lamsza"); err != nil {
+		t.Errorf("cleanup ban flag: %v", err)
+	}
+}
+
+func TestClaimWebsiteCreatesUnpublishedListing(t *testing.T) {
+	cleanupClaimTestDomains(t)
+	defer cleanupClaimTestDomains(t)
+
+	owner := mustLogin("website-owner@test.lamsza")
+	other := mustLogin("website-joiner@test.lamsza")
+	admin := mustLogin("admin@test.lamsza")
+	webID := submitWebsite(t, owner, "claim-example.com", "Claim Title", "Claim blurb")
+	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": webID, "action": "approve"}, admin)
+
+	locID := mustLocID(t)
+	var catID, typeID int
+	db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&catID)
+	db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID)
+	rr := doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
+		"website_id": webID, "name": "Manifesto", "location_id": locID,
+		"category_id": catID, "type_id": typeID, "url": "https://evil.example",
+	}, owner)
+	if rr.Code != 200 {
+		t.Fatalf("create %d %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	if created["published"] != false || created["verified"] != false || created["role"] != "owner" {
+		t.Fatalf("created %#v", created)
+	}
+	var title, url string
+	var published, verified bool
+	db.DB.QueryRow(`SELECT w.title, e.url, e.published, e.verified FROM websites w JOIN entries e ON e.id = w.entry_id WHERE w.id = $1`, webID).Scan(&title, &url, &published, &verified)
+	if title != "Claim Title" || url != "https://claim-example.com" || published || verified {
+		t.Fatalf("stored title %q url %q published %v verified %v", title, url, published, verified)
+	}
+	before := searchJSON(t, "claim-example.com")
+	if len(before["entries"].([]interface{})) != 0 || len(before["websites"].([]interface{})) != 1 {
+		t.Fatalf("before publish %#v", before)
+	}
+	entryID := int(created["id"].(float64))
+	doRequestWithCookie(t, "POST", "/api/admin/listing-queue/publish", map[string]interface{}{"entry_id": entryID}, admin)
+	after := searchJSON(t, "www.claim-example.com")
+	ents := after["entries"].([]interface{})
+	if len(ents) != 1 || ents[0].(map[string]interface{})["claimed"] != true {
+		t.Fatalf("domain entries %#v", ents)
+	}
+	if after["websites"].([]interface{})[0].(map[string]interface{})["url"] != "https://claim-example.com" {
+		t.Fatal("website hit missing")
+	}
+	byName := searchJSON(t, "Manifesto")
+	if byName["website_query"] == true || len(byName["websites"].([]interface{})) != 0 {
+		t.Fatalf("name query leaked website %#v", byName["websites"])
+	}
+	if byName["entries"].([]interface{})[0].(map[string]interface{})["claimed"] != true {
+		t.Fatal("name query missing claimed")
+	}
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
+		"website_id": webID, "name": "Second", "location_id": locID,
+		"category_id": catID, "type_id": typeID,
+	}, other)
+	if rr.Code != 409 {
+		t.Fatalf("second listing %d", rr.Code)
+	}
+	banned := mustLogin("website-claim-ban@test.lamsza")
+	db.DB.Exec(`UPDATE users SET website_banned = true WHERE email = $1`, "website-claim-ban@test.lamsza")
+	freeID := submitWebsite(t, owner, "claim-free.com", "Free", "Free page.")
+	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": freeID, "action": "approve"}, admin)
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
+		"website_id": freeID, "name": "Banned claim", "location_id": locID,
+		"category_id": catID, "type_id": typeID,
+	}, banned)
+	if rr.Code != 403 {
+		t.Fatalf("banned claim %d %s", rr.Code, rr.Body.String())
+	}
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{"entry_id": entryID}, other)
+	var member map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &member)
+	if member["role"] != "member" || member["status"] != "pending" {
+		t.Fatalf("join %#v", member)
+	}
+}
+
 func adminQueueCount(t *testing.T, cookie *http.Cookie) int {
 	t.Helper()
 	rr := doRequestWithCookie(t, "GET", "/api/auth/me", nil, cookie)

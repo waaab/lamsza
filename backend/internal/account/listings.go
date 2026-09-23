@@ -4,6 +4,7 @@ import (
 	"backend/internal/auth"
 	"backend/internal/db"
 	"backend/internal/utils"
+	"backend/internal/webdomain"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -52,6 +53,7 @@ type claimBody struct {
 }
 
 type createListingBody struct {
+	WebsiteID      int             `json:"website_id"`
 	Name           string          `json:"name"`
 	LocationID     int             `json:"location_id"`
 	CategoryID     int             `json:"category_id"`
@@ -681,6 +683,12 @@ func jsonObjectOrEmptyListing(raw json.RawMessage) string {
 	return string(raw)
 }
 
+func writeListingConflict(w http.ResponseWriter, code int, errorCode string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": errorCode})
+}
+
 func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	var body createListingBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -697,6 +705,33 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	if !validListingURL(body.URL) {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
+	}
+
+	if body.WebsiteID > 0 {
+		var banned bool
+		err := db.DB.QueryRow(`SELECT website_banned FROM users WHERE id = $1`, userID).Scan(&banned)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if banned {
+			writeListingConflict(w, http.StatusForbidden, "website_banned")
+			return
+		}
+	} else if strings.TrimSpace(body.URL) != "" {
+		domainKey, err := webdomain.CanonicalDomain(body.URL)
+		if err == nil {
+			var exists bool
+			err = db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM websites WHERE domain_key = $1)`, domainKey).Scan(&exists)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if exists {
+				writeListingConflict(w, http.StatusConflict, "domain_taken")
+				return
+			}
+		}
 	}
 
 	var catName string
@@ -725,6 +760,32 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 	defer tx.Rollback()
 
+	listingURL := strings.TrimSpace(body.URL)
+	if body.WebsiteID > 0 {
+		var domainKey, status string
+		var linkedEntryID sql.NullInt64
+		err = tx.QueryRow(`
+			SELECT domain_key, status, entry_id FROM websites WHERE id = $1 FOR UPDATE
+		`, body.WebsiteID).Scan(&domainKey, &status, &linkedEntryID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if status != "approved" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if linkedEntryID.Valid {
+			writeListingConflict(w, http.StatusConflict, "domain_taken")
+			return
+		}
+		listingURL = "https://" + domainKey
+	}
+
 	slug, err := nextUniqueEntrySlug(tx, baseSlug)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -736,7 +797,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, delivery_hours, photos, ratings_enabled)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, '[]'::jsonb, false)
 		RETURNING id
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, strings.TrimSpace(body.URL), body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery).Scan(&entryID)
+	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery).Scan(&entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -750,6 +811,22 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if body.WebsiteID > 0 {
+		res, err := tx.Exec(`
+			UPDATE websites SET entry_id = $1 WHERE id = $2 AND entry_id IS NULL
+		`, entryID, body.WebsiteID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			writeListingConflict(w, http.StatusConflict, "domain_taken")
+			return
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
