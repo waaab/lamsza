@@ -176,7 +176,6 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
     gap: 1.25rem;
-    max-width: 64rem;
 }
 
 .admin-welcome-card {
@@ -482,7 +481,6 @@
 }
 
 .admin-cache-panel {
-    max-width: 64rem;
     margin: 1.75rem 0 2rem;
 }
 
