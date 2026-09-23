@@ -11,6 +11,15 @@ import (
 )
 
 func TestMigrateWebsitesBackfillsListingURL(t *testing.T) {
+	if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "backfill-sorozo.com"); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "backfill-sorozo.com"); err != nil {
+			t.Errorf("cleanup backfill-sorozo.com: %v", err)
+		}
+	}()
+
 	account.MigrateWebsites()
 	var banned bool
 	if err := db.DB.QueryRow(`SELECT website_banned FROM users LIMIT 1`).Scan(&banned); err != nil {
@@ -27,6 +36,10 @@ func TestMigrateWebsitesBackfillsListingURL(t *testing.T) {
 	err := db.DB.QueryRow(`SELECT domain_key, status, entry_id FROM websites WHERE domain_key = $1`, "backfill-sorozo.com").Scan(&key, &status, &entryID)
 	if err != nil || key != "backfill-sorozo.com" || status != "approved" {
 		t.Fatalf("backfill %q %q err %v", key, status, err)
+	}
+	wantEntryID := int(id.(float64))
+	if entryID != wantEntryID {
+		t.Fatalf("entry_id %d want %d", entryID, wantEntryID)
 	}
 }
 
