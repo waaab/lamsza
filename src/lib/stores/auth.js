@@ -13,6 +13,7 @@ const empty = {
     picture: "",
     givenName: "",
     familyName: "",
+    displayName: "",
     locale: "",
     googleSub: "",
     lastLoginAt: null,
@@ -20,8 +21,44 @@ const empty = {
     theme: null,
     quicklinkSlots: null,
     prefsImportedAt: null,
+    preferredLocation: null,
     adminQueueCount: 0,
+    offline: false,
 };
+
+const SESSION_CACHE_KEY = "lamsza_auth_session";
+
+function readSessionCache() {
+    if (typeof sessionStorage === "undefined") return null;
+    try {
+        const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
+        if (!raw) return null;
+        const data = JSON.parse(raw);
+        if (!data || !data.loggedIn) return null;
+        return { ...empty, ...data, offline: true };
+    } catch {
+        return null;
+    }
+}
+
+function writeSessionCache(state) {
+    if (typeof sessionStorage === "undefined") return;
+    try {
+        const { offline: _offline, ...rest } = state;
+        sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(rest));
+    } catch {
+        /* private mode / quota */
+    }
+}
+
+function clearSessionCache() {
+    if (typeof sessionStorage === "undefined") return;
+    try {
+        sessionStorage.removeItem(SESSION_CACHE_KEY);
+    } catch {
+        /* ignore */
+    }
+}
 
 const ACCOUNT_THEMES = new Set(["light", "dark", "system"]);
 
@@ -85,11 +122,13 @@ function createAuthStore() {
                     credentials: "include",
                 });
                 if (!res.ok) {
+                    clearSessionCache();
                     set(empty);
                     return empty;
                 }
                 const me = await res.json();
-                const next = meToAuthState(me);
+                const next = { ...meToAuthState(me), offline: false };
+                writeSessionCache(next);
                 set(next);
                 applyAccountTheme(next.theme);
 
@@ -109,7 +148,8 @@ function createAuthStore() {
                                     credentials: "include",
                                 });
                                 if (meRes.ok) {
-                                    const updated = meToAuthState(await meRes.json());
+                                    const updated = { ...meToAuthState(await meRes.json()), offline: false };
+                                    writeSessionCache(updated);
                                     set(updated);
                                     applyAccountTheme(updated.theme);
                                     return updated;
@@ -125,6 +165,11 @@ function createAuthStore() {
 
                 return next;
             } catch {
+                const cached = readSessionCache();
+                if (cached) {
+                    set(cached);
+                    return cached;
+                }
                 set(empty);
                 return empty;
             } finally {
@@ -150,6 +195,7 @@ function createAuthStore() {
             } catch {
                 /* still clear locally */
             }
+            clearSessionCache();
             set(empty);
         },
     };

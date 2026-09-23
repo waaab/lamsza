@@ -53,6 +53,8 @@
     let total = 0;
     /** Same batch size as index / hirek lists */
     const PAGE_BATCH = 12;
+    /** One grid row (desktop). Avoid a full page of placeholders for a short list. */
+    const SKELETON_COUNT = 3;
     let visibleCount = PAGE_BATCH;
 
     /** @type {{ event_types: string[], locations: { name: string, location_slug: string, county_slug: string, county_name: string }[], months: string[], event_days: string[], schedule_event_ids: number[] }} */
@@ -427,6 +429,7 @@
     }
 
     function clearMonthOnly() {
+        if (filterMonthKey === null && filterDayKey === null) return;
         filterMonthKey = null;
         filterDayKey = null;
         closeMonthDrill();
@@ -954,7 +957,7 @@
     <section class="list">
         {#if loading}
             <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-                {#each Array(PAGE_BATCH) as _}
+                {#each Array(SKELETON_COUNT) as _, i (i)}
                     <article
                         class="card event event--skeleton"
                         class:event--grid={viewMode === "grid"}
@@ -1395,6 +1398,7 @@
                     class="btn btn-sm events-calendar-clear"
                     class:active={filterMonthKey === null && filterDayKey === null}
                     aria-pressed={filterMonthKey === null && filterDayKey === null}
+                    disabled={filterMonthKey === null && filterDayKey === null}
                     on:click={clearMonthOnly}>
                     <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M216-96q-29.7 0-50.85-21.5Q144-139 144-168v-528q0-29 21.15-50.5T216-768h72v-96h72v96h240v-96h72v96h72q29.7 0 50.85 21.5Q816-725 816-696v528q0 29-21.15 50.5T744-96H216Zm0-72h528v-360H216v360Zm0-432h528v-96H216v96Zm0 0v-96 96Zm264.21 216q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5ZM298.5-394.29q-10.5-10.29-10.5-25.5t10.29-25.71q10.29-10.5 25.5-10.5t25.71 10.29q10.5 10.29 10.5 25.5t-10.29 25.71q-10.29 10.5-25.5 10.5t-25.71-10.29ZM636.21-384q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5Zm-156 144q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5ZM298.5-250.29q-10.5-10.29-10.5-25.5t10.29-25.71q10.29-10.5 25.5-10.5t25.71 10.29q10.5 10.29 10.5 25.5t-10.29 25.71q-10.29 10.5-25.5 10.5t-25.71-10.29ZM636.21-240q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5Z"/></svg>
                     <span class="btn-label">Összes hónap</span></button
@@ -1444,6 +1448,7 @@
                     class="btn btn-sm events-calendar-clear"
                     class:active={filterMonthKey === null && filterDayKey === null}
                     aria-pressed={filterMonthKey === null && filterDayKey === null}
+                    disabled={filterMonthKey === null && filterDayKey === null}
                     on:click={clearMonthOnly}>
                     <svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M216-96q-29.7 0-50.85-21.5Q144-139 144-168v-528q0-29 21.15-50.5T216-768h72v-96h72v96h240v-96h72v96h72q29.7 0 50.85 21.5Q816-725 816-696v528q0 29-21.15 50.5T744-96H216Zm0-72h528v-360H216v360Zm0-432h528v-96H216v96Zm0 0v-96 96Zm264.21 216q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5ZM298.5-394.29q-10.5-10.29-10.5-25.5t10.29-25.71q10.29-10.5 25.5-10.5t25.71 10.29q10.5 10.29 10.5 25.5t-10.29 25.71q-10.29 10.5-25.5 10.5t-25.71-10.29ZM636.21-384q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5Zm-156 144q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5ZM298.5-250.29q-10.5-10.29-10.5-25.5t10.29-25.71q10.29-10.5 25.5-10.5t25.71 10.29q10.5 10.29 10.5 25.5t-10.29 25.71q-10.29 10.5-25.5 10.5t-25.71-10.29ZM636.21-240q-15.21 0-25.71-10.29t-10.5-25.5q0-15.21 10.29-25.71t25.5-10.5q15.21 0 25.71 10.29t10.5 25.5q0 15.21-10.29 25.71t-25.5 10.5Z"/></svg>
                     <span class="btn-label">Összes hónap</span></button
@@ -1685,6 +1690,11 @@
         width: 100%;
         margin: 0.5rem 0 0.65rem;
         justify-content: center;
+    }
+
+    .events-calendar-clear:disabled {
+        cursor: default;
+        opacity: 1;
     }
 
     .events-year-calendar {

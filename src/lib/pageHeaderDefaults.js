@@ -30,7 +30,7 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
     },
     index: {
         title: "Index",
-        greeting: "Minden, ami helyi: szakemberek, intézmények, szolgáltatások.",
+        greeting: "Minden, ami helyi, egy helyen: szakemberek, intézmények, szolgáltatások.",
     },
     "index/szolgaltatasok": {
         title: "Szolgáltatások",

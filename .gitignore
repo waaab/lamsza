@@ -37,5 +37,8 @@ server.pid
 backend/server.pid
 *.log
 
+# Linked git worktrees
+.worktrees/
+
 # Extension Build Output
 extension/

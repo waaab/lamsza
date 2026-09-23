@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS users (
     theme VARCHAR(16),
     quicklink_slots INTEGER,
     prefs_imported_at TIMESTAMP,
+    display_name VARCHAR(24) NOT NULL DEFAULT '',
     last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

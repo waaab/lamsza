@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"backend/internal/utils"
 
@@ -106,9 +107,9 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if q != "" && normalizedQ != "" {
-		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, rank DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, rank DESC, btrim(e.name) ASC, e.id ASC"
 	} else {
-		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, e.name ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, btrim(e.name) ASC, e.id ASC"
 	}
 
 	log.Printf("EntriesHandler query: %s", sqlQuery)
@@ -133,6 +134,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("EntriesHandler scan error: %v", err)
 			continue
 		}
+		e.Name = strings.TrimSpace(e.Name)
 		e.Languages = pqLanguages
 		e.Type = utils.CanonicalEntryType(e.Type)
 		e.Hours = jsonObjectOrEmpty(hours)
@@ -191,6 +193,7 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Entry not found", 404)
 		return
 	}
+	e.Name = strings.TrimSpace(e.Name)
 	e.Languages = pqLanguages
 	e.Type = utils.CanonicalEntryType(e.Type)
 	e.Hours = jsonObjectOrEmpty(hours)

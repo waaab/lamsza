@@ -3,7 +3,7 @@
     import { get } from "svelte/store";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
-    import { profileTabIds } from "$lib/accountPrefs.js";
+    import { userSettingsTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
     import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
     import {
@@ -26,8 +26,10 @@
     import { applyTheme, LABELS, theme } from "$lib/stores/theme";
 
     const TAB_LABELS = {
-        profil: "Profil",
-        beallitasok: "Beállítások",
+        fiok: "Fiók",
+        tema: "Téma beállítások",
+        linkbeallitasok: "Link beállítások",
+        location: "Településem",
         bejegyzeseim: "Bejegyzéseim",
         linkjeim: "Linkjeim",
         elozmenyek: "Előzmények",
@@ -69,11 +71,20 @@
         return d.toLocaleString("hu-HU");
     }
 
-    let activeTab = $state(profileTabIds[0]);
+    let activeTab = $state(userSettingsTabIds[0]);
     let saveError = $state("");
+    let linkSaveError = $state("");
+    let displayName = $state("");
+    let displayNameError = $state("");
+    let displayNameSaving = $state(false);
     let linksError = $state("");
     let historyError = $state("");
     let selectedTheme = $state("system");
+    let preferredSettlementId = $state("");
+    /** @type {Array<{ id: number, name: string, county: string, type: string }>} */
+    let locationChoices = $state([]);
+    let locationSaveError = $state("");
+    let locationSaving = $state(false);
     let slotCount = $state(DEFAULT_QUICKLINK_SLOTS);
     /** @type {Array<{ id: number, title: string, url: string, bg_color?: string, position?: number }>} */
     let accountLinks = $state([]);
@@ -128,6 +139,7 @@
                 ? state.quicklinkSlots
                 : readSlotCount(),
         );
+        displayName = String(state.displayName || "");
     }
 
     async function loadLinks() {
@@ -511,6 +523,45 @@
         }
     }
 
+    async function loadLocationChoices() {
+        try {
+            const rows = await apiFetch("/api/locations");
+            locationChoices = (Array.isArray(rows) ? rows : [])
+                .filter((row) => String(row?.type || "") !== "megye")
+                .map((row) => ({
+                    id: Number(row.id),
+                    name: String(row.name ?? "").trim(),
+                    county: String(row.county ?? "").trim(),
+                    type: String(row.type ?? "").trim(),
+                }))
+                .filter((row) => row.id > 0 && row.name)
+                .sort((a, b) => a.name.localeCompare(b.name, "hu"));
+        } catch {
+            locationChoices = [];
+            locationSaveError = "A települések betöltése nem sikerült";
+        }
+    }
+
+    async function savePreferredLocation() {
+        locationSaveError = "";
+        locationSaving = true;
+        const id = Number(preferredSettlementId);
+        try {
+            await apiFetch("/api/account/preferences", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    preferred_settlement_id: Number.isFinite(id) && id > 0 ? id : 0,
+                }),
+            });
+            await auth.refresh();
+        } catch {
+            locationSaveError = "A mentés nem sikerült";
+        } finally {
+            locationSaving = false;
+        }
+    }
+
     onMount(() => {
         let accountDataLoaded = false;
         selectedTheme = get(theme);
@@ -519,9 +570,13 @@
                 accountDataLoaded = false;
                 return;
             }
+            preferredSettlementId = state.preferredLocation?.id
+                ? String(state.preferredLocation.id)
+                : "";
             if (accountDataLoaded) return;
             accountDataLoaded = true;
             initSettingsFromAuth();
+            void loadLocationChoices();
             void loadLinks();
             void loadHistory();
             void loadFavorites();
@@ -544,10 +599,26 @@
         };
     });
 
-    async function savePreferences() {
+    async function saveTheme() {
         saveError = "";
         const themeToSave = get(theme);
         const prevTheme = themeToSave;
+        try {
+            await apiFetch("/api/account/preferences", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ theme: themeToSave }),
+            });
+            applyTheme(themeToSave);
+            await auth.refresh();
+        } catch {
+            applyTheme(prevTheme);
+            saveError = "A mentés nem sikerült";
+        }
+    }
+
+    async function saveLinkSettings() {
+        linkSaveError = "";
         const prevSlots = slotCount;
         const slots = clampSlotCount(slotCount);
         slotCount = slots;
@@ -555,18 +626,38 @@
             await apiFetch("/api/account/preferences", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    theme: themeToSave,
-                    quicklink_slots: slots,
-                }),
+                body: JSON.stringify({ quicklink_slots: slots }),
             });
-            applyTheme(themeToSave);
             writeSlotCount(slots);
             await auth.refresh();
         } catch {
-            applyTheme(prevTheme);
             slotCount = prevSlots;
-            saveError = "A mentés nem sikerült";
+            linkSaveError = "A mentés nem sikerült";
+        }
+    }
+
+    async function saveDisplayName() {
+        displayNameError = "";
+        const name = displayName.trim().replace(/\s+/g, " ");
+        if ([...name].length > 24) {
+            displayNameError = "A megjelenített név legfeljebb 24 karakter lehet.";
+            return;
+        }
+        displayNameSaving = true;
+        const prev = displayName;
+        displayName = name;
+        try {
+            await apiFetch("/api/account/preferences", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ display_name: name }),
+            });
+            await auth.refresh();
+        } catch {
+            displayName = prev;
+            displayNameError = "A mentés nem sikerült";
+        } finally {
+            displayNameSaving = false;
         }
     }
 
@@ -720,21 +811,21 @@
 
 <section class="page-section profile-page">
     <PublicPageHero
-        title="Profil"
+        title="Felhasználói beállítások"
         greeting="Fiókod és beállításaid"
         loading={false}
-        breadcrumbLabel="Profil"
+        breadcrumbLabel="Felhasználói beállítások"
         documentTitleSuffix=" – Lámsza"
     />
 
     {#if !$auth.loggedIn}
         <div class="info-box profile-login-prompt">
-            <p>Jelentkezz be a profilodhoz</p>
+            <p>Jelentkezz be a felhasználói beállításokhoz</p>
             <button type="button" class="btn" onclick={openLogin}>Belépés</button>
         </div>
     {:else}
-        <nav class="header-tabs profile-tabs" aria-label="Profil lapok">
-            {#each profileTabIds as tabId (tabId)}
+        <nav class="header-tabs profile-tabs" aria-label="Felhasználói beállítások">
+            {#each userSettingsTabIds as tabId (tabId)}
                 <button
                     type="button"
                     class="btn"
@@ -746,10 +837,36 @@
             {/each}
         </nav>
 
-        {#if activeTab === "profil"}
+        {#if activeTab === "fiok"}
+            <div class="profile-settings">
+                <h3>Megjelenített név</h3>
+                <p class="profile-hint">
+                    Rövid név a kezdőlap üdvözlésében. Üresen a Google-fiók neve marad. Legfeljebb 24 karakter.
+                </p>
+                <label for="display_name">Név</label>
+                <input
+                    id="display_name"
+                    class="profile-location-select"
+                    type="text"
+                    maxlength="24"
+                    bind:value={displayName}
+                    autocomplete="nickname"
+                />
+                {#if displayNameError}
+                    <p class="profile-error">{displayNameError}</p>
+                {/if}
+                <button
+                    type="button"
+                    class="btn profile-save"
+                    disabled={displayNameSaving}
+                    onclick={saveDisplayName}
+                >
+                    {displayNameSaving ? "Mentés…" : "Mentés"}
+                </button>
+            </div>
             <dl class="profile-fields">
                 {#if hasField($auth.picture)}
-                    <dt>Profilkép</dt>
+                    <dt>Fénykép</dt>
                     <dd><img src={$auth.picture} alt="" class="profile-photo" /></dd>
                 {/if}
                 {#if hasField($auth.givenName)}
@@ -785,7 +902,7 @@
                     <dd>{formatTimestamp($auth.createdAt)}</dd>
                 {/if}
             </dl>
-        {:else if activeTab === "beallitasok"}
+        {:else if activeTab === "tema"}
             <div class="profile-settings">
                 <h3>Téma</h3>
                 <div class="profile-theme-buttons" role="group" aria-label="Téma">
@@ -800,8 +917,19 @@
                         </button>
                     {/each}
                 </div>
-
+                {#if saveError}
+                    <p class="profile-error">{saveError}</p>
+                {/if}
+                <button type="button" class="btn profile-save" onclick={saveTheme}>
+                    Mentés
+                </button>
+            </div>
+        {:else if activeTab === "linkbeallitasok"}
+            <div class="profile-settings">
                 <h3>Gyorslinkek száma a főoldalon</h3>
+                <p class="profile-hint">
+                    Ennyi hely jelenik meg a kezdőlap gyorslinkjei között, a saját linkjeiddel együtt.
+                </p>
                 <div
                     class="quicklinks-slot-stepper"
                     role="group"
@@ -823,12 +951,52 @@
                         onclick={increaseSlots}
                     >+</button>
                 </div>
-
-                {#if saveError}
-                    <p class="profile-error">{saveError}</p>
+                {#if linkSaveError}
+                    <p class="profile-error">{linkSaveError}</p>
                 {/if}
-                <button type="button" class="btn profile-save" onclick={savePreferences}>
+                <button type="button" class="btn profile-save" onclick={saveLinkSettings}>
                     Mentés
+                </button>
+            </div>
+        {:else if activeTab === "location"}
+            <div class="profile-settings">
+                <h3>Településem</h3>
+                <p class="profile-hint">
+                    A saját településed. A kedvenc helyek nem állítják be, és a kereső sem választja ki magától.
+                </p>
+                <p class="profile-hint">
+                    Ha ki van választva, a kezdőlap időjárása és eseménysora ezt a települést használja.
+                    Ha nincs, az időjárás az admin alapértelmezett települése, az eseménysor pedig minden település eseményét mutatja.
+                    Az index közelségi rendezése is ezt veszi középpontnak, amikor bekapcsolod; üresen az admin alapértelmezett települése a középpont.
+                </p>
+                <p class="profile-hint">
+                    A kereső település nélkül indul, és mindenhol keres, amíg te nem választasz települést.
+                    A településed a lista elején jelenik meg, Településem néven, hogy egy koppintással kiválaszthasd.
+                    A keresőben vagy az indexen választott szűrő ezt a beállítást nem írja felül.
+                </p>
+                <label for="preferred_settlement">Település</label>
+                <select
+                    id="preferred_settlement"
+                    class="profile-location-select"
+                    bind:value={preferredSettlementId}
+                >
+                    <option value="">Nincs kiválasztva</option>
+                    {#each locationChoices as loc (loc.id)}
+                        <option value={String(loc.id)}>
+                            {loc.name}{loc.county ? ` (${loc.county})` : ""}{loc.type ? ` – ${loc.type}` : ""}
+                        </option>
+                    {/each}
+                </select>
+                {#if locationSaveError}
+                    <p class="profile-error">{locationSaveError}</p>
+                {/if}
+                <button
+                    type="button"
+                    class="btn profile-save"
+                    disabled={locationSaving}
+                    onclick={savePreferredLocation}
+                >
+                    {locationSaving ? "Mentés…" : "Mentés"}
                 </button>
             </div>
         {:else if activeTab === "bejegyzeseim"}
@@ -1406,6 +1574,21 @@
     .profile-settings h3 {
         margin: 0.5rem 0 0;
         font-size: 1rem;
+    }
+    .profile-hint {
+        margin: 0;
+        max-width: 36rem;
+        color: var(--text-muted, #666);
+    }
+    .profile-location-select {
+        min-width: min(100%, 22rem);
+        max-width: 100%;
+        padding: 0.45rem 0.6rem;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        background: var(--card-bg, #fff);
+        color: var(--text-primary);
+        font: inherit;
     }
     .profile-theme-buttons {
         display: flex;

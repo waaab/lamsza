@@ -1,18 +1,45 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { homepageAttractionWeather, homepageSettlements } from "../src/lib/favoriteHomepage.js";
+import { homepageAttractionWeather, homepageEventPlace, homepageSettlements } from "../src/lib/favoriteHomepage.js";
 
-test("no favorite settlement uses the site default", () => {
-    const rows = homepageSettlements({ settlements: [] }, { slug: "csikszereda", name: "Csíkszereda" });
+test("saved place replaces the site default", () => {
+    const rows = homepageSettlements(
+        { slug: "kezdivasarhely", name: "Kézdivásárhely" },
+        { slug: "sepsiszentgyorgy", name: "Sepsiszentgyörgy" },
+    );
+    assert.deepEqual(rows, [{ slug: "sepsiszentgyorgy", name: "Sepsiszentgyörgy" }]);
+});
+
+test("favorite settlements do not replace the site default", () => {
+    const rows = homepageSettlements(
+        { slug: "csikszereda", name: "Csíkszereda" },
+        null,
+    );
     assert.deepEqual(rows, [{ slug: "csikszereda", name: "Csíkszereda" }]);
 });
 
-test("favorite settlements keep added order and skip the default", () => {
+test("a saved place wins over the site default", () => {
     const rows = homepageSettlements(
-        { settlements: [{ slug: "udvarhely", name: "Székelyudvarhely" }, { slug: "csikszereda", name: "Csíkszereda" }] },
+        { slug: "csikszereda", name: "Csíkszereda" },
+        { slug: "sepsiszentgyorgy", name: "Sepsiszentgyörgy" },
+    );
+    assert.deepEqual(rows.map((r) => r.slug), ["sepsiszentgyorgy"]);
+});
+
+test("missing site default yields no homepage place", () => {
+    assert.deepEqual(homepageSettlements({}, null), []);
+});
+
+test("homepage events use a saved place", () => {
+    assert.deepEqual(
+        homepageEventPlace({ slug: "csikszereda", name: "Csíkszereda" }),
         { slug: "csikszereda", name: "Csíkszereda" },
     );
-    assert.deepEqual(rows.map((r) => r.slug), ["udvarhely", "csikszereda"]);
+});
+
+test("homepage events list every location when no place is saved", () => {
+    assert.equal(homepageEventPlace(null), null);
+    assert.equal(homepageEventPlace({ slug: "  ", name: "Csíkszereda" }), null);
 });
 
 test("attraction weather skips missing coordinates", () => {

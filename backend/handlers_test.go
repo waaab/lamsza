@@ -15,8 +15,10 @@ import (
 	"backend/internal/weather"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -32,6 +34,9 @@ func init() {
 	mondasok.Migrate()
 	handlers.MigrateEntryVerified()
 	handlers.MigrateEntryReviews()
+	handlers.MigrateEntryLocationSearch()
+	handlers.MigrateSettlementLocationTypes()
+	events.Migrate()
 	auth.Migrate()
 	account.Migrate()
 
@@ -55,8 +60,10 @@ func init() {
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
+	testMux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
 	testMux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))
 	testMux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	testMux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
 	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
@@ -64,14 +71,20 @@ func init() {
 	testMux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	testMux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
 	testMux.HandleFunc("/api/admin/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	testMux.HandleFunc("/api/admin/settlement_location_types", middleware.ApplyCORS(handlers.HandleAdminSettlementLocationTypes))
 	testMux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
+	testMux.HandleFunc("/api/admin/dashboard_stats", middleware.ApplyCORS(handlers.HandleAdminDashboardStats))
 	testMux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
 	testMux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
+	testMux.HandleFunc("/api/admin/catalog_event_types", middleware.ApplyCORS(events.HandleAdminCatalogEventTypes))
+	testMux.HandleFunc("/api/admin/catalog_event_subtypes", middleware.ApplyCORS(events.HandleAdminCatalogEventSubtypes))
 	testMux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
+	testMux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
 	testMux.HandleFunc("/api/admin/news_feeds", middleware.ApplyCORS(news.HandleAdminNewsFeeds))
 	testMux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
 	testMux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
 	testMux.HandleFunc("/api/admin/mondasok", middleware.ApplyCORS(mondasok.HandleAdminMondasok))
+	testMux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
 	testMux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
@@ -261,6 +274,20 @@ func TestGetNews(t *testing.T) {
 	}
 }
 
+func TestGetPublicNewsFeeds(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/news/feeds", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/news/feeds: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	if origin := rr.Header().Get("Access-Control-Allow-Origin"); origin == "" {
+		t.Fatal("GET /api/news/feeds: missing CORS header")
+	}
+	var feeds []map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &feeds); err != nil {
+		t.Fatalf("Response is not valid JSON array: %v", err)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // County Weather
 // ---------------------------------------------------------------------------
@@ -392,6 +419,108 @@ func TestAdminEntryTypesCRUD(t *testing.T) {
 	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id="+formatID(id), nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("DELETE entry_types: expected 200, got %d", rr.Code)
+	}
+}
+
+func TestAdminRoutesPreviouslyMissing(t *testing.T) {
+	checks := []struct {
+		path string
+		want string
+	}{
+		{"/api/admin/dashboard_stats", "{"},
+		{"/api/admin/settlement_location_types", "["},
+		{"/api/admin/catalog_event_types", "["},
+		{"/api/admin/catalog_event_subtypes", "["},
+		{"/api/settlement_location_types", "["},
+	}
+	for _, c := range checks {
+		rr := doRequest(t, "GET", c.path, nil)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("GET %s: expected 200, got %d; body: %s", c.path, rr.Code, rr.Body.String())
+		}
+		if origin := rr.Header().Get("Access-Control-Allow-Origin"); origin == "" {
+			t.Fatalf("GET %s: missing CORS header", c.path)
+		}
+		body := strings.TrimSpace(rr.Body.String())
+		if body == "" || body[0] != c.want[0] {
+			t.Fatalf("GET %s: expected JSON starting with %q, got %s", c.path, c.want, rr.Body.String())
+		}
+	}
+
+	rr := doRequest(t, "GET", "/api/entry/related", nil)
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/entry/related: expected 400, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestPreferredSettlementDoesNotFollowFilters(t *testing.T) {
+	cookie := mustLogin("preferred-place@test.lamsza")
+	rr := doRequest(t, "GET", "/api/locations", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("locations: %d %s", rr.Code, rr.Body.String())
+	}
+	var locs []map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &locs); err != nil {
+		t.Fatal(err)
+	}
+	var settlementID int
+	var slug string
+	for _, loc := range locs {
+		if strings.EqualFold(fmt.Sprint(loc["type"]), "megye") {
+			continue
+		}
+		id, _ := loc["id"].(float64)
+		s, _ := loc["slug"].(string)
+		if id > 0 && s != "" {
+			settlementID = int(id)
+			slug = s
+			break
+		}
+	}
+	if settlementID == 0 {
+		t.Skip("no settlement to save")
+	}
+
+	rr = doRequestWithCookie(t, "PUT", "/api/account/preferences", map[string]int{
+		"preferred_settlement_id": settlementID,
+	}, cookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("save preferred: %d %s", rr.Code, rr.Body.String())
+	}
+	var me map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &me); err != nil {
+		t.Fatal(err)
+	}
+	pref, _ := me["preferred_location"].(map[string]interface{})
+	if pref == nil || pref["slug"] != slug {
+		t.Fatalf("preferred_location = %#v, want slug %s", me["preferred_location"], slug)
+	}
+
+	rr = doRequestWithCookie(t, "PUT", "/api/account/preferences", map[string]int{
+		"preferred_settlement_id": 0,
+	}, cookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("clear preferred: %d %s", rr.Code, rr.Body.String())
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &me); err != nil {
+		t.Fatal(err)
+	}
+	if me["preferred_location"] != nil {
+		t.Fatalf("expected cleared preferred_location, got %#v", me["preferred_location"])
+	}
+}
+
+func TestGetPublicQuickLinks(t *testing.T) {
+	rr := doRequest(t, "GET", "/api/quick_links", nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/quick_links: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	if origin := rr.Header().Get("Access-Control-Allow-Origin"); origin == "" {
+		t.Fatal("GET /api/quick_links: missing CORS header")
+	}
+	var links []map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &links); err != nil {
+		t.Fatalf("Response is not valid JSON array: %v", err)
 	}
 }
 

@@ -24,6 +24,7 @@ var dashboardCountTables = []struct {
 	{"entry_categories", "entry_categories"},
 	{"entry_types", "entry_types"},
 	{"pages", "pages"},
+	{"page_faq", "page_faq_sections"},
 	{"weather_translations", "weather_desc_translations"},
 	{"settings", "site_settings"},
 }
@@ -54,5 +55,6 @@ func HandleAdminDashboardStats(w http.ResponseWriter, r *http.Request) {
 		out[row.Key] = n
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(out)
 }

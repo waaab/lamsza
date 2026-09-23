@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
+	"unicode/utf8"
 )
 
 func Migrate() {
@@ -37,9 +39,21 @@ func ClampSlots(n int) int {
 	return n
 }
 
+const maxDisplayNameLen = 24
+
+func NormalizeDisplayName(raw string) (string, error) {
+	name := strings.Join(strings.Fields(strings.TrimSpace(raw)), " ")
+	if utf8.RuneCountInString(name) > maxDisplayNameLen {
+		return "", fmt.Errorf("invalid display_name")
+	}
+	return name, nil
+}
+
 type preferencesBody struct {
-	Theme          *string `json:"theme"`
-	QuicklinkSlots *int    `json:"quicklink_slots"`
+	Theme                 *string `json:"theme"`
+	QuicklinkSlots        *int    `json:"quicklink_slots"`
+	PreferredSettlementID *int    `json:"preferred_settlement_id"`
+	DisplayName           *string `json:"display_name"`
 }
 
 type importBody struct {
@@ -89,6 +103,35 @@ func HandlePreferences(w http.ResponseWriter, r *http.Request) {
 		setClauses = append(setClauses, fmt.Sprintf("quicklink_slots = $%d", argN))
 		args = append(args, slots)
 		argN++
+	}
+	if body.DisplayName != nil {
+		name, err := NormalizeDisplayName(*body.DisplayName)
+		if err != nil {
+			http.Error(w, "invalid display_name", http.StatusBadRequest)
+			return
+		}
+		setClauses = append(setClauses, fmt.Sprintf("display_name = $%d", argN))
+		args = append(args, name)
+		argN++
+	}
+	if body.PreferredSettlementID != nil {
+		id := *body.PreferredSettlementID
+		if id <= 0 {
+			setClauses = append(setClauses, "preferred_settlement_id = NULL")
+		} else {
+			var found int
+			err := db.DB.QueryRow(`
+				SELECT id FROM settlements
+				WHERE id = $1 AND LOWER(TRIM(COALESCE(type, ''))) <> 'megye'
+			`, id).Scan(&found)
+			if err != nil {
+				http.Error(w, "invalid preferred_settlement_id", http.StatusBadRequest)
+				return
+			}
+			setClauses = append(setClauses, fmt.Sprintf("preferred_settlement_id = $%d", argN))
+			args = append(args, id)
+			argN++
+		}
 	}
 
 	if len(setClauses) == 0 {

@@ -3,7 +3,7 @@ import test from "node:test";
 import {
     buildImportPayload,
     meToAuthState,
-    profileTabIds,
+    userSettingsTabIds,
 } from "../src/lib/accountPrefs.js";
 
 test("buildImportPayload copies browser prefs", () => {
@@ -51,10 +51,12 @@ test("buildImportPayload drops history rows missing slug or name", () => {
     assert.equal(payload.history[0].slug, "kavezo");
 });
 
-test("profileTabIds are the account tabs", () => {
-    assert.deepEqual(profileTabIds, [
-        "profil",
-        "beallitasok",
+test("userSettingsTabIds are the account tabs", () => {
+    assert.deepEqual(userSettingsTabIds, [
+        "fiok",
+        "tema",
+        "linkbeallitasok",
+        "location",
         "bejegyzeseim",
         "linkjeim",
         "elozmenyek",
@@ -70,6 +72,7 @@ test("meToAuthState maps google fields", () => {
         picture: "https://example.test/a.jpg",
         given_name: "Anna",
         family_name: "Kiss",
+        display_name: "Panna",
         locale: "hu",
         google_sub: "sub-1",
         theme: null,
@@ -78,5 +81,6 @@ test("meToAuthState maps google fields", () => {
     });
     assert.equal(state.loggedIn, true);
     assert.equal(state.picture, "https://example.test/a.jpg");
+    assert.equal(state.displayName, "Panna");
     assert.equal(state.theme, null);
 });

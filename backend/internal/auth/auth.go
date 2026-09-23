@@ -101,10 +101,23 @@ func Migrate() {
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS theme VARCHAR(16)`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS quicklink_slots INTEGER`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS prefs_imported_at TIMESTAMP`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_settlement_id INTEGER`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(24) NOT NULL DEFAULT ''`,
 	} {
 		if _, err := db.DB.Exec(q); err != nil {
 			log.Printf("users column migrate: %v", err)
 		}
+	}
+	if _, err := db.DB.Exec(`
+		DO $$ BEGIN
+			ALTER TABLE users
+				ADD CONSTRAINT users_preferred_settlement_fk
+				FOREIGN KEY (preferred_settlement_id) REFERENCES settlements(id) ON DELETE SET NULL;
+		EXCEPTION
+			WHEN duplicate_object THEN NULL;
+		END $$
+	`); err != nil {
+		log.Printf("users preferred settlement fk: %v", err)
 	}
 	_, err = db.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS sessions (
@@ -274,19 +287,26 @@ func HandleMe(w http.ResponseWriter, r *http.Request) {
 
 func WriteMe(w http.ResponseWriter, userID int) error {
 	var (
-		email, name, givenName, familyName, picture, locale, googleSub string
-		theme                                                            sql.NullString
-		quicklinkSlots                                                   sql.NullInt64
-		prefsImportedAt                                                  sql.NullTime
-		lastLoginAt, createdAt                                           time.Time
+		email, name, givenName, familyName, picture, locale, googleSub, displayName string
+		theme                                                                       sql.NullString
+		quicklinkSlots                                                              sql.NullInt64
+		prefsImportedAt                                                             sql.NullTime
+		lastLoginAt, createdAt                                                      time.Time
+		preferredID                                                                 sql.NullInt64
+		preferredSlug, preferredName, preferredCounty                               sql.NullString
 	)
 	err := db.DB.QueryRow(`
-		SELECT email, name, given_name, family_name, picture, locale, google_sub,
-		       last_login_at, created_at, theme, quicklink_slots, prefs_imported_at
-		FROM users WHERE id = $1
+		SELECT u.email, u.name, u.given_name, u.family_name, u.picture, u.locale, u.google_sub, u.display_name,
+		       u.last_login_at, u.created_at, u.theme, u.quicklink_slots, u.prefs_imported_at,
+		       u.preferred_settlement_id, s.slug, s.name, c.slug
+		FROM users u
+		LEFT JOIN settlements s ON s.id = u.preferred_settlement_id
+		LEFT JOIN counties c ON c.id = s.county_id
+		WHERE u.id = $1
 	`, userID).Scan(
-		&email, &name, &givenName, &familyName, &picture, &locale, &googleSub,
+		&email, &name, &givenName, &familyName, &picture, &locale, &googleSub, &displayName,
 		&lastLoginAt, &createdAt, &theme, &quicklinkSlots, &prefsImportedAt,
+		&preferredID, &preferredSlug, &preferredName, &preferredCounty,
 	)
 	if err != nil {
 		return err
@@ -300,6 +320,7 @@ func WriteMe(w http.ResponseWriter, userID int) error {
 		"picture":       picture,
 		"locale":        locale,
 		"google_sub":    googleSub,
+		"display_name":  displayName,
 		"last_login_at": lastLoginAt,
 		"created_at":    createdAt,
 	}
@@ -317,6 +338,16 @@ func WriteMe(w http.ResponseWriter, userID int) error {
 		resp["prefs_imported_at"] = prefsImportedAt.Time
 	} else {
 		resp["prefs_imported_at"] = nil
+	}
+	if preferredID.Valid && preferredSlug.Valid && strings.TrimSpace(preferredSlug.String) != "" {
+		resp["preferred_location"] = map[string]interface{}{
+			"id":          preferredID.Int64,
+			"slug":        preferredSlug.String,
+			"name":        preferredName.String,
+			"county_slug": preferredCounty.String,
+		}
+	} else {
+		resp["preferred_location"] = nil
 	}
 	if IsAdmin(email) {
 		var queueCount int

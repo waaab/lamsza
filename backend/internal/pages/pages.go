@@ -41,7 +41,7 @@ func MigratePages() {
 		{"varosok", "Székelyföldi Városok", "Székelyföldi városok listája megyénként."},
 		{"falvak", "Székelyföldi Falvak", "Falvak és községek listája megyénként."},
 		{"szekek", "Székelyföld történelmi székei", "A székely székek és a hozzájuk kapcsolódó megyék."},
-		{"index", "Index", "Minden, ami helyi: szakemberek, intézmények, szolgáltatások."},
+		{"index", "Index", "Minden, ami helyi, egy helyen: szakemberek, intézmények, szolgáltatások."},
 		{"index/szolgaltatasok", "Szolgáltatások", "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár."},
 		{"terkep", "Székelyföld Térkép", "Hamarosan érkezik az interaktív térképünk helyi adatokkal!"},
 		{"valtozasnaplo", "Változásnapló", "Újítások, javítások — emberi nyelven."},

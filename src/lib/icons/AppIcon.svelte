@@ -20,6 +20,20 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
             ><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg
         >
+    {:else if name === "profile"}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+    {:else if name === "dashboard"}
+        <!-- Four-up board: three tiles and a gear -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7.5" height="7.5" rx="1.6"></rect>
+            <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.6"></rect>
+            <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.6"></rect>
+            <circle cx="17.25" cy="17.25" r="2.05"></circle>
+            <path d="M17.25 13.35v1.15M17.25 20v1.15M13.35 17.25h1.15M20 17.25h1.15M14.55 14.55l.8.8M19.15 19.15l.8.8M19.95 14.55l-.8.8M15.35 19.15l-.8.8"></path>
+        </svg>
     {:else if name === "entries"}
         <!-- Same as homepage “Indexelünk” -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -68,6 +82,17 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
             ><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg
         >
+    {:else if name === "my_location"}
+        <!-- Target: outer ring, inner ring, center, four ticks -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="6.25"></circle>
+            <circle cx="12" cy="12" r="2.35"></circle>
+            <circle cx="12" cy="12" r="0.9" fill="currentColor" stroke="none"></circle>
+            <line x1="12" y1="1.25" x2="12" y2="3.75"></line>
+            <line x1="12" y1="20.25" x2="12" y2="22.75"></line>
+            <line x1="1.25" y1="12" x2="3.75" y2="12"></line>
+            <line x1="20.25" y1="12" x2="22.75" y2="12"></line>
+        </svg>
     {:else if name === "venues"}
         <!-- Stadium: rim, bowl, entrance notch, pennants (.app-icon-solid) -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -94,13 +119,19 @@
             <path d="M3 10h18"></path>
         </svg>
     {:else if name === "entry_categories"}
+        <!-- Category: triangle, square, circle -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"></line>
-            <line x1="8" y1="12" x2="21" y2="12"></line>
-            <line x1="8" y1="18" x2="21" y2="18"></line>
-            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            <polygon points="12 2.2 6.15 10.8 17.85 10.8"></polygon>
+            <rect x="2.5" y="13.6" width="7.5" height="7.5"></rect>
+            <circle cx="17.65" cy="17.35" r="3.75"></circle>
+        </svg>
+    {:else if name === "category_search"}
+        <!-- Category search: triangle, square, magnifying glass -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2.2 6.15 10.8 17.85 10.8"></polygon>
+            <rect x="2.5" y="13.6" width="7.5" height="7.5"></rect>
+            <circle cx="16.45" cy="16.35" r="3.25"></circle>
+            <line x1="18.85" y1="18.75" x2="21.2" y2="21.1"></line>
         </svg>
     {:else if name === "entry_types"}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -132,6 +163,11 @@
             <path d="M17 20h4v-7l-4-3"></path>
             <path d="M3 20h18"></path>
         </svg>
+    {:else if name === "x"}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
     {:else if name === "settings"}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             ><circle cx="12" cy="12" r="3"></circle><path
@@ -146,6 +182,12 @@
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
             ><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg
         >
+    {:else if name === "page_faq"}
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <path d="M12 17h.01"></path>
+        </svg>
     {/if}
 </span>
 

@@ -3,6 +3,8 @@
     import EntryCard from "$lib/components/EntryCard.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
+    import { listingAnchor, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import { auth } from "$lib/stores/auth";
     import {
         entryMatchesAsideFilters,
         normalizeTagKey,
@@ -19,6 +21,7 @@
     } from "$lib/entryCategory.js";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { apiFetch } from "$lib/api.js";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
 
     let pageHeader = initialPageHeader("index");
     let pageHeaderLoading = false;
@@ -38,8 +41,15 @@
     let visibleCount = 12;
     let sortMode = "title";
     let sortOpen = false;
+    let locationOrderOn = false;
+    /** @type {{ slug: string, name: string, county_slug: string } | null} */
+    let siteLocation = null;
+    /** @type {Array<Record<string, any>>} */
+    let locations = [];
 
     const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
+
+    $: listingLocation = listingAnchor(siteLocation, $auth.preferredLocation, $auth.loggedIn);
 
     function setSortMode(mode) {
         sortMode = mode;
@@ -56,12 +66,20 @@
     $: hasActiveFilters =
         currentCategory !== "osszes" ||
         selectedTypeKey != null ||
-        selectedTagKey != null;
+        selectedTagKey != null ||
+        locationOrderOn;
 
     function clearAllFilters() {
         currentCategory = "osszes";
         selectedTypeKey = null;
         selectedTagKey = null;
+        locationOrderOn = false;
+        scrollToTop();
+    }
+
+    function toggleLocationOrder() {
+        locationOrderOn = !locationOrderOn;
+        sortOpen = false;
         scrollToTop();
     }
 
@@ -97,9 +115,10 @@
         }
         return selectedTagKey;
     })();
-    $: sortedEntries = [...filteredEntries].sort((a, b) => {
-        if (sortMode === "newest") return b.id - a.id;
-        return a.name.localeCompare(b.name);
+    $: sortedEntries = sortDirectoryEntries(filteredEntries, {
+        sortMode,
+        location: locationOrderOn ? listingLocation : null,
+        locations,
     });
     $: totalCount = sortedEntries.length;
     $: displayItems = sortedEntries.slice(0, visibleCount);
@@ -112,22 +131,38 @@
         currentCategory;
         selectedTypeKey;
         selectedTagKey;
+        locationOrderOn;
         visibleCount = 12;
     }
 
-    onMount(async () => {
+    onMount(() => {
         loadPageMeta("index").then((p) => {
             pageHeader = p;
         });
-        try {
-            entries = (await apiFetch("/api/directory")) || [];
-            dynamicCategories = directoryCategoryTabs(entries);
-        } catch (err) {
-            console.error(err);
-            error = "Hiba történt az adatok betöltésekor.";
-        } finally {
-            loading = false;
-        }
+        (async () => {
+            try {
+                const [directory, config, locs] = await Promise.all([
+                    apiFetch("/api/directory"),
+                    apiFetch("/api/config/public"),
+                    apiFetch("/api/locations"),
+                ]);
+                entries = directory || [];
+                dynamicCategories = directoryCategoryTabs(entries);
+                locations = Array.isArray(locs) ? locs : [];
+                if (config?.my_location_slug) {
+                    siteLocation = {
+                        slug: config.my_location_slug,
+                        name: config.my_location_name || config.my_location_slug,
+                        county_slug: config.my_location_county_slug || "",
+                    };
+                }
+            } catch (err) {
+                console.error(err);
+                error = "Hiba történt az adatok betöltésekor.";
+            } finally {
+                loading = false;
+            }
+        })();
     });
 </script>
 
@@ -178,6 +213,12 @@
                             >{/if}
                         <span class="active">{tagFilterLabel}</span>
                     {/if}
+                    {#if locationOrderOn && listingLocation}
+                        {#if currentCategory !== "osszes" || typeFilterLabel || tagFilterLabel}<span
+                                class="filter-sep">·</span
+                            >{/if}
+                        <span class="active">{listingLocation.name}</span>
+                    {/if}
                     <button
                         type="button"
                         class="clear-filters btn btn-xs"
@@ -191,6 +232,37 @@
         </span>
 
         <div class="view-mode-toggle">
+            {#if listingLocation}
+                <button
+                    type="button"
+                    class="btn btn-sm"
+                    class:active={locationOrderOn}
+                    aria-pressed={locationOrderOn}
+                    title={locationOrderOn
+                        ? `${listingLocation.name}: először itt, aztán a környék, majd távolabb. Név szerint minden sávban.`
+                        : `Közelség szerint: ${listingLocation.name}`}
+                    on:click={toggleLocationOrder}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                        ><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle
+                            cx="12"
+                            cy="10"
+                            r="3"
+                        ></circle></svg
+                    >
+                    <span>{listingLocation.name}</span>
+                </button>
+            {/if}
             <div class="sort-toggle">
                 <button class="btn btn-sm" on:click={() => (sortOpen = !sortOpen)}>
                     <svg
@@ -380,7 +452,7 @@
         </div>
         <div class="card index-stats-item">
             <div class="index-stats-item-content">
-                <div class="index-stats-item-icon"><svg xmlns="http://www.w3.org/2000/svg" height="50px" viewBox="0 -960 960 960" width="50px" fill="currentColor"><path d="M240-336h312v-72H240v72Zm0-120h480v-72H240v72Zm-72 264q-29 0-50.5-21.5T96-264v-432q0-29.7 21.5-50.85Q139-768 168-768h216l96 96h312q29.7 0 50.85 21.15Q864-629.7 864-600v336q0 29-21.15 50.5T792-192H168Zm0-72h624v-336H450l-96-96H168v432Zm0 0v-432 432Z"/></svg></div>
+                <div class="index-stats-item-icon"><AppIcon name="entry_categories" size={50} /></div>
                 <span class="index-stats-item-value">10</span>
                 <h3 class="index-stats-item-title">Kategória</h3>
             </div>

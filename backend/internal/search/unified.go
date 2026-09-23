@@ -25,6 +25,19 @@ type AttractionSearchHit struct {
 	Description string `json:"description,omitempty"`
 }
 
+// VenueSearchHit is a lightweight shape for unified search JSON.
+type VenueSearchHit struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	Slug           string `json:"slug"`
+	Kind           string `json:"kind"`
+	KindLabel      string `json:"kind_label"`
+	SettlementName string `json:"settlement_name"`
+	SettlementSlug string `json:"settlement_slug"`
+	CountySlug     string `json:"county_slug"`
+	CountyName     string `json:"county_name"`
+}
+
 // HistoricalSeatSearchHit is a lightweight shape for unified search JSON.
 type HistoricalSeatSearchHit struct {
 	ID   int    `json:"id"`
@@ -38,6 +51,7 @@ type UnifiedSearchResult struct {
 	Events          []models.Event            `json:"events"`
 	News            []newsSearchItem          `json:"news"`
 	Attractions     []AttractionSearchHit     `json:"attractions"`
+	Venues          []VenueSearchHit          `json:"venues"`
 	HistoricalSeats []HistoricalSeatSearchHit `json:"historical_seats"`
 }
 
@@ -59,6 +73,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			Events:          []models.Event{},
 			News:            []newsSearchItem{},
 			Attractions:     []AttractionSearchHit{},
+			Venues:          []VenueSearchHit{},
 			HistoricalSeats: []HistoricalSeatSearchHit{},
 		})
 		return
@@ -73,6 +88,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	var events []models.Event
 	var newsItems []newsSearchItem
 	var attractionHits []AttractionSearchHit
+	var venueHits []VenueSearchHit
 	var seatHits []HistoricalSeatSearchHit
 
 	// Search locations (ILIKE on name, name_ro, name_de, county)
@@ -117,6 +133,19 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			   OR unaccent(LOWER(COALESCE(a.name_ro,''))) ILIKE unaccent($1)
 			   OR unaccent(LOWER(COALESCE(a.name_de,''))) ILIKE unaccent($1)
 			   OR unaccent(LOWER(COALESCE(a.description,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(a.content,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(c.name)) ILIKE unaccent($1)
+			   OR LOWER(c.slug) ILIKE LOWER($1)
+			   OR EXISTS (
+			        SELECT 1 FROM settlements s
+			        WHERE s.county_id = a.county_id
+			          AND (
+			            unaccent(LOWER(s.name)) ILIKE unaccent($1)
+			            OR unaccent(LOWER(COALESCE(s.name_ro,''))) ILIKE unaccent($1)
+			            OR unaccent(LOWER(COALESCE(s.name_de,''))) ILIKE unaccent($1)
+			            OR LOWER(s.slug) ILIKE LOWER($1)
+			          )
+			   )
 			ORDER BY a.name ASC
 			LIMIT 12
 		`, pattern)
@@ -129,6 +158,44 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			var h AttractionSearchHit
 			if err := rows.Scan(&h.ID, &h.Name, &h.Slug, &h.CountySlug, &h.CountyName, &h.Description); err == nil {
 				attractionHits = append(attractionHits, h)
+			}
+		}
+	}()
+
+	// Search venues (helyszínek) by their own text or by the settlement they belong to.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		rows, err := db.DB.Query(`
+			SELECT v.id, v.name, v.slug, v.kind, COALESCE(vt.label_hu, v.kind),
+				s.name, s.slug, c.name, c.slug
+			FROM venues v
+			JOIN settlements s ON v.settlement_id = s.id
+			JOIN counties c ON s.county_id = c.id
+			LEFT JOIN venue_types vt ON vt.slug = v.kind
+			WHERE unaccent(LOWER(v.name)) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(v.name_ro,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(v.name_de,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(v.address,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(v.description,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(v.notes,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(vt.label_hu,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(s.name)) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(s.name_ro,''))) ILIKE unaccent($1)
+			   OR unaccent(LOWER(COALESCE(s.name_de,''))) ILIKE unaccent($1)
+			   OR LOWER(s.slug) ILIKE LOWER($1)
+			ORDER BY v.name ASC
+			LIMIT 20
+		`, pattern)
+		if err != nil {
+			log.Printf("UnifiedSearch venues error: %v", err)
+			return
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var h VenueSearchHit
+			if err := rows.Scan(&h.ID, &h.Name, &h.Slug, &h.Kind, &h.KindLabel, &h.SettlementName, &h.SettlementSlug, &h.CountyName, &h.CountySlug); err == nil {
+				venueHits = append(venueHits, h)
 			}
 		}
 	}()
@@ -286,6 +353,9 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	if attractionHits == nil {
 		attractionHits = []AttractionSearchHit{}
 	}
+	if venueHits == nil {
+		venueHits = []VenueSearchHit{}
+	}
 	if seatHits == nil {
 		seatHits = []HistoricalSeatSearchHit{}
 	}
@@ -297,6 +367,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		Events:          events,
 		News:            newsItems,
 		Attractions:     attractionHits,
+		Venues:          venueHits,
 		HistoricalSeats: seatHits,
 	})
 }

@@ -1,11 +1,28 @@
-export const profileTabIds = [
-    "profil",
-    "beallitasok",
+export const userSettingsTabIds = [
+    "fiok",
+    "tema",
+    "linkbeallitasok",
+    "location",
     "bejegyzeseim",
     "linkjeim",
     "elozmenyek",
     "kedvencek",
 ];
+
+/** @param {unknown} raw */
+export function normalizePreferredLocation(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const row = /** @type {{ id?: unknown, slug?: unknown, name?: unknown, county_slug?: unknown }} */ (raw);
+    const slug = String(row.slug ?? "").trim();
+    if (!slug) return null;
+    const id = Number(row.id);
+    return {
+        id: Number.isFinite(id) && id > 0 ? id : null,
+        slug,
+        name: String(row.name ?? "").trim() || slug,
+        county_slug: String(row.county_slug ?? "").trim(),
+    };
+}
 
 /** @param {{ title?: unknown; url?: unknown; bg_color?: unknown }} link */
 function validLink(link) {
@@ -59,6 +76,7 @@ export function meToAuthState(me) {
         picture: me.picture ?? "",
         givenName: me.given_name ?? "",
         familyName: me.family_name ?? "",
+        displayName: String(me.display_name ?? "").trim(),
         locale: me.locale ?? "",
         googleSub: me.google_sub ?? "",
         lastLoginAt: me.last_login_at ?? null,
@@ -66,6 +84,7 @@ export function meToAuthState(me) {
         theme: me.theme ?? null,
         quicklinkSlots: me.quicklink_slots ?? null,
         prefsImportedAt: me.prefs_imported_at ?? null,
+        preferredLocation: normalizePreferredLocation(me.preferred_location),
         adminQueueCount: me.admin_queue_count ?? 0,
     };
 }

@@ -1,6 +1,6 @@
 <script>
     import { browser } from "$app/environment";
-    import { onMount, onDestroy } from "svelte";
+    import { onDestroy } from "svelte";
     import { apiFetch } from "$lib/api";
     import { formatDateShort, venuePageUrl } from "$lib/utils";
     import { kindLabel } from "$lib/venueKindLabels.js";
@@ -63,9 +63,18 @@
         }
     }
 
-    $: if (browser && (settlementSlug != null || countySlug != null || organizerName != null)) {
+    $: if (browser) {
+        void settlementSlug;
+        void countySlug;
+        void organizerName;
         fetchEvents();
     }
+
+    $: scoped = Boolean(
+        String(settlementSlug ?? "").trim()
+        || String(countySlug ?? "").trim()
+        || String(organizerName ?? "").trim(),
+    );
 
     function startTicker() {
         if (!ticker || tickerInterval) return;
@@ -152,7 +161,7 @@
 <section id="esemenyek">
     <div class="event-widget component-box widget">
         <div class="widget-header" title="{filteredItems.length} {typeLabel ? typeLabel + 'i Esemény' : 'Esemény'}">
-            <h3 class="widget-title">Események{#if !loading} <span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel} <span class="type-label"> · {typeLabel}</span>{/if}</h3>
+            <h3 class="widget-title">Események{#if !loading} <span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel} <span class="type-label"> · {typeLabel}</span>{/if}{#if scoped} <span class="type-label"> · </span> <a href="/esemenyek">Összes esemény</a>{/if}</h3>
             {#if !loading && (availableTypes.length > 1 || availableLocTypes.length > 1)}
                 <div class="event-type-badges">
                     {#if hasAnyFilter}
@@ -187,9 +196,11 @@
                         <span class="event-ticker-meta">...</span>
                     </span>
                 </div>
-                <div class="widget-nav">
-                    <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
-                </div>
+                {#if !scoped}
+                    <div class="widget-nav">
+                        <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                    </div>
+                {/if}
             {:else if loading}
                 <div class="event-cards-row">
                     {#each Array(limit) as _}
@@ -202,9 +213,11 @@
                         </article>
                     {/each}
                 </div>
-                <div class="widget-nav">
-                    <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
-                </div>
+                {#if !scoped}
+                    <div class="widget-nav">
+                        <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                    </div>
+                {/if}
             {:else if error || items.length === 0}
                 <span class="info-box"><p>Nincsenek közeli események.</p></span>
             {:else if ticker}
@@ -284,7 +297,9 @@
                             <button class="btn btn-xs scroll-arrow left" on:click={() => handleArrowClick(-1)} aria-label="Előző esemény">&#8249;</button>
                             <button class="btn btn-xs scroll-arrow right" on:click={() => handleArrowClick(1)} aria-label="Következő esemény">&#8250;</button>
                         </div>
-                        <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                        {#if !scoped}
+                            <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                        {/if}
                     </div>
                 </div>
             {:else}
@@ -335,6 +350,7 @@
                         </article>
                     {/each}
                     </div>
+                {#if showArrows || !scoped}
                 <div class="widget-nav">
                     {#if showArrows}
                         <div class="arrows-container">
@@ -352,8 +368,11 @@
                         >&#8250;</button>
                         </div>
                     {/if}
-                    <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                    {#if !scoped}
+                        <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                    {/if}
                 </div>
+                {/if}
             {/if}
         </div>
     </div>

@@ -21,7 +21,9 @@
         entryMatchesCategory,
     } from "$lib/entryCategory.js";
     import { apiFetch } from "$lib/api.js";
+    import { listingAnchor, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+    import { auth } from "$lib/stores/auth";
 
     let pageHeader = initialPageHeader("index");
     let pageHeaderLoading = false;
@@ -41,8 +43,15 @@
     let visibleCount = 12;
     let sortMode = "title";
     let sortOpen = false;
+    let locationOrderOn = false;
+    /** @type {{ slug: string, name: string, county_slug: string } | null} */
+    let siteLocation = null;
+    /** @type {Array<Record<string, any>>} */
+    let locations = [];
 
     const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
+
+    $: listingLocation = listingAnchor(siteLocation, $auth.preferredLocation, $auth.loggedIn);
 
     function setSortMode(mode) {
         sortMode = mode;
@@ -58,7 +67,14 @@
     function clearAllFilters() {
         selectedTypeKey = null;
         selectedTagKey = null;
+        locationOrderOn = false;
         goto("/index");
+    }
+
+    function toggleLocationOrder() {
+        locationOrderOn = !locationOrderOn;
+        sortOpen = false;
+        scrollToTop();
     }
 
     $: filteredEntries = entries.filter((e) =>
@@ -87,9 +103,10 @@
         }
         return selectedTagKey;
     })();
-    $: sortedEntries = [...filteredEntries].sort((a, b) => {
-        if (sortMode === "newest") return b.id - a.id;
-        return a.name.localeCompare(b.name);
+    $: sortedEntries = sortDirectoryEntries(filteredEntries, {
+        sortMode,
+        location: locationOrderOn ? listingLocation : null,
+        locations,
     });
     $: totalCount = sortedEntries.length;
     $: displayItems = sortedEntries.slice(0, visibleCount);
@@ -102,6 +119,7 @@
         currentCategory;
         selectedTypeKey;
         selectedTagKey;
+        locationOrderOn;
         visibleCount = 12;
     }
 
@@ -116,6 +134,26 @@
             pageHeader = p;
             pageHeaderLoading = false;
         });
+        apiFetch("/api/config/public")
+            .then((config) => {
+                if (config?.my_location_slug) {
+                    siteLocation = {
+                        slug: config.my_location_slug,
+                        name: config.my_location_name || config.my_location_slug,
+                        county_slug: config.my_location_county_slug || "",
+                    };
+                }
+            })
+            .catch(() => {
+                siteLocation = null;
+            });
+        apiFetch("/api/locations")
+            .then((locs) => {
+                locations = Array.isArray(locs) ? locs : [];
+            })
+            .catch(() => {
+                locations = [];
+            });
     });
 
     async function fetchData(categoryId) {
@@ -177,6 +215,10 @@
                     <span class="filter-sep">·</span>
                     <span class="active">{tagFilterLabel}</span>
                 {/if}
+                {#if locationOrderOn && listingLocation}
+                    <span class="filter-sep">·</span>
+                    <span class="active">{listingLocation.name}</span>
+                {/if}
                 <button
                     type="button"
                     class="clear-filters btn btn-xs"
@@ -189,6 +231,37 @@
         </span>
 
         <div class="view-mode-toggle">
+            {#if listingLocation}
+                <button
+                    type="button"
+                    class="btn btn-sm"
+                    class:active={locationOrderOn}
+                    aria-pressed={locationOrderOn}
+                    title={locationOrderOn
+                        ? `${listingLocation.name}: először itt, aztán a környék, majd távolabb. Név szerint minden sávban.`
+                        : `Közelség szerint: ${listingLocation.name}`}
+                    on:click={toggleLocationOrder}
+                >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                        ><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle
+                            cx="12"
+                            cy="10"
+                            r="3"
+                        ></circle></svg
+                    >
+                    <span>{listingLocation.name}</span>
+                </button>
+            {/if}
             <div class="sort-toggle">
                 <button class="btn btn-sm" on:click={() => (sortOpen = !sortOpen)}>
                     <svg

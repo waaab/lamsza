@@ -19,7 +19,7 @@
         readSlotCount,
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
-    import { homepageAttractionWeather, homepageSettlements } from "$lib/favoriteHomepage.js";
+    import { homepageAttractionWeather, homepageEventPlace, homepageSettlements } from "$lib/favoriteHomepage.js";
 
     const USER_LINKS_KEY = "user_quick_links";
     const PROMOTED_CACHE_KEY = "promoted_links_cache";
@@ -50,11 +50,11 @@
         ? Math.max(0, DEFAULT_QUICKLINK_SLOTS - 1 - userLinks.length)
         : 0;
     $: siteDefault = { slug: myLocationSlug, name: myLocationName };
-    $: settlementPlaces = $auth.loggedIn
-        ? homepageSettlements(favorites, siteDefault)
-        : myLocationSlug
-            ? [{ slug: myLocationSlug, name: myLocationName }]
-            : [];
+    $: settlementPlaces = homepageSettlements(
+        siteDefault,
+        $auth.loggedIn ? $auth.preferredLocation : null,
+    );
+    $: eventPlace = $auth.loggedIn ? homepageEventPlace($auth.preferredLocation) : null;
     $: attractionWeatherPlaces = $auth.loggedIn ? homepageAttractionWeather(favorites) : [];
 
     function truncateTitle(title, maxLen = 8) {
@@ -281,7 +281,9 @@
         title={pageHeader.title}
         greeting={pageHeader.greeting}
         loading={pageHeaderLoading}
-        titleOverride={$auth.loggedIn ? `Szerussz, ${$auth.user}!` : null}
+        titleOverride={$auth.loggedIn && ($auth.displayName || $auth.user)
+            ? `Szerussz, ${$auth.displayName || $auth.user}!`
+            : null}
         showBreadcrumbs={false}
     />
 
@@ -406,12 +408,10 @@
     </div>
 </section>
 
-{#if $auth.loggedIn}
-    {#each settlementPlaces as place (place.slug)}
-        <EventsWidget ticker={true} settlementSlug={place.slug} locationName={place.name} />
-    {/each}
+{#if eventPlace}
+    <EventsWidget ticker={true} settlementSlug={eventPlace.slug} locationName={eventPlace.name} />
 {:else}
-    <EventsWidget ticker={true} settlementSlug={myLocationSlug} locationName={myLocationName} />
+    <EventsWidget ticker={true} />
 {/if}
 
 <MondasWidget />

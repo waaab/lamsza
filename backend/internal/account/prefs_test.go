@@ -12,6 +12,19 @@ func TestNormalizeTheme(t *testing.T) {
 	}
 }
 
+func TestNormalizeDisplayName(t *testing.T) {
+	got, err := NormalizeDisplayName("  Attila   Bögözi  ")
+	if err != nil || got != "Attila Bögözi" {
+		t.Fatalf("got %q %v", got, err)
+	}
+	if got, err := NormalizeDisplayName("   "); err != nil || got != "" {
+		t.Fatalf("empty got %q %v", got, err)
+	}
+	if _, err := NormalizeDisplayName("ez a név már túl hosszú ide"); err == nil {
+		t.Fatal("expected long display name to fail")
+	}
+}
+
 func TestClampSlots(t *testing.T) {
 	if ClampSlots(3) != 7 || ClampSlots(20) != 14 || ClampSlots(9) != 9 {
 		t.Fatal("slot clamp mismatch")

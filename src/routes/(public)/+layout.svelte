@@ -7,13 +7,11 @@
 
     $: faqSectionKey = deriveFaqSectionKey($page.url.pathname);
     import { auth } from "$lib/stores/auth";
-    import { theme, cycleTheme, LABELS } from "$lib/stores/theme";
-    import { fade } from "svelte/transition";
     import { apiFetch } from "$lib/api.js";
     import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
 
-    let settingsOpen = false;
     let scrollY = 0;
     let loginDialogOpen = false;
     let googleClientId = "";
@@ -31,14 +29,6 @@
         configLoaded = true;
         return stopLoginListener;
     });
-
-    function toggleSettings() {
-        settingsOpen = !settingsOpen;
-    }
-
-    function closeSettings() {
-        settingsOpen = false;
-    }
 
     function scrollToTop() {
         if (typeof window !== "undefined") {
@@ -67,7 +57,6 @@
 
 <svelte:window
     bind:scrollY
-    on:click={closeSettings}
     on:keydown={(e) => loginDialogOpen && e.key === "Escape" && closeLoginDialog()}
 />
 
@@ -281,34 +270,26 @@
     </div>
     <div class="nav">
         {#if $auth.loggedIn}
-            <a class="nav-admin-user" href="/profil" title="{$auth.user} bejelentkezve">{$auth.user}</a>
+            <a
+                href="/beallitasok"
+                class="btn nav-btn {$page.url.pathname === '/beallitasok' ? 'active' : ''}"
+                title="Felhasználói beállítások"
+            >
+                <AppIcon name="profile" size={16} />
+                <span class="sr-only">Felhasználói beállítások</span>
+            </a>
             {#if $auth.isAdmin}
             <button
                 type="button"
                 class="btn nav-btn nav-btn--admin {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
-                title="Admin panel"
+                title="Dashboard"
                 on:click={() => goto('/admin')}
             >
                 {#if $auth.adminQueueCount > 0}
                     <span class="nav-admin-badge" aria-label="{$auth.adminQueueCount} jóváhagyásra vár">{$auth.adminQueueCount}</span>
                 {/if}
-                <span class="sr-only">Admin</span>
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    ><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle
-                        cx="12"
-                        cy="7"
-                        r="4"
-                    /></svg
-                >
+                <span class="sr-only">Dashboard</span>
+                <AppIcon name="dashboard" size={16} />
             </button>
             {/if}
             <button
@@ -354,48 +335,27 @@
             </button>
         {/if}
 
-        <div class="settings-container">
-            <button
-                class="btn nav-btn"
-                on:click|stopPropagation={toggleSettings}
-                aria-label="Beállítások megnyitása"
-                aria-expanded={settingsOpen}
+        <a
+            href="/beallitasok"
+            class="btn nav-btn {$page.url.pathname === '/beallitasok' ? 'active' : ''}"
+            title="Felhasználói beállítások"
+        >
+            <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                ><circle cx="12" cy="12" r="3" /><path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
+                /></svg
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    ><circle cx="12" cy="12" r="3" /><path
-                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-                    /></svg
-                >
-                <span class="sr-only">Béállítások</span>
-            </button>
-
-            {#if settingsOpen}
-                <div
-                    class="settings-dropdown"
-                    on:click|stopPropagation
-                    role="presentation"
-                >
-                    <div class="dropdown-header">Béállítások</div>
-                    <button
-                        class="dropdown-item"
-                        on:click={() => cycleTheme($theme)}
-                    >
-                        <span class="dropdown-item-label">Téma:</span>
-                        <span class="dropdown-item-value">{LABELS[$theme]}</span
-                        >
-                    </button>
-                </div>
-            {/if}
-        </div>
+            <span class="sr-only">Felhasználói beállítások</span>
+        </a>
     </div>
 </header>
 

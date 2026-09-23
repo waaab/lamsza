@@ -29,30 +29,36 @@
     let authReady = false;
     let authDenied = false;
     let googleClientId = "";
+    let configUnreachable = false;
+    let adminOffline = false;
     let activeTab = "welcome";
 
     /** Section shortcuts: order matches sidebar (below Dashboard / home). Footer hint = right column label. */
+    /** Same id, icon, and title as the sidebar buttons, in sidebar order. */
     const ADMIN_WELCOME_ITEMS = [
-        { id: "mondasok", label: "Mondások", footerHint: "sor" },
-        { id: "quicklinks", label: "Gyorslinkek", footerHint: "link" },
-        { id: "locations", label: "Települések", footerHint: "település" },
-        { id: "counties", label: "Megyék", footerHint: "megye" },
-        { id: "venues", label: "Helyszínek", footerHint: "helyszín" },
-        { id: "attractions", label: "Látnivalók", footerHint: "látnivaló" },
-        { id: "events", label: "Események", footerHint: "esemény" },
-        { id: "entries", label: "Bejegyzések", footerHint: "bejegyzés" },
-        { id: "entry_categories", label: "Bejegyzés kategóriák", footerHint: "kategória" },
-        { id: "entry_types", label: "Bejegyzés típusok", footerHint: "típus" },
-        { id: "pages", label: "Oldalak", footerHint: "oldal" },
-        { id: "weather_translations", label: "Időjárás fordítások", footerHint: "fordítás" },
-        { id: "newsfeeds", label: "Hírfolyamok", footerHint: "folyam" },
-        /** site_settings: egy sor = egy konfigurációs kulcs */
-        { id: "settings", label: "Beállítások", footerHint: "kulcs" },
+        { id: "mondasok", title: "Mondások" },
+        { id: "quicklinks", title: "Gyorslinkek" },
+        { id: "entries", title: "Index" },
+        { id: "entry_categories", title: "Bejegyzés Kategóriák" },
+        { id: "entry_types", title: "Bejegyzés típusok" },
+        { id: "locations", title: "Települések" },
+        { id: "counties", title: "Megyék" },
+        { id: "venues", title: "Helyszínek" },
+        { id: "attractions", title: "Látnivalók" },
+        { id: "events", title: "Események" },
+        { id: "pages", title: "Oldalak" },
+        { id: "page_faq", title: "GYIK" },
+        { id: "weather_translations", title: "Időjárás fordítások" },
+        { id: "newsfeeds", title: "Hírfolyamok" },
+        { id: "settings", title: "Beállítások" },
     ];
 
     function goToAdminTab(/** @type {string} */ tab) {
         activeTab = tab;
-        if (tab === "welcome") fetchDashboardStats();
+        if (tab === "welcome") {
+            fetchDashboardStats();
+            fetchSettings();
+        }
         if (tab === "counties") fetchCountyRegions();
         if (tab === "venues") {
             fetchVenuesCatalog();
@@ -64,6 +70,7 @@
         if (tab === "settings") fetchSettings();
         if (tab === "weather_translations") fetchWeatherTranslations();
         if (tab === "pages") fetchPages();
+        if (tab === "page_faq") fetchPageFaq();
     }
 
     /** @type {{ tab: string, message: string } | null} */
@@ -318,44 +325,290 @@
     let dashboardStats = /** @type {Record<string, number>} */ ({});
     let dashboardStatsFetched = false;
     let dashboardStatsError = "";
+    let dashboardStatsRequest = 0;
+    let settingsLoaded = false;
+    let settingsLoadError = "";
+    /** @type {{ name: string, detail: string }[]} */
+    let browserCacheRows = [];
+    /** @type {{ id: string, level: string, text: string, tab?: string, action?: string }[]} */
+    let browserCacheNotices = [];
+    /** @type {{ source: string, text: string }[]} */
+    let apiNotices = [];
+
+    const ADMIN_API_LABELS = {
+        mondasok: "Mondások",
+        quick_links: "Gyorslinkek",
+        news_feeds: "Hírfolyamok",
+        locations: "Települések",
+        attractions: "Látnivalók",
+        entries: "Index",
+        entry_categories: "Bejegyzés kategóriák",
+        entry_types: "Bejegyzés típusok",
+        events: "Események",
+        catalog_event_types: "Eseménytípusok",
+        catalog_event_subtypes: "Esemény-altípusok",
+        pages: "Oldalak",
+        page_faq: "GYIK",
+        venues: "Helyszínek",
+        venue_types: "Helyszíntípusok",
+        settlement_location_types: "Településtípusok",
+        counties: "Megyék",
+        historical_seats: "Történelmi székek",
+        weather_translations: "Időjárás fordítások",
+    };
+
+    function rememberApiError(source, message) {
+        const text = String(message || "Az API nem válaszolt.");
+        apiNotices = [
+            ...apiNotices.filter((n) => n.source !== source),
+            { source, text },
+        ];
+    }
+
+    function forgetApiError(source) {
+        if (!apiNotices.some((n) => n.source === source)) return;
+        apiNotices = apiNotices.filter((n) => n.source !== source);
+    }
 
     /** @type {{ id: number, name: string, slug: string, owner_email: string }[]} */
     let listingQueueUnpublished = [];
     /** @type {{ entry_id: number, entry_name: string, user_id: number, email: string }[]} */
     let listingQueueMembers = [];
     let listingQueueError = "";
+    let listingQueueFetched = false;
 
-    async function fetchDashboardStats() {
-        dashboardStatsFetched = false;
-        dashboardStatsError = "";
-        try {
-            const res = await apiCall("/api/admin/dashboard_stats");
-            if (!res.ok) {
-                dashboardStatsError = (await res.text()) || `HTTP ${res.status}`;
-                return;
-            }
-            const raw = await res.json();
-            const next = /** @type {Record<string, number>} */ ({});
-            if (raw && typeof raw === "object") {
-                for (const k of Object.keys(raw)) {
-                    const n = Number(raw[k]);
-                    next[k] = Number.isFinite(n) ? n : 0;
-                }
-            }
-            dashboardStats = next;
-            dashboardStatsFetched = true;
-        } catch (e) {
-            dashboardStatsError = String(e?.message || e);
-            console.error(e);
+    function describeApiFailure(subject, status, body) {
+        const raw = String(body || "").trim();
+        if (/data api stopped/i.test(raw)) {
+            return `${subject} nem tölthető be: a tartalom API le van állítva, csak a Google-belépés fut.`;
         }
+        if (status === 401 || status === 403) {
+            return `${subject} nem tölthető be: a szerver elutasította a kérést (HTTP ${status}). A munkamenet lejárt, vagy a fiók nem admin.`;
+        }
+        if (status === 404) {
+            return `${subject} nem tölthető be: ez az útvonal nincs bekötve a szerveren (HTTP 404).`;
+        }
+        if (status >= 500) {
+            return `${subject} nem tölthető be: a szerver hibával válaszolt (HTTP ${status}).`;
+        }
+        if (status) {
+            return `${subject} nem tölthető be: a kérés nem sikerült (HTTP ${status}).`;
+        }
+        return `${subject} nem tölthető be: a kérés nem ért el a szerverig.`;
     }
 
-    /** @param {string} tabId */
-    function adminWelcomeCount(tabId) {
-        const v = dashboardStats[tabId];
-        if (v === undefined || v === null) return 0;
-        const n = Number(v);
-        return Number.isFinite(n) ? n : 0;
+    function describeTransportError(subject, error) {
+        const msg = String(error?.message || error || "");
+        if (/failed to fetch|networkerror|load failed|network request failed/i.test(msg)) {
+            return `${subject} nem tölthető be: a kérés nem ért el a szerverig. Az API nem fut, vagy a böngésző nem éri el.`;
+        }
+        if (msg.startsWith(subject)) return msg;
+        return msg || `${subject} nem tölthető be.`;
+    }
+
+    async function fetchDashboardStats() {
+        const requestId = ++dashboardStatsRequest;
+        if (!dashboardStatsFetched) dashboardStatsError = "";
+        let lastError = "";
+        for (let attempt = 0; attempt < 2; attempt++) {
+            if (requestId !== dashboardStatsRequest) return;
+            try {
+                const res = await apiCall("/api/admin/dashboard_stats");
+                if (requestId !== dashboardStatsRequest) return;
+                if (!res.ok) {
+                    throw new Error(describeApiFailure("A táblaszámlálók", res.status, await res.text()));
+                }
+                const raw = await res.json();
+                if (requestId !== dashboardStatsRequest) return;
+                if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+                    throw new Error("Az API válasza nem tartalmazza a táblaszámlálókat.");
+                }
+                const next = /** @type {Record<string, number>} */ ({});
+                for (const item of ADMIN_WELCOME_ITEMS) {
+                    const n = Number(raw[item.id]);
+                    if (!Number.isFinite(n)) {
+                        throw new Error("Az API válaszából hiányoznak a táblaszámlálók.");
+                    }
+                    next[item.id] = n;
+                }
+                dashboardStats = next;
+                dashboardStatsFetched = true;
+                dashboardStatsError = "";
+                return;
+            } catch (e) {
+                lastError = describeTransportError("A táblaszámlálók", e);
+                if (attempt === 0) {
+                    await new Promise((resolve) => setTimeout(resolve, 400));
+                }
+            }
+        }
+        if (requestId !== dashboardStatsRequest) return;
+        dashboardStatsError = lastError;
+        console.error(lastError);
+    }
+
+    function collectBrowserCaches() {
+        /** @type {{ name: string, detail: string }[]} */
+        const rows = [];
+        const weatherVersion =
+            siteSettings.weather_cache_version != null
+                ? String(siteSettings.weather_cache_version)
+                : "";
+        const linksVersion =
+            siteSettings.quick_links_version != null
+                ? String(siteSettings.quick_links_version)
+                : "";
+        const ttlMin = Number(siteSettings.weather_cache_ttl_minutes);
+        const weatherTtlMs = Number.isFinite(ttlMin) && ttlMin > 0 ? ttlMin * 60 * 1000 : 15 * 60 * 1000;
+        const hourMs = 60 * 60 * 1000;
+        const newsTtlMs = 30 * 60 * 1000;
+        let weatherTotal = 0;
+        let weatherFresh = 0;
+        let weatherStale = 0;
+        let newsTotal = 0;
+        let newsFresh = 0;
+        let newsStale = 0;
+        let promotedDetail = "nincs mentett gyorslink-válasz ebben a böngészőben";
+        let promotedState = "nincs";
+
+        const ageState = (timestamp, ttlMs, version, expectedVersion) => {
+            if (!Number.isFinite(timestamp)) return "nincs időbélyeg";
+            const expired = Date.now() - timestamp >= ttlMs;
+            const versionOk = !expectedVersion || String(version ?? "") === expectedVersion;
+            if (!versionOk) return "régi szerververzió";
+            if (expired) return "lejárt";
+            return "érvényes";
+        };
+
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (!key) continue;
+                let parsed = null;
+                try {
+                    parsed = JSON.parse(localStorage.getItem(key) || "");
+                } catch {
+                    parsed = null;
+                }
+                if (key.startsWith("weather_cache_")) {
+                    weatherTotal += 1;
+                    const state = parsed
+                        ? ageState(parsed.timestamp, weatherTtlMs, parsed.cache_version, weatherVersion)
+                        : "sérült";
+                    if (state === "érvényes") weatherFresh += 1;
+                    else weatherStale += 1;
+                } else if (key === "promoted_links_cache") {
+                    promotedState = parsed
+                        ? ageState(parsed.timestamp, hourMs, parsed.version, linksVersion)
+                        : "sérült";
+                    promotedDetail = promotedState;
+                } else if (key === "hirek_cache" || key.startsWith("news_cache")) {
+                    newsTotal += 1;
+                    const state = parsed ? ageState(parsed.timestamp, newsTtlMs, "", "") : "sérült";
+                    if (state === "érvényes") newsFresh += 1;
+                    else newsStale += 1;
+                }
+            }
+        } catch {
+            /* private mode */
+        }
+
+        const weatherServer = settingsLoaded
+            ? `A szerver TTL ${ttlMin || "—"} perc, verzió ${weatherVersion || "—"}.`
+            : "A szerver verziója most nem ismert.";
+        rows.push({
+            name: "Időjárás",
+            detail: `${weatherServer}. Ebben a böngészőben ${weatherTotal} mentés, ${weatherFresh} érvényes.`,
+        });
+        rows.push({
+            name: "Gyorslinkek",
+            detail: `${
+                settingsLoaded ? `szerververzió ${linksVersion || "—"}, böngésző TTL 60 perc` : "szerververzió még nincs betöltve"
+            }. ${promotedDetail}.`,
+        });
+        rows.push({
+            name: "Hírek",
+            detail:
+                newsTotal > 0
+                    ? `30 perces böngésző TTL, szerververzió nélkül. ${newsTotal} mentés, ${newsFresh} érvényes, ${newsStale} lejárt vagy sérült.`
+                    : "30 perces böngésző TTL, szerververzió nélkül. Ebben a böngészőben nincs hírmásolat.",
+        });
+        browserCacheRows = rows;
+
+        /** @type {{ id: string, level: string, text: string, action: string }[]} */
+        const notices = [];
+        if (weatherTotal === 0) {
+            notices.push({
+                id: "cache-weather",
+                level: "info",
+                text: `Időjárás: ebben a böngészőben nincs mentett előrejelzés. ${weatherServer}`,
+                action: "cache-refresh",
+            });
+        } else if (weatherStale > 0) {
+            notices.push({
+                id: "cache-weather",
+                level: "warning",
+                text: `Időjárás: ${weatherStale} mentés lejárt, régi verziójú vagy sérült. Érvényes: ${weatherFresh}. ${weatherServer}`,
+                action: "cache-refresh",
+            });
+        } else {
+            notices.push({
+                id: "cache-weather",
+                level: "success",
+                text: `Időjárás: ${weatherFresh} mentés érvényes. ${weatherServer}`,
+                action: "cache-refresh",
+            });
+        }
+
+        const linksServer = settingsLoaded
+            ? `Szerververzió ${linksVersion || "—"}, böngésző TTL 60 perc.`
+            : "A szerververzió most nem ismert. Böngésző TTL 60 perc.";
+        if (promotedState === "nincs") {
+            notices.push({
+                id: "cache-links",
+                level: "info",
+                text: `Gyorslinkek: ebben a böngészőben nincs mentett lista. ${linksServer}`,
+                action: "cache-refresh",
+            });
+        } else if (promotedState === "érvényes") {
+            notices.push({
+                id: "cache-links",
+                level: "success",
+                text: `Gyorslinkek: a mentett lista érvényes. ${linksServer}`,
+                action: "cache-refresh",
+            });
+        } else {
+            notices.push({
+                id: "cache-links",
+                level: "warning",
+                text: `Gyorslinkek: a mentett lista ${promotedDetail}. ${linksServer}`,
+                action: "cache-refresh",
+            });
+        }
+
+        if (newsTotal === 0) {
+            notices.push({
+                id: "cache-news",
+                level: "info",
+                text: "Hírek: ebben a böngészőben nincs mentett hírlista. A másolat 30 percig él, szerververzió nélkül.",
+                action: "cache-refresh",
+            });
+        } else if (newsStale > 0) {
+            notices.push({
+                id: "cache-news",
+                level: "warning",
+                text: `Hírek: ${newsStale} mentés lejárt vagy sérült. Érvényes: ${newsFresh}. A másolat 30 percig él, szerververzió nélkül.`,
+                action: "cache-refresh",
+            });
+        } else {
+            notices.push({
+                id: "cache-news",
+                level: "success",
+                text: `Hírek: ${newsFresh} mentés érvényes. A másolat 30 percig él, szerververzió nélkül.`,
+                action: "cache-refresh",
+            });
+        }
+        browserCacheNotices = notices;
     }
 
     async function fetchListingQueue() {
@@ -363,14 +616,21 @@
         try {
             const res = await apiCall("/api/admin/listing-queue");
             if (!res.ok) {
-                listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+                listingQueueError = describeApiFailure(
+                    "A bejegyzés-jóváhagyások",
+                    res.status,
+                    await res.text(),
+                );
+                listingQueueFetched = true;
                 return;
             }
             const data = await res.json();
             listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
             listingQueueMembers = Array.isArray(data.members) ? data.members : [];
+            listingQueueFetched = true;
         } catch (e) {
-            listingQueueError = String(e?.message || e);
+            listingQueueError = describeTransportError("A bejegyzés-jóváhagyások", e);
+            listingQueueFetched = true;
             console.error(e);
         }
     }
@@ -422,7 +682,7 @@
         welcome: {
             title: "Dashboard",
             greeting:
-                "Üdvözöllek. A kártyákon a táblák rekordjainak száma látható; jobb oldalon egy rövid típus-címke. Kattintva megnyílik a megfelelő kezelőfelület.",
+                "Üdvözöllek. A kártyákon a táblák rekordjainak száma látható, a név pedig megegyezik az oldalsáv gombjaival. Kattintva megnyílik a megfelelő kezelőfelület.",
         },
         mondasok: {
             title: "Mondások",
@@ -475,6 +735,10 @@
         pages: {
             title: "Oldalak",
             greeting: "Statikus oldalak (szabályzatok, szöveges tartalmak) szerkesztése.",
+        },
+        page_faq: {
+            title: "GYIK",
+            greeting: "Oldalankénti gyakori kérdések és felelősségkizárások.",
         },
         weather_translations: {
             title: "Időjárás fordítások",
@@ -833,12 +1097,17 @@
                 if (res.ok) {
                     const data = await res.json();
                     googleClientId = data.google_client_id || "";
+                    configUnreachable = false;
+                } else {
+                    configUnreachable = true;
                 }
             } catch (e) {
+                configUnreachable = true;
                 console.error(e);
             }
             const me = await auth.refresh();
             authReady = true;
+            adminOffline = !!me.offline;
             if (me.isAdmin) {
                 authenticated = true;
                 fetchAll();
@@ -873,6 +1142,7 @@
     }
 
     async function fetchAll() {
+        collectBrowserCaches();
         await fetchDashboardStats();
         await fetchListingQueue();
         fetchMondasok();
@@ -890,16 +1160,12 @@
         fetchSettings();
         fetchWeatherTranslations();
         fetchPages();
+        fetchPageFaq();
         fetchCountyRegions();
     }
 
     async function fetchWeatherTranslations() {
-        try {
-            const res = await apiCall(`/api/admin/weather_translations`);
-            if (res.ok) weatherTranslations = await res.json();
-        } catch (e) {
-            console.error(e);
-        }
+        await loadData("weather_translations", (d) => (weatherTranslations = d));
     }
 
     async function saveWeatherTranslation(e) {
@@ -952,22 +1218,31 @@
     async function fetchSettings() {
         try {
             const res = await apiCall(`/api/admin/settings`);
-            if (res.ok) {
-                const data = await res.json();
-                siteSettings = {
-                    weather_cache_ttl_minutes: data.weather_cache_ttl_minutes ?? "15",
-                    weather_cache_version: data.weather_cache_version ?? "1",
-                    weather_icon_style: data.weather_icon_style ?? "emoji",
-                    weather_active_users_estimate: data.weather_active_users_estimate ?? "10000",
-                    weather_provider_default: data.weather_provider_default ?? "open_meteo",
-                    weather_provider_open_meteo_enabled: data.weather_provider_open_meteo_enabled ?? "true",
-                    weather_provider_weatherapi_enabled: data.weather_provider_weatherapi_enabled ?? "true",
-                    weather_provider_openweathermap_enabled: data.weather_provider_openweathermap_enabled ?? "true",
-                    my_location_slug: data.my_location_slug ?? "csikszereda",
-                    ...data,
-                };
+            if (!res.ok) {
+                settingsLoadError = describeApiFailure("A beállítások", res.status, await res.text());
+                collectBrowserCaches();
+                return;
             }
+            const data = await res.json();
+            siteSettings = {
+                weather_cache_ttl_minutes: data.weather_cache_ttl_minutes ?? "15",
+                weather_cache_version: data.weather_cache_version ?? "1",
+                quick_links_version: data.quick_links_version ?? "1",
+                weather_icon_style: data.weather_icon_style ?? "emoji",
+                weather_active_users_estimate: data.weather_active_users_estimate ?? "10000",
+                weather_provider_default: data.weather_provider_default ?? "open_meteo",
+                weather_provider_open_meteo_enabled: data.weather_provider_open_meteo_enabled ?? "true",
+                weather_provider_weatherapi_enabled: data.weather_provider_weatherapi_enabled ?? "true",
+                weather_provider_openweathermap_enabled: data.weather_provider_openweathermap_enabled ?? "true",
+                my_location_slug: data.my_location_slug ?? "csikszereda",
+                ...data,
+            };
+            settingsLoaded = true;
+            settingsLoadError = "";
+            collectBrowserCaches();
         } catch (e) {
+            settingsLoadError = describeTransportError("A beállítások", e);
+            collectBrowserCaches();
             console.error(e);
         }
     }
@@ -1011,14 +1286,11 @@
     }
 
     async function fetchPages() {
-        try {
-            const res = await apiCall(`/api/admin/pages`);
-            if (res.ok) adminPages = await res.json();
-            const r2 = await apiCall(`/api/admin/page_faq`);
-            if (r2.ok) pageFaqSections = await r2.json();
-        } catch (e) {
-            console.error(e);
-        }
+        await loadData("pages", (d) => (adminPages = d));
+    }
+
+    async function fetchPageFaq() {
+        await loadData("page_faq", (d) => (pageFaqSections = d));
     }
 
     function startEditPage(page) {
@@ -1103,7 +1375,7 @@
                 clearAdminTabError();
                 await showAlert("GYIK / disclaimer mentve.");
                 editingPageFaq = null;
-                fetchPages();
+                fetchPageFaq();
             } else {
                 setAdminTabError("Hiba: " + (await res.text()));
             }
@@ -1116,10 +1388,19 @@
 
     // generic fetch helper
     async function loadData(endpoint, setter) {
+        const path = endpoint.startsWith("/") ? endpoint : `/api/admin/${endpoint}`;
+        const source = endpoint.replace(/^\/api\/(?:admin\/)?/, "");
         try {
-            const res = await apiCall(`/api/admin/${endpoint}`);
-            if (res.ok) setter(await res.json());
+            const res = await apiCall(path);
+            if (!res.ok) {
+                const label = ADMIN_API_LABELS[source] || source;
+                rememberApiError(source, describeApiFailure(label, res.status, await res.text()));
+                return;
+            }
+            setter(await res.json());
+            forgetApiError(source);
         } catch (e) {
+            rememberApiError(source, describeTransportError(ADMIN_API_LABELS[source] || source, e));
             console.error(e);
         }
     }
@@ -1139,15 +1420,7 @@
     }
 
     async function fetchSettlementLocationTypes() {
-        try {
-            const res = await apiCall(`/api/admin/settlement_location_types`,
-            );
-            if (res.ok) {
-                settlementLocationTypes = await res.json();
-            }
-        } catch (e) {
-            console.error(e);
-        }
+        await loadData("settlement_location_types", (d) => (settlementLocationTypes = d));
     }
 
     async function submitNewSettlementLocationType(e) {
@@ -1468,19 +1741,21 @@
         }
     }
     async function fetchVenuesCatalog() {
-        try {
-            const res = await apiCall(`/api/admin/venues`);
-            if (res.ok) venuesCatalog = await res.json();
-        } catch (e) {
-            console.error(e);
-        }
+        await loadData("venues", (d) => (venuesCatalog = d));
     }
     async function fetchVenueTypes() {
         try {
             const res = await apiCall(`/api/admin/venue_types`);
-            if (res.ok) {
-                venueTypesList = await res.json();
-                if (venueTypesList.length) {
+            if (!res.ok) {
+                rememberApiError(
+                    "venue_types",
+                    describeApiFailure("A helyszíntípusok", res.status, await res.text()),
+                );
+                return;
+            }
+            forgetApiError("venue_types");
+            venueTypesList = await res.json();
+            if (venueTypesList.length) {
                     const slugs = new Set(venueTypesList.map((t) => t.slug));
                     if (!slugs.has(String(newVenue.kind))) {
                         newVenue = {
@@ -1497,9 +1772,9 @@
                             kind: venueTypesList[0].slug,
                         };
                     }
-                }
             }
         } catch (e) {
+            rememberApiError("venue_types", describeTransportError("A helyszíntípusok", e));
             console.error(e);
         }
     }
@@ -1819,19 +2094,127 @@
     }
 
     $: eventsWithIncompleteDateTime = events.filter((e) => !eventDateTimeComplete(e));
+
+    function apiNoticeTab(source) {
+        const tabs = {
+            quick_links: "quicklinks",
+            news_feeds: "newsfeeds",
+            venues: "venues",
+            venue_types: "venues",
+            catalog_event_types: "events",
+            catalog_event_subtypes: "events",
+            counties: "counties",
+            historical_seats: "counties",
+            settlement_location_types: "locations",
+        };
+        if (tabs[source]) return tabs[source];
+        return ADMIN_API_LABELS[source] ? source : "";
+    }
+
+    function buildDashboardMessages() {
+        /** @type {{ id: string, level: string, text: string, tab?: string, action?: string }[]} */
+        const messages = [];
+        if (adminOffline) {
+            messages.push({
+                id: "api-offline",
+                level: "error",
+                text: "Az API nem elérhető. A felület a legutóbbi belépés alapján nyílt meg, adatok nélkül.",
+            });
+        }
+        if (dashboardStatsError) {
+            messages.push({
+                id: "stats",
+                level: "error",
+                text: dashboardStatsError,
+                action: "retry-stats",
+            });
+        }
+        if (settingsLoadError) {
+            messages.push({
+                id: "settings",
+                level: "error",
+                text: settingsLoadError,
+                tab: "settings",
+                action: "open",
+            });
+        }
+        if (listingQueueError) {
+            messages.push({
+                id: "queue-error",
+                level: "error",
+                text: listingQueueError,
+                action: "retry-queue",
+            });
+        }
+        for (const notice of apiNotices) {
+            messages.push({
+                id: `api-${notice.source}`,
+                level: "error",
+                text: notice.text,
+                tab: apiNoticeTab(notice.source),
+                action: "open",
+            });
+        }
+        if (mondasok.length > 0 && mondasokTodayCount === 0) {
+            messages.push({
+                id: "mondas",
+                level: "warning",
+                text: `Ma (${mondasTodayYmd}) nincs beütemezett mondás, ezért a kezdőlapon a mondás-blokk rejtve marad.`,
+                tab: "mondasok",
+                action: "open",
+            });
+        }
+        if (eventsWithIncompleteDateTime.length > 0) {
+            messages.push({
+                id: "events",
+                level: "warning",
+                text: `${eventsWithIncompleteDateTime.length} eseménynél hiányzik a kezdő vagy a befejező dátum és időpont.`,
+                tab: "events",
+                action: "open",
+            });
+        }
+        for (const notice of browserCacheNotices) messages.push(notice);
+        const waiting = listingQueueUnpublished.length + listingQueueMembers.length;
+        if (listingQueueFetched && !listingQueueError) {
+            if (waiting > 0) {
+                messages.push({
+                    id: "queue",
+                    level: "info",
+                    text: `${listingQueueUnpublished.length} bejegyzés és ${listingQueueMembers.length} tag vár jóváhagyásra.`,
+                });
+            } else {
+                messages.push({
+                    id: "queue-ok",
+                    level: "success",
+                    text: "Nincs jóváhagyásra váró bejegyzés vagy tag.",
+                });
+            }
+        }
+        return messages;
+    }
+
+    $: dashboardMessages = buildDashboardMessages(
+        adminOffline,
+        dashboardStatsError,
+        settingsLoadError,
+        listingQueueError,
+        listingQueueUnpublished,
+        listingQueueMembers,
+        mondasok,
+        mondasokTodayCount,
+        mondasTodayYmd,
+        eventsWithIncompleteDateTime,
+        browserCacheNotices,
+        apiNotices,
+        listingQueueFetched,
+    );
     function fetchAttractions() {
         loadData("attractions", (d) => (attractions = d));
     }
 
     async function fetchCountyRegions() {
-        try {
-            const r1 = await apiCall(`/api/counties`);
-            if (r1.ok) countiesFromAPI = await r1.json();
-            const r2 = await apiCall(`/api/historical_seats`);
-            if (r2.ok) historicalSeatsFromAPI = await r2.json();
-        } catch (e) {
-            console.error(e);
-        }
+        await loadData("/api/counties", (d) => (countiesFromAPI = d));
+        await loadData("/api/historical_seats", (d) => (historicalSeatsFromAPI = d));
     }
 
     /** One limit for every truncated label in admin tables (full value in title/tooltip). */
@@ -2862,6 +3245,8 @@
                                 onSignedIn={onGoogleSignedIn}
                             />
                         {/key}
+                    {:else if configUnreachable}
+                        <p>Az API nem elérhető, ezért a belépés most nem lehetséges.</p>
                     {:else}
                         <p>
                             A Google belépés nincs beállítva
@@ -2894,13 +3279,9 @@
                 type="button"
                 class="admin-sidebar-btn {activeTab === 'welcome' ? 'active' : ''}"
                 on:click={() => goToAdminTab('welcome')}
-                title="Dashboard home"
+                title="Dashboard"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"
-                    ><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline
-                        points="9 22 9 12 15 12 15 22"
-                    ></polyline></svg
-                >
+                <AdminNavIcon name="dashboard" />
             </button>
 
             <button
@@ -3018,6 +3399,14 @@
             </button>
 
             <button
+                class="admin-sidebar-btn {activeTab === 'page_faq' ? 'active' : ''}"
+                on:click={() => goToAdminTab('page_faq')}
+                title="GYIK"
+            >
+                <AdminNavIcon name="page_faq" />
+            </button>
+
+            <button
                 class="admin-sidebar-btn {activeTab === 'weather_translations' ? 'active' : ''}"
                 on:click={() => goToAdminTab('weather_translations')}
                 title="Időjárás fordítások"
@@ -3066,51 +3455,32 @@
             </header>
 
             <div class="admin-container w-full">
-                {#if activeTab === "welcome" && dashboardStatsError}
-                    <div class="admin-alert admin-alert--error" role="alert">
-                        Nem sikerült betölteni a táblaszámlálókat: {dashboardStatsError}
-                    </div>
-                {/if}
                 {#if activeTab === "welcome"}
-                    <div class="admin-welcome" role="navigation" aria-label="Admin sections">
-                        <div class="admin-welcome-grid">
-                            {#each ADMIN_WELCOME_ITEMS as item}
-                                {@const cnt = adminWelcomeCount(item.id)}
-                                <button
-                                    type="button"
-                                    class="admin-welcome-card"
-                                    on:click={() => goToAdminTab(item.id)}
-                                    aria-label={item.label}
-                                >
-                                    <div class="admin-welcome-card-body">
-                                        <AdminNavIcon name={item.id} size={56} />
-                                    </div>
-                                    <div class="admin-welcome-card-footer">
-                                        <span class="admin-welcome-card-footer-left"
-                                            title={dashboardStatsFetched
-                                                ? "Rekordok száma az adatbázisban"
-                                                : "Betöltés…"}
-                                            >{dashboardStatsFetched ? cnt : "…"}</span
-                                        >
-                                        <span class="admin-welcome-card-footer-right"
-                                            title="Sorok típusa ebben a táblában"
-                                            >{item.footerHint}</span
-                                        >
-                                    </div>
-                                </button>
-                            {/each}
-                        </div>
-                    </div>
-                    <section class="admin-listing-queue" aria-labelledby="listing-queue-title">
-                        <h3 id="listing-queue-title">Bejegyzés-jóváhagyások</h3>
-                        {#if listingQueueError}
-                            <div class="admin-alert admin-alert--error" role="alert">
-                                {listingQueueError}
+                    <section aria-labelledby="admin-messages-title">
+                        <h3 id="admin-messages-title">Üzenetek</h3>
+                        {#each dashboardMessages as msg (msg.id)}
+                            <div
+                                class="admin-alert admin-alert--{msg.level}"
+                                role={msg.level === "error" || msg.level === "warning" ? "alert" : "status"}
+                            >
+                                {msg.text}
+                                {#if msg.action === "retry-stats"}
+                                    <button type="button" class="admin-alert__btn" on:click={fetchDashboardStats}>Újra</button>
+                                {:else if msg.action === "retry-queue"}
+                                    <button type="button" class="admin-alert__btn" on:click={fetchListingQueue}>Újra</button>
+                                {:else if msg.action === "open" && msg.tab}
+                                    <button type="button" class="admin-alert__btn" on:click={() => goToAdminTab(msg.tab)}>Megnyitás</button>
+                                {:else if msg.action === "cache-refresh"}
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        disabled
+                                        title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
+                                    >Frissítés</button>
+                                {/if}
                             </div>
-                        {/if}
-                        {#if listingQueueUnpublished.length === 0 && listingQueueMembers.length === 0}
-                            <p class="admin-info">Nincs jóváhagyásra váró bejegyzés vagy tag.</p>
-                        {:else}
+                        {/each}
+                        {#if listingQueueFetched && !listingQueueError && (listingQueueUnpublished.length > 0 || listingQueueMembers.length > 0)}
                             {#if listingQueueUnpublished.length > 0}
                                 <h4>Közzétételre váró bejegyzések</h4>
                                 <div class="admin-table-wrapper">
@@ -3175,6 +3545,51 @@
                                 </div>
                             {/if}
                         {/if}
+                    </section>
+                    <div class="admin-welcome" role="navigation" aria-label="Admin sections">
+                        <div class="admin-welcome-grid">
+                            {#each ADMIN_WELCOME_ITEMS as item}
+                                <button
+                                    type="button"
+                                    class="admin-welcome-card"
+                                    on:click={() => goToAdminTab(item.id)}
+                                    title={item.title}
+                                    aria-label={item.title}
+                                >
+                                    <div class="admin-welcome-card-body">
+                                        <AdminNavIcon name={item.id} size={56} />
+                                    </div>
+                                    <div class="admin-welcome-card-footer">
+                                        <span class="admin-welcome-card-footer-left"
+                                            title={dashboardStatsFetched && dashboardStats[item.id] != null
+                                                ? "Rekordok száma az adatbázisban"
+                                                : "Betöltés…"}
+                                            >{dashboardStatsFetched && dashboardStats[item.id] != null
+                                                ? dashboardStats[item.id]
+                                                : "…"}</span
+                                        >
+                                        <span class="admin-welcome-card-footer-right" title={item.title}
+                                            >{item.title}</span
+                                        >
+                                    </div>
+                                </button>
+                            {/each}
+                        </div>
+                    </div>
+                    <section class="admin-cache-panel" aria-labelledby="admin-cache-title">
+                        <h3 id="admin-cache-title">Gyorsítótár</h3>
+                        <p>
+                            A kártyák számai nincsenek gyorsítótárazva. Minden megnyitáskor a szerver számolja a táblákat.
+                            Az alábbi mentések csak ebben a böngészőben vannak, a nyilvános oldalak használják.
+                        </p>
+                        <ul class="admin-cache-list">
+                            {#each browserCacheRows as row (row.name)}
+                                <li>
+                                    <span class="admin-cache-name">{row.name}</span>
+                                    <span class="admin-cache-detail">{row.detail}</span>
+                                </li>
+                            {/each}
+                        </ul>
                     </section>
                 {/if}
 
@@ -5208,8 +5623,10 @@
                     </details>
 
                     <div class="admin-table-toolbar">
-                        <label class="admin-search-label"
-                            >Keresés
+                        <label class="admin-search-label">
+                            <span class="admin-search-heading">
+                                Keresés
+                            </span>
                             <input
                                 id="search_entry_categories"
                                 name="search_entry_categories"
@@ -5575,14 +5992,14 @@
                         </div>
                     {:else}
                         <p class="admin-info">
-                            Oldalszintű beállítások: alapértelmezett település (kezdőlap időjárás, eseményszűrés),
+                            Oldalszintű beállítások: alapértelmezett település vendégeknek és azoknak, akik nem választottak saját települést (kezdőlap időjárás, eseményszűrés),
                             időjárás-szolgáltatók engedélyezése, ikon stílus, cache TTL és látogató-becslés.
                             A <strong>cache törlése</strong> új verziószámot ad — a látogatók frissebb időjárást kapnak.
                         </p>
                     {/if}
                     <section class="admin-form-section">
                         <h3>Alapértelmezett település (MyLocation)</h3>
-                        <p class="admin-hint">A kezdőlap időjárás widgetje és az események szűrése ezt a települést használja alapértelmezettként.</p>
+                        <p class="admin-hint">Ez a vendégek, és a saját település nélküli felhasználók alaphelye a kezdőlapon és az index közelségi rendezésénél. A saját települést mindenki a felhasználói beállításokban állítja; a kereső és az index szűrője csak a találatokat szűri.</p>
                         <div class="admin-form" style="max-width: 32rem;">
                             <label for="my_location_slug">Település</label>
                             <select id="my_location_slug" name="my_location_slug" bind:value={siteSettings.my_location_slug}>
@@ -5801,76 +6218,10 @@
                                 <button type="button" class="btn-update" on:click={cancelEditPage}>Mégse</button>
                             </div>
                         </form>
-                    {:else if editingPageFaq}
-                        <h3>GYIK / disclaimer: {editingPageFaq.label_hu || editingPageFaq.section_key}</h3>
-                        <p class="admin-info">
-                            Kulcs: <code>{editingPageFaq.section_key}</code> — a nyilvános oldalon a
-                            <code>PageFaqDisclaimer</code> ugyanazt a HTML-struktúrát használja (<code>.faq</code>,
-                            <code>details.faq-item</code>, <code>#disclaimer</code>, <code>.note.info</code>). Minden
-                            blokk egy külön kérdés / válasz pár.
-                        </p>
-                        <form class="admin-form" on:submit|preventDefault={savePageFaq} style="max-width: 52rem;">
-                            <label for="pfaq_label">Megjelenített név (admin)</label>
-                            <input id="pfaq_label" name="label_hu" type="text" bind:value={editingPageFaq.label_hu} />
-
-                            <label for="pfaq_title">GYIK szekció címe (H2)</label>
-                            <input id="pfaq_title" name="faq_title" type="text" bind:value={editingPageFaq.faq_title} placeholder="pl. Hogyan működik ez az oldal?" />
-
-                            <div class="admin-faq-toolbar">
-                                <span class="admin-faq-toolbar-label">Kérdések és válaszok</span>
-                                <button type="button" class="btn-update btn-sm" on:click={addFaqItem}
-                                    >+ Új kérdés</button
-                                >
-                            </div>
-
-                            {#each editingPageFaq.faq_items || [] as item, i (i)}
-                                <details class="admin-faq-pair" open>
-                                    <summary>Kérdés {i + 1}</summary>
-                                    <div class="admin-faq-pair-fields">
-                                        <label for={"pfaq_q_" + i}>Kérdés (summary)</label>
-                                        <input
-                                            id={"pfaq_q_" + i}
-                                            name={"faq_question_" + i}
-                                            type="text"
-                                            bind:value={editingPageFaq.faq_items[i].question}
-                                            placeholder="Rövid kérdés"
-                                        />
-                                        <label for={"pfaq_a_" + i}>Válasz (Markdown)</label>
-                                        <textarea
-                                            id={"pfaq_a_" + i}
-                                            name={"faq_answer_" + i}
-                                            bind:value={editingPageFaq.faq_items[i].answer}
-                                            rows="5"
-                                            class="input-mono"
-                                            placeholder="Válasz szövege…"
-                                        ></textarea>
-                                        <button
-                                            type="button"
-                                            class="btn-delete btn-sm"
-                                            on:click={() => removeFaqItem(i)}>Kérdés törlése</button
-                                        >
-                                    </div>
-                                </details>
-                            {:else}
-                                <p class="admin-info">Még nincs kérdés — kattints az „Új kérdés” gombra.</p>
-                            {/each}
-
-                            <label for="pfaq_disc">Disclaimer (Markdown)</label>
-                            <textarea id="pfaq_disc" bind:value={editingPageFaq.disclaimer_markdown} rows="8" class="input-mono"></textarea>
-
-                            <div class="flex gap-md mt-md">
-                                <button type="submit" class="admin-submit-btn" disabled={pageFaqSaving}>
-                                    {pageFaqSaving ? 'Mentés…' : 'Mentés'}
-                                </button>
-                                <button type="button" class="btn-update" on:click={cancelEditPageFaq}>Mégse</button>
-                            </div>
-                        </form>
                     {:else}
                         {#if !adminTabError}
                             <p class="admin-info">
-                                Statikus oldalak: <strong>cím</strong>, <strong>bevezető</strong> (a főcím alatt), <strong>HTML tartalom</strong> (pl. irányelvek), valamint oldalankénti <strong>GYIK és disclaimer</strong>
-                                szekciók. A GYIK a nyilvános oldalon a <code>PageFaqDisclaimer</code> komponensen keresztül
-                                jelenik meg (kérdés–válasz párok, disclaimer).
+                                Statikus oldalak: <strong>cím</strong>, <strong>bevezető</strong> (a főcím alatt) és <strong>HTML tartalom</strong> (pl. irányelvek).
                             </p>
                         {/if}
                         <h3 class="admin-subtab-heading">Irányelvek és statikus oldalak</h3>
@@ -5951,7 +6302,82 @@
                                 ))}
                         />
 
-                        <h3 class="admin-subtab-heading">GYIK és felelősségkizárások (oldalanként)</h3>
+                    {/if}
+                {/if}
+
+                <!-- GYIK Tab -->
+                {#if activeTab === "page_faq"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {/if}
+                    {#if editingPageFaq}
+                        <h3>GYIK / disclaimer: {editingPageFaq.label_hu || editingPageFaq.section_key}</h3>
+                        <p class="admin-info">
+                            Kulcs: <code>{editingPageFaq.section_key}</code> — a nyilvános oldalon a
+                            <code>PageFaqDisclaimer</code> ugyanazt a HTML-struktúrát használja (<code>.faq</code>,
+                            <code>details.faq-item</code>, <code>#disclaimer</code>, <code>.note.info</code>). Minden
+                            blokk egy külön kérdés / válasz pár.
+                        </p>
+                        <form class="admin-form" on:submit|preventDefault={savePageFaq} style="max-width: 52rem;">
+                            <label for="pfaq_label">Megjelenített név (admin)</label>
+                            <input id="pfaq_label" name="label_hu" type="text" bind:value={editingPageFaq.label_hu} />
+
+                            <label for="pfaq_title">GYIK szekció címe (H2)</label>
+                            <input id="pfaq_title" name="faq_title" type="text" bind:value={editingPageFaq.faq_title} placeholder="pl. Hogyan működik ez az oldal?" />
+
+                            <div class="admin-faq-toolbar">
+                                <span class="admin-faq-toolbar-label">Kérdések és válaszok</span>
+                                <button type="button" class="btn-update btn-sm" on:click={addFaqItem}
+                                    >+ Új kérdés</button
+                                >
+                            </div>
+
+                            {#each editingPageFaq.faq_items || [] as item, i (i)}
+                                <details class="admin-faq-pair" open>
+                                    <summary>Kérdés {i + 1}</summary>
+                                    <div class="admin-faq-pair-fields">
+                                        <label for={"pfaq_q_" + i}>Kérdés (summary)</label>
+                                        <input
+                                            id={"pfaq_q_" + i}
+                                            name={"faq_question_" + i}
+                                            type="text"
+                                            bind:value={editingPageFaq.faq_items[i].question}
+                                            placeholder="Rövid kérdés"
+                                        />
+                                        <label for={"pfaq_a_" + i}>Válasz (Markdown)</label>
+                                        <textarea
+                                            id={"pfaq_a_" + i}
+                                            name={"faq_answer_" + i}
+                                            bind:value={editingPageFaq.faq_items[i].answer}
+                                            rows="5"
+                                            class="input-mono"
+                                            placeholder="Válasz szövege…"
+                                        ></textarea>
+                                        <button
+                                            type="button"
+                                            class="btn-delete btn-sm"
+                                            on:click={() => removeFaqItem(i)}>Kérdés törlése</button
+                                        >
+                                    </div>
+                                </details>
+                            {:else}
+                                <p class="admin-info">Még nincs kérdés — kattints az „Új kérdés” gombra.</p>
+                            {/each}
+
+                            <label for="pfaq_disc">Disclaimer (Markdown)</label>
+                            <textarea id="pfaq_disc" bind:value={editingPageFaq.disclaimer_markdown} rows="8" class="input-mono"></textarea>
+
+                            <div class="flex gap-md mt-md">
+                                <button type="submit" class="admin-submit-btn" disabled={pageFaqSaving}>
+                                    {pageFaqSaving ? 'Mentés…' : 'Mentés'}
+                                </button>
+                                <button type="button" class="btn-update" on:click={cancelEditPageFaq}>Mégse</button>
+                            </div>
+                        </form>
+                    {:else}
+                        <h3 class="admin-subtab-heading">GYIK és felelősségkizárások</h3>
                         <p class="admin-info">
                             Ugyanaz a kinézet, mint a <code>/hirek</code> oldalon: <code>.faq</code>,
                             <code>.faq-title</code>, <code>.faq-list</code>, <code>.faq-item</code>, <code>#disclaimer</code>,
