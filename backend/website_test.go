@@ -30,6 +30,12 @@ func TestMigrateWebsitesBackfillsListingURL(t *testing.T) {
 }
 
 func TestWebsiteSubmitPendingRaisesQueue(t *testing.T) {
+	defer func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "submit-example.com"); err != nil {
+			t.Errorf("cleanup submit-example.com: %v", err)
+		}
+	}()
+
 	cookie := mustLogin("website-submit@test.lamsza")
 	adminCookie := mustLogin("admin@test.lamsza")
 	before := adminQueueCount(t, adminCookie)
@@ -62,6 +68,12 @@ func TestWebsiteSubmitPendingRaisesQueue(t *testing.T) {
 }
 
 func TestWebsiteSubmitRejectsBannedAndSignedOut(t *testing.T) {
+	defer func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "banned-example.com"); err != nil {
+			t.Errorf("cleanup banned-example.com: %v", err)
+		}
+	}()
+
 	rr := doRequest(t, "POST", "/api/websites", map[string]string{
 		"domain": "banned-example.com", "title": "T", "description": "D",
 	})

@@ -122,7 +122,12 @@ func handleWebsiteSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if conflict := checkWebsiteDomainConflict(domainKey); conflict != nil {
+	conflict, err := checkWebsiteDomainConflict(domainKey)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if conflict != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)
 		json.NewEncoder(w).Encode(conflict)
@@ -172,7 +177,7 @@ func submittedHost(raw string) (string, error) {
 	return strings.ToLower(u.Hostname()), nil
 }
 
-func checkWebsiteDomainConflict(domainKey string) map[string]interface{} {
+func checkWebsiteDomainConflict(domainKey string) (map[string]interface{}, error) {
 	var (
 		status    string
 		title     string
@@ -188,15 +193,15 @@ func checkWebsiteDomainConflict(domainKey string) map[string]interface{} {
 		WHERE w.domain_key = $1
 	`, domainKey).Scan(&status, &title, &entryID, &entryName, &entrySlug, &published)
 	if err == sql.ErrNoRows {
-		return nil
+		return nil, nil
 	}
 	if err != nil {
-		return map[string]interface{}{"error": "internal"}
+		return nil, err
 	}
 
 	switch status {
 	case "pending":
-		return map[string]interface{}{"error": "domain_pending"}
+		return map[string]interface{}{"error": "domain_pending"}, nil
 	case "approved":
 		if entryID.Valid && published.Valid && published.Bool {
 			return map[string]interface{}{
@@ -205,7 +210,7 @@ func checkWebsiteDomainConflict(domainKey string) map[string]interface{} {
 					"name": entryName.String,
 					"slug": entrySlug.String,
 				},
-			}
+			}, nil
 		}
 		return map[string]interface{}{
 			"error": "domain_taken",
@@ -213,8 +218,8 @@ func checkWebsiteDomainConflict(domainKey string) map[string]interface{} {
 				"title":  title,
 				"domain": domainKey,
 			},
-		}
+		}, nil
 	default:
-		return nil
+		return nil, nil
 	}
 }
