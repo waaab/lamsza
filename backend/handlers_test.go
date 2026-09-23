@@ -58,6 +58,8 @@ func init() {
 	testMux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
 	testMux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	testMux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
+	testMux.HandleFunc("/api/account/websites/lookup", middleware.ApplyCORS(account.HandleWebsiteLookup))
+	testMux.HandleFunc("/api/account/websites", middleware.ApplyCORS(account.HandleAccountWebsites))
 	testMux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
@@ -77,6 +79,7 @@ func init() {
 	testMux.HandleFunc("/api/admin/settlement_location_types", middleware.ApplyCORS(handlers.HandleAdminSettlementLocationTypes))
 	testMux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
 	testMux.HandleFunc("/api/admin/dashboard_stats", middleware.ApplyCORS(handlers.HandleAdminDashboardStats))
+	testMux.HandleFunc("/api/admin/users", admin(auth.HandleAdminUsers))
 	testMux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
 	testMux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
 	testMux.HandleFunc("/api/admin/catalog_event_types", middleware.ApplyCORS(events.HandleAdminCatalogEventTypes))
@@ -454,6 +457,37 @@ func TestAdminRoutesPreviouslyMissing(t *testing.T) {
 	rr := doRequest(t, "GET", "/api/entry/related", nil)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("GET /api/entry/related: expected 400, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAdminUsersListRequiresAdmin(t *testing.T) {
+	rr := doAnonRequest(t, "GET", "/api/admin/users", nil)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("anon users list: expected 401, got %d", rr.Code)
+	}
+	rr = doRequestWithCookie(t, "GET", "/api/admin/users", nil, testAdminCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("admin users list: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var users []map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &users); err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, u := range users {
+		if u["email"] != "admin@test.lamsza" {
+			continue
+		}
+		found = true
+		if u["is_admin"] != true {
+			t.Fatalf("admin flag: %#v", u["is_admin"])
+		}
+		if strings.TrimSpace(fmt.Sprint(u["created_at"])) == "" {
+			t.Fatal("missing created_at")
+		}
+	}
+	if !found {
+		t.Fatal("registered admin user missing from list")
 	}
 }
 

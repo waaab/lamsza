@@ -3,6 +3,7 @@ import test from "node:test";
 import {
     buildImportPayload,
     meToAuthState,
+    userAccountTabIds,
     userSettingsTabIds,
 } from "../src/lib/accountPrefs.js";
 
@@ -51,16 +52,23 @@ test("buildImportPayload drops history rows missing slug or name", () => {
     assert.equal(payload.history[0].slug, "kavezo");
 });
 
-test("userSettingsTabIds are the account tabs", () => {
-    assert.deepEqual(userSettingsTabIds, [
+test("userAccountTabIds are the account tabs", () => {
+    assert.deepEqual(userAccountTabIds, [
         "fiok",
+        "adatlapjaim",
+        "weboldalaim",
+        "kereses",
+        "bongeszes",
+        "kedvencek",
+        "linkjeim",
+    ]);
+});
+
+test("userSettingsTabIds are the settings tabs", () => {
+    assert.deepEqual(userSettingsTabIds, [
         "tema",
         "linkbeallitasok",
         "location",
-        "bejegyzeseim",
-        "linkjeim",
-        "elozmenyek",
-        "kedvencek",
     ]);
 });
 

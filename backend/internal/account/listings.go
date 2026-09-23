@@ -53,18 +53,19 @@ type claimBody struct {
 }
 
 type createListingBody struct {
-	WebsiteID      int             `json:"website_id"`
-	Name           string          `json:"name"`
-	LocationID     int             `json:"location_id"`
-	CategoryID     int             `json:"category_id"`
-	TypeID         int             `json:"type_id"`
-	URL            string          `json:"url"`
-	Phone          string          `json:"phone"`
-	Address        string          `json:"address"`
-	Notes          string          `json:"notes"`
-	Languages      []string        `json:"languages"`
-	Hours          json.RawMessage `json:"hours"`
-	DeliveryHours  json.RawMessage `json:"delivery_hours"`
+	WebsiteID     int             `json:"website_id"`
+	Name          string          `json:"name"`
+	LocationID    int             `json:"location_id"`
+	CategoryID    int             `json:"category_id"`
+	TypeID        int             `json:"type_id"`
+	URL           string          `json:"url"`
+	Phone         string          `json:"phone"`
+	Address       string          `json:"address"`
+	Notes         string          `json:"notes"`
+	Languages     []string        `json:"languages"`
+	Hours         json.RawMessage `json:"hours"`
+	DeliveryHours json.RawMessage `json:"delivery_hours"`
+	Photos        json.RawMessage `json:"photos"`
 }
 
 type updateListingBody struct {
@@ -147,6 +148,13 @@ func photosOrEmpty(raw json.RawMessage) string {
 }
 
 func sanitizeListingPhotos(raw json.RawMessage) json.RawMessage {
+	return sanitizeListingPhotosLimit(raw, maxListingPhotos)
+}
+
+func sanitizeListingPhotosLimit(raw json.RawMessage, limit int) json.RawMessage {
+	if limit < 1 {
+		limit = 1
+	}
 	raw = photosArrayOrEmpty(raw)
 	var in []listingPhoto
 	if err := json.Unmarshal(raw, &in); err != nil {
@@ -154,7 +162,7 @@ func sanitizeListingPhotos(raw json.RawMessage) json.RawMessage {
 	}
 	out := make([]listingPhoto, 0, len(in))
 	for _, p := range in {
-		if len(out) >= maxListingPhotos {
+		if len(out) >= limit {
 			break
 		}
 		url := strings.TrimSpace(p.URL)
@@ -182,6 +190,38 @@ func sanitizeListingPhotos(raw json.RawMessage) json.RawMessage {
 		return json.RawMessage(`[]`)
 	}
 	return json.RawMessage(b)
+}
+
+func normalizeListingLanguages(in []string) []string {
+	allowed := map[string]struct{}{"RO": {}, "HU": {}, "DE": {}, "EN": {}}
+	seen := map[string]struct{}{}
+	for _, part := range in {
+		code := strings.ToUpper(strings.TrimSpace(part))
+		if _, ok := allowed[code]; ok {
+			seen[code] = struct{}{}
+		}
+	}
+	out := make([]string, 0, 4)
+	for _, code := range []string{"RO", "HU", "DE", "EN"} {
+		if _, ok := seen[code]; ok {
+			out = append(out, code)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"HU"}
+	}
+	return out
+}
+
+func listingClaimed(entryID int) (bool, error) {
+	var claimed bool
+	err := db.DB.QueryRow(`
+		SELECT EXISTS(
+			SELECT 1 FROM entry_members
+			WHERE entry_id = $1 AND role = 'owner' AND status = 'active'
+		)
+	`, entryID).Scan(&claimed)
+	return claimed, err
 }
 
 func photosArrayOrEmpty(b []byte) json.RawMessage {
@@ -464,7 +504,7 @@ type listingDetailResponse struct {
 	TypeID         int             `json:"type_id"`
 	URL            string          `json:"url"`
 	Phone          string          `json:"phone"`
-	Address         string          `json:"address"`
+	Address        string          `json:"address"`
 	Notes          string          `json:"notes"`
 	Languages      []string        `json:"languages"`
 	Hours          json.RawMessage `json:"hours"`
@@ -735,9 +775,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
 		return
 	}
-	if len(body.Languages) == 0 {
-		body.Languages = []string{"HU"}
-	}
+	body.Languages = normalizeListingLanguages(body.Languages)
 	if !validListingURL(body.URL) {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
@@ -788,6 +826,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
+	photos := string(sanitizeListingPhotosLimit(body.Photos, 1))
 
 	tx, err := db.DB.Begin()
 	if err != nil {
@@ -831,9 +870,9 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	var entryID int
 	err = tx.QueryRow(`
 		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, delivery_hours, photos, ratings_enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, '[]'::jsonb, false)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, $14::jsonb, false)
 		RETURNING id
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery).Scan(&entryID)
+	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery, photos).Scan(&entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -924,9 +963,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
 		return
 	}
-	if len(body.Languages) == 0 {
-		body.Languages = []string{"HU"}
-	}
+	body.Languages = normalizeListingLanguages(body.Languages)
 	if !validListingURL(body.URL) {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
@@ -945,7 +982,18 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
-	photos := photosOrEmpty(body.Photos)
+	claimed, err := listingClaimed(entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	photoLimit := 1
+	if claimed {
+		photoLimit = maxListingPhotos
+	} else {
+		body.RatingsEnabled = false
+	}
+	photos := string(sanitizeListingPhotosLimit(body.Photos, photoLimit))
 	listingURL := strings.TrimSpace(body.URL)
 
 	conflict, err := listingURLDomainConflict(entryID, listingURL)

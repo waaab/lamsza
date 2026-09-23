@@ -17,6 +17,7 @@
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
     import EntryPhotosEditor from "$lib/components/EntryPhotosEditor.svelte";
     import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
+    import { canonicalDomain } from "$lib/websiteDomain.js";
 
     /** Local calendar date as YYYY-MM-DD (for date inputs). */
     function localISODate() {
@@ -51,6 +52,7 @@
         { id: "page_faq", title: "GYIK" },
         { id: "weather_translations", title: "Időjárás fordítások" },
         { id: "newsfeeds", title: "Hírfolyamok" },
+        { id: "users", title: "Felhasználók" },
         { id: "settings", title: "Beállítások" },
     ];
 
@@ -73,6 +75,7 @@
         if (tab === "pages") fetchPages();
         if (tab === "page_faq") fetchPageFaq();
         if (tab === "websites") fetchAdminWebsites();
+        if (tab === "users") fetchUsers();
     }
 
     /** @type {{ tab: string, message: string } | null} */
@@ -220,6 +223,7 @@
     let searchWeatherTrans = "";
     let searchAdminPages = "";
     let searchPageFaqRows = "";
+    let searchUsers = "";
     let pageMondasok = 1;
     let pageQuickLinks = 1;
     let pageNewsFeeds = 1;
@@ -235,6 +239,9 @@
     let pageWeatherTrans = 1;
     let pageAdminPages = 1;
     let pagePageFaqRows = 1;
+    let pageUsers = 1;
+    /** @type {Array<{ id: number, email: string, name: string, given_name: string, family_name: string, display_name: string, locale: string, settlement: string, created_at: string, last_login_at: string, website_banned: boolean, is_admin: boolean }>} */
+    let adminUsers = [];
     let pageEntryTypes = 1;
     let pageAttractions = 1;
     let pageCounties = 1;
@@ -362,6 +369,7 @@
         counties: "Megyék",
         historical_seats: "Történelmi székek",
         weather_translations: "Időjárás fordítások",
+        users: "Felhasználók",
     };
 
     function rememberApiError(source, message) {
@@ -774,6 +782,10 @@
             greeting:
                 "Az időjárás API szövegeinek fordítása magyarra, románra, németre.",
         },
+        users: {
+            title: "Felhasználók",
+            greeting: "Regisztrált felhasználók és a regisztráció adatai.",
+        },
         settings: {
             title: "Beállítások",
             greeting: "Rendszer-, időjárás- és egyéb szolgáltatás-beállítások.",
@@ -1070,6 +1082,16 @@
         row.updated_at,
     ]);
     $: pgPageFaqRows = adminPageSlice(rfPageFaqRows, pagePageFaqRows);
+    $: rfUsers = filterRows(adminUsers, searchUsers, (u) => [
+        u.email,
+        u.name,
+        u.given_name,
+        u.family_name,
+        u.display_name,
+        u.locale,
+        u.settlement,
+    ]);
+    $: pgUsers = adminPageSlice(rfUsers, pageUsers);
     $: rfEntryTypes = filterRows(entryTypes, searchEntryTypes, (et) => [
         et.id,
         et.name,
@@ -1202,6 +1224,11 @@
         fetchPages();
         fetchPageFaq();
         fetchCountyRegions();
+        fetchUsers();
+    }
+
+    function fetchUsers() {
+        loadData("users", (d) => (adminUsers = Array.isArray(d) ? d : []));
     }
 
     async function fetchWeatherTranslations() {
@@ -3509,6 +3536,13 @@
 
             <hr class="admin-sidebar-sep" aria-hidden="true" />
 
+            <button
+                class="admin-sidebar-btn {activeTab === 'users' ? 'active' : ''}"
+                on:click={() => goToAdminTab("users")}
+                title="Felhasználók"
+            >
+                <AdminNavIcon name="users" />
+            </button>
 
             <button
                 class="admin-sidebar-btn {activeTab === 'settings'
@@ -3530,9 +3564,7 @@
                         <p class="admin-page-greeting">{adminPageHead.greeting}</p>
                     {/if}
                 </div>
-                <button class="btn-logout" on:click={logout}
-                    >Kijelentkezés</button
-                >
+                <button class="btn" type="button" on:click={logout}>Kijelentkezés</button>
             </header>
 
             <div class="admin-container w-full">
@@ -3541,39 +3573,31 @@
                         <h3 id="admin-messages-title">Üzenetek</h3>
                         {#each dashboardMessages as msg (msg.id)}
                             <div
-                                class="admin-alert admin-alert--{msg.level}"
+                                class="info-box {msg.level}"
                                 role={msg.level === "error" || msg.level === "warning" ? "alert" : "status"}
                             >
-                                {msg.text}
-                                {#if msg.action === "retry-stats"}
-                                    <button type="button" class="admin-alert__btn" on:click={fetchDashboardStats}>Újra</button>
-                                {:else if msg.action === "retry-queue"}
-                                    <button type="button" class="admin-alert__btn" on:click={fetchListingQueue}>Újra</button>
-                                {:else if msg.action === "open" && msg.tab}
-                                    <button type="button" class="admin-alert__btn" on:click={() => goToAdminTab(msg.tab)}>Megnyitás</button>
-                                {:else if msg.action === "cache-refresh"}
-                                    <button
-                                        type="button"
-                                        class="admin-alert__btn"
-                                        disabled
-                                        title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
-                                    >Frissítés</button>
-                                {:else if msg.action === "website"}
-                                    <button
-                                        type="button"
-                                        class="admin-alert__btn"
-                                        on:click={() => reviewWebsite(msg.websiteId, "approve")}
-                                    >Approve</button>
-                                    <button
-                                        type="button"
-                                        class="admin-alert__btn"
-                                        on:click={() => reviewWebsite(msg.websiteId, "reject")}
-                                    >Reject</button>
-                                    <button
-                                        type="button"
-                                        class="admin-alert__btn"
-                                        on:click={() => reviewWebsite(msg.websiteId, "ban")}
-                                    >Ban User</button>
+                                <p>{msg.text}</p>
+                                {#if msg.action}
+                                    <p>
+                                        {#if msg.action === "retry-stats"}
+                                            <button type="button" class="btn btn-sm" on:click={fetchDashboardStats}>Újra</button>
+                                        {:else if msg.action === "retry-queue"}
+                                            <button type="button" class="btn btn-sm" on:click={fetchListingQueue}>Újra</button>
+                                        {:else if msg.action === "open" && msg.tab}
+                                            <button type="button" class="btn btn-sm" on:click={() => goToAdminTab(msg.tab)}>Megnyitás</button>
+                                        {:else if msg.action === "cache-refresh"}
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm"
+                                                disabled
+                                                title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
+                                            >Frissítés</button>
+                                        {:else if msg.action === "website"}
+                                            <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "approve")}>Approve</button>
+                                            <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "reject")}>Reject</button>
+                                            <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "ban")}>Ban User</button>
+                                        {/if}
+                                    </p>
                                 {/if}
                             </div>
                         {/each}
@@ -3631,7 +3655,7 @@
                                                         >Elfogadás</button>
                                                         <button
                                                             type="button"
-                                                            class="btn-logout"
+                                                            class="btn btn-sm"
                                                             on:click={() => rejectListingQueueMember(row.entry_id, row.user_id)}
                                                         >Elutasítás</button>
                                                     </td>
@@ -3693,8 +3717,8 @@
                 <!-- Mondások Tab -->
                 {#if activeTab === "mondasok"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -3706,10 +3730,12 @@
                         </p>
                     {/if}
                     {#if mondasok.length > 0 && mondasokTodayCount === 0}
-                        <div class="admin-alert admin-alert--warning" role="status">
-                            Ma ({mondasTodayYmd}) nincs beütemezett mondás, ezért a kezdőlapon
-                            a mondás-blokk rejtve marad. Állítsd egy idézet
-                            <strong>megjelenés napját</strong> a mai dátumra.
+                        <div class="info-box warning" role="status">
+                            <p>
+                                Ma ({mondasTodayYmd}) nincs beütemezett mondás, ezért a kezdőlapon
+                                a mondás-blokk rejtve marad. Állítsd egy idézet
+                                <strong>megjelenés napját</strong> a mai dátumra.
+                            </p>
                         </div>
                     {/if}
                     <details class="admin-create-panel">
@@ -3851,8 +3877,8 @@
                 <!-- Quick Links Tab -->
                 {#if activeTab === "quicklinks"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -3999,8 +4025,8 @@
                 <!-- News Feeds Tab -->
                 {#if activeTab === "newsfeeds"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -4169,8 +4195,8 @@
                 <!-- Locations Tab -->
                 {#if activeTab === "locations"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -4522,8 +4548,8 @@
                 <!-- Venues Tab -->
                 {#if activeTab === "venues"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -4927,15 +4953,17 @@
                 <!-- Events Tab -->
                 {#if activeTab === "events"}
                     {#if eventsWithIncompleteDateTime.length > 0}
-                        <div class="admin-alert admin-alert--warning" role="alert">
-                            <strong>Hiányos esemény-időpontok.</strong>
-                            {eventsWithIncompleteDateTime.length} eseménynél nincs meg minden kötelező mező
-                            (kezdő/befejező dátum és óra:perc). Szerkeszd a listában a ⚠ jelű sorokat, és töltsd
-                            ki a mezőket.
+                        <div class="info-box warning" role="alert">
+                            <p>
+                                <strong>Hiányos esemény-időpontok.</strong>
+                                {eventsWithIncompleteDateTime.length} eseménynél nincs meg minden kötelező mező
+                                (kezdő/befejező dátum és óra:perc). Szerkeszd a listában a ⚠ jelű sorokat, és töltsd
+                                ki a mezőket.
+                            </p>
                         </div>
                     {:else if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -5692,8 +5720,8 @@
                 <!-- Entry Categories Tab -->
                 {#if activeTab === "entry_categories"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -5819,8 +5847,8 @@
                 <!-- Weboldalak Tab -->
                 {#if activeTab === "websites"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -5868,7 +5896,6 @@
                                     <th>Beküldve</th>
                                     <th>Jóváhagyva</th>
                                     <th>Jóváhagyta</th>
-                                    <th>URL</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -5883,10 +5910,9 @@
                                         <td>{formatAdminTime(site.submitted_at)}</td>
                                         <td>{formatAdminTime(site.approved_at)}</td>
                                         <td>{site.approver || "—"}</td>
-                                        <td class="admin-table-cell-preview" title={site.url || ""}>{urlPreview(site.url)}</td>
                                     </tr>
                                 {:else}
-                                    <tr><td colspan="10">Nincsenek weboldalak.</td></tr>
+                                    <tr><td colspan="9">Nincsenek weboldalak.</td></tr>
                                 {/each}
                             </tbody>
                         </table>
@@ -5910,8 +5936,8 @@
                 <!-- Entries Tab -->
                 {#if activeTab === "entries"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -6061,7 +6087,7 @@
                                 class="admin-search-input"
                                 bind:value={searchEntries}
                                 on:input={() => (pageEntries = 1)}
-                                placeholder="Név, URL, címke…"
+                                placeholder="Név, domain, címke…"
                             /></label
                         >
                     </div>
@@ -6086,7 +6112,7 @@
                                     <th>Név</th>
                                     <th>Típus</th>
                                     <th>Igényelt</th>
-                                    <th>URL</th>
+                                    <th>Domain</th>
                                     <th>Település</th>
                                     <th>Kategória</th>
                                     <th>Telefon</th>
@@ -6108,7 +6134,7 @@
                                             ></td
                                         >
                                         <td>{s.verified ? "Ellenőrzött" : "Nem ellenőrzött"}</td>
-                                        <td class="admin-table-cell-preview" title={s.url || ""}>{s.url ? urlPreview(s.url) : "—"}</td>
+                                        <td>{canonicalDomain(String(s.url ?? "")) || "—"}</td>
                                         <td>{getLocationName(s.location_id)}</td
                                         >
                                         <td>{getCategoryName(s.category_id)}</td
@@ -6172,11 +6198,89 @@
                     />
                 {/if}
 
+                {#if activeTab === "users"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
+                        </div>
+                    {/if}
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_users"
+                                name="search_users"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchUsers}
+                                on:input={() => (pageUsers = 1)}
+                                placeholder="E-mail, név, település…"
+                            /></label
+                        >
+                    </div>
+                    <AdminPaginationBar
+                        total={pgUsers.total}
+                        page={pgUsers.page}
+                        totalPages={pgUsers.totalPages}
+                        from={pgUsers.from}
+                        to={pgUsers.to}
+                        on:prev={() => (pageUsers = Math.max(1, pageUsers - 1))}
+                        on:next={() =>
+                            (pageUsers = Math.min(pgUsers.totalPages, pageUsers + 1))}
+                    />
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>E-mail</th>
+                                    <th>Név</th>
+                                    <th>Megjelenített név</th>
+                                    <th>Nyelv</th>
+                                    <th>Település</th>
+                                    <th>Regisztráció</th>
+                                    <th>Utolsó belépés</th>
+                                    <th>Tiltva</th>
+                                    <th>Admin</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each pgUsers.rows as user (user.id)}
+                                    <tr>
+                                        <td>{user.email}</td>
+                                        <td>{[user.given_name, user.family_name].filter(Boolean).join(" ") || user.name || "—"}</td>
+                                        <td>{user.display_name || user.name || "—"}</td>
+                                        <td>{user.locale || "—"}</td>
+                                        <td>{user.settlement || "—"}</td>
+                                        <td>{formatAdminTime(user.created_at)}</td>
+                                        <td>{formatAdminTime(user.last_login_at)}</td>
+                                        <td>{user.website_banned ? "Igen" : "Nem"}</td>
+                                        <td>{user.is_admin ? "Igen" : "Nem"}</td>
+                                    </tr>
+                                {:else}
+                                    <tr>
+                                        <td colspan="9">Nincs regisztrált felhasználó.</td>
+                                    </tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgUsers.total}
+                        page={pgUsers.page}
+                        totalPages={pgUsers.totalPages}
+                        from={pgUsers.from}
+                        to={pgUsers.to}
+                        on:prev={() => (pageUsers = Math.max(1, pageUsers - 1))}
+                        on:next={() =>
+                            (pageUsers = Math.min(pgUsers.totalPages, pageUsers + 1))}
+                    />
+                {/if}
+
                 <!-- Beállítások (Settings) Tab -->
                 {#if activeTab === "settings"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -6256,8 +6360,8 @@
                 <!-- Időjárás fordítások (Weather translations) Tab -->
                 {#if activeTab === "weather_translations"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -6383,8 +6487,8 @@
                 <!-- Oldalak (Pages) Tab -->
                 {#if activeTab === "pages"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {/if}
                     {#if editingPage}
@@ -6496,8 +6600,8 @@
                 <!-- GYIK Tab -->
                 {#if activeTab === "page_faq"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {/if}
                     {#if editingPageFaq}
@@ -6655,8 +6759,8 @@
                 <!-- Entry Types Tab -->
                 {#if activeTab === "entry_types"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -6773,8 +6877,8 @@
                 <!-- Attractions Tab -->
                 {#if activeTab === "attractions"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">
@@ -6908,8 +7012,8 @@
                 <!-- Counties Tab -->
                 {#if activeTab === "counties"}
                     {#if adminTabError && activeTab === adminTabError.tab}
-                        <div class="admin-alert admin-alert--error" role="alert">
-                            {adminTabError.message}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
                         </div>
                     {:else}
                         <p class="admin-info">

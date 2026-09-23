@@ -27,6 +27,7 @@ var dashboardCountTables = []struct {
 	{"pages", "pages"},
 	{"page_faq", "page_faq_sections"},
 	{"weather_translations", "weather_desc_translations"},
+	{"users", "users"},
 	{"settings", "site_settings"},
 }
 

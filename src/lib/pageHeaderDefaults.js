@@ -36,6 +36,10 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
         title: "Szolgáltatások",
         greeting: "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár.",
     },
+    "index/weboldalak": {
+        title: "Weboldalak",
+        greeting: "Jóváhagyott helyi weboldalak az indexen.",
+    },
     terkep: {
         title: "Székelyföld Térkép",
         greeting: "Hamarosan érkezik az interaktív térképünk helyi adatokkal!",

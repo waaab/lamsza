@@ -118,6 +118,127 @@ func SearchWebsites(q string) (hits []WebsiteHit, domainQuery bool, publishedEnt
 	return hits, false, 0
 }
 
+type accountWebsiteItem struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Domain      string `json:"domain"`
+	URL         string `json:"url"`
+	Status      string `json:"status"`
+	Claimed     bool   `json:"claimed"`
+}
+
+func HandleAccountWebsites(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := auth.UserFromRequest(r)
+	if err != nil || u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	rows, err := db.DB.Query(`
+		SELECT w.id, w.title, w.description, w.domain_key, w.status,
+			EXISTS (
+				SELECT 1 FROM entry_members m
+				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
+			)
+		FROM websites w
+		WHERE w.user_id = $1
+		ORDER BY w.created_at DESC, w.id DESC
+	`, u.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	items := []accountWebsiteItem{}
+	for rows.Next() {
+		var item accountWebsiteItem
+		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.Status, &item.Claimed); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		item.URL = "https://" + item.Domain
+		items = append(items, item)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"websites": items})
+}
+
+type websiteLookup struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Domain      string `json:"domain"`
+	URL         string `json:"url"`
+	Status      string `json:"status"`
+	Claimed     bool   `json:"claimed"`
+	EntryID     int    `json:"entry_id"`
+	Published   bool   `json:"published"`
+	Membership  string `json:"membership"`
+}
+
+func HandleWebsiteLookup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	u, err := auth.UserFromRequest(r)
+	if err != nil || u == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	domainKey, err := webdomain.CanonicalDomain(r.URL.Query().Get("url"))
+	if err != nil || domainKey == "" {
+		json.NewEncoder(w).Encode(map[string]any{"website": nil})
+		return
+	}
+
+	var item websiteLookup
+	var entryID sql.NullInt64
+	var published sql.NullBool
+	var membership sql.NullString
+	err = db.DB.QueryRow(`
+		SELECT w.id, w.title, w.description, w.domain_key, w.status, w.entry_id, e.published,
+			EXISTS (
+				SELECT 1 FROM entry_members m
+				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
+			),
+			(
+				SELECT m.role || ':' || m.status
+				FROM entry_members m
+				WHERE m.entry_id = w.entry_id AND m.user_id = $2
+				LIMIT 1
+			)
+		FROM websites w
+		LEFT JOIN entries e ON e.id = w.entry_id
+		WHERE w.domain_key = $1
+	`, domainKey, u.ID).Scan(
+		&item.ID, &item.Title, &item.Description, &item.Domain, &item.Status,
+		&entryID, &published, &item.Claimed, &membership,
+	)
+	if err == sql.ErrNoRows {
+		json.NewEncoder(w).Encode(map[string]any{"website": nil})
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if entryID.Valid {
+		item.EntryID = int(entryID.Int64)
+	}
+	item.Published = published.Valid && published.Bool
+	item.URL = "https://" + item.Domain
+	if membership.Valid {
+		item.Membership = membership.String
+	}
+	json.NewEncoder(w).Encode(map[string]any{"website": item})
+}
+
 func HandleWebsites(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

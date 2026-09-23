@@ -290,7 +290,7 @@
     font-style: italic;
 }
 
-.admin-header .btn-logout {
+.admin-header .btn {
     flex-shrink: 0;
     align-self: flex-start;
 }
@@ -436,24 +436,6 @@
     background: var(--btn-submit-hover);
 }
 
-.btn-logout {
-    background: var(--btn-logout-bg);
-    color: white;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: var(--text-base);
-    font-weight: bold;
-    transition: background 0.2s ease;
-}
-
-.btn-logout:hover {
-    background: var(--btn-logout-hover);
-}
-
-
-
 /* Secondary / edit — outline, matches table + modal “Szerkesztés” across admin */
 .btn-update {
     display: inline-block;
@@ -495,47 +477,8 @@
     border-radius: 6px;
 }
 
-.admin-alert {
-    margin: 0 0 1.5rem;
-    padding: 1rem 1.25rem;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    line-height: 1.5;
-}
-
-.admin-alert--warning {
-    background: #fff7ed;
-    border-color: #fdba74;
-    color: #7c2d12;
-}
-
-.admin-alert--error {
-    background: #fef2f2;
-    border-color: #fca5a5;
-    color: #7f1d1d;
-}
-
-.admin-alert--success {
-    background: #f0fdf4;
-    border-color: #86efac;
-    color: #14532d;
-}
-
-.admin-alert--info {
-    background: #eff6ff;
-    border-color: #93c5fd;
-    color: #1e3a8a;
-}
-
-.admin-alert__btn {
-    display: inline-block;
-    padding: 0.35rem 0.75rem;
-    border-radius: 6px;
-    border: 1px solid currentColor;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
+.admin-container .info-box + .info-box {
+    margin-top: 0.75rem;
 }
 
 .admin-cache-panel {

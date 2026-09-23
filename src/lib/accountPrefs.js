@@ -1,12 +1,17 @@
-export const userSettingsTabIds = [
+export const userAccountTabIds = [
     "fiok",
+    "adatlapjaim",
+    "weboldalaim",
+    "kereses",
+    "bongeszes",
+    "kedvencek",
+    "linkjeim",
+];
+
+export const userSettingsTabIds = [
     "tema",
     "linkbeallitasok",
     "location",
-    "bejegyzeseim",
-    "linkjeim",
-    "elozmenyek",
-    "kedvencek",
 ];
 
 /** @param {unknown} raw */

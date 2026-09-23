@@ -57,6 +57,8 @@ func main() {
 	mux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
 	mux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	mux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
+	mux.HandleFunc("/api/account/websites/lookup", middleware.ApplyCORS(account.HandleWebsiteLookup))
+	mux.HandleFunc("/api/account/websites", middleware.ApplyCORS(account.HandleAccountWebsites))
 	mux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
 
 	// Core Module (Always Enabled)
@@ -78,6 +80,7 @@ func main() {
 	mux.HandleFunc("/api/admin/settlement_location_types", middleware.ApplyCORS(handlers.HandleAdminSettlementLocationTypes))
 	mux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
 	mux.HandleFunc("/api/admin/dashboard_stats", middleware.ApplyCORS(handlers.HandleAdminDashboardStats))
+	mux.HandleFunc("/api/admin/users", admin(auth.HandleAdminUsers))
 	mux.HandleFunc("/api/admin/entry-images", middleware.ApplyCORS(handlers.HandleEntryImageUpload))
 	mux.Handle("/api/media/entry-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/entry-images/", http.FileServer(http.Dir(handlers.EntryImagesDir()))).ServeHTTP))
 	mux.Handle("/api/media/event-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/event-images/", http.FileServer(http.Dir(handlers.EventImagesDir()))).ServeHTTP))

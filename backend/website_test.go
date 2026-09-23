@@ -463,3 +463,96 @@ func TestWebsiteListingCreateReservesDomain(t *testing.T) {
 		t.Fatalf("domain change: %d %s", rr.Code, rr.Body.String())
 	}
 }
+
+func TestAccountWebsitesListsOnlyTheSignedInUser(t *testing.T) {
+	for _, domain := range []string{"account-mine.example", "account-other.example"} {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+			t.Fatal(err)
+		}
+	}
+	defer func() {
+		for _, domain := range []string{"account-mine.example", "account-other.example"} {
+			if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+				t.Errorf("cleanup %s: %v", domain, err)
+			}
+		}
+	}()
+
+	mine := mustLogin("website-mine@test.lamsza")
+	other := mustLogin("website-other@test.lamsza")
+	created := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+		"domain": "account-mine.example", "title": "Mine", "description": "My page.",
+	}, mine)
+	if created.Code != 201 {
+		t.Fatalf("mine submit: %d %s", created.Code, created.Body.String())
+	}
+	otherCreated := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+		"domain": "account-other.example", "title": "Other", "description": "Their page.",
+	}, other)
+	if otherCreated.Code != 201 {
+		t.Fatalf("other submit: %d %s", otherCreated.Code, otherCreated.Body.String())
+	}
+
+	denied := doRequest(t, "GET", "/api/account/websites", nil)
+	if denied.Code != http.StatusUnauthorized {
+		t.Fatalf("signed out: %d", denied.Code)
+	}
+
+	rr := doRequestWithCookie(t, "GET", "/api/account/websites", nil, mine)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("list: %d %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "account-mine.example") || !strings.Contains(rr.Body.String(), `"status":"pending"`) {
+		t.Fatalf("missing own pending website: %s", rr.Body.String())
+	}
+	if strings.Contains(rr.Body.String(), "account-other.example") {
+		t.Fatalf("listed another user's website: %s", rr.Body.String())
+	}
+}
+
+func TestWebsiteLookupFindsAnExistingDomain(t *testing.T) {
+	const domain = "lookup-example.com"
+	if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+			t.Errorf("cleanup %s: %v", domain, err)
+		}
+	}()
+
+	rr := doRequest(t, "GET", "/api/account/websites/lookup?url=https://www."+domain, nil)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("signed out: %d", rr.Code)
+	}
+
+	owner := mustLogin("website-lookup@test.lamsza")
+	rr = doRequestWithCookie(t, "GET", "/api/account/websites/lookup?url="+url.QueryEscape(domain), nil, owner)
+	if rr.Code != http.StatusOK || !strings.Contains(rr.Body.String(), `"website":null`) {
+		t.Fatalf("missing domain: %d %s", rr.Code, rr.Body.String())
+	}
+
+	id := submitWebsite(t, owner, domain, "Lookup Title", "Lookup page.")
+	admin := mustLogin("admin@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "approve"}, admin)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doRequestWithCookie(t, "GET", "/api/account/websites/lookup?url="+url.QueryEscape("https://www."+domain+"/menu"), nil, owner)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("lookup: %d %s", rr.Code, rr.Body.String())
+	}
+	var body struct {
+		Website map[string]interface{} `json:"website"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Website["title"] != "Lookup Title" || body.Website["domain"] != domain || body.Website["claimed"] != false {
+		t.Fatalf("lookup body %#v", body.Website)
+	}
+	if body.Website["entry_id"].(float64) != 0 {
+		t.Fatalf("unclaimed website has entry %#v", body.Website["entry_id"])
+	}
+}

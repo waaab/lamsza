@@ -272,12 +272,12 @@
     <div class="nav">
         {#if $auth.loggedIn}
             <a
-                href="/beallitasok"
-                class="btn nav-btn {$page.url.pathname === '/beallitasok' ? 'active' : ''}"
-                title="Felhasználói beállítások"
+                href="/fiok"
+                class="btn nav-btn {$page.url.pathname === '/fiok' ? 'active' : ''}"
+                title="Fiók"
             >
                 <AppIcon name="profile" size={16} />
-                <span class="sr-only">Felhasználói beállítások</span>
+                <span class="sr-only">Fiók</span>
             </a>
             {#if $auth.isAdmin}
             <button

@@ -17,98 +17,85 @@
     }
 </script>
 
-<div class="entry-hours-editor">
-    <table class="entry-hours-editor__table">
-        <thead>
-            <tr>
-                <th>Nap</th>
-                <th>Zárva</th>
-                <th>Nyitás</th>
-                <th>Zárás</th>
-            </tr>
-        </thead>
-        <tbody>
-            {#each rows as row (row.key)}
-                <tr>
-                    <th scope="row">{row.label}</th>
-                    <td>
-                        <label class="entry-hours-editor__closed">
-                            <input
-                                type="checkbox"
-                                checked={row.slot.closed}
-                                onchange={(event) =>
-                                    patchDay(row.key, {
-                                        closed: event.currentTarget.checked,
-                                    })}
-                            />
-                            <span class="sr-only">Zárva</span>
-                        </label>
-                    </td>
-                    <td>
-                        <input
-                            type="time"
-                            value={row.slot.open}
-                            disabled={row.slot.closed}
-                            oninput={(event) =>
-                                patchDay(row.key, { open: event.currentTarget.value })}
-                        />
-                    </td>
-                    <td>
-                        <input
-                            type="time"
-                            value={row.slot.close}
-                            disabled={row.slot.closed}
-                            oninput={(event) =>
-                                patchDay(row.key, { close: event.currentTarget.value })}
-                        />
-                    </td>
-                </tr>
-            {/each}
-        </tbody>
-    </table>
-</div>
+<ul class="entry-hours-editor">
+    {#each rows as row (row.key)}
+        <li>
+            <div class="entry-hours-editor__head">
+                <span class="entry-hours-editor__day">{row.label}</span>
+                <label class="entry-hours-editor__closed">
+                    <input
+                        type="checkbox"
+                        checked={row.slot.closed}
+                        onchange={(event) =>
+                            patchDay(row.key, { closed: event.currentTarget.checked })}
+                    />
+                    Zárva
+                </label>
+            </div>
+            <div class="entry-hours-editor__times">
+                <input
+                    type="time"
+                    aria-label="{row.label} nyitás"
+                    value={row.slot.open}
+                    disabled={row.slot.closed}
+                    oninput={(event) => patchDay(row.key, { open: event.currentTarget.value })}
+                />
+                <input
+                    type="time"
+                    aria-label="{row.label} zárás"
+                    value={row.slot.close}
+                    disabled={row.slot.closed}
+                    oninput={(event) => patchDay(row.key, { close: event.currentTarget.value })}
+                />
+            </div>
+        </li>
+    {/each}
+</ul>
 
 <style>
     .entry-hours-editor {
-        overflow-x: auto;
-        border: 1px solid var(--border-color);
-        border-radius: 8px;
-        background: var(--bg-body, var(--card-bg));
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        min-width: 0;
     }
-    .entry-hours-editor__table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: var(--text-sm);
+    .entry-hours-editor li {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
     }
-    .entry-hours-editor__table th,
-    .entry-hours-editor__table td {
-        padding: 0.4rem 0.55rem;
-        border-bottom: 1px solid var(--border-color);
-        text-align: left;
-        vertical-align: middle;
+    .entry-hours-editor__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
     }
-    .entry-hours-editor__table thead th {
-        font-weight: 600;
-        color: var(--text-secondary);
-    }
-    .entry-hours-editor__table tbody th {
+    .entry-hours-editor__day {
         font-weight: 500;
-        white-space: nowrap;
     }
-    .entry-hours-editor__table tbody tr:last-child th,
-    .entry-hours-editor__table tbody tr:last-child td {
-        border-bottom: none;
+    .entry-hours-editor__times {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0.4rem;
+        min-width: 0;
     }
-    .entry-hours-editor__table input[type="time"] {
+    .entry-hours-editor input[type="time"] {
         width: 100%;
-        min-width: 6.5rem;
+        min-width: 0;
+        box-sizing: border-box;
         margin: 0;
     }
     .entry-hours-editor__closed {
         display: inline-flex;
         align-items: center;
+        gap: 0.3rem;
         margin: 0;
         font-weight: 400;
+        white-space: nowrap;
     }
     .entry-hours-editor__closed input {
         width: auto;

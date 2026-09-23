@@ -43,6 +43,7 @@ func MigratePages() {
 		{"szekek", "Székelyföld történelmi székei", "A székely székek és a hozzájuk kapcsolódó megyék."},
 		{"index", "Index", "Minden, ami helyi, egy helyen: szakemberek, intézmények, szolgáltatások."},
 		{"index/szolgaltatasok", "Szolgáltatások", "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár."},
+		{"index/weboldalak", "Weboldalak", "Jóváhagyott helyi weboldalak az indexen."},
 		{"terkep", "Székelyföld Térkép", "Hamarosan érkezik az interaktív térképünk helyi adatokkal!"},
 		{"valtozasnaplo", "Változásnapló", "Újítások, javítások — emberi nyelven."},
 		{"iranyelvek", "Irányelvek", "Adatvédelem, sütik és felhasználási feltételek — összefoglaló."},

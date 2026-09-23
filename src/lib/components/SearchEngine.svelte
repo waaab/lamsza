@@ -35,8 +35,8 @@
     let locationFieldEl;
     /** @type {Array<Record<string, any>>} */
     let locations = [];
-    /** @type {null | "services" | "websites"} */
-    let resultFilter = null;
+    /** @type {"index" | "services" | "websites"} */
+    let resultFilter = "index";
     $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
     $: townChoices = locationMenuTowns(locations, preferredLocation);
     $: selectedSlug = selectedLocation?.slug || "";
@@ -64,7 +64,7 @@
         : resultFilter === "websites"
           ? []
           : orderedEntries;
-    $: showBrowseSections = !resultFilter;
+    $: showBrowseSections = resultFilter === "index";
     $: hasResults = searchResults && (
         (showBrowseSections && filteredLocations.length > 0) ||
         indexEntries.length > 0 ||
@@ -113,8 +113,8 @@
         locationMenuOpen = false;
     }
 
-    function toggleResultFilter(kind) {
-        resultFilter = resultFilter === kind ? null : kind;
+    function selectResultFilter(kind) {
+        resultFilter = kind;
     }
 
     function stopAnswerTyping() {
@@ -225,17 +225,9 @@
         searchInputValue = "";
         searchResults = null;
         suggestions = [];
-        resultFilter = null;
+        resultFilter = "index";
         resetAnswer();
         dispatch("discoverClose");
-    }
-
-    function clearSearch() {
-        searchInputValue = "";
-        searchResults = null;
-        suggestions = [];
-        resultFilter = null;
-        resetAnswer();
     }
 
     onMount(() => {
@@ -372,7 +364,7 @@
             {#if searchInputValue !== ""}
                 <button
                     class="btn clear-search-btn"
-                    on:click={clearSearch}
+                    on:click={closeDiscover}
                     aria-label="Keresés törlése"
                 >
                     <AppIcon name="x" size={20} />
@@ -410,18 +402,11 @@
                         <p>Írd be a keresett szót, majd kattints a „Na lámsza!" gombra.</p>
                     {/if}
                 </span>
-                <button
-                    class="btn discover-close-btn"
-                    on:click={closeDiscover}
-                    aria-label="Bezárás"
-                >
-                    <AppIcon name="x" size={20} />
-                </button>
             </div>
 
             {#if !loading && searchResults && totalCount > 0}
                 <div class="discover-sections">
-                    {#if answerSettlement && !resultFilter}
+                    {#if answerSettlement && resultFilter === "index"}
                         <div class="discover-answer">
                             <p class="discover-answer-text">
                                 {answerShown}<span
@@ -437,7 +422,10 @@
                     {/if}
                     {#if shownWebsites.length > 0 && (resultFilter === "websites" || searchResults.website_query)}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">Weboldalak</h4>
+                            <h4 class="discover-section-title">
+                                <AppIcon name="websites" size={18} />
+                                Weboldalak
+                            </h4>
                             <div class="list flex">
                                 {#each shownWebsites as website (website.id)}
                                     <WebsiteCard {website} />
@@ -449,7 +437,8 @@
                     {#if indexEntries.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">
-                                {resultFilter === "services" ? "Szolgáltatások" : "📋 Index"}
+                                <AppIcon name="entries" size={18} />
+                                Szolgáltatások
                             </h4>
                             <div class="list flex">
                                 {#each indexEntries as entry (entry.id)}
@@ -461,7 +450,10 @@
 
                     {#if shownWebsites.length > 0 && resultFilter !== "websites" && !searchResults.website_query}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">Weboldalak</h4>
+                            <h4 class="discover-section-title">
+                                <AppIcon name="websites" size={18} />
+                                Weboldalak
+                            </h4>
                             <div class="list flex">
                                 {#each shownWebsites as website (website.id)}
                                     <WebsiteCard {website} />
@@ -472,7 +464,10 @@
 
                     {#if showBrowseSections && filteredEvents.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">📅 Események</h4>
+                            <h4 class="discover-section-title">
+                                <AppIcon name="events" size={18} />
+                                Események
+                            </h4>
                             <div class="discover-event-list">
                                 {#each filteredEvents as ev}
                                     <a href="/esemenyek/{ev.id}" class="discover-event-card">
@@ -489,7 +484,10 @@
 
                     {#if showBrowseSections && filteredVenues.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">🏟 Helyszínek</h4>
+                            <h4 class="discover-section-title">
+                                <AppIcon name="venues" size={18} />
+                                Helyszínek
+                            </h4>
                             <div class="discover-venue-list">
                                 {#each filteredVenues as venue}
                                     <a
@@ -508,7 +506,10 @@
 
                     {#if showBrowseSections && filteredAttractions.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title discover-section-title--attractions">🏔 Látnivalók</h4>
+                            <h4 class="discover-section-title discover-section-title--attractions">
+                                <AppIcon name="attractions" size={18} />
+                                Látnivalók
+                            </h4>
                             <div class="discover-attraction-list">
                                 {#each filteredAttractions as att}
                                     <a
@@ -528,7 +529,10 @@
 
                     {#if showBrowseSections && filteredLocations.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">📍 Települések</h4>
+                            <h4 class="discover-section-title">
+                                <AppIcon name="locations" size={18} />
+                                Települések
+                            </h4>
                             <div class="list flex">
                                 {#each filteredLocations as loc}
                                     {@const entry = locationToEntry(loc)}
@@ -540,7 +544,10 @@
 
                     {#if showBrowseSections && searchResults.historical_seats?.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title discover-section-title--szek">⚜ Történelmi székek</h4>
+                            <h4 class="discover-section-title discover-section-title--szek">
+                                <AppIcon name="szekek" size={18} />
+                                Történelmi székek
+                            </h4>
                             <div class="discover-szek-list">
                                 {#each searchResults.historical_seats as seat}
                                     <a href="/szekek/{seat.slug}" class="discover-szek-card">
@@ -553,7 +560,10 @@
 
                     {#if showBrowseSections && searchResults.news?.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">📰 Hírek</h4>
+                            <h4 class="discover-section-title">
+                                <AppIcon name="newsfeeds" size={18} />
+                                Hírek
+                            </h4>
                             <div class="discover-news-list">
                                 {#each searchResults.news as item}
                                     <a href={item.link} target="_blank" rel="nofollow noopener" class="discover-news-card">
@@ -576,23 +586,31 @@
                         <a class="btn btn-md duckduckgo" href="https://duckduckgo.com/?q={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">DuckDuckGo</a>
                         <a class="btn btn-md yahoo" href="https://search.yahoo.com/search?p={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">Yahoo</a>
                     </div>
-                    <div class="btn-group result-filters">
-                        <a class="btn btn-md index" href="/index">Lámsza Index</a>
+                    <div class="btn-group result-filters" role="group" aria-label="Találatok szűrése">
                         <button
                             type="button"
-                            class="btn btn-md result-filter"
-                            class:is-on={resultFilter === "services"}
+                            class="btn btn-md nav-btn"
+                            class:active={resultFilter === "index"}
+                            aria-pressed={resultFilter === "index"}
+                            on:click={() => selectResultFilter("index")}
+                        >
+                            Lámsza Index
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-md nav-btn"
+                            class:active={resultFilter === "services"}
                             aria-pressed={resultFilter === "services"}
-                            on:click={() => toggleResultFilter("services")}
+                            on:click={() => selectResultFilter("services")}
                         >
                             Szolgáltatások
                         </button>
                         <button
                             type="button"
-                            class="btn btn-md result-filter"
-                            class:is-on={resultFilter === "websites"}
+                            class="btn btn-md nav-btn"
+                            class:active={resultFilter === "websites"}
                             aria-pressed={resultFilter === "websites"}
-                            on:click={() => toggleResultFilter("websites")}
+                            on:click={() => selectResultFilter("websites")}
                         >
                             Weboldalak
                         </button>
@@ -649,25 +667,6 @@
 }
 .external-search-links a.yahoo:hover {
     background: var(--yahoo-purple);
-    color: var(--white);
-}
-.external-search-links a.index {
-    border-color: var(--szekely-green);
-}
-.external-search-links a.index:hover {
-    background: var(--szekely-green);
-    color: var(--white);
-}
-.external-search-links button.result-filter {
-    border-color: var(--szekely-green);
-    font: inherit;
-    font-size: var(--text-sm);
-    font-weight: 600;
-}
-.external-search-links button.result-filter:hover,
-.external-search-links button.result-filter.is-on {
-    background: var(--szekely-green);
-    border-color: var(--szekely-green);
     color: var(--white);
 }
 .result-filters {
@@ -826,19 +825,6 @@
 .search-place {
     font-weight: 600;
 }
-.discover-close-btn {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 0.25rem;
-    border-radius: 50%;
-}
-.discover-close-btn:hover {
-    background: var(--skeleton-bg);
-    color: var(--szekely-red);
-}
 
 .discover-sections {
     padding: 0 1.5rem 0;
@@ -881,9 +867,23 @@
     margin-bottom: 0;
 }
 .discover-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-weight: 600;
     color: var(--text-secondary);
     margin: 0 0 0.75rem 0;
+}
+.discover-section-title :global(svg) {
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.discover-section-title :global(svg polygon.app-icon-solid) {
+    fill: currentColor;
+    stroke: none;
 }
 
 .discover-event-list,

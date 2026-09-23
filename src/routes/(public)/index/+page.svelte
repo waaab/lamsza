@@ -29,6 +29,8 @@
     import AppIcon from "$lib/icons/AppIcon.svelte";
 
     let pageHeader = initialPageHeader("index");
+    let servicesHeader = initialPageHeader("index/szolgaltatasok");
+    let websitesHeader = initialPageHeader("index/weboldalak");
     let pageHeaderLoading = false;
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
@@ -245,9 +247,23 @@
         visibleWebsiteCount = 12;
     }
 
+    $: activeHeader =
+        indexView === "services"
+            ? servicesHeader
+            : indexView === "websites"
+              ? websitesHeader
+              : pageHeader;
+    $: indexGreeting = activeHeader.greeting;
+
     onMount(() => {
         loadPageMeta("index").then((p) => {
             pageHeader = p;
+        });
+        loadPageMeta("index/szolgaltatasok").then((p) => {
+            servicesHeader = p;
+        });
+        loadPageMeta("index/weboldalak").then((p) => {
+            websitesHeader = p;
         });
         (async () => {
             try {
@@ -272,11 +288,8 @@
 
 <PublicPageHero
     title="Index"
-    greeting={indexView === "services"
-        ? "Helyi szolgáltatások: szakemberek, üzletek és intézmények"
-        : indexView === "websites"
-          ? "Helyi weboldalak: no categories defined yet but soon"
-          : pageHeader.greeting}
+    greeting={indexGreeting}
+    showGreeting={false}
     loading={pageHeaderLoading}
     breadcrumbLabel={indexView === "websites"
         ? "Weboldalak"
@@ -288,37 +301,48 @@
     documentTitleSuffix=" - Székely Gugel"
 >
     <div slot="title" class="index-heading">
-        <div class="index-heading__titles">
-            <h1 class="page-title">
-                {#if indexView === "all"}
-                    Index
-                {:else}
-                    <a href="/index">Index</a>
-                {/if}
-            </h1>
-            <a
-                href="/index/szolgaltatasok"
-                class="index-heading__link"
-                class:active={indexView === "services"}
-                aria-current={indexView === "services" ? "page" : undefined}
-            >Szolgáltatások</a>
-            <a
-                href="/index/weboldalak"
-                class="index-heading__link"
-                class:active={indexView === "websites"}
-                aria-current={indexView === "websites" ? "page" : undefined}
-            >Weboldalak</a>
+        <div class="index-heading__main">
+            <div class="index-heading__titles">
+                <h1 class="page-title">
+                    {#if indexView === "all"}
+                        Index
+                    {:else}
+                        <a href="/index">Index</a>
+                    {/if}
+                </h1>
+                <a
+                    href="/index/szolgaltatasok"
+                    class="index-heading__link"
+                    class:active={indexView === "services"}
+                    aria-current={indexView === "services" ? "page" : undefined}
+                >Szolgáltatások</a>
+                <a
+                    href="/index/weboldalak"
+                    class="index-heading__link"
+                    class:active={indexView === "websites"}
+                    aria-current={indexView === "websites" ? "page" : undefined}
+                >Weboldalak</a>
+            </div>
+            {#if !pageHeaderLoading && indexGreeting}
+                <p class="greeting index-heading__greeting">{indexGreeting}</p>
+            {/if}
         </div>
-        <div class="index-heading__add">
-            <button
-                type="button"
-                class="btn btn-primary btn-lg"
-                on:click={() => (addWebsiteOpen = true)}
-            >Add hozzá a weboldalad</button>
-            <p>
-                Ingyenes. A webcím, a cím és egy rövid leírás kell. Az admin jóváhagyása után a weboldal megjelenik az indexen.
-            </p>
-        </div>
+        {#if indexView === "websites"}
+            <div class="index-heading__add">
+                <button
+                    type="button"
+                    class="btn btn-primary btn-lg"
+                    on:click={() => (addWebsiteOpen = true)}
+                >Add hozzá a weboldalad</button>
+                <p>
+                    Ingyenes. A webcím, a cím és egy rövid leírás kell. Az admin jóváhagyása után a weboldal megjelenik az indexen.
+                </p>
+            </div>
+        {:else}
+            <div class="index-heading__add">
+                <a class="btn btn-primary btn-lg" href="/fiok?uj=bejegyzes">Új bejegyzés</a>
+            </div>
+        {/if}
     </div>
 </PublicPageHero>
 
@@ -561,8 +585,8 @@
 {/snippet}
 
 {#snippet directoryBlock(kind)}
-<section class="index-directory" aria-label={kind === "websites" ? "Weboldalak" : "Szolgáltatások"}>
-    <h2 class="index-directory__title">{kind === "websites" ? "Weboldalak" : "Szolgáltatások"}</h2>
+<section class="index-directory" aria-label={kind === "websites" ? websitesHeader.title : servicesHeader.title}>
+    <h2 class="index-directory__title">{kind === "websites" ? websitesHeader.title : servicesHeader.title}</h2>
     <div class="header-tabs">
         <span class="header-tabs-label" aria-label="Kiemelt Kategóriák">Kiemelt Kategóriák:</span>
         {#if kind === "websites"}
@@ -725,9 +749,16 @@
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-        margin-bottom: 0.5rem;
+        gap: 1.5rem 2rem;
+    }
+
+    .index-heading__main {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.35rem;
+        min-width: 0;
+        flex: 1 1 auto;
     }
 
     .index-heading__titles {
@@ -758,7 +789,12 @@
         color: var(--szekely-green);
     }
 
+    .index-heading__greeting {
+        margin: 0.35rem 0 0;
+    }
+
     .index-heading__add {
+        flex: 0 0 auto;
         margin-left: auto;
         display: flex;
         flex-direction: column;

@@ -170,6 +170,61 @@ func RequireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+type adminUser struct {
+	ID             int       `json:"id"`
+	Email          string    `json:"email"`
+	Name           string    `json:"name"`
+	GivenName      string    `json:"given_name"`
+	FamilyName     string    `json:"family_name"`
+	DisplayName    string    `json:"display_name"`
+	Locale         string    `json:"locale"`
+	Settlement     string    `json:"settlement"`
+	CreatedAt      time.Time `json:"created_at"`
+	LastLoginAt    time.Time `json:"last_login_at"`
+	WebsiteBanned  bool      `json:"website_banned"`
+	IsAdmin        bool      `json:"is_admin"`
+}
+
+// HandleAdminUsers lists registered accounts for the admin users table.
+func HandleAdminUsers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	rows, err := db.DB.Query(`
+		SELECT u.id, u.email, u.name, u.given_name, u.family_name, u.display_name, u.locale,
+		       COALESCE(s.name, ''), u.created_at, u.last_login_at, u.website_banned
+		FROM users u
+		LEFT JOIN settlements s ON s.id = u.preferred_settlement_id
+		ORDER BY u.created_at DESC, u.id DESC
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	out := []adminUser{}
+	for rows.Next() {
+		var u adminUser
+		if err := rows.Scan(
+			&u.ID, &u.Email, &u.Name, &u.GivenName, &u.FamilyName, &u.DisplayName, &u.Locale,
+			&u.Settlement, &u.CreatedAt, &u.LastLoginAt, &u.WebsiteBanned,
+		); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		u.IsAdmin = IsAdmin(u.Email)
+		out = append(out, u)
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	json.NewEncoder(w).Encode(out)
+}
+
 func UserFromContext(ctx context.Context) *User {
 	u, _ := ctx.Value(userContextKey).(*User)
 	return u
