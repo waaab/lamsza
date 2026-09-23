@@ -169,6 +169,9 @@
                         {/if}
                         <h3 class="entry-listing__title">
                             <a href={href} class="entry-listing__name">{entry?.name}</a>
+                            {#if entry?.claimed}
+                                <span class="entry-profile__owned">Foglalt</span>
+                            {/if}
                         </h3>
                     </div>
                     {#if placeLines.length}

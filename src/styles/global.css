@@ -1660,6 +1660,53 @@ section {
   color: var(--text-muted);
 }
 
+.card.website-card {
+  padding: 0;
+}
+
+.website-card__link {
+  display: block;
+  padding: 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.website-card__title {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--szekely-green);
+}
+
+.website-card__description {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+
+.website-card__domain {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.entry-profile__owned {
+  margin-left: 0.5rem;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--szekely-blue);
+}
+
+.websites-section {
+  margin: 1.5rem 0;
+}
+
+.websites-section-title {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+}
+
 .card.news .entry-name {
   margin-top: 0.5rem;
   font-size: var(--text-lg);

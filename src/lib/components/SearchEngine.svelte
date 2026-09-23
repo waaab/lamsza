@@ -2,6 +2,7 @@
     import { createEventDispatcher, onDestroy, onMount } from "svelte";
     import { apiFetch } from "$lib/api";
     import EntryCard from "$lib/components/EntryCard.svelte";
+    import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import { searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
     import {
         buildSettlementAnswer,
@@ -17,7 +18,7 @@
     let showDiscover = false;
 
     let searchInputValue = "";
-    let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats }
+    let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats, websites, website_query }
     let suggestions = [];
     let loading = false;
     let searchInputEl;
@@ -41,7 +42,8 @@
         (searchResults.news && searchResults.news.length > 0) ||
         filteredAttractions.length > 0 ||
         filteredVenues.length > 0 ||
-        (searchResults.historical_seats && searchResults.historical_seats.length > 0)
+        (searchResults.historical_seats && searchResults.historical_seats.length > 0) ||
+        (searchResults.websites && searchResults.websites.length > 0)
     );
     $: totalCount = searchResults
         ? filteredLocations.length +
@@ -50,7 +52,8 @@
           (searchResults.news?.length || 0) +
           filteredAttractions.length +
           filteredVenues.length +
-          (searchResults.historical_seats?.length || 0)
+          (searchResults.historical_seats?.length || 0) +
+          (searchResults.websites?.length || 0)
         : 0;
     $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
     $: townChoices = (locations || [])
@@ -194,6 +197,7 @@
                 attractions: [],
                 venues: [],
                 historical_seats: [],
+                websites: [],
             };
         } finally {
             loading = false;
@@ -412,12 +416,34 @@
                             {/if}
                         </div>
                     {/if}
+                    {#if searchResults.website_query && searchResults.websites?.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title">Weboldalak</h4>
+                            <div class="list flex">
+                                {#each searchResults.websites as website (website.id)}
+                                    <WebsiteCard {website} />
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
                     {#if searchResults.entries?.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📋 Index</h4>
                             <div class="list flex">
                                 {#each orderedEntries as entry}
                                     <EntryCard {entry} />
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if !searchResults.website_query && searchResults.websites?.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title">Weboldalak</h4>
+                            <div class="list flex">
+                                {#each searchResults.websites as website (website.id)}
+                                    <WebsiteCard {website} />
                                 {/each}
                             </div>
                         </div>

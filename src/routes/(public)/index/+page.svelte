@@ -1,7 +1,9 @@
 <script>
     import { onMount } from "svelte";
+    import AddWebsiteForm from "$lib/components/AddWebsiteForm.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
     import { listingAnchor, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
     import { auth } from "$lib/stores/auth";
@@ -28,8 +30,11 @@
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
     let entries = [];
+    /** @type {Array<{ id: number, title: string, description: string, domain: string, url: string }>} */
+    let websites = [];
     let loading = true;
     let error = null;
+    let addWebsiteOpen = false;
 
     /** @type {string | null} */
     let selectedTypeKey = null;
@@ -141,12 +146,14 @@
         });
         (async () => {
             try {
-                const [directory, config, locs] = await Promise.all([
+                const [directory, config, locs, websitesData] = await Promise.all([
                     apiFetch("/api/directory"),
                     apiFetch("/api/config/public"),
                     apiFetch("/api/locations"),
+                    apiFetch("/api/websites"),
                 ]);
                 entries = directory || [];
+                websites = websitesData?.websites || [];
                 dynamicCategories = directoryCategoryTabs(entries);
                 locations = Array.isArray(locs) ? locs : [];
                 if (config?.my_location_slug) {
@@ -175,6 +182,18 @@
     breadcrumbParentUrl=""
     documentTitleSuffix=" - Székely Gugel"
 />
+
+<div class="page-actions">
+    <button
+        type="button"
+        class="btn btn-primary"
+        on:click={() => (addWebsiteOpen = true)}>Add your website for free</button
+    >
+</div>
+
+{#if addWebsiteOpen}
+    <AddWebsiteForm onClose={() => (addWebsiteOpen = false)} />
+{/if}
 
 <div class="header-tabs">
     <span class="header-tabs-label" aria-label="Kiemelt Kategóriák">Kiemelt Kategóriák:</span>
@@ -370,6 +389,17 @@
 {/snippet}
 
 {@render indexFilterBar()}
+
+{#if currentCategory === "osszes" && websites.length > 0}
+    <section class="websites-section">
+        <h2 class="websites-section-title">Weboldalak</h2>
+        <div class="list flex">
+            {#each websites as website (website.id)}
+                <WebsiteCard {website} />
+            {/each}
+        </div>
+    </section>
+{/if}
 
 <div class="list-page-layout">
     <section class="list">
