@@ -70,6 +70,7 @@ func main() {
 	mux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	mux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	mux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
+	mux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
 	mux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
 	mux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	mux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))

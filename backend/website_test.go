@@ -92,6 +92,109 @@ func TestWebsiteSubmitRejectsBannedAndSignedOut(t *testing.T) {
 	}
 }
 
+func submitWebsite(t *testing.T, cookie *http.Cookie, domain, title, description string) int {
+	t.Helper()
+	rr := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+		"domain": domain, "title": title, "description": description,
+	}, cookie)
+	if rr.Code != 201 {
+		t.Fatalf("submit %s: %d %s", domain, rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	id, ok := created["id"].(float64)
+	if !ok || id <= 0 {
+		t.Fatalf("submit id %#v", created)
+	}
+	return int(id)
+}
+
+func queueBody(t *testing.T, cookie *http.Cookie) string {
+	t.Helper()
+	rr := doRequestWithCookie(t, "GET", "/api/admin/listing-queue", nil, cookie)
+	if rr.Code != 200 {
+		t.Fatalf("queue: %d %s", rr.Code, rr.Body.String())
+	}
+	return rr.Body.String()
+}
+
+func queueWebsites(t *testing.T, cookie *http.Cookie) []map[string]interface{} {
+	t.Helper()
+	rr := doRequestWithCookie(t, "GET", "/api/admin/listing-queue", nil, cookie)
+	if rr.Code != 200 {
+		t.Fatalf("queue: %d %s", rr.Code, rr.Body.String())
+	}
+	var resp map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &resp)
+	raw, ok := resp["websites"].([]interface{})
+	if !ok {
+		t.Fatalf("websites missing %#v", resp)
+	}
+	out := make([]map[string]interface{}, len(raw))
+	for i, item := range raw {
+		out[i] = item.(map[string]interface{})
+	}
+	return out
+}
+
+func TestWebsiteApproveRejectAndBan(t *testing.T) {
+	cleanupReviewTestDomains := func() {
+		for _, d := range []string{"review-example.com", "reject-example.com", "ban-example.com", "after-ban.com"} {
+			if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, d); err != nil {
+				t.Errorf("cleanup %s: %v", d, err)
+			}
+		}
+		if _, err := db.DB.Exec(`UPDATE users SET website_banned = false WHERE email = $1`, "website-review@test.lamsza"); err != nil {
+			t.Errorf("cleanup ban flag: %v", err)
+		}
+	}
+	cleanupReviewTestDomains()
+	defer cleanupReviewTestDomains()
+
+	user := mustLogin("website-review@test.lamsza")
+	admin := mustLogin("admin@test.lamsza")
+	id := submitWebsite(t, user, "review-example.com", "Review", "A page.")
+	q := queueWebsites(t, admin)
+	if len(q) != 1 || q[0]["domain"] != "review-example.com" || q[0]["title"] != "Review" || q[0]["submitter"] == "" {
+		t.Fatalf("queue %#v", q)
+	}
+	rr := doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "approve"}, admin)
+	if rr.Code != 200 {
+		t.Fatalf("approve %d %s", rr.Code, rr.Body.String())
+	}
+	if strings.Contains(queueBody(t, admin), "review-example.com") {
+		t.Fatal("approved website stayed in the queue")
+	}
+	pub := doRequest(t, "GET", "/api/websites", nil)
+	if !strings.Contains(pub.Body.String(), "review-example.com") {
+		t.Fatal("approved website was not public")
+	}
+
+	id = submitWebsite(t, user, "reject-example.com", "Reject", "Gone.")
+	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "reject"}, admin)
+	if rr.Code != 200 {
+		t.Fatalf("reject %d", rr.Code)
+	}
+	again := submitWebsite(t, user, "reject-example.com", "Reject", "Again.")
+	if again <= 0 {
+		t.Fatal("rejected key was not freed")
+	}
+	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": again, "action": "reject"}, admin)
+
+	banID := submitWebsite(t, user, "ban-example.com", "Ban", "Nope.")
+	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": banID, "action": "ban"}, admin)
+	if rr.Code != 200 {
+		t.Fatalf("ban %d %s", rr.Code, rr.Body.String())
+	}
+	rr = doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+		"domain": "after-ban.com", "title": "T", "description": "D",
+	}, user)
+	if rr.Code != 403 {
+		t.Fatalf("banned resubmit %d", rr.Code)
+	}
+	mustLogin("website-review@test.lamsza")
+}
+
 func adminQueueCount(t *testing.T, cookie *http.Cookie) int {
 	t.Helper()
 	rr := doRequestWithCookie(t, "GET", "/api/auth/me", nil, cookie)

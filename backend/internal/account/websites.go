@@ -223,3 +223,103 @@ func checkWebsiteDomainConflict(domainKey string) (map[string]interface{}, error
 		return nil, nil
 	}
 }
+
+type adminWebsiteBody struct {
+	ID     int    `json:"id"`
+	Action string `json:"action"`
+}
+
+func HandleAdminWebsite(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body adminWebsiteBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.ID <= 0 {
+		http.Error(w, "id required", http.StatusBadRequest)
+		return
+	}
+
+	switch body.Action {
+	case "approve":
+		res, err := db.DB.Exec(`
+			UPDATE websites SET status = 'approved' WHERE id = $1 AND status = 'pending'
+		`, body.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	case "reject":
+		res, err := db.DB.Exec(`
+			DELETE FROM websites WHERE id = $1 AND status = 'pending'
+		`, body.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	case "ban":
+		tx, err := db.DB.Begin()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer tx.Rollback()
+
+		var userID sql.NullInt64
+		err = tx.QueryRow(`
+			SELECT user_id FROM websites WHERE id = $1 AND status = 'pending'
+		`, body.ID).Scan(&userID)
+		if err == sql.ErrNoRows {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if !userID.Valid {
+			http.Error(w, "user required", http.StatusBadRequest)
+			return
+		}
+
+		res, err := tx.Exec(`DELETE FROM websites WHERE id = $1 AND status = 'pending'`, body.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+
+		_, err = tx.Exec(`UPDATE users SET website_banned = true WHERE id = $1`, userID.Int64)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := tx.Commit(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	default:
+		http.Error(w, "action must be approve, reject, or ban", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}

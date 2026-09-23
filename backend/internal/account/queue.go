@@ -20,9 +20,18 @@ type queueMember struct {
 	Email     string `json:"email"`
 }
 
+type queueWebsite struct {
+	ID          int    `json:"id"`
+	Domain      string `json:"domain"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Submitter   string `json:"submitter"`
+}
+
 type queueResponse struct {
 	Unpublished []queueUnpublished `json:"unpublished"`
 	Members     []queueMember      `json:"members"`
+	Websites    []queueWebsite     `json:"websites"`
 }
 
 func QueueCount() (int, error) {
@@ -45,6 +54,7 @@ func HandleListingQueue(w http.ResponseWriter, r *http.Request) {
 	resp := queueResponse{
 		Unpublished: []queueUnpublished{},
 		Members:     []queueMember{},
+		Websites:    []queueWebsite{},
 	}
 
 	rows, err := db.DB.Query(`
@@ -89,6 +99,27 @@ func HandleListingQueue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		resp.Members = append(resp.Members, item)
+	}
+
+	rows, err = db.DB.Query(`
+		SELECT w.id, w.domain_key, w.title, w.description, COALESCE(u.email, '')
+		FROM websites w
+		LEFT JOIN users u ON u.id = w.user_id
+		WHERE w.status = 'pending'
+		ORDER BY w.id ASC
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item queueWebsite
+		if err := rows.Scan(&item.ID, &item.Domain, &item.Title, &item.Description, &item.Submitter); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Websites = append(resp.Websites, item)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

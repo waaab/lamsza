@@ -69,6 +69,7 @@ func init() {
 	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
+	testMux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
 	testMux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
 	testMux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	testMux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
