@@ -46,7 +46,7 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
     },
     valtozasnaplo: {
         title: "Változásnapló",
-        greeting: "Újítások, javítások — emberi nyelven.",
+        greeting: "Újítások, javítások - emberi nyelven.",
     },
     iranyelvek: {
         title: "Irányelvek",

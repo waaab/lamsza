@@ -45,7 +45,7 @@ func MigratePages() {
 		{"index/szolgaltatasok", "Szolgáltatások", "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár."},
 		{"index/weboldalak", "Weboldalak", "Jóváhagyott helyi weboldalak az indexen."},
 		{"terkep", "Székelyföld Térkép", "Hamarosan érkezik az interaktív térképünk helyi adatokkal!"},
-		{"valtozasnaplo", "Változásnapló", "Újítások, javítások — emberi nyelven."},
+		{"valtozasnaplo", "Változásnapló", "Újítások, javítások - emberi nyelven."},
 		{"iranyelvek", "Irányelvek", "Adatvédelem, sütik és felhasználási feltételek — összefoglaló."},
 		{"iranyelvek/sutik", "Sütik", "Hogyan használjuk a sütiket és mire valók."},
 		{"iranyelvek/feltetelek", "Feltételek", "A szolgáltatás igénybevételének feltételei."},
