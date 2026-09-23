@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import { page } from "$app/stores";
     import AddWebsiteForm from "$lib/components/AddWebsiteForm.svelte";
+    import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
@@ -26,6 +27,7 @@
     } from "$lib/entryCategory.js";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { apiFetch } from "$lib/api.js";
+    import { openLogin } from "$lib/openLogin.js";
     import AppIcon from "$lib/icons/AppIcon.svelte";
 
     let pageHeader = initialPageHeader("index");
@@ -40,6 +42,16 @@
     let loading = true;
     let error = null;
     let addWebsiteOpen = false;
+    let createListingOpen = false;
+
+    async function openCreateListing() {
+        await auth.init();
+        if (!$auth.loggedIn) {
+            openLogin();
+            return;
+        }
+        createListingOpen = true;
+    }
 
     /** @type {string | null} */
     let selectedTypeKey = null;
@@ -340,7 +352,11 @@
             </div>
         {:else}
             <div class="index-heading__add">
-                <a class="btn btn-primary btn-lg" href="/fiok?uj=bejegyzes">Új bejegyzés</a>
+                <button
+                    type="button"
+                    class="btn btn-primary btn-lg"
+                    on:click={openCreateListing}
+                >Új bejegyzés</button>
             </div>
         {/if}
     </div>
@@ -348,6 +364,10 @@
 
 {#if addWebsiteOpen}
     <AddWebsiteForm onClose={() => (addWebsiteOpen = false)} />
+{/if}
+
+{#if createListingOpen}
+    <ListingFormDialog mode="create" onClose={() => (createListingOpen = false)} />
 {/if}
 
 <svelte:window on:pointerdown={handleWindowPointerDown} />
