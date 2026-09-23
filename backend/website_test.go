@@ -373,3 +373,79 @@ func adminQueueCount(t *testing.T, cookie *http.Cookie) int {
 	}
 	return int(n)
 }
+
+func TestWebsiteListingCreateReservesDomain(t *testing.T) {
+	const domain = "listing-reserve-example.com"
+	cleanup := func() {
+		if _, err := db.DB.Exec(`DELETE FROM entries WHERE id IN (SELECT entry_id FROM websites WHERE domain_key = $1)`, domain); err != nil {
+			t.Errorf("cleanup entries: %v", err)
+		}
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+			t.Errorf("cleanup website: %v", err)
+		}
+	}
+	cleanup()
+	defer cleanup()
+
+	owner := mustLogin("listing-reserve@test.lamsza")
+	locID := mustLocID(t)
+	var catID, typeID int
+	if err := db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&catID); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
+		"name":        "Reserve Listing",
+		"location_id": locID,
+		"category_id": catID,
+		"type_id":     typeID,
+		"url":         "https://www.listing-reserve-example.com/menu",
+		"notes":       "Fresh notes here.",
+	}, owner)
+	if rr.Code != 200 {
+		t.Fatalf("create listing: %d %s", rr.Code, rr.Body.String())
+	}
+	var created map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &created)
+	entryID := int(created["id"].(float64))
+	defer doRequestWithCookie(t, "DELETE", "/api/account/listings?id="+formatID(entryID), nil, owner)
+
+	var key, status, title, description string
+	var linkedEntryID, ownerID int
+	err := db.DB.QueryRow(`
+		SELECT domain_key, status, title, description, entry_id, user_id
+		FROM websites WHERE domain_key = $1
+	`, domain).Scan(&key, &status, &title, &description, &linkedEntryID, &ownerID)
+	if err != nil {
+		t.Fatalf("website row missing: %v", err)
+	}
+	if key != domain || status != "approved" || linkedEntryID != entryID {
+		t.Fatalf("website %#v entry %d", map[string]interface{}{
+			"key": key, "status": status, "entry_id": linkedEntryID,
+		}, entryID)
+	}
+	if title != "Reserve Listing" || description != "Fresh notes here." {
+		t.Fatalf("website text title=%q description=%q", title, description)
+	}
+
+	dup := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+		"domain": domain, "title": "Other Site", "description": "Taken.",
+	}, owner)
+	if dup.Code != 409 || !strings.Contains(dup.Body.String(), "domain_taken") {
+		t.Fatalf("duplicate submit: %d %s", dup.Code, dup.Body.String())
+	}
+
+	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), map[string]interface{}{
+		"name":        "Reserve Listing",
+		"location_id": locID,
+		"category_id": catID,
+		"type_id":     typeID,
+		"url":         "https://other-domain.com",
+	}, owner)
+	if rr.Code != 409 || !strings.Contains(rr.Body.String(), "domain_taken") {
+		t.Fatalf("domain change: %d %s", rr.Code, rr.Body.String())
+	}
+}

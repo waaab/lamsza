@@ -1690,7 +1690,7 @@ section {
   color: var(--text-muted);
 }
 
-.entry-profile__owned {
+.entry-listing .entry-profile__owned {
   margin-left: 0.5rem;
   font-size: var(--text-sm);
   font-weight: 700;

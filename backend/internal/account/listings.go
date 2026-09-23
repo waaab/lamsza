@@ -689,6 +689,42 @@ func writeListingConflict(w http.ResponseWriter, code int, errorCode string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": errorCode})
 }
 
+func listingURLDomainConflict(entryID int, newURL string) (bool, error) {
+	newURL = strings.TrimSpace(newURL)
+	var newKey string
+	if newURL != "" {
+		key, err := webdomain.CanonicalDomain(newURL)
+		if err != nil {
+			return false, nil
+		}
+		newKey = key
+	}
+
+	var linkedKey sql.NullString
+	err := db.DB.QueryRow(`SELECT domain_key FROM websites WHERE entry_id = $1`, entryID).Scan(&linkedKey)
+	if err == nil && linkedKey.Valid {
+		if newURL == "" || linkedKey.String != newKey {
+			return true, nil
+		}
+	}
+	if newURL == "" {
+		return false, nil
+	}
+
+	var existingEntryID sql.NullInt64
+	err = db.DB.QueryRow(`SELECT entry_id FROM websites WHERE domain_key = $1`, newKey).Scan(&existingEntryID)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if !existingEntryID.Valid || int(existingEntryID.Int64) != entryID {
+		return true, nil
+	}
+	return false, nil
+}
+
 func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	var body createListingBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -825,6 +861,22 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			writeListingConflict(w, http.StatusConflict, "domain_taken")
 			return
 		}
+	} else if listingURL != "" {
+		domainKey, err := webdomain.CanonicalDomain(listingURL)
+		if err == nil {
+			submittedHostValue := domainKey
+			if host, err := submittedHost(listingURL); err == nil {
+				submittedHostValue = host
+			}
+			_, err = tx.Exec(`
+				INSERT INTO websites (domain_key, submitted_host, title, description, status, user_id, entry_id)
+				VALUES ($1, $2, $3, $4, 'approved', $5, $6)
+			`, domainKey, submittedHostValue, websiteTitle(body.Name), websiteDescription(body.Notes), userID, entryID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -894,6 +946,17 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
 	photos := photosOrEmpty(body.Photos)
+	listingURL := strings.TrimSpace(body.URL)
+
+	conflict, err := listingURLDomainConflict(entryID, listingURL)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if conflict {
+		writeListingConflict(w, http.StatusConflict, "domain_taken")
+		return
+	}
 
 	_, err = db.DB.Exec(`
 		UPDATE entries SET
@@ -903,7 +966,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			ratings_enabled = $14
 		WHERE id = $15
 	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
-		strings.TrimSpace(body.URL), body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
+		listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
 		hours, delivery, photos, body.RatingsEnabled, entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
