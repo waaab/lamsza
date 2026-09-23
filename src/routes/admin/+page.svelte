@@ -374,6 +374,8 @@
     let listingQueueUnpublished = [];
     /** @type {{ entry_id: number, entry_name: string, user_id: number, email: string }[]} */
     let listingQueueMembers = [];
+    /** @type {{ id: number, domain: string, title: string, description: string, submitter: string }[]} */
+    let listingQueueWebsites = [];
     let listingQueueError = "";
     let listingQueueFetched = false;
 
@@ -627,6 +629,7 @@
             const data = await res.json();
             listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
             listingQueueMembers = Array.isArray(data.members) ? data.members : [];
+            listingQueueWebsites = Array.isArray(data.websites) ? data.websites : [];
             listingQueueFetched = true;
         } catch (e) {
             listingQueueError = describeTransportError("A bejegyzés-jóváhagyások", e);
@@ -668,6 +671,20 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "reject" }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    async function reviewWebsite(websiteId, action) {
+        const res = await apiCall("/api/admin/websites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: websiteId, action }),
         });
         if (!res.ok) {
             listingQueueError = (await res.text()) || `HTTP ${res.status}`;
@@ -2111,8 +2128,8 @@
         return ADMIN_API_LABELS[source] ? source : "";
     }
 
-    function buildDashboardMessages() {
-        /** @type {{ id: string, level: string, text: string, tab?: string, action?: string }[]} */
+    function buildDashboardMessages(websites) {
+        /** @type {{ id: string, level: string, text: string, tab?: string, action?: string, websiteId?: number }[]} */
         const messages = [];
         if (adminOffline) {
             messages.push({
@@ -2174,26 +2191,40 @@
             });
         }
         for (const notice of browserCacheNotices) messages.push(notice);
-        const waiting = listingQueueUnpublished.length + listingQueueMembers.length;
+        const siteRows = Array.isArray(websites) ? websites : [];
+        const waiting =
+            listingQueueUnpublished.length +
+            listingQueueMembers.length +
+            siteRows.length;
         if (listingQueueFetched && !listingQueueError) {
             if (waiting > 0) {
                 messages.push({
                     id: "queue",
                     level: "info",
-                    text: `${listingQueueUnpublished.length} bejegyzés és ${listingQueueMembers.length} tag vár jóváhagyásra.`,
+                    text: `${listingQueueUnpublished.length} bejegyzés, ${listingQueueMembers.length} tag és ${siteRows.length} weboldal vár jóváhagyásra.`,
                 });
             } else {
                 messages.push({
                     id: "queue-ok",
                     level: "success",
-                    text: "Nincs jóváhagyásra váró bejegyzés vagy tag.",
+                    text: "Nincs jóváhagyásra váró bejegyzés, tag vagy weboldal.",
                 });
             }
+        }
+        for (const site of siteRows) {
+            messages.push({
+                id: "website-" + site.id,
+                level: "info",
+                text: `${site.submitter} added ${site.domain}: ${site.title}. ${site.description}`,
+                action: "website",
+                websiteId: site.id,
+            });
         }
         return messages;
     }
 
     $: dashboardMessages = buildDashboardMessages(
+        listingQueueWebsites,
         adminOffline,
         dashboardStatsError,
         settingsLoadError,
@@ -3477,6 +3508,22 @@
                                         disabled
                                         title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
                                     >Frissítés</button>
+                                {:else if msg.action === "website"}
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        on:click={() => reviewWebsite(msg.websiteId, "approve")}
+                                    >Approve</button>
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        on:click={() => reviewWebsite(msg.websiteId, "reject")}
+                                    >Reject</button>
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        on:click={() => reviewWebsite(msg.websiteId, "ban")}
+                                    >Ban User</button>
                                 {/if}
                             </div>
                         {/each}
