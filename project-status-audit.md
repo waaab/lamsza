@@ -16,7 +16,7 @@ Shipped and recorded in `src/lib/publicChangelog.js` and `changelog.md`:
 
 The footer version is the first entry of `src/lib/publicChangelog.js`. It is not a separate hardcoded string.
 
-Still open for a public launch: most `/api/admin/*` routes answer without a session (listing queue and website admin return 401; entries and settings return 200), and `/api/proxy` fetches an arbitrary URL. Dated specs under `docs/superpowers/` were not rewritten; they are the design records for the features above.
+`/api/admin/*` requires an admin Google session. `/api/proxy` only fetches crests, attraction images, and news-feed URLs already stored in the database, and it refuses private addresses. Dated specs under `docs/superpowers/` were not rewritten; they are the design records for the features above. A public launch still needs the remaining go-live checks (consent, content pages, SEO, schema, accessibility).
 
 ---
 

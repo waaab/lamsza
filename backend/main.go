@@ -67,46 +67,46 @@ func main() {
 	mux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	mux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
 	mux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))
-	mux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	mux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandlePublicLocations))
 	mux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
 	mux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	mux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	mux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
 	mux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
-	mux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
-	mux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
-	mux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
-	mux.HandleFunc("/api/admin/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
-	mux.HandleFunc("/api/admin/settlement_location_types", middleware.ApplyCORS(handlers.HandleAdminSettlementLocationTypes))
-	mux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
-	mux.HandleFunc("/api/admin/dashboard_stats", middleware.ApplyCORS(handlers.HandleAdminDashboardStats))
+	mux.HandleFunc("/api/admin/entries", admin(handlers.HandleAdminEntries))
+	mux.HandleFunc("/api/admin/entry_categories", admin(handlers.HandleAdminEntryCategories))
+	mux.HandleFunc("/api/admin/entry_types", admin(handlers.HandleAdminEntryTypes))
+	mux.HandleFunc("/api/admin/locations", admin(handlers.HandleAdminLocations))
+	mux.HandleFunc("/api/admin/settlement_location_types", admin(handlers.HandleAdminSettlementLocationTypes))
+	mux.HandleFunc("/api/admin/county_seat", admin(handlers.HandleSetCountySeat))
+	mux.HandleFunc("/api/admin/dashboard_stats", admin(handlers.HandleAdminDashboardStats))
 	mux.HandleFunc("/api/admin/users", admin(auth.HandleAdminUsers))
-	mux.HandleFunc("/api/admin/entry-images", middleware.ApplyCORS(handlers.HandleEntryImageUpload))
+	mux.HandleFunc("/api/admin/entry-images", admin(handlers.HandleEntryImageUpload))
 	mux.Handle("/api/media/entry-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/entry-images/", http.FileServer(http.Dir(handlers.EntryImagesDir()))).ServeHTTP))
 	mux.Handle("/api/media/event-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/event-images/", http.FileServer(http.Dir(handlers.EventImagesDir()))).ServeHTTP))
 	mux.HandleFunc("/api/attractions", middleware.ApplyCORS(handlers.HandleAttractions))
 	mux.HandleFunc("/api/historical_seats", middleware.ApplyCORS(handlers.HandleHistoricalSeats))
 	mux.HandleFunc("/api/counties", middleware.ApplyCORS(handlers.HandleCounties))
-	mux.HandleFunc("/api/admin/counties", middleware.ApplyCORS(handlers.HandleAdminCounties))
-	mux.HandleFunc("/api/admin/historical_seats", middleware.ApplyCORS(handlers.HandleAdminHistoricalSeats))
-	mux.HandleFunc("/api/admin/attractions", middleware.ApplyCORS(handlers.HandleAdminAttractions))
+	mux.HandleFunc("/api/admin/counties", admin(handlers.HandleAdminCounties))
+	mux.HandleFunc("/api/admin/historical_seats", admin(handlers.HandleAdminHistoricalSeats))
+	mux.HandleFunc("/api/admin/attractions", admin(handlers.HandleAdminAttractions))
 
 	// Public config (weather cache TTL, version) + admin settings
 	mux.HandleFunc("/api/config/public", middleware.ApplyCORS(settings.HandlePublicConfig))
-	mux.HandleFunc("/api/admin/settings", middleware.ApplyCORS(settings.HandleAdminSettings))
-	mux.HandleFunc("/api/admin/settings/clear-weather-cache", middleware.ApplyCORS(settings.ClearWeatherCache))
+	mux.HandleFunc("/api/admin/settings", admin(settings.HandleAdminSettings))
+	mux.HandleFunc("/api/admin/settings/clear-weather-cache", admin(settings.ClearWeatherCache))
 
 	// Pages (public + admin)
 	mux.HandleFunc("/api/pages", middleware.ApplyCORS(pages.HandlePublicPage))
-	mux.HandleFunc("/api/admin/pages", middleware.ApplyCORS(pages.HandleAdminPages))
+	mux.HandleFunc("/api/admin/pages", admin(pages.HandleAdminPages))
 	mux.HandleFunc("/api/page_faq", middleware.ApplyCORS(pagefaq.HandlePublic))
-	mux.HandleFunc("/api/admin/page_faq", middleware.ApplyCORS(pagefaq.HandleAdmin))
+	mux.HandleFunc("/api/admin/page_faq", admin(pagefaq.HandleAdmin))
 
 	// Optional Modules
 	if config.AppConfig.Features.Weather {
 		mux.HandleFunc("/api/weather", middleware.ApplyCORS(weather.HandleWeather))
 		mux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
-		mux.HandleFunc("/api/admin/weather_translations", middleware.ApplyCORS(weather.HandleAdminWeatherTranslations))
+		mux.HandleFunc("/api/admin/weather_translations", admin(weather.HandleAdminWeatherTranslations))
 		log.Println("Module [Weather] enabled")
 	}
 
@@ -116,32 +116,32 @@ func main() {
 		mux.HandleFunc("/api/events/detail", middleware.ApplyCORS(events.HandleEventDetail))
 		mux.HandleFunc("/api/venues", middleware.ApplyCORS(venues.HandlePublic))
 		mux.HandleFunc("/api/venue_types", middleware.ApplyCORS(venues.HandlePublicVenueTypes))
-		mux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
-		mux.HandleFunc("/api/admin/events/schedule", middleware.ApplyCORS(events.HandleAdminEventSchedule))
-		mux.HandleFunc("/api/admin/catalog_event_types", middleware.ApplyCORS(events.HandleAdminCatalogEventTypes))
-		mux.HandleFunc("/api/admin/catalog_event_subtypes", middleware.ApplyCORS(events.HandleAdminCatalogEventSubtypes))
-		mux.HandleFunc("/api/admin/event-images", middleware.ApplyCORS(handlers.HandleEventImageUpload))
-		mux.HandleFunc("/api/admin/venues", middleware.ApplyCORS(venues.HandleAdmin))
-		mux.HandleFunc("/api/admin/venue_types", middleware.ApplyCORS(venues.HandleAdminVenueTypes))
+		mux.HandleFunc("/api/admin/events", admin(events.HandleAdminEvents))
+		mux.HandleFunc("/api/admin/events/schedule", admin(events.HandleAdminEventSchedule))
+		mux.HandleFunc("/api/admin/catalog_event_types", admin(events.HandleAdminCatalogEventTypes))
+		mux.HandleFunc("/api/admin/catalog_event_subtypes", admin(events.HandleAdminCatalogEventSubtypes))
+		mux.HandleFunc("/api/admin/event-images", admin(handlers.HandleEventImageUpload))
+		mux.HandleFunc("/api/admin/venues", admin(venues.HandleAdmin))
+		mux.HandleFunc("/api/admin/venue_types", admin(venues.HandleAdminVenueTypes))
 		log.Println("Module [Events] enabled")
 	}
 
 	if config.AppConfig.Features.News {
 		mux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 		mux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
-		mux.HandleFunc("/api/admin/news_feeds", middleware.ApplyCORS(news.HandleAdminNewsFeeds))
+		mux.HandleFunc("/api/admin/news_feeds", admin(news.HandleAdminNewsFeeds))
 		log.Println("Module [News] enabled")
 	}
 
 	if config.AppConfig.Features.Mondasok {
 		mux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
-		mux.HandleFunc("/api/admin/mondasok", middleware.ApplyCORS(mondasok.HandleAdminMondasok))
+		mux.HandleFunc("/api/admin/mondasok", admin(mondasok.HandleAdminMondasok))
 		log.Println("Module [Mondasok] enabled")
 	}
 
 	if config.AppConfig.Features.QuickLinks {
 		mux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
-		mux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
+		mux.HandleFunc("/api/admin/quick_links", admin(links.HandleAdminQuickLinks))
 		log.Println("Module [QuickLinks] enabled")
 	}
 

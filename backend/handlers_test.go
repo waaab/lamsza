@@ -12,12 +12,14 @@ import (
 	"backend/internal/mondasok"
 	"backend/internal/news"
 	"backend/internal/search"
+	"backend/internal/settings"
 	"backend/internal/weather"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -66,32 +68,33 @@ func init() {
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	testMux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
 	testMux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))
-	testMux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
+	testMux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandlePublicLocations))
 	testMux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
 	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
 	testMux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
-	testMux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
-	testMux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
-	testMux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
-	testMux.HandleFunc("/api/admin/locations", middleware.ApplyCORS(handlers.HandleAdminLocations))
-	testMux.HandleFunc("/api/admin/settlement_location_types", middleware.ApplyCORS(handlers.HandleAdminSettlementLocationTypes))
-	testMux.HandleFunc("/api/admin/county_seat", middleware.ApplyCORS(handlers.HandleSetCountySeat))
-	testMux.HandleFunc("/api/admin/dashboard_stats", middleware.ApplyCORS(handlers.HandleAdminDashboardStats))
+	testMux.HandleFunc("/api/admin/entries", admin(handlers.HandleAdminEntries))
+	testMux.HandleFunc("/api/admin/entry_categories", admin(handlers.HandleAdminEntryCategories))
+	testMux.HandleFunc("/api/admin/entry_types", admin(handlers.HandleAdminEntryTypes))
+	testMux.HandleFunc("/api/admin/locations", admin(handlers.HandleAdminLocations))
+	testMux.HandleFunc("/api/admin/settlement_location_types", admin(handlers.HandleAdminSettlementLocationTypes))
+	testMux.HandleFunc("/api/admin/county_seat", admin(handlers.HandleSetCountySeat))
+	testMux.HandleFunc("/api/admin/dashboard_stats", admin(handlers.HandleAdminDashboardStats))
 	testMux.HandleFunc("/api/admin/users", admin(auth.HandleAdminUsers))
+	testMux.HandleFunc("/api/admin/settings", admin(settings.HandleAdminSettings))
 	testMux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
-	testMux.HandleFunc("/api/admin/events", middleware.ApplyCORS(events.HandleAdminEvents))
-	testMux.HandleFunc("/api/admin/catalog_event_types", middleware.ApplyCORS(events.HandleAdminCatalogEventTypes))
-	testMux.HandleFunc("/api/admin/catalog_event_subtypes", middleware.ApplyCORS(events.HandleAdminCatalogEventSubtypes))
+	testMux.HandleFunc("/api/admin/events", admin(events.HandleAdminEvents))
+	testMux.HandleFunc("/api/admin/catalog_event_types", admin(events.HandleAdminCatalogEventTypes))
+	testMux.HandleFunc("/api/admin/catalog_event_subtypes", admin(events.HandleAdminCatalogEventSubtypes))
 	testMux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 	testMux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
-	testMux.HandleFunc("/api/admin/news_feeds", middleware.ApplyCORS(news.HandleAdminNewsFeeds))
+	testMux.HandleFunc("/api/admin/news_feeds", admin(news.HandleAdminNewsFeeds))
 	testMux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
 	testMux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
-	testMux.HandleFunc("/api/admin/mondasok", middleware.ApplyCORS(mondasok.HandleAdminMondasok))
+	testMux.HandleFunc("/api/admin/mondasok", admin(mondasok.HandleAdminMondasok))
 	testMux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
-	testMux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
+	testMux.HandleFunc("/api/admin/quick_links", admin(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
 	testMux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
@@ -140,7 +143,6 @@ func doAnonRequest(t *testing.T, method, path string, body interface{}) *httptes
 	return doRequestWithCookie(t, method, path, body, nil)
 }
 
-
 func doRequest(t *testing.T, method, path string, body interface{}) *httptest.ResponseRecorder {
 	t.Helper()
 	var reqBody *bytes.Buffer
@@ -152,6 +154,9 @@ func doRequest(t *testing.T, method, path string, body interface{}) *httptest.Re
 	}
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
+	if strings.HasPrefix(strings.Split(path, "?")[0], "/api/admin/") && testAdminCookie != nil {
+		req.AddCookie(testAdminCookie)
+	}
 	rr := httptest.NewRecorder()
 	testMux.ServeHTTP(rr, req)
 	return rr
@@ -599,8 +604,8 @@ func TestAdminQuickLinksCRUD(t *testing.T) {
 
 func TestAdminMondasokCRUD(t *testing.T) {
 	payload := map[string]string{
-		"text":          "Test mondas for integration testing",
-		"display_date":  "2030-06-15",
+		"text":         "Test mondas for integration testing",
+		"display_date": "2030-06-15",
 	}
 
 	rr := doRequest(t, "POST", "/api/admin/mondasok", payload)
@@ -840,6 +845,59 @@ func TestProxyMissingURL(t *testing.T) {
 	}
 }
 
+func TestAdminRoutesRequireAdmin(t *testing.T) {
+	for _, path := range []string{"/api/admin/entries", "/api/admin/settings", "/api/admin/events", "/api/admin/news_feeds"} {
+		rr := doAnonRequest(t, "GET", path, nil)
+		if rr.Code != http.StatusUnauthorized {
+			t.Fatalf("%s: expected 401, got %d body %s", path, rr.Code, rr.Body.String())
+		}
+	}
+	member := mustLogin("member-not-admin@test.lamsza")
+	rr := doRequestWithCookie(t, "GET", "/api/admin/entries", nil, member)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("non-admin: expected 403, got %d body %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestProxyRejectsArbitraryAndPrivateURLs(t *testing.T) {
+	rr := doAnonRequest(t, "GET", "/api/proxy?url="+url.QueryEscape("http://example.com"), nil)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("example.com: expected 403, got %d body %s", rr.Code, rr.Body.String())
+	}
+	rr = doAnonRequest(t, "GET", "/api/proxy?url="+url.QueryEscape("http://127.0.0.1/secret"), nil)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("loopback: expected 403, got %d body %s", rr.Code, rr.Body.String())
+	}
+	rr = doAnonRequest(t, "POST", "/api/proxy?url="+url.QueryEscape("http://example.com"), nil)
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST proxy: expected 405, got %d", rr.Code)
+	}
+}
+
+func TestProxyAllowsStoredFeedURL(t *testing.T) {
+	const feed = "https://feeds.example.test/only-stored"
+	var id int
+	err := db.DB.QueryRow(
+		`INSERT INTO news_feeds (title, feed_url, bg_color) VALUES ($1, $2, $3) RETURNING id`,
+		"Proxy Allow Test", feed, "#ffffff",
+	).Scan(&id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.DB.Exec(`DELETE FROM news_feeds WHERE id = $1`, id)
+
+	rr := doAnonRequest(t, "GET", "/api/proxy?url="+url.QueryEscape(feed), nil)
+	if rr.Code == http.StatusForbidden || rr.Code == http.StatusBadRequest {
+		t.Fatalf("stored feed should pass the allowlist, got %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestPublicLocationWriteRejected(t *testing.T) {
+	rr := doAnonRequest(t, "POST", "/api/locations", map[string]string{"name": "Nope"})
+	if rr.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /api/locations: expected 405, got %d body %s", rr.Code, rr.Body.String())
+	}
+}
 
 func TestAdminPublishDoesNotVerify(t *testing.T) {
 	rr := doRequestWithCookie(t, "GET", "/api/locations", nil, testAdminCookie)
@@ -1079,11 +1137,11 @@ func TestMemberCanPatchListing(t *testing.T) {
 	}
 
 	patchBody := map[string]interface{}{
-		"name":          "Patched Member Name",
-		"location_id":   locationID,
-		"category_id":   categoryID,
-		"type_id":       typeID,
-		"photos":        []map[string]interface{}{{"url": "javascript:alert(1)", "alt": "x"}},
+		"name":        "Patched Member Name",
+		"location_id": locationID,
+		"category_id": categoryID,
+		"type_id":     typeID,
+		"photos":      []map[string]interface{}{{"url": "javascript:alert(1)", "alt": "x"}},
 	}
 	rr = doRequestWithCookie(t, "PATCH", "/api/account/listings?id="+formatID(entryID), patchBody, memberCookie)
 	if rr.Code != http.StatusOK {
