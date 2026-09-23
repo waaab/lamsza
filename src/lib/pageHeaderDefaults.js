@@ -34,7 +34,7 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
     },
     "index/szolgaltatasok": {
         title: "Szolgáltatások",
-        greeting: "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár.",
+        greeting: "Az index szolgáltatástípusú bejegyzései.",
     },
     "index/weboldalak": {
         title: "Weboldalak",
