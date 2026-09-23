@@ -38,6 +38,7 @@
     const ADMIN_WELCOME_ITEMS = [
         { id: "mondasok", title: "Mondások" },
         { id: "quicklinks", title: "Gyorslinkek" },
+        { id: "websites", title: "Weboldalak" },
         { id: "entries", title: "Index" },
         { id: "entry_categories", title: "Bejegyzés Kategóriák" },
         { id: "entry_types", title: "Bejegyzés típusok" },
@@ -71,6 +72,7 @@
         if (tab === "weather_translations") fetchWeatherTranslations();
         if (tab === "pages") fetchPages();
         if (tab === "page_faq") fetchPageFaq();
+        if (tab === "websites") fetchAdminWebsites();
     }
 
     /** @type {{ tab: string, message: string } | null} */
@@ -210,6 +212,7 @@
     let searchEvents = "";
     let searchEntryCategories = "";
     let searchEntries = "";
+    let searchAdminWebsites = "";
     let searchEntryTypes = "";
     let searchAttractions = "";
     let searchCounties = "";
@@ -226,6 +229,9 @@
     let pageEvents = 1;
     let pageEntryCategories = 1;
     let pageEntries = 1;
+    let pageAdminWebsites = 1;
+    /** @type {{ id: number, domain: string, title: string, description: string, status: string, submitter: string, claimed: boolean, url: string }[]} */
+    let adminWebsites = [];
     let pageWeatherTrans = 1;
     let pageAdminPages = 1;
     let pagePageFaqRows = 1;
@@ -341,6 +347,7 @@
         news_feeds: "Hírfolyamok",
         locations: "Települések",
         attractions: "Látnivalók",
+        websites: "Weboldalak",
         entries: "Index",
         entry_categories: "Bejegyzés kategóriák",
         entry_types: "Bejegyzés típusok",
@@ -374,6 +381,8 @@
     let listingQueueUnpublished = [];
     /** @type {{ entry_id: number, entry_name: string, user_id: number, email: string }[]} */
     let listingQueueMembers = [];
+    /** @type {{ id: number, domain: string, title: string, description: string, submitter: string }[]} */
+    let listingQueueWebsites = [];
     let listingQueueError = "";
     let listingQueueFetched = false;
 
@@ -627,6 +636,7 @@
             const data = await res.json();
             listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
             listingQueueMembers = Array.isArray(data.members) ? data.members : [];
+            listingQueueWebsites = Array.isArray(data.websites) ? data.websites : [];
             listingQueueFetched = true;
         } catch (e) {
             listingQueueError = describeTransportError("A bejegyzés-jóváhagyások", e);
@@ -677,6 +687,21 @@
         await auth.refresh();
     }
 
+    async function reviewWebsite(websiteId, action) {
+        const res = await apiCall("/api/admin/websites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: websiteId, action }),
+        });
+        if (!res.ok) {
+            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            return;
+        }
+        await fetchListingQueue();
+        await fetchAdminWebsites();
+        await auth.refresh();
+    }
+
     /** Cím + rövid köszöntő / leírás — minden admin-fülön egységes fejléc. */
     const ADMIN_PAGE_COPY = {
         welcome: {
@@ -719,6 +744,10 @@
             title: "Események",
             greeting:
                 "Közösségi és sportesemények: időpontok, helyszín, típusok és opcionális program.",
+        },
+        websites: {
+            title: "Weboldalak",
+            greeting: "Jóváhagyott és várakozó weboldalak: domain, cím, leírás és beküldő.",
         },
         entries: {
             title: "Bejegyzések",
@@ -1010,6 +1039,16 @@
         ];
     });
     $: pgEntries = adminPageSlice(rfEntries, pageEntries);
+    $: rfAdminWebsites = filterRows(adminWebsites, searchAdminWebsites, (site) => [
+        site.title,
+        site.domain,
+        site.description,
+        site.submitter,
+        site.approver,
+        site.status,
+        site.claimed ? "Átvéve" : "Gazdátlan",
+    ]);
+    $: pgAdminWebsites = adminPageSlice(rfAdminWebsites, pageAdminWebsites);
     $: rfWeatherTrans = filterRows(
         weatherTranslations,
         searchWeatherTrans,
@@ -1152,6 +1191,7 @@
         fetchSettlementLocationTypes();
         fetchAttractions();
         fetchEntries();
+        fetchAdminWebsites();
         fetchEntryCategories();
         fetchEntryTypes();
         fetchEvents();
@@ -1539,6 +1579,16 @@
     }
     function fetchEntries() {
         loadData("entries", (d) => (entries = d));
+    }
+    async function fetchAdminWebsites() {
+        try {
+            const res = await apiCall("/api/admin/websites");
+            if (!res.ok) return;
+            const data = await res.json();
+            adminWebsites = Array.isArray(data.websites) ? data.websites : [];
+        } catch (e) {
+            console.error(e);
+        }
     }
     function fetchEntryCategories() {
         loadData("entry_categories", (d) => (entryCategories = d));
@@ -2111,8 +2161,8 @@
         return ADMIN_API_LABELS[source] ? source : "";
     }
 
-    function buildDashboardMessages() {
-        /** @type {{ id: string, level: string, text: string, tab?: string, action?: string }[]} */
+    function buildDashboardMessages(websites) {
+        /** @type {{ id: string, level: string, text: string, tab?: string, action?: string, websiteId?: number }[]} */
         const messages = [];
         if (adminOffline) {
             messages.push({
@@ -2174,26 +2224,40 @@
             });
         }
         for (const notice of browserCacheNotices) messages.push(notice);
-        const waiting = listingQueueUnpublished.length + listingQueueMembers.length;
+        const siteRows = Array.isArray(websites) ? websites : [];
+        const waiting =
+            listingQueueUnpublished.length +
+            listingQueueMembers.length +
+            siteRows.length;
         if (listingQueueFetched && !listingQueueError) {
             if (waiting > 0) {
                 messages.push({
                     id: "queue",
                     level: "info",
-                    text: `${listingQueueUnpublished.length} bejegyzés és ${listingQueueMembers.length} tag vár jóváhagyásra.`,
+                    text: `${listingQueueUnpublished.length} bejegyzés, ${listingQueueMembers.length} tag és ${siteRows.length} weboldal vár jóváhagyásra.`,
                 });
             } else {
                 messages.push({
                     id: "queue-ok",
                     level: "success",
-                    text: "Nincs jóváhagyásra váró bejegyzés vagy tag.",
+                    text: "Nincs jóváhagyásra váró bejegyzés, tag vagy weboldal.",
                 });
             }
+        }
+        for (const site of siteRows) {
+            messages.push({
+                id: "website-" + site.id,
+                level: "info",
+                text: `${site.submitter} added ${site.domain}: ${site.title}. ${site.description}`,
+                action: "website",
+                websiteId: site.id,
+            });
         }
         return messages;
     }
 
     $: dashboardMessages = buildDashboardMessages(
+        listingQueueWebsites,
         adminOffline,
         dashboardStatsError,
         settingsLoadError,
@@ -2227,6 +2291,13 @@
     }
 
     /** URLs and long strings in table cells use the same max length as contentPreview. */
+    function formatAdminTime(value) {
+        if (!value) return "—";
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return "—";
+        return d.toLocaleString("hu-HU");
+    }
+
     function urlPreview(url, maxLen = ADMIN_TABLE_PREVIEW_MAX) {
         if (!url || !String(url).trim()) return "—";
         const s = String(url).trim();
@@ -3307,6 +3378,16 @@
             <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
+                class="admin-sidebar-btn {activeTab === 'websites'
+                    ? 'active'
+                    : ''}"
+                on:click={() => goToAdminTab("websites")}
+                title="Weboldalak"
+            >
+                <AdminNavIcon name="websites" />
+            </button>
+
+            <button
                 class="admin-sidebar-btn {activeTab === 'entries'
                     ? 'active'
                     : ''}"
@@ -3477,6 +3558,22 @@
                                         disabled
                                         title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
                                     >Frissítés</button>
+                                {:else if msg.action === "website"}
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        on:click={() => reviewWebsite(msg.websiteId, "approve")}
+                                    >Approve</button>
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        on:click={() => reviewWebsite(msg.websiteId, "reject")}
+                                    >Reject</button>
+                                    <button
+                                        type="button"
+                                        class="admin-alert__btn"
+                                        on:click={() => reviewWebsite(msg.websiteId, "ban")}
+                                    >Ban User</button>
                                 {/if}
                             </div>
                         {/each}
@@ -5715,6 +5812,97 @@
                             (pageEntryCategories = Math.min(
                                 pgEntryCategories.totalPages,
                                 pageEntryCategories + 1,
+                            ))}
+                    />
+                {/if}
+
+                <!-- Weboldalak Tab -->
+                {#if activeTab === "websites"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="admin-alert admin-alert--error" role="alert">
+                            {adminTabError.message}
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Jóváhagyott és várakozó weboldalak. A jóváhagyás, elutasítás és tiltás a vezérlőpult üzeneteiben történik.
+                        </p>
+                    {/if}
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label"
+                            >Keresés
+                            <input
+                                id="search_admin_websites"
+                                name="search_admin_websites"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchAdminWebsites}
+                                on:input={() => (pageAdminWebsites = 1)}
+                                placeholder="Cím, domain, leírás…"
+                            /></label
+                        >
+                    </div>
+                    <AdminPaginationBar
+                        total={pgAdminWebsites.total}
+                        page={pgAdminWebsites.page}
+                        totalPages={pgAdminWebsites.totalPages}
+                        from={pgAdminWebsites.from}
+                        to={pgAdminWebsites.to}
+                        on:prev={() =>
+                            (pageAdminWebsites = Math.max(1, pageAdminWebsites - 1))}
+                        on:next={() =>
+                            (pageAdminWebsites = Math.min(
+                                pgAdminWebsites.totalPages,
+                                pageAdminWebsites + 1,
+                            ))}
+                    />
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Cím</th>
+                                    <th>Domain</th>
+                                    <th>Állapot</th>
+                                    <th>Átvéve</th>
+                                    <th>Leírás</th>
+                                    <th>Beküldő</th>
+                                    <th>Beküldve</th>
+                                    <th>Jóváhagyva</th>
+                                    <th>Jóváhagyta</th>
+                                    <th>URL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each pgAdminWebsites.rows as site}
+                                    <tr>
+                                        <td>{site.title}</td>
+                                        <td>{site.domain}</td>
+                                        <td>{site.status === "approved" ? "Jóváhagyott" : "Jóváhagyásra vár"}</td>
+                                        <td>{site.claimed ? "Átvéve" : "Gazdátlan"}</td>
+                                        <td class="admin-table-cell-preview" title={site.description || ""}>{contentPreview(site.description)}</td>
+                                        <td>{site.submitter || "—"}</td>
+                                        <td>{formatAdminTime(site.submitted_at)}</td>
+                                        <td>{formatAdminTime(site.approved_at)}</td>
+                                        <td>{site.approver || "—"}</td>
+                                        <td class="admin-table-cell-preview" title={site.url || ""}>{urlPreview(site.url)}</td>
+                                    </tr>
+                                {:else}
+                                    <tr><td colspan="10">Nincsenek weboldalak.</td></tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgAdminWebsites.total}
+                        page={pgAdminWebsites.page}
+                        totalPages={pgAdminWebsites.totalPages}
+                        from={pgAdminWebsites.from}
+                        to={pgAdminWebsites.to}
+                        on:prev={() =>
+                            (pageAdminWebsites = Math.max(1, pageAdminWebsites - 1))}
+                        on:next={() =>
+                            (pageAdminWebsites = Math.min(
+                                pgAdminWebsites.totalPages,
+                                pageAdminWebsites + 1,
                             ))}
                     />
                 {/if}

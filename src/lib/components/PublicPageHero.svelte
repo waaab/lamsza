@@ -44,7 +44,11 @@
 {/if}
 
 {#if showTitle}
-    <h1 class="page-title">{displayTitle || (loading ? "…" : "")}</h1>
+    {#if $$slots.title}
+        <slot name="title" />
+    {:else}
+        <h1 class="page-title">{displayTitle || (loading ? "…" : "")}</h1>
+    {/if}
 {/if}
 
 {#if showGreeting && displayGreeting}

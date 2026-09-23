@@ -1,6 +1,7 @@
 package search
 
 import (
+	"backend/internal/account"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/models"
@@ -53,6 +54,8 @@ type UnifiedSearchResult struct {
 	Attractions     []AttractionSearchHit     `json:"attractions"`
 	Venues          []VenueSearchHit          `json:"venues"`
 	HistoricalSeats []HistoricalSeatSearchHit `json:"historical_seats"`
+	Websites        []account.WebsiteHit      `json:"websites"`
+	WebsiteQuery    bool                      `json:"website_query"`
 }
 
 type newsSearchItem struct {
@@ -75,10 +78,13 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			Attractions:     []AttractionSearchHit{},
 			Venues:          []VenueSearchHit{},
 			HistoricalSeats: []HistoricalSeatSearchHit{},
+			Websites:        []account.WebsiteHit{},
+			WebsiteQuery:    false,
 		})
 		return
 	}
 
+	websiteHits, domainQuery, publishedEntryID := account.SearchWebsites(q)
 	normalizedQ := utils.Slugify(q)
 	pattern := "%" + strings.ToLower(q) + "%"
 
@@ -230,6 +236,41 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		if domainQuery {
+			if publishedEntryID <= 0 {
+				return
+			}
+			var e models.Entry
+			var pqLanguages []string
+			var rank float64
+			err := db.DB.QueryRow(`
+				SELECT e.id, COALESCE(typ.name,''), COALESCE(ec.name,''), e.name, e.slug,
+					s.name, s.slug, c.name, c.slug, s.type,
+					COALESCE(s.name_ro,''), COALESCE(s.name_de,''),
+					COALESCE(e.phone,''), COALESCE(e.address,''), COALESCE(e.notes,''),
+					e.languages, COALESCE(e.url,''),
+					EXISTS (
+						SELECT 1 FROM entry_members m
+						WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'
+					) AS claimed,
+					false as is_direct_match,
+					0::float8 as rank
+				FROM entries e
+				JOIN entry_types typ ON typ.id = e.type_id
+				JOIN settlements s ON e.location_id = s.id
+				JOIN counties c ON s.county_id = c.id
+				LEFT JOIN entry_categories ec ON e.category_id = ec.id
+				WHERE e.id = $1 AND e.published = true
+			`, publishedEntryID).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.IsDirectMatch, &rank)
+			if err != nil {
+				log.Printf("UnifiedSearch domain entry error: %v", err)
+				return
+			}
+			e.Languages = pqLanguages
+			e.Type = utils.CanonicalEntryType(e.Type)
+			entries = append(entries, e)
+			return
+		}
 		if normalizedQ == "" {
 			return
 		}
@@ -239,6 +280,10 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 				COALESCE(s.name_ro,''), COALESCE(s.name_de,''),
 				COALESCE(e.phone,''), COALESCE(e.address,''), COALESCE(e.notes,''),
 				e.languages, COALESCE(e.url,''),
+				EXISTS (
+					SELECT 1 FROM entry_members m
+					WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'
+				) AS claimed,
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank
 			FROM entries e
@@ -250,7 +295,11 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
 			  AND e.published = true
-			GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de
+			GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de,
+				EXISTS (
+					SELECT 1 FROM entry_members m
+					WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'
+				)
 			ORDER BY is_direct_match DESC, rank DESC, e.name ASC
 			LIMIT 20
 		`, q, normalizedQ)
@@ -263,7 +312,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			var e models.Entry
 			var pqLanguages []string
 			var rank float64
-			if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.IsDirectMatch, &rank); err == nil {
+			if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.IsDirectMatch, &rank); err == nil {
 				e.Languages = pqLanguages
 				e.Type = utils.CanonicalEntryType(e.Type)
 				entries = append(entries, e)
@@ -359,6 +408,9 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	if seatHits == nil {
 		seatHits = []HistoricalSeatSearchHit{}
 	}
+	if websiteHits == nil {
+		websiteHits = []account.WebsiteHit{}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(UnifiedSearchResult{
@@ -369,5 +421,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		Attractions:     attractionHits,
 		Venues:          venueHits,
 		HistoricalSeats: seatHits,
+		Websites:        websiteHits,
+		WebsiteQuery:    domainQuery,
 	})
 }

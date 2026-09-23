@@ -2,7 +2,8 @@
     import { createEventDispatcher, onDestroy, onMount } from "svelte";
     import { apiFetch } from "$lib/api";
     import EntryCard from "$lib/components/EntryCard.svelte";
-    import { searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import WebsiteCard from "$lib/components/WebsiteCard.svelte";
+    import { locationMenuTowns, searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
     import { isServiceEntry } from "$lib/entryType.js";
     import {
         buildSettlementAnswer,
@@ -18,7 +19,7 @@
     let showDiscover = false;
 
     let searchInputValue = "";
-    let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats }
+    let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats, websites, website_query }
     let suggestions = [];
     let loading = false;
     let searchInputEl;
@@ -37,11 +38,7 @@
     /** @type {null | "services" | "websites"} */
     let resultFilter = null;
     $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
-    $: townChoices = (locations || [])
-        .filter((loc) => String(loc?.type || "") !== "megye" && String(loc?.slug || "").trim())
-        .filter((loc) => loc.slug !== preferredLocation?.slug)
-        .slice()
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "hu"));
+    $: townChoices = locationMenuTowns(locations, preferredLocation);
     $: selectedSlug = selectedLocation?.slug || "";
     $: selectedCounty = selectedLocation?.county_slug || "";
     $: filteredEntries = (searchResults?.entries || []).filter((entry) =>
@@ -61,17 +58,12 @@
         !selectedCounty || item.county_slug === selectedCounty,
     );
     $: serviceEntries = orderedEntries.filter((entry) => isServiceEntry(entry));
-    $: websiteEntries = orderedEntries.filter((entry) => websiteHost(entry?.url) !== "");
-    $: shownWebsites =
-        resultFilter === "websites"
-            ? websiteEntries
-            : resultFilter === "services"
-              ? []
-              : queryLooksLikeWebsite(searchInputValue)
-                ? websiteEntries.filter((entry) => entryUrlMatchesQuery(entry, searchInputValue))
-                : [];
-    $: indexEntries =
-        resultFilter === "services" ? serviceEntries : resultFilter === "websites" ? [] : orderedEntries;
+    $: shownWebsites = resultFilter === "services" ? [] : (searchResults?.websites || []);
+    $: indexEntries = resultFilter === "services"
+        ? serviceEntries
+        : resultFilter === "websites"
+          ? []
+          : orderedEntries;
     $: showBrowseSections = !resultFilter;
     $: hasResults = searchResults && (
         (showBrowseSections && filteredLocations.length > 0) ||
@@ -123,30 +115,6 @@
 
     function toggleResultFilter(kind) {
         resultFilter = resultFilter === kind ? null : kind;
-    }
-
-    function websiteHost(url) {
-        const raw = String(url || "").trim();
-        if (!raw) return "";
-        return raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split(/[/?#]/)[0];
-    }
-
-    function websiteHref(url) {
-        const raw = String(url || "").trim();
-        if (!raw) return "";
-        return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-    }
-
-    function queryLooksLikeWebsite(query) {
-        const value = String(query || "").trim();
-        return value.length > 0 && !/\s/.test(value) && value.includes(".");
-    }
-
-    function entryUrlMatchesQuery(entry, query) {
-        const host = websiteHost(entry?.url).toLowerCase();
-        const needle = websiteHost(query).toLowerCase();
-        if (!host || !needle) return false;
-        return host.includes(needle) || needle.includes(host);
     }
 
     function stopAnswerTyping() {
@@ -239,6 +207,7 @@
                 attractions: [],
                 venues: [],
                 historical_seats: [],
+                websites: [],
             };
         } finally {
             loading = false;
@@ -466,20 +435,12 @@
                             {/if}
                         </div>
                     {/if}
-                    {#if shownWebsites.length > 0}
+                    {#if shownWebsites.length > 0 && (resultFilter === "websites" || searchResults.website_query)}
                         <div class="discover-section">
                             <h4 class="discover-section-title">Weboldalak</h4>
-                            <div class="discover-website-list">
-                                {#each shownWebsites as entry (entry.id)}
-                                    <a
-                                        href={websiteHref(entry.url)}
-                                        class="discover-website-card"
-                                        target="_blank"
-                                        rel="nofollow noopener"
-                                    >
-                                        <span class="discover-website-title">{entry.name}</span>
-                                        <span class="discover-website-host">{websiteHost(entry.url)}</span>
-                                    </a>
+                            <div class="list flex">
+                                {#each shownWebsites as website (website.id)}
+                                    <WebsiteCard {website} />
                                 {/each}
                             </div>
                         </div>
@@ -493,6 +454,17 @@
                             <div class="list flex">
                                 {#each indexEntries as entry (entry.id)}
                                     <EntryCard {entry} />
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if shownWebsites.length > 0 && resultFilter !== "websites" && !searchResults.website_query}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title">Weboldalak</h4>
+                            <div class="list flex">
+                                {#each shownWebsites as website (website.id)}
+                                    <WebsiteCard {website} />
                                 {/each}
                             </div>
                         </div>
@@ -915,33 +887,10 @@
 }
 
 .discover-event-list,
-.discover-news-list,
-.discover-website-list {
+.discover-news-list {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-}
-.discover-website-card {
-    display: block;
-    padding: 0.6rem 0.8rem;
-    background: var(--bg-body);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    text-decoration: none;
-    transition: background 0.2s, border-color 0.2s;
-}
-.discover-website-card:hover {
-    background: var(--tab-hover-bg);
-    border-color: var(--text-muted);
-}
-.discover-website-title {
-    display: block;
-    font-weight: 500;
-}
-.discover-website-host {
-    display: block;
-    color: var(--text-faint);
 }
 .discover-event-card,
 .discover-news-card {

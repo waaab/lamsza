@@ -3,6 +3,7 @@
     import { EMPTY_PLACEHOLDER, displayInitials } from "$lib/displayValue.js";
     import { gallerySlides } from "$lib/entryPhotos.js";
     import { showListingRatings } from "$lib/entryPublicExtras.js";
+    import ClaimMark from "$lib/components/ClaimMark.svelte";
     import EntryStars from "$lib/components/EntryStars.svelte";
 
     /**
@@ -169,6 +170,9 @@
                         {/if}
                         <h3 class="entry-listing__title">
                             <a href={href} class="entry-listing__name">{entry?.name}</a>
+                            {#if !placeholder && !isSettlement}
+                                <ClaimMark claimed={Boolean(entry?.claimed)} />
+                            {/if}
                         </h3>
                     </div>
                     {#if placeLines.length}

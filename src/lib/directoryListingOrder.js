@@ -59,6 +59,22 @@ export function searchPreferredLocation(preferred, loggedIn) {
 }
 
 /**
+ * Towns for the location menu, A–Z, without counties and without the saved place.
+ * The saved place is rendered first by the menu itself and is not selected.
+ *
+ * @param {Array<Record<string, any>> | null | undefined} locations
+ * @param {{ slug?: string } | null | undefined} preferred
+ */
+export function locationMenuTowns(locations, preferred) {
+    const preferredSlug = String(preferred?.slug ?? "").trim();
+    return (locations || [])
+        .filter((loc) => String(loc?.type || "") !== "megye" && String(loc?.slug || "").trim())
+        .filter((loc) => loc.slug !== preferredSlug)
+        .slice()
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "hu"));
+}
+
+/**
  * The place the index location button names.
  * A signed-in user's saved place wins; otherwise the site location.
  *
@@ -135,6 +151,30 @@ export function locationRing(entry, anchor, locations) {
  *   locations?: Array<{ id?: number, slug?: string, type?: string, parent_id?: number | null, county_slug?: string }>,
  * }} [options]
  */
+/**
+ * Same name and newest order as directory listings. Websites have no place,
+ * so the location button does not apply.
+ *
+ * @param {Array<Record<string, any>>} websites
+ * @param {string} [sortMode]
+ */
+export function sortWebsites(websites, sortMode = "title") {
+    const newest = sortMode === "newest";
+    const list = Array.isArray(websites) ? [...websites] : [];
+    list.sort((a, b) => {
+        if (newest) {
+            const byId = Number(b?.id) - Number(a?.id);
+            if (byId !== 0) return byId;
+        }
+        const byTitle = String(a?.title ?? "")
+            .trim()
+            .localeCompare(String(b?.title ?? "").trim(), "hu");
+        if (byTitle !== 0) return byTitle;
+        return Number(a?.id) - Number(b?.id);
+    });
+    return list;
+}
+
 export function sortDirectoryEntries(entries, options = {}) {
     const sortMode = options.sortMode === "newest" ? "newest" : "title";
     const location = options.location?.slug ? options.location : null;

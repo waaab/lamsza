@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import { fade } from "svelte/transition";
     import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import PageFaqDisclaimer from "$lib/components/PageFaqDisclaimer.svelte";
@@ -370,7 +371,7 @@
 <footer>
     <div class="copyright">
         Sok ❤️-el Székelyföldről.
-        © {new Date().getFullYear()} &bull; Na lámsza - Erdélyi magyar startlap
+        © {new Date().getFullYear()} &bull; Na lámsza &bull; Erdélyi magyar startlap
         és kereső. Az internet székely kapuja.
     </div>
     <div class="footer-bottom">

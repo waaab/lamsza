@@ -1,9 +1,13 @@
 <script>
     import { onMount } from "svelte";
+    import { page } from "$app/stores";
+    import AddWebsiteForm from "$lib/components/AddWebsiteForm.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import WebsiteCard from "$lib/components/WebsiteCard.svelte";
+    import ClaimStatusFilter from "$lib/components/ClaimStatusFilter.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
-    import { listingAnchor, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import { locationMenuTowns, searchPreferredLocation, sortDirectoryEntries, sortWebsites } from "$lib/directoryListingOrder.js";
     import { auth } from "$lib/stores/auth";
     import {
         entryMatchesAsideFilters,
@@ -13,6 +17,7 @@
     import {
         canonicalEntryType,
         canonicalEntryTypeKey,
+        filterServiceEntries,
     } from "$lib/entryType.js";
     import {
         canonicalEntryCategory,
@@ -28,32 +33,112 @@
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
     let entries = [];
+    /** @type {Array<{ id: number, title: string, description: string, domain: string, url: string, claimed?: boolean }>} */
+    let websites = [];
     let loading = true;
     let error = null;
+    let addWebsiteOpen = false;
 
     /** @type {string | null} */
     let selectedTypeKey = null;
     /** @type {string | null} */
     let selectedTagKey = null;
+    /** @type {"claimed" | "unclaimed" | null} */
+    let serviceClaimFilter = null;
+    /** @type {"claimed" | "unclaimed" | null} */
+    let websiteClaimFilter = null;
 
-    let viewMode = "grid";
+    /** @param {Record<string, any>} item @param {"claimed" | "unclaimed" | null} filter */
+    function matchesClaim(item, filter) {
+        if (filter === "claimed") return Boolean(item?.claimed);
+        if (filter === "unclaimed") return !item?.claimed;
+        return true;
+    }
+
+    let serviceViewMode = "grid";
+    let websiteViewMode = "flex";
     let currentCategory = "osszes";
-    let visibleCount = 12;
-    let sortMode = "title";
-    let sortOpen = false;
-    let locationOrderOn = false;
+    let visibleServiceCount = 12;
+    let visibleWebsiteCount = 12;
+    let serviceSortMode = "title";
+    let websiteSortMode = "title";
+    /** @type {"services" | "websites" | null} */
+    let sortMenuKey = null;
     /** @type {{ slug: string, name: string, county_slug: string } | null} */
-    let siteLocation = null;
+    let selectedPlace = null;
+    /** @type {string | null} */
+    let locationMenuKey = null;
     /** @type {Array<Record<string, any>>} */
     let locations = [];
 
     const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
 
-    $: listingLocation = listingAnchor(siteLocation, $auth.preferredLocation, $auth.loggedIn);
+    $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
+    $: townChoices = locationMenuTowns(locations, preferredLocation);
+    $: indexView =
+        $page.url.pathname === "/index/weboldalak"
+            ? "websites"
+            : $page.url.pathname === "/index/szolgaltatasok"
+              ? "services"
+              : "all";
+    $: viewEntries = filterServiceEntries(entries);
 
-    function setSortMode(mode) {
-        sortMode = mode;
-        sortOpen = false;
+    /**
+     * @param {"services" | "websites"} kind
+     * @param {"title" | "newest"} mode
+     */
+    function setSortMode(kind, mode) {
+        if (kind === "websites") websiteSortMode = mode;
+        else serviceSortMode = mode;
+        sortMenuKey = null;
+        locationMenuKey = null;
+    }
+
+    /** @param {"services" | "websites"} kind */
+    function toggleSortMenu(kind) {
+        sortMenuKey = sortMenuKey === kind ? null : kind;
+        locationMenuKey = null;
+    }
+
+    /**
+     * @param {"services" | "websites"} kind
+     * @param {"grid" | "flex"} mode
+     */
+    function setViewMode(kind, mode) {
+        if (kind === "websites") websiteViewMode = mode;
+        else serviceViewMode = mode;
+    }
+
+    /** @param {string} key */
+    function toggleLocationMenu(key) {
+        locationMenuKey = locationMenuKey === key ? null : key;
+        sortMenuKey = null;
+    }
+
+    /** @param {Record<string, any>} loc */
+    function choosePlace(loc) {
+        const slug = String(loc?.slug || "").trim();
+        if (!slug) return;
+        selectedPlace = {
+            slug,
+            name: String(loc?.name || "").trim() || slug,
+            county_slug: String(loc?.county_slug || "").trim(),
+        };
+        locationMenuKey = null;
+    }
+
+    /** @param {PointerEvent} event */
+    function handleWindowPointerDown(event) {
+        const target = event.target;
+        if (!locationMenuKey) return;
+        if (target instanceof Element && target.closest(".index-location")) return;
+        locationMenuKey = null;
+    }
+
+    /** @param {Record<string, any>} entry @param {{ slug?: string } | null} place */
+    function matchesPlace(entry, place) {
+        if (!place?.slug) return true;
+        return String(entry?.location_slug || "") === place.slug;
     }
 
     function scrollToTop() {
@@ -67,28 +152,42 @@
         currentCategory !== "osszes" ||
         selectedTypeKey != null ||
         selectedTagKey != null ||
-        locationOrderOn;
+        serviceClaimFilter != null ||
+        selectedPlace != null;
 
     function clearAllFilters() {
         currentCategory = "osszes";
         selectedTypeKey = null;
         selectedTagKey = null;
-        locationOrderOn = false;
+        serviceClaimFilter = null;
+        websiteClaimFilter = null;
+        selectedPlace = null;
+        locationMenuKey = null;
         scrollToTop();
     }
 
-    function toggleLocationOrder() {
-        locationOrderOn = !locationOrderOn;
-        sortOpen = false;
-        scrollToTop();
-    }
-
-    $: filteredEntries = entries.filter(
+    $: filteredEntries = viewEntries.filter(
         (e) =>
             (currentCategory === "osszes" ||
                 entryMatchesCategory(e, currentCategory)) &&
-            entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey),
+            entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey) &&
+            matchesPlace(e, selectedPlace) &&
+            matchesClaim(e, serviceClaimFilter),
     );
+    $: serviceClaimCounts = {
+        claimed: viewEntries.filter((e) =>
+            (currentCategory === "osszes" || entryMatchesCategory(e, currentCategory)) &&
+            entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey) &&
+            matchesPlace(e, selectedPlace) &&
+            e.claimed,
+        ).length,
+        unclaimed: viewEntries.filter((e) =>
+            (currentCategory === "osszes" || entryMatchesCategory(e, currentCategory)) &&
+            entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey) &&
+            matchesPlace(e, selectedPlace) &&
+            !e.claimed,
+        ).length,
+    };
 
     $: categoryFilterLabel =
         currentCategory === "osszes"
@@ -115,24 +214,35 @@
         }
         return selectedTagKey;
     })();
-    $: sortedEntries = sortDirectoryEntries(filteredEntries, {
-        sortMode,
-        location: locationOrderOn ? listingLocation : null,
-        locations,
-    });
+    $: sortedEntries = sortDirectoryEntries(filteredEntries, { sortMode: serviceSortMode });
     $: totalCount = sortedEntries.length;
-    $: displayItems = sortedEntries.slice(0, visibleCount);
+    $: displayItems = sortedEntries.slice(0, visibleServiceCount);
+    $: filteredWebsites = websites.filter((site) => matchesClaim(site, websiteClaimFilter));
+    $: sortedWebsites = sortWebsites(filteredWebsites, websiteSortMode);
+    $: websiteClaimCounts = {
+        claimed: websites.filter((site) => site.claimed).length,
+        unclaimed: websites.filter((site) => !site.claimed).length,
+    };
+    $: displayWebsites = sortedWebsites.slice(0, visibleWebsiteCount);
 
-    function loadMore() {
-        visibleCount += 12;
+    function loadMoreServices() {
+        visibleServiceCount += 12;
+    }
+
+    function loadMoreWebsites() {
+        visibleWebsiteCount += 12;
     }
 
     $: {
         currentCategory;
         selectedTypeKey;
         selectedTagKey;
-        locationOrderOn;
-        visibleCount = 12;
+        serviceClaimFilter;
+        websiteClaimFilter;
+        selectedPlace;
+        indexView;
+        visibleServiceCount = 12;
+        visibleWebsiteCount = 12;
     }
 
     onMount(() => {
@@ -141,21 +251,15 @@
         });
         (async () => {
             try {
-                const [directory, config, locs] = await Promise.all([
+                const [directory, locs, websitesData] = await Promise.all([
                     apiFetch("/api/directory"),
-                    apiFetch("/api/config/public"),
                     apiFetch("/api/locations"),
+                    apiFetch("/api/websites"),
                 ]);
                 entries = directory || [];
+                websites = websitesData?.websites || [];
                 dynamicCategories = directoryCategoryTabs(entries);
                 locations = Array.isArray(locs) ? locs : [];
-                if (config?.my_location_slug) {
-                    siteLocation = {
-                        slug: config.my_location_slug,
-                        name: config.my_location_name || config.my_location_slug,
-                        county_slug: config.my_location_county_slug || "",
-                    };
-                }
             } catch (err) {
                 console.error(err);
                 error = "Hiba történt az adatok betöltésekor.";
@@ -167,35 +271,80 @@
 </script>
 
 <PublicPageHero
-    title={pageHeader.title}
-    greeting={pageHeader.greeting}
+    title="Index"
+    greeting={indexView === "services"
+        ? "Helyi szolgáltatások: szakemberek, üzletek és intézmények"
+        : indexView === "websites"
+          ? "Helyi weboldalak: no categories defined yet but soon"
+          : pageHeader.greeting}
     loading={pageHeaderLoading}
-    breadcrumbLabel="Index"
-    breadcrumbParentLabel=""
-    breadcrumbParentUrl=""
+    breadcrumbLabel={indexView === "websites"
+        ? "Weboldalak"
+        : indexView === "services"
+          ? "Szolgáltatások"
+          : "Index"}
+    breadcrumbParentLabel={indexView === "all" ? "" : "Index"}
+    breadcrumbParentUrl={indexView === "all" ? "" : "/index"}
     documentTitleSuffix=" - Székely Gugel"
-/>
-
-<div class="header-tabs">
-    <span class="header-tabs-label" aria-label="Kiemelt Kategóriák">Kiemelt Kategóriák:</span>
-    {#if loading}
-        <span class="btn btn--loading">Szűrők betöltése…</span>
-    {:else}
-        <div class="header-tabs-filters-row">
-            {#each dynamicCategories as cat}
-                <button
-                    class="btn btn-md {cat.id === currentCategory ? 'active' : ''}"
-                    on:click={() => (currentCategory = cat.id)}>{cat.label}</button
-                >
-            {/each}
+>
+    <div slot="title" class="index-heading">
+        <div class="index-heading__titles">
+            <h1 class="page-title">
+                {#if indexView === "all"}
+                    Index
+                {:else}
+                    <a href="/index">Index</a>
+                {/if}
+            </h1>
+            <a
+                href="/index/szolgaltatasok"
+                class="index-heading__link"
+                class:active={indexView === "services"}
+                aria-current={indexView === "services" ? "page" : undefined}
+            >Szolgáltatások</a>
+            <a
+                href="/index/weboldalak"
+                class="index-heading__link"
+                class:active={indexView === "websites"}
+                aria-current={indexView === "websites" ? "page" : undefined}
+            >Weboldalak</a>
         </div>
-    {/if}
-</div>
-{#snippet indexFilterBar()}
+        <div class="index-heading__add">
+            <button
+                type="button"
+                class="btn btn-primary btn-lg"
+                on:click={() => (addWebsiteOpen = true)}
+            >Add hozzá a weboldalad</button>
+            <p>
+                Ingyenes. A webcím, a cím és egy rövid leírás kell. Az admin jóváhagyása után a weboldal megjelenik az indexen.
+            </p>
+        </div>
+    </div>
+</PublicPageHero>
+
+{#if addWebsiteOpen}
+    <AddWebsiteForm onClose={() => (addWebsiteOpen = false)} />
+{/if}
+
+<svelte:window on:pointerdown={handleWindowPointerDown} />
+
+{#snippet indexFilterBar(kind, bar)}
     <div class="filter-actions">
         <span class="info-box">
             <p>
-                {#if !hasActiveFilters}
+                {#if kind === "websites" && !websiteClaimFilter}
+                    💡 Leszűrve: <span class="active">Összes</span>
+                {:else if kind === "websites"}
+                    🔍 Szűrők:
+                    <span class="active">{websiteClaimFilter === "claimed" ? "Átvéve" : "Gazdátlan"}</span>
+                    <button
+                        type="button"
+                        class="clear-filters btn btn-xs"
+                        aria-label="Szűrők törlése"
+                        title="Szűrők törlése"
+                        on:click={() => (websiteClaimFilter = null)}>Szűrő törlése</button
+                    >
+                {:else if !hasActiveFilters}
                     💡 Leszűrve: <span class="active">Összes</span>
                 {:else}
                     🔍 Szűrők:
@@ -213,11 +362,17 @@
                             >{/if}
                         <span class="active">{tagFilterLabel}</span>
                     {/if}
-                    {#if locationOrderOn && listingLocation}
+                    {#if serviceClaimFilter}
                         {#if currentCategory !== "osszes" || typeFilterLabel || tagFilterLabel}<span
                                 class="filter-sep">·</span
                             >{/if}
-                        <span class="active">{listingLocation.name}</span>
+                        <span class="active">{serviceClaimFilter === "claimed" ? "Átvéve" : "Gazdátlan"}</span>
+                    {/if}
+                    {#if selectedPlace}
+                        {#if currentCategory !== "osszes" || typeFilterLabel || tagFilterLabel || serviceClaimFilter}<span
+                                class="filter-sep">·</span
+                            >{/if}
+                        <span class="active">{selectedPlace.name}</span>
                     {/if}
                     <button
                         type="button"
@@ -228,20 +383,24 @@
                     >
                 {/if}
             </p>
-            <p><span>({displayItems.length}/{totalCount})</span></p>
+            <p><span>({kind === "websites" ? displayWebsites.length : displayItems.length}/{kind === "websites" ? sortedWebsites.length : totalCount})</span></p>
         </span>
 
         <div class="view-mode-toggle">
-            {#if listingLocation}
+            <div class="index-location">
                 <button
                     type="button"
                     class="btn btn-sm"
-                    class:active={locationOrderOn}
-                    aria-pressed={locationOrderOn}
-                    title={locationOrderOn
-                        ? `${listingLocation.name}: először itt, aztán a környék, majd távolabb. Név szerint minden sávban.`
-                        : `Közelség szerint: ${listingLocation.name}`}
-                    on:click={toggleLocationOrder}
+                    class:active={kind !== "websites" && !!selectedPlace}
+                    disabled={kind === "websites"}
+                    aria-expanded={kind !== "websites" && locationMenuKey === `${kind}:${bar}`}
+                    aria-haspopup={kind === "websites" ? undefined : "listbox"}
+                    title={kind === "websites"
+                        ? "A weboldalak település szerint még nem szűrhetők."
+                        : selectedPlace
+                          ? selectedPlace.name
+                          : "Település"}
+                    on:click={() => toggleLocationMenu(`${kind}:${bar}`)}
                 >
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -260,11 +419,43 @@
                             r="3"
                         ></circle></svg
                     >
-                    <span>{listingLocation.name}</span>
+                    <span>{kind !== "websites" && selectedPlace ? selectedPlace.name : "Település"}</span>
                 </button>
-            {/if}
+                {#if kind !== "websites" && locationMenuKey === `${kind}:${bar}`}
+                    <ul class="index-location-menu" role="listbox">
+                        {#if preferredLocation}
+                            <li>
+                                <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected={selectedPlace?.slug === preferredLocation.slug}
+                                    on:click={() => choosePlace(preferredLocation)}
+                                >
+                                    <span class="index-location-option-label">Településem</span>
+                                    <span>{preferredLocation.name}</span>
+                                </button>
+                            </li>
+                        {/if}
+                        {#each townChoices as town (town.slug + town.county_slug)}
+                            <li>
+                                <button
+                                    type="button"
+                                    role="option"
+                                    aria-selected={selectedPlace?.slug === town.slug}
+                                    on:click={() => choosePlace(town)}
+                                >
+                                    <span>{town.name}</span>
+                                    {#if town.county}
+                                        <span class="index-location-option-meta">{town.county}</span>
+                                    {/if}
+                                </button>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
             <div class="sort-toggle">
-                <button class="btn btn-sm" on:click={() => (sortOpen = !sortOpen)}>
+                <button class="btn btn-sm" on:click={() => toggleSortMenu(kind)}>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="16"
@@ -285,26 +476,26 @@
                         ></polyline><line x1="18" y1="10" x2="18" y2="18"
                         ></line></svg
                     >
-                    <span>{sortLabels[sortMode]}</span>
+                    <span>{sortLabels[kind === "websites" ? websiteSortMode : serviceSortMode]}</span>
                 </button>
-                {#if sortOpen}
+                {#if sortMenuKey === kind}
                     <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
                     <div class="sort-toggle-menu" on:click|stopPropagation>
                         <button
-                            class:active={sortMode === "title"}
-                            on:click={() => setSortMode("title")}>Név (A→Z)</button
+                            class:active={(kind === "websites" ? websiteSortMode : serviceSortMode) === "title"}
+                            on:click={() => setSortMode(kind, "title")}>Név (A→Z)</button
                         >
                         <button
-                            class:active={sortMode === "newest"}
-                            on:click={() => setSortMode("newest")}>Legújabb</button
+                            class:active={(kind === "websites" ? websiteSortMode : serviceSortMode) === "newest"}
+                            on:click={() => setSortMode(kind, "newest")}>Legújabb</button
                         >
                     </div>
                 {/if}
             </div>
 
             <button
-                class="btn btn-sm {viewMode === 'grid' ? 'active' : ''}"
-                on:click={() => (viewMode = "grid")}
+                class="btn btn-sm {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'grid' ? 'active' : ''}"
+                on:click={() => setViewMode(kind, "grid")}
                 title="Rács nézet"
             >
                 <svg
@@ -332,8 +523,8 @@
                 <span>Rács</span>
             </button>
             <button
-                class="btn btn-sm {viewMode === 'flex' ? 'active' : ''}"
-                on:click={() => (viewMode = "flex")}
+                class="btn btn-sm {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'flex' ? 'active' : ''}"
+                on:click={() => setViewMode(kind, "flex")}
                 title="Lista nézet"
             >
                 <svg
@@ -369,77 +560,127 @@
     </div>
 {/snippet}
 
-{@render indexFilterBar()}
-
-<div class="list-page-layout">
-    <section class="list">
-        {#if loading}
-            <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-                {#each Array(6) as _, i (i)}
-                    <EntryCard placeholder layout={viewMode === "grid" ? "grid" : "list"} />
-                {/each}
-            </div>
-        {:else if error}
-            <span class="info-box error">
-                <p>{error}</p>
-            </span>
-        {:else if displayItems.length === 0}
-            <span class="info-box info"
-                ><p>Nincs megjeleníthető bejegyzés.</p></span
-            >
+{#snippet directoryBlock(kind)}
+<section class="index-directory" aria-label={kind === "websites" ? "Weboldalak" : "Szolgáltatások"}>
+    <h2 class="index-directory__title">{kind === "websites" ? "Weboldalak" : "Szolgáltatások"}</h2>
+    <div class="header-tabs">
+        <span class="header-tabs-label" aria-label="Kiemelt Kategóriák">Kiemelt Kategóriák:</span>
+        {#if kind === "websites"}
+            <div class="header-tabs-filters-row"></div>
+        {:else if loading}
+            <span class="btn btn--loading">Szűrők betöltése…</span>
         {:else}
-            <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
-                {#each displayItems as entry}
-                    <EntryCard {entry} layout={viewMode === "grid" ? "grid" : "list"} />
+            <div class="header-tabs-filters-row">
+                {#each dynamicCategories as cat}
+                    <button
+                        class="btn btn-md {cat.id === currentCategory ? 'active' : ''}"
+                        on:click={() => (currentCategory = cat.id)}>{cat.label}</button
+                    >
                 {/each}
             </div>
-            {#if visibleCount < totalCount}
-                <div class="load-more">
-                    <button class="btn nav-btn" on:click={loadMore}
-                        >Több betöltése ↓</button
-                    >
-                </div>
-            {/if}
         {/if}
-    </section>
-
-    <aside class="sidebar index-tags-sidebar" aria-label="Címkék">
-        <div class="sidebar-box">
-            <div class="sidebar-header">
-                <h4 class="sidebar-heading">Címkék</h4>
-            </div>
-            {#if loading}
-                <div
-                    class="index-tags-aside-skeleton"
-                    aria-busy="true"
-                    aria-label="Címkék betöltése"
-                >
-                    <div class="index-tags-aside-skeleton__row">
-                        {#each Array(8) as _}
-                            <span class="skeleton index-tags-aside-skeleton__chip"></span>
+    </div>
+    {@render indexFilterBar(kind, "start")}
+    <div class="list-page-layout">
+        <section class="list">
+            {#if kind === "websites"}
+                {#if loading}
+                    <div class="list {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'grid' ? 'grid' : 'flex'}">
+                        {#each Array(6) as _, i (i)}
+                            <EntryCard placeholder layout={(kind === "websites" ? websiteViewMode : serviceViewMode) === "grid" ? "grid" : "list"} />
                         {/each}
                     </div>
-                    <div class="index-tags-aside-skeleton__row">
-                        {#each Array(6) as _}
-                            <span class="skeleton index-tags-aside-skeleton__chip"></span>
+                {:else if error}
+                    <span class="info-box error"><p>{error}</p></span>
+                {:else if displayWebsites.length === 0}
+                    <span class="info-box info"><p>{websites.length === 0 ? "Még nincs jóváhagyott weboldal." : "Nincs találat a szűrésre."}</p></span>
+                {:else}
+                    <div class="list {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'grid' ? 'grid' : 'flex'}">
+                        {#each displayWebsites as website (website.id)}
+                            <WebsiteCard {website} />
                         {/each}
                     </div>
+                    {#if visibleWebsiteCount < sortedWebsites.length}
+                        <div class="load-more">
+                            <button class="btn nav-btn" on:click={loadMoreWebsites}>Több betöltése ↓</button>
+                        </div>
+                    {/if}
+                {/if}
+            {:else if loading}
+                <div class="list {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'grid' ? 'grid' : 'flex'}">
+                    {#each Array(6) as _, i (i)}
+                        <EntryCard placeholder layout={(kind === "websites" ? websiteViewMode : serviceViewMode) === "grid" ? "grid" : "list"} />
+                    {/each}
                 </div>
             {:else if error}
-                <p class="index-tags-aside__empty">Nem sikerült betölteni a címkéket.</p>
+                <span class="info-box error"><p>{error}</p></span>
+            {:else if displayItems.length === 0}
+                <span class="info-box info"><p>Nincs megjeleníthető szolgáltatás.</p></span>
             {:else}
-                <IndexTagAside
-                    bind:selectedTypeKey
-                    bind:selectedTagKey
-                    {entries}
-                />
+                <div class="list {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'grid' ? 'grid' : 'flex'}">
+                    {#each displayItems as entry}
+                        <EntryCard {entry} layout={(kind === "websites" ? websiteViewMode : serviceViewMode) === "grid" ? "grid" : "list"} />
+                    {/each}
+                </div>
+                {#if visibleServiceCount < totalCount}
+                    <div class="load-more">
+                        <button class="btn nav-btn" on:click={loadMoreServices}>Több betöltése ↓</button>
+                    </div>
+                {/if}
             {/if}
-        </div>
-    </aside>
-</div>
+        </section>
+        <aside class="sidebar index-tags-sidebar" aria-label={kind === "websites" ? "Weboldalak" : "Szolgáltatások"}>
+            <div class="sidebar-box">
+                <div class="sidebar-header">
+                    <h4 class="sidebar-heading">{kind === "websites" ? "Weboldalak" : "Szolgáltatások"}</h4>
+                </div>
+                {#if kind === "websites"}
+                    <ClaimStatusFilter
+                        bind:value={websiteClaimFilter}
+                        claimedCount={websiteClaimCounts.claimed}
+                        unclaimedCount={websiteClaimCounts.unclaimed}
+                    />
+                {:else if loading}
+                    <div class="index-tags-aside-skeleton" aria-busy="true" aria-label="Címkék betöltése">
+                        <div class="index-tags-aside-skeleton__row">
+                            {#each Array(8) as _}
+                                <span class="skeleton index-tags-aside-skeleton__chip"></span>
+                            {/each}
+                        </div>
+                        <div class="index-tags-aside-skeleton__row">
+                            {#each Array(6) as _}
+                                <span class="skeleton index-tags-aside-skeleton__chip"></span>
+                            {/each}
+                        </div>
+                    </div>
+                {:else if error}
+                    <p class="index-tags-aside__empty">Nem sikerült betölteni a címkéket.</p>
+                {:else}
+                    <IndexTagAside
+                        bind:selectedTypeKey
+                        bind:selectedTagKey
+                        bind:claimFilter={serviceClaimFilter}
+                        claimedCount={serviceClaimCounts.claimed}
+                        unclaimedCount={serviceClaimCounts.unclaimed}
+                        entries={viewEntries}
+                    />
+                {/if}
+            </div>
+        </aside>
+    </div>
+    {@render indexFilterBar(kind, "end")}
+</section>
+{/snippet}
 
-{@render indexFilterBar()}
+{#if indexView !== "websites"}
+    {@render directoryBlock("services")}
+{/if}
+{#if indexView !== "services"}
+    {@render directoryBlock("websites")}
+{/if}
 
+
+{#if indexView !== "websites"}
 <section class="index-stats-section">
     <h2 class="index-stats-section-title">Index statisztikák:</h2>
     <div class="index-stats-items">
@@ -468,7 +709,71 @@
         </div>
     </div>
 </section>
+{/if}
 <style>
+    .index-directory + .index-directory {
+        margin-top: 2.5rem;
+    }
+
+    .index-directory__title {
+        margin: 0 0 0.75rem;
+        font-size: var(--text-lg);
+        color: var(--text-secondary);
+    }
+
+    .index-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .index-heading__titles {
+        display: flex;
+        align-items: baseline;
+        flex-wrap: wrap;
+        gap: 0.35rem 1.25rem;
+        min-width: 0;
+    }
+
+    .index-heading__titles .page-title {
+        margin: 0;
+    }
+
+    .index-heading__titles .page-title a {
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .index-heading__link {
+        font-size: var(--text-xl);
+        font-weight: 600;
+        color: var(--text-muted);
+        text-decoration: none;
+    }
+
+    .index-heading__link.active {
+        color: var(--szekely-green);
+    }
+
+    .index-heading__add {
+        margin-left: auto;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 0.45rem;
+        max-width: 28rem;
+        text-align: right;
+    }
+
+    .index-heading__add p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: var(--text-sm);
+        line-height: 1.4;
+    }
 
 .index-stats-items{
     display: flex;

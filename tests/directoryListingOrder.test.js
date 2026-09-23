@@ -3,9 +3,11 @@ import { test } from "node:test";
 import {
     compareEntryNames,
     listingAnchor,
+    locationMenuTowns,
     searchPreferredLocation,
     locationRing,
     sortDirectoryEntries,
+    sortWebsites,
 } from "../src/lib/directoryListingOrder.js";
 
 const locations = [
@@ -70,6 +72,14 @@ test("without a location anchor, order stays name A-Z across places", () => {
     assert.equal(ordered[0].id, 6);
 });
 
+test("the location menu keeps the saved place out of the A-Z towns", () => {
+    const towns = locationMenuTowns(locations, { slug: "csikszereda", name: "Csíkszereda" });
+    assert.deepEqual(
+        towns.map((town) => town.slug),
+        ["kezdioroszfalu", "kezdivasarhely", "kovaszna", "nyujtod", "szekelyudvarhely"],
+    );
+});
+
 test("a signed-in user's saved place stays available for the location menu", () => {
     const saved = { slug: "csikszereda", name: "Csíkszereda", county_slug: "hargita" };
     assert.equal(searchPreferredLocation(saved, false), null);
@@ -84,4 +94,20 @@ test("listing anchor prefers the saved place, then the site location", () => {
     assert.equal(listingAnchor(site, saved, true)?.name, "Csíkszereda");
     assert.equal(listingAnchor(site, null, true)?.name, "Kézdivásárhely");
     assert.equal(listingAnchor(null, null, false), null);
+});
+
+test("website name order uses the title, and newest uses id", () => {
+    const sites = [
+        { id: 1, title: " Axil" },
+        { id: 3, title: "Zeta" },
+        { id: 2, title: "Bogozi" },
+    ];
+    assert.deepEqual(
+        sortWebsites(sites, "title").map((site) => site.id),
+        [1, 2, 3],
+    );
+    assert.deepEqual(
+        sortWebsites(sites, "newest").map((site) => site.id),
+        [3, 2, 1],
+    );
 });

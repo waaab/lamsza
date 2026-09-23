@@ -38,6 +38,7 @@ func main() {
 	events.Migrate()
 	auth.Migrate()
 	account.Migrate()
+	account.MigrateWebsites()
 
 	mux := http.DefaultServeMux
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
@@ -56,6 +57,7 @@ func main() {
 	mux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
 	mux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	mux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
+	mux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
 
 	// Core Module (Always Enabled)
 	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
@@ -68,6 +70,7 @@ func main() {
 	mux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	mux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	mux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
+	mux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
 	mux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
 	mux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	mux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))

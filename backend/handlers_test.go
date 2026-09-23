@@ -39,6 +39,7 @@ func init() {
 	events.Migrate()
 	auth.Migrate()
 	account.Migrate()
+	account.MigrateWebsites()
 
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
 		return middleware.ApplyCORS(auth.RequireAdmin(h))
@@ -57,6 +58,7 @@ func init() {
 	testMux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
 	testMux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
 	testMux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
+	testMux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
@@ -67,6 +69,7 @@ func init() {
 	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
+	testMux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
 	testMux.HandleFunc("/api/admin/entries", middleware.ApplyCORS(handlers.HandleAdminEntries))
 	testMux.HandleFunc("/api/admin/entry_categories", middleware.ApplyCORS(handlers.HandleAdminEntryCategories))
 	testMux.HandleFunc("/api/admin/entry_types", middleware.ApplyCORS(handlers.HandleAdminEntryTypes))
@@ -88,6 +91,7 @@ func init() {
 	testMux.HandleFunc("/api/admin/quick_links", middleware.ApplyCORS(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
+	testMux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
 
 	testAdminCookie = mustLogin("admin@test.lamsza")
 }
