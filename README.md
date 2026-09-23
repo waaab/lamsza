@@ -3,7 +3,7 @@
 A high-performance, culturally authentic startpage and directory for the Szekely region.
 
 ## Overview
-Lamsza is a full-stack platform featuring a local service directory with advanced bilingual search, real-time weather, news aggregation, and a random quote ("mondás") system.
+Lamsza is a full-stack platform: a local directory of services and websites, bilingual search, weather, news, events, and a daily quote ("mondás"). Signed-in people have a Fiók page, settings, and favorite places. The published product version is the first entry in `src/lib/publicChangelog.js` (currently v1.2.0). The footer and `/valtozasnaplo` both read that list.
 
 ## Tech Stack
 - **Frontend**: SvelteKit (Vanilla CSS & JS)
@@ -28,4 +28,3 @@ Lamsza is a full-stack platform featuring a local service directory with advance
 
 ## Architecture
 See [architecture_overview.md](architecture_overview.md) for a detailed breakdown.
-鼓

@@ -2,6 +2,7 @@
     import { onMount } from "svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+    import { PUBLIC_CHANGELOG } from "$lib/publicChangelog.js";
 
     let pageHeader = initialPageHeader("valtozasnaplo");
     let pageHeaderLoading = false;
@@ -30,80 +31,21 @@
 <section class="faq" id="gyik">
     <h2 class="faq-title">Aplikáció verziók</h2>
     <div class="faq-list">
-        <details class="faq-item" open>
-            <summary>v1.1.0 - 2026. március 6.</summary>
-            <ul>
-                <li>
-                    <strong>Moduláris felépítés</strong>: A háttérrendszer
-                    mostantól modulokra oszlik, így könnyebben fejleszthető és
-                    karbantartható.
-                </li>
-                <li>
-                    <strong>Funkció-kapcsolók</strong>: Bizonyos funkciók (pl.
-                    események, hírek) mostantól egyetlen kattintással
-                    kikapcsolhatóak a beállításaokban, ha nincs rájuk szükség.
-                </li>
-                <li>
-                    <strong>Rendszertakarítás</strong>: A belső kódstruktúra
-                    optimalizálva lett a gyorsabb és megbízhatóbb működés
-                    érdekében.
-                </li>
-                <li>Helyreigazított automatikus tesztelési folyamat.</li>
-            </ul>
-        </details>
-
-        <details class="faq-item">
-            <summary>v1.0.0 - 2026. március 1.</summary>
-            <ul>
-                <li>Teljes újraindítás - a Székely Gugel él és virul!</li>
-                <li>
-                    Helyi kereső: kereshetsz orvosra, iskolára, mesteremberre és
-                    hivatalra
-                </li>
-                <li>Időjárás jelenlegi helyi adatok alapján</li>
-                <li>Friss hírek erdélyi forrásokból</li>
-                <li>Gyorslinkek rács</li>
-                <li>Székely mondás naponta</li>
-                <li>Sötét / Világos / Rendszer alapú témavalásztó</li>
-                <li>Szolgáltatások oldal kategóriák szerint szűrhető</li>
-            </ul>
-        </details>
-
-        <details class="faq-item">
-            <summary>v0.9.5 - 2026. február 28.</summary>
-            <ul>
-                <li>Alap elrendezés és fejléc kialakítva</li>
-                <li>
-                    Keresősáv hozzáadva Google, Bing, DuckDuckGo és Yandex
-                    gombokkal
-                </li>
-                <li>Székely mondások megjelennek a főoldal alján</li>
-                <li>Teljesen reszponzív, mobil-barát elrendezés</li>
-            </ul>
-        </details>
-
-        <details class="faq-item">
-            <summary>v0.9.0 - 2026. február 20.</summary>
-            <ul>
-                <li>Kezdeti dizájn és alapok letéve</li>
-                <li>Székely színvilág és tipográfia meghatározva</li>
-                <li>SvelteKit + Go backend elindítva</li>
-            </ul>
-        </details>
-
-        <details class="faq-item">
-            <summary>v0.8.0 - 2026. február 12.</summary>
-            <ul>
-                <li>PostgreSQL adatbázis felállítva</li>
-                <li>Első API végpontok elkészültek</li>
-            </ul>
-        </details>
-
-        <details class="faq-item">
-            <summary>v0.7.0 - 2026. február 1.</summary>
-            <ul>
-                <li>A projekt elindult - „Na lámsza, csináljuk meg!"</li>
-            </ul>
-        </details>
+        {#each PUBLIC_CHANGELOG as entry, index (entry.version)}
+            <details class="faq-item" open={index === 0}>
+                <summary>v{entry.version} - {entry.date}</summary>
+                <ul>
+                    {#each entry.items as item}
+                        <li>
+                            {#if typeof item === "string"}
+                                {item}
+                            {:else}
+                                <strong>{item.lead}</strong>: {item.text}
+                            {/if}
+                        </li>
+                    {/each}
+                </ul>
+            </details>
+        {/each}
     </div>
 </section>

@@ -68,11 +68,12 @@ Primary use case: every new browser tab + browsing local entries.
 **Changelog & Versioning**
 - User-facing changelog page: /valtozasnaplo (simple list of versions + changes in Hungarian)
 - Technical changelog.md (in root or docs/, for developers only – not public)
-- Footer shows current version with link to changelog (e.g. v1.0.0 | Változásnapló)
+- Footer version is the newest entry in `src/lib/publicChangelog.js`. Adding a release at the top of that list updates the footer and the public page together. Current published version: v1.2.0.
 
-**Non-Goals for v1.0**
-- Google Sign-In / user accounts (defer to v1.2)
-- Custom user links / saved favorites
+**Non-Goals for v1.0** (shipped later, in v1.2.0)
+- Google Sign-In, the Fiók page, and user settings (theme, quick links, saved settlement)
+- Custom user links and saved favorites
+- Homepage weather follows the saved settlement, not the favorite list
 
 **Success Criteria for v1.0**
 - Extension overrides new tab correctly

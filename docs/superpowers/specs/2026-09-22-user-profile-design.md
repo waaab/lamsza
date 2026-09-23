@@ -2,6 +2,8 @@
 
 Date: 2026-09-22
 
+**Later change (24 Sep 2026):** the homepage weather and events ticker follow the saved settlement in user settings (`users.preferred_settlement_id`), not favorite settlements. Favorite látnivalók with coordinates can still add a weather widget. The account page is `/fiok`, not `/profil`.
+
 ## Problem
 
 A signed-in Google account stores a name, an email, and login timestamps. Theme, homepage link slot count, personal homepage links, and recently opened listings live only in this browser. Directory listings have no owner. The public **Ellenőrzött** badge is the `claimed` column, so “someone owns this” and “an admin checked this” are the same flag. The homepage weather widget and events ticker follow one site-wide settlement (`my_location_slug`, default Csíkszereda).
@@ -46,12 +48,12 @@ A favorite is one of: settlement, látnivaló (attraction), listing, or event. T
 
 Signed in, the homepage:
 
-- Renders one weather widget and one events ticker per favorite settlement, in the order they were added.
-- Renders one weather widget per favorite látnivaló that has coordinates, in the order added. A látnivaló without coordinates stays on the profile only.
+- Uses the saved settlement from user settings for the weather widget and the events ticker. Favorite settlements do not choose that place.
+- If no settlement is saved, weather uses the admin default and the events ticker lists every location.
+- Renders one extra weather widget per favorite látnivaló that has coordinates. A látnivaló without coordinates stays on the profile only.
 - Uses the account’s links and slot count.
-- If there is no favorite settlement, weather and events fall back to the admin default settlement.
 
-Signed out, the homepage keeps today’s behavior: admin default settlement, and links plus slot count from this browser.
+Signed out, the homepage uses the admin default settlement, and links plus slot count from this browser. The events ticker lists every location.
 
 Favorite listings and events do not add homepage widgets.
 
@@ -109,6 +111,6 @@ Profile reads and account writes require a session. A failed save keeps the prev
 - The public listing can show Claimed and Ellenőrzött independently.
 - The owner can remove a member. A member cannot delete the listing.
 - Favorites accept a settlement, a látnivaló, a listing, and an event. A deleted target disappears.
-- Signed in, homepage weather and events follow favorite settlements, and látnivalók with coordinates get weather. With no favorite settlement, the admin default is used.
+- Signed in, homepage weather and the events ticker follow the saved settlement. Favorite látnivalók with coordinates still get a weather widget. With no saved settlement, weather uses the admin default and the events ticker lists every location.
 - Signed out, the homepage uses the admin default settlement.
 - The admin nav count equals unpublished listings plus pending member requests.

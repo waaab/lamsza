@@ -5,6 +5,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.0] - 2026-09-24
+
+### Added
+- Events calendar with venues.
+- Cities, villages, counties, and historical seats.
+- Google sign-in, the Fiók page, and user settings.
+- Favorite places.
+- A saved settlement: when set, homepage weather and the events ticker use that settlement.
+- Claimed listings can be edited, including photos, opening hours, and ratings.
+- Website submission, and a separate Weboldalak list on the index.
+- Search can filter services and websites.
+
+---
+
 ## [1.1.0] - 2026-03-06
 
 ### Added

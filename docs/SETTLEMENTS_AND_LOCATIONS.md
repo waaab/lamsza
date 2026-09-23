@@ -167,8 +167,10 @@ Migration also backfills `slug` and `county_slug` for existing rows and inserts 
 ### 4.3 Site Settings – Default Location
 
 - **Setting:** `my_location_slug` (e.g. `csikszereda`)
-- **Used for:** Homepage weather, “my location” behavior
+- **Used for:** Homepage weather when a signed-in user has no saved settlement. Signed-out visitors always use this default.
 - **Admin:** Dropdown of all locations
+
+A signed-in user's own settlement is `users.preferred_settlement_id`, edited on `/beallitasok` (Település beállítások). When it is set, homepage weather and the events ticker use that settlement. Favorite places do not set it, and neither does the search place filter. With no saved settlement, the events ticker lists every location.
 
 ---
 

@@ -20,7 +20,9 @@ We use GitHub Actions for continuous integration.
 - **Workflow**: `.github/workflows/build-test.yml`
 - **Trigger**: Runs on every `push`.
 - **Function**: Verifies that both the SvelteKit frontend and Go backend compile successfully without errors.
-- **Note**: This workflow does **not** deploy code to the DigitalOcean server. It is strictly for build and test verification.
+- **Note**: This workflow does **not** deploy code to the DigitalOcean server. It compiles the frontend and backend. It does not run `go test` or `node --test`.
+
+The public product version lives in `src/lib/publicChangelog.js`. The footer and `/valtozasnaplo` read it. `package.json` stays the private npm package version and is not that number.
 
 ## Local Development
 1. Ensure your `.env` is configured.

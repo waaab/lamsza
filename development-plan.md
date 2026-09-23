@@ -44,14 +44,18 @@
 17. Add sections for quick links, news feeds (with refresh/timestamps), local DB CRUD, service categories, mondások
 18. Unified Admin Styling: Dark blue for submit, orange for logout, red for delete.
 
-### Phase 6 – Theme (Light/Dark Mode)
+### Phase 6 – Theme (Light/Dark Mode) (done)
 18. Add toggle button + localStorage persistence
 19. Use CSS variables + data-theme attribute
 
-### Phase 7 – Changelog & Versioning
+### Phase 7 – Changelog & Versioning (done)
 20. Add footer version link to /valtozasnaplo
 21. Create user-facing /valtozasnaplo page
 22. Maintain technical changelog.md (developers only)
+23. Footer version is derived from the first entry of `src/lib/publicChangelog.js` (v1.2.0)
+
+### Shipped after this plan
+Accounts, favorites, a saved settlement, claimed listings, directory websites, and the events/places work are in the product. They are recorded in `changelog.md` and on `/valtozasnaplo`. Dated design notes under `docs/superpowers/` are the specs those features were built from, not a second status board.
 
 ### Phase 8 – Polish & Extension
 23. Bundle size & perf check

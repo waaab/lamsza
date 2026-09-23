@@ -4,6 +4,8 @@
 
 **Goal:** A signed-in user can favorite settlements, látnivalók, listings, and events. The homepage shows weather and events for each favorite settlement, and weather for each favorite látnivaló that has coordinates.
 
+**Later change (24 Sep 2026):** favorite settlements do not choose homepage weather or the events ticker. Those follow the saved settlement. Favorite látnivalók with coordinates can still add a weather widget.
+
 **Architecture:** `user_favorites` stores `(user_id, entity_type, entity_id)`. Public pages toggle one row. `/profil` gains the **Kedvenc helyek** tab. The homepage, when signed in, repeats widgets in `created_at` order and falls back to `my_location_slug` when there is no favorite settlement.
 
 **Tech Stack:** Go `net/http` + Postgres, Svelte 5 runes for the new button, existing pages stay on their current style, Node `node --test`, Go `go test`.

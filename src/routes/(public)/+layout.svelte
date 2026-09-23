@@ -12,6 +12,7 @@
     import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
+    import { APP_VERSION } from "$lib/publicChangelog.js";
 
     let scrollY = 0;
     let loginDialogOpen = false;
@@ -394,7 +395,7 @@
             <a href="/iranyelvek/sutik" title="Sütik">Sütik</a>
             &bull;
             <a href="/valtozasnaplo" title="Verzió és Változásnapló"
-                >v1.0.0 - Változásnapló</a
+                >v{APP_VERSION} - Változásnapló</a
             >
         </div>
     </div>
