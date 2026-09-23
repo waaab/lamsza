@@ -1,4 +1,5 @@
 <script>
+    import ClaimStatusFilter from "$lib/components/ClaimStatusFilter.svelte";
     import { buildDirectoryTagCloud } from "$lib/directoryTagCloud.js";
 
     /** @type {Array<{ type?: string, tags?: string[] }>} */
@@ -8,6 +9,10 @@
     export let selectedTypeKey = null;
     /** @type {string | null} */
     export let selectedTagKey = null;
+    /** @type {"claimed" | "unclaimed" | null} */
+    export let claimFilter = null;
+    export let claimedCount = 0;
+    export let unclaimedCount = 0;
 
     $: cloud = buildDirectoryTagCloud(entries);
     $: hasAny =
@@ -23,6 +28,11 @@
 </script>
 
 <div class="index-tags-aside">
+    <ClaimStatusFilter
+        bind:value={claimFilter}
+        {claimedCount}
+        {unclaimedCount}
+    />
     {#if !hasAny}
         <p class="index-tags-aside__empty">Nincs megjeleníthető címke.</p>
     {:else}

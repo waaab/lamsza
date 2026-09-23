@@ -10,7 +10,11 @@ CREATE TABLE IF NOT EXISTS websites (
     user_id INTEGER REFERENCES users(id),
     entry_id INTEGER REFERENCES entries(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    approved_at TIMESTAMP,
+    approved_by INTEGER REFERENCES users(id),
     CONSTRAINT websites_status_check CHECK (status IN ('pending', 'approved'))
 );
+ALTER TABLE websites ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP;
+ALTER TABLE websites ADD COLUMN IF NOT EXISTS approved_by INTEGER REFERENCES users(id);
 CREATE INDEX IF NOT EXISTS idx_websites_status ON websites (status);
 CREATE INDEX IF NOT EXISTS idx_websites_entry ON websites (entry_id);

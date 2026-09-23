@@ -20,6 +20,7 @@ var dashboardCountTables = []struct {
 	{"venues", "venues"},
 	{"attractions", "attractions"},
 	{"events", "events"},
+	{"websites", "websites"},
 	{"entries", "entries"},
 	{"entry_categories", "entry_categories"},
 	{"entry_types", "entry_types"},

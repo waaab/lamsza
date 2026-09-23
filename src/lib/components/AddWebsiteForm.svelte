@@ -13,6 +13,13 @@
     let pending = $state(false);
     let submitted = $state(false);
 
+    function fieldError(field) {
+        if (field === "domain") return "A webcím nem érvényes.";
+        if (field === "title") return "A cím kötelező, legfeljebb 120 karakter.";
+        if (field === "description") return "A rövid leírás kötelező, legfeljebb 300 karakter.";
+        return "Ellenőrizd a mezőket.";
+    }
+
     async function handleSubmit(event) {
         event.preventDefault();
         if (!$auth.loggedIn) {
@@ -37,24 +44,24 @@
             const data = await res.json().catch(() => ({}));
 
             if (res.status === 400) {
-                error = data.field || "invalid";
+                error = fieldError(data.field);
             } else if (res.status === 403) {
-                error = "You cannot add a website.";
+                error = "Nem adhatsz hozzá weboldalt.";
             } else if (res.status === 409 && data.error === "domain_pending") {
-                error = "This domain is already waiting for approval.";
+                error = "Ez a domain már jóváhagyásra vár.";
             } else if (res.status === 409 && data.error === "domain_taken") {
                 if (data.listing?.name) {
-                    error = data.listing.name;
+                    error = `Ezt a domaint már használja: ${data.listing.name}`;
                 } else if (data.website) {
-                    error = `${data.website.title} (${data.website.domain})`;
+                    error = `Ezt a domaint már használja: ${data.website.title} (${data.website.domain})`;
                 } else {
-                    error = "domain_taken";
+                    error = "Ezt a domaint már átvették.";
                 }
             } else {
-                error = "Request failed.";
+                error = "A küldés nem sikerült.";
             }
         } catch {
-            error = "Request failed.";
+            error = "A küldés nem sikerült.";
         } finally {
             pending = false;
         }
@@ -74,16 +81,19 @@
     }}
 >
     <div class="link-dialog add-website-form">
-        <h3 id="add-website-title">Add your website for free</h3>
+        <h3 id="add-website-title">Add hozzá a weboldalad</h3>
+        <p class="add-website-form__explain">
+            Ingyenes. A webcím, a cím és egy rövid leírás kell. Az admin jóváhagyása után a weboldal megjelenik az indexen. Bejegyzés csak akkor lesz belőle, ha valaki később átveszi.
+        </p>
 
         {#if submitted}
-            <p class="add-website-form__success">Waiting for admin approval.</p>
+            <p class="add-website-form__success">Várakozás az admin jóváhagyására.</p>
             <div class="link-dialog-actions">
-                <button type="button" class="btn btn-md" onclick={onClose}>Close</button>
+                <button type="button" class="btn btn-md" onclick={onClose}>Bezárás</button>
             </div>
         {:else}
             <form class="link-dialog-form add-website-form__fields" onsubmit={handleSubmit}>
-                <label for="website-domain">Domain</label>
+                <label for="website-domain">Webcím</label>
                 <input
                     id="website-domain"
                     name="domain"
@@ -93,7 +103,7 @@
                     required
                 />
 
-                <label for="website-title">Title</label>
+                <label for="website-title">Cím</label>
                 <input
                     id="website-title"
                     name="title"
@@ -103,7 +113,7 @@
                     required
                 />
 
-                <label for="website-description">Description</label>
+                <label for="website-description">Rövid leírás</label>
                 <textarea
                     id="website-description"
                     name="description"
@@ -119,9 +129,9 @@
 
                 <div class="link-dialog-actions">
                     <button type="submit" class="link-dialog-submit" disabled={pending}>
-                        {pending ? "Submitting…" : "Submit"}
+                        {pending ? "Küldés…" : "Beküldés"}
                     </button>
-                    <button type="button" class="btn btn-md" onclick={onClose}>Cancel</button>
+                    <button type="button" class="btn btn-md" onclick={onClose}>Mégse</button>
                 </div>
             </form>
         {/if}
@@ -145,6 +155,12 @@
         margin: 0;
         color: var(--szekely-red);
         font-weight: 600;
+    }
+
+    .add-website-form__explain {
+        margin: 0 0 1rem;
+        color: var(--text-muted);
+        line-height: 1.45;
     }
 
     .add-website-form__success {

@@ -42,7 +42,7 @@
   /* Specific Note Colors */
   --warning-note-bg: rgba(220, 100, 50, 0.06);
   --warning-note-border: rgba(220, 100, 50, 0.4);
-  --info-note-bg: rgba(50, 150, 220, 0.07);
+  --info-note-bg: rgb(42 75 109 / 10%);
   --info-note-border: rgba(50, 150, 220, 0.45);
   --info-box-brown-bg: rgba(50, 150, 220, 0.05);
 
@@ -117,9 +117,9 @@
   /* Specific Note Colors */
   --warning-note-bg: rgba(255, 153, 51, 0.1);
   --warning-note-border: rgba(255, 153, 51, 0.5);
-  --info-note-bg: rgba(102, 178, 255, 0.1);
-  --info-note-border: rgba(102, 178, 255, 0.5);
-  --info-box-brown-bg: rgba(102, 178, 255, 0.05);
+  --info-note-bg: rgb(47 78 113 / 10%);
+  --info-note-border: rgb(42 75 109 / 50%);
+  --info-box-brown-bg: rgb(42 75 109 / 5%);
 
   /* Shadows */
   --shadow-sm: rgba(0, 0, 0, 0.3);
@@ -185,9 +185,9 @@
     /* Specific Note Colors */
     --warning-note-bg: rgba(255, 153, 51, 0.1);
     --warning-note-border: rgba(255, 153, 51, 0.5);
-    --info-note-bg: rgba(102, 178, 255, 0.1);
-    --info-note-border: rgba(102, 178, 255, 0.5);
-    --info-box-brown-bg: rgba(102, 178, 255, 0.05);
+    --info-note-bg: rgb(47 78 113 / 10%);
+    --info-note-border: rgb(42 75 109 / 50%);
+    --info-box-brown-bg: rgb(42 75 109 / 5%);
 
     /* Shadows */
     --shadow-sm: rgba(0, 0, 0, 0.3);
@@ -1690,12 +1690,6 @@ section {
   color: var(--text-muted);
 }
 
-.entry-listing .entry-profile__owned {
-  margin-left: 0.5rem;
-  font-size: var(--text-sm);
-  font-weight: 700;
-  color: var(--szekely-blue);
-}
 
 .websites-section {
   margin: 1.5rem 0;
@@ -2665,6 +2659,8 @@ svg {
 
 /* View Mode Toggle */
 .filter-actions {
+  position: relative;
+  z-index: 30;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2747,6 +2743,61 @@ svg {
 
 .view-mode-toggle .btn {
   border-style: dashed;
+}
+
+.view-mode-toggle .btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.index-location {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.index-location-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 100;
+  min-width: 16rem;
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.index-location-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+
+.index-location-menu button:hover,
+.index-location-menu button[aria-selected="true"] {
+  background: var(--tab-hover-bg);
+}
+
+.index-location-option-label,
+.index-location-option-meta {
+  color: var(--text-muted);
+  font-size: var(--text-xs, 0.75rem);
 }
 
 /* Color coding for search results */

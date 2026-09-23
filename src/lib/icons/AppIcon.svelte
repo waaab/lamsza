@@ -44,6 +44,15 @@
             <path d="M4 10h2"></path>
             <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path>
         </svg>
+    {:else if name === "websites"}
+        <!-- Same list as Index, with W W instead of 1 and 2 -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="10" x2="21" y1="6" y2="6"></line>
+            <line x1="10" x2="21" y1="12" y2="12"></line>
+            <line x1="10" x2="21" y1="18" y2="18"></line>
+            <path d="M2.3 3.5 3.8 8.7 5.3 5.5 6.8 8.7 8.3 3.5"></path>
+            <path d="M2.3 14.2 3.8 19.4 5.3 16.2 6.8 19.4 8.3 14.2"></path>
+        </svg>
     {:else if name === "mondasok"}
         <!-- Hungarian „ — scaled to match visual weight of 24×24 stroke icons -->
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" overflow="visible" class="app-icon-quote">

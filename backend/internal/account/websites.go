@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // WebsiteHit is a public website search result.
@@ -19,6 +20,7 @@ type WebsiteHit struct {
 	Description string `json:"description"`
 	Domain      string `json:"domain"`
 	URL         string `json:"url"`
+	Claimed     bool   `json:"claimed"`
 }
 
 type websiteListItem struct {
@@ -27,6 +29,7 @@ type websiteListItem struct {
 	Description string `json:"description"`
 	Domain      string `json:"domain"`
 	URL         string `json:"url"`
+	Claimed     bool   `json:"claimed"`
 }
 
 type websitesListResponse struct {
@@ -56,13 +59,18 @@ func SearchWebsites(q string) (hits []WebsiteHit, domainQuery bool, publishedEnt
 			title, description, key string
 			entryID                 sql.NullInt64
 			published               sql.NullBool
+			claimed                 bool
 		)
 		err = db.DB.QueryRow(`
-			SELECT w.id, w.title, w.description, w.domain_key, w.entry_id, e.published
+			SELECT w.id, w.title, w.description, w.domain_key, w.entry_id, e.published,
+				EXISTS (
+					SELECT 1 FROM entry_members m
+					WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
+				)
 			FROM websites w
 			LEFT JOIN entries e ON e.id = w.entry_id
 			WHERE w.domain_key = $1 AND w.status = 'approved'
-		`, domainKey).Scan(&id, &title, &description, &key, &entryID, &published)
+		`, domainKey).Scan(&id, &title, &description, &key, &entryID, &published, &claimed)
 		if err == nil {
 			domainQuery = true
 			hits = append(hits, WebsiteHit{
@@ -71,6 +79,7 @@ func SearchWebsites(q string) (hits []WebsiteHit, domainQuery bool, publishedEnt
 				Description: description,
 				Domain:      key,
 				URL:         "https://" + key,
+				Claimed:     claimed,
 			})
 			if entryID.Valid && published.Valid && published.Bool {
 				publishedEntryID = int(entryID.Int64)
@@ -81,7 +90,11 @@ func SearchWebsites(q string) (hits []WebsiteHit, domainQuery bool, publishedEnt
 
 	pattern := "%" + strings.ToLower(q) + "%"
 	rows, err := db.DB.Query(`
-		SELECT w.id, w.title, w.description, w.domain_key
+		SELECT w.id, w.title, w.description, w.domain_key,
+			EXISTS (
+				SELECT 1 FROM entry_members m
+				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
+			)
 		FROM websites w
 		LEFT JOIN entries e ON e.id = w.entry_id
 		WHERE w.status = 'approved'
@@ -96,7 +109,7 @@ func SearchWebsites(q string) (hits []WebsiteHit, domainQuery bool, publishedEnt
 	defer rows.Close()
 	for rows.Next() {
 		var hit WebsiteHit
-		if err := rows.Scan(&hit.ID, &hit.Title, &hit.Description, &hit.Domain); err != nil {
+		if err := rows.Scan(&hit.ID, &hit.Title, &hit.Description, &hit.Domain, &hit.Claimed); err != nil {
 			continue
 		}
 		hit.URL = "https://" + hit.Domain
@@ -119,7 +132,11 @@ func HandleWebsites(w http.ResponseWriter, r *http.Request) {
 func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	resp := websitesListResponse{Websites: []websiteListItem{}}
 	rows, err := db.DB.Query(`
-		SELECT id, title, description, domain_key
+		SELECT id, title, description, domain_key,
+			EXISTS (
+				SELECT 1 FROM entry_members m
+				WHERE m.entry_id = websites.entry_id AND m.role = 'owner' AND m.status = 'active'
+			)
 		FROM websites
 		WHERE status = 'approved'
 		ORDER BY title ASC, id ASC
@@ -131,7 +148,7 @@ func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	for rows.Next() {
 		var item websiteListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.Claimed); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -297,10 +314,75 @@ type adminWebsiteBody struct {
 }
 
 func HandleAdminWebsite(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
+	switch r.Method {
+	case http.MethodGet:
+		handleAdminWebsitesList(w, r)
+	case http.MethodPost:
+		handleAdminWebsiteAction(w, r)
+	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+func handleAdminWebsitesList(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.DB.Query(`
+		SELECT w.id, w.domain_key, w.title, w.description, w.status,
+			COALESCE(u.email, ''),
+			w.created_at,
+			w.approved_at,
+			COALESCE(approver.email, ''),
+			EXISTS (
+				SELECT 1 FROM entry_members m
+				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
+			)
+		FROM websites w
+		LEFT JOIN users u ON u.id = w.user_id
+		LEFT JOIN users approver ON approver.id = w.approved_by
+		ORDER BY w.title ASC, w.id ASC
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	defer rows.Close()
+	type adminWebsiteRow struct {
+		ID          int    `json:"id"`
+		Domain      string `json:"domain"`
+		Title       string `json:"title"`
+		Description string `json:"description"`
+		Status      string `json:"status"`
+		Submitter   string `json:"submitter"`
+		SubmittedAt string `json:"submitted_at"`
+		ApprovedAt  string `json:"approved_at"`
+		Approver    string `json:"approver"`
+		Claimed     bool   `json:"claimed"`
+		URL         string `json:"url"`
+	}
+	list := []adminWebsiteRow{}
+	for rows.Next() {
+		var item adminWebsiteRow
+		var submittedAt, approvedAt sql.NullTime
+		if err := rows.Scan(
+			&item.ID, &item.Domain, &item.Title, &item.Description, &item.Status,
+			&item.Submitter, &submittedAt, &approvedAt, &item.Approver, &item.Claimed,
+		); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		item.URL = "https://" + item.Domain
+		if submittedAt.Valid {
+			item.SubmittedAt = submittedAt.Time.Format(time.RFC3339)
+		}
+		if approvedAt.Valid {
+			item.ApprovedAt = approvedAt.Time.Format(time.RFC3339)
+		}
+		list = append(list, item)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"websites": list})
+}
+
+func handleAdminWebsiteAction(w http.ResponseWriter, r *http.Request) {
 
 	var body adminWebsiteBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -314,9 +396,16 @@ func HandleAdminWebsite(w http.ResponseWriter, r *http.Request) {
 
 	switch body.Action {
 	case "approve":
+		adminUser := auth.UserFromContext(r.Context())
+		if adminUser == nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		res, err := db.DB.Exec(`
-			UPDATE websites SET status = 'approved' WHERE id = $1 AND status = 'pending'
-		`, body.ID)
+			UPDATE websites
+			SET status = 'approved', approved_at = NOW(), approved_by = $2
+			WHERE id = $1 AND status = 'pending'
+		`, body.ID, adminUser.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

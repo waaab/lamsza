@@ -1,4 +1,5 @@
 <script>
+    import ClaimMark from "$lib/components/ClaimMark.svelte";
     import { canonicalEntryType } from "$lib/entryType.js";
     import { displayText, displayInitials, EMPTY_PLACEHOLDER } from "$lib/displayValue.js";
     import {
@@ -184,10 +185,8 @@
                 </svg>
                 {verified ? "Ellenőrzött" : "Nem ellenőrzött"}
             </span>
-            {#if claimed}
-                <span class="entry-profile__dot" aria-hidden="true">·</span>
-                <span class="entry-profile__owned">Foglalt</span>
-            {/if}
+            <span class="entry-profile__dot" aria-hidden="true">·</span>
+            <ClaimMark {claimed} showLabel />
             {#if showListingTodayHours(entry)}
                 <span class="entry-profile__dot" aria-hidden="true">·</span>
                 <span class="entry-profile__today">Nyitvatartás ma</span>

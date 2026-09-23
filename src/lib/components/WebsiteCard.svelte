@@ -1,5 +1,7 @@
 <script>
-    /** @type {{ website: { title: string, description: string, domain: string, url: string } }} */
+    import ClaimMark from "$lib/components/ClaimMark.svelte";
+
+    /** @type {{ website: { title: string, description: string, domain: string, url: string, claimed?: boolean } }} */
     let { website } = $props();
 </script>
 
@@ -10,7 +12,10 @@
         rel="noopener"
         class="website-card__link"
     >
-        <h3 class="website-card__title">{website.title}</h3>
+        <h3 class="website-card__title">
+            {website.title}
+            <ClaimMark claimed={Boolean(website.claimed)} />
+        </h3>
         {#if website.description}
             <p class="website-card__description">{website.description}</p>
         {/if}

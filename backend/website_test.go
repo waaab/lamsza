@@ -3,6 +3,7 @@ package main
 import (
 	"backend/internal/account"
 	"backend/internal/db"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -178,6 +179,19 @@ func TestWebsiteApproveRejectAndBan(t *testing.T) {
 	}
 	if strings.Contains(queueBody(t, admin), "review-example.com") {
 		t.Fatal("approved website stayed in the queue")
+	}
+	var approver string
+	var approvedAt sql.NullTime
+	if err := db.DB.QueryRow(`
+		SELECT COALESCE(u.email, ''), w.approved_at
+		FROM websites w
+		LEFT JOIN users u ON u.id = w.approved_by
+		WHERE w.domain_key = $1
+	`, "review-example.com").Scan(&approver, &approvedAt); err != nil {
+		t.Fatal(err)
+	}
+	if approver != "admin@test.lamsza" || !approvedAt.Valid {
+		t.Fatalf("approval record approver %q at %v", approver, approvedAt)
 	}
 	pub := doRequest(t, "GET", "/api/websites", nil)
 	if !strings.Contains(pub.Body.String(), "review-example.com") {

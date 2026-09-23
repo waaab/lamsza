@@ -3,7 +3,8 @@
     import { apiFetch } from "$lib/api";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
-    import { searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import { locationMenuTowns, searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import { isServiceEntry } from "$lib/entryType.js";
     import {
         buildSettlementAnswer,
         pickSettlement,
@@ -34,33 +35,10 @@
     let locationFieldEl;
     /** @type {Array<Record<string, any>>} */
     let locations = [];
-
-    $: hasResults = searchResults && (
-        filteredLocations.length > 0 ||
-        filteredEntries.length > 0 ||
-        filteredEvents.length > 0 ||
-        (searchResults.news && searchResults.news.length > 0) ||
-        filteredAttractions.length > 0 ||
-        filteredVenues.length > 0 ||
-        (searchResults.historical_seats && searchResults.historical_seats.length > 0) ||
-        (searchResults.websites && searchResults.websites.length > 0)
-    );
-    $: totalCount = searchResults
-        ? filteredLocations.length +
-          filteredEntries.length +
-          filteredEvents.length +
-          (searchResults.news?.length || 0) +
-          filteredAttractions.length +
-          filteredVenues.length +
-          (searchResults.historical_seats?.length || 0) +
-          (searchResults.websites?.length || 0)
-        : 0;
+    /** @type {null | "services" | "websites"} */
+    let resultFilter = null;
     $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
-    $: townChoices = (locations || [])
-        .filter((loc) => String(loc?.type || "") !== "megye" && String(loc?.slug || "").trim())
-        .filter((loc) => loc.slug !== preferredLocation?.slug)
-        .slice()
-        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "hu"));
+    $: townChoices = locationMenuTowns(locations, preferredLocation);
     $: selectedSlug = selectedLocation?.slug || "";
     $: selectedCounty = selectedLocation?.county_slug || "";
     $: filteredEntries = (searchResults?.entries || []).filter((entry) =>
@@ -79,6 +57,34 @@
     $: filteredAttractions = (searchResults?.attractions || []).filter((item) =>
         !selectedCounty || item.county_slug === selectedCounty,
     );
+    $: serviceEntries = orderedEntries.filter((entry) => isServiceEntry(entry));
+    $: shownWebsites = resultFilter === "services" ? [] : (searchResults?.websites || []);
+    $: indexEntries = resultFilter === "services"
+        ? serviceEntries
+        : resultFilter === "websites"
+          ? []
+          : orderedEntries;
+    $: showBrowseSections = !resultFilter;
+    $: hasResults = searchResults && (
+        (showBrowseSections && filteredLocations.length > 0) ||
+        indexEntries.length > 0 ||
+        (showBrowseSections && filteredEvents.length > 0) ||
+        (showBrowseSections && (searchResults.news?.length || 0) > 0) ||
+        (showBrowseSections && filteredAttractions.length > 0) ||
+        (showBrowseSections && filteredVenues.length > 0) ||
+        (showBrowseSections && (searchResults.historical_seats?.length || 0) > 0) ||
+        shownWebsites.length > 0
+    );
+    $: totalCount = searchResults
+        ? (showBrowseSections ? filteredLocations.length : 0) +
+          indexEntries.length +
+          (showBrowseSections ? filteredEvents.length : 0) +
+          (showBrowseSections ? (searchResults.news?.length || 0) : 0) +
+          (showBrowseSections ? filteredAttractions.length : 0) +
+          (showBrowseSections ? filteredVenues.length : 0) +
+          (showBrowseSections ? (searchResults.historical_seats?.length || 0) : 0) +
+          shownWebsites.length
+        : 0;
 
     function placeMatches(slug, selected) {
         if (!selected) return true;
@@ -105,6 +111,10 @@
         event?.stopPropagation();
         selectedLocation = null;
         locationMenuOpen = false;
+    }
+
+    function toggleResultFilter(kind) {
+        resultFilter = resultFilter === kind ? null : kind;
     }
 
     function stopAnswerTyping() {
@@ -215,6 +225,7 @@
         searchInputValue = "";
         searchResults = null;
         suggestions = [];
+        resultFilter = null;
         resetAnswer();
         dispatch("discoverClose");
     }
@@ -223,6 +234,7 @@
         searchInputValue = "";
         searchResults = null;
         suggestions = [];
+        resultFilter = null;
         resetAnswer();
     }
 
@@ -290,6 +302,7 @@
                 <button
                     type="button"
                     class="search-location-name"
+                    class:search-location-name--set={!!selectedLocation}
                     aria-expanded={locationMenuOpen}
                     aria-haspopup="listbox"
                     on:click={toggleLocationMenu}
@@ -383,7 +396,13 @@
                             {#if totalCount === 0}
                                 <span>Nincs találat erre a keresésre.</span>
                             {:else}
-                                🔍 Keresés: <span class="active">{searchInputValue}</span>
+                                🔍 Keresés
+                                {#if selectedLocation}
+                                    <span class="search-place">{selectedLocation.name} és környéke:</span>
+                                {:else}
+                                    mindenhol:
+                                {/if}
+                                <span class="active">{searchInputValue}</span>
                             {/if}
                         </p>
                         <p><span>({totalCount} találat)</span></p>
@@ -402,7 +421,7 @@
 
             {#if !loading && searchResults && totalCount > 0}
                 <div class="discover-sections">
-                    {#if answerSettlement}
+                    {#if answerSettlement && !resultFilter}
                         <div class="discover-answer">
                             <p class="discover-answer-text">
                                 {answerShown}<span
@@ -416,40 +435,42 @@
                             {/if}
                         </div>
                     {/if}
-                    {#if searchResults.website_query && searchResults.websites?.length > 0}
+                    {#if shownWebsites.length > 0 && (resultFilter === "websites" || searchResults.website_query)}
                         <div class="discover-section">
                             <h4 class="discover-section-title">Weboldalak</h4>
                             <div class="list flex">
-                                {#each searchResults.websites as website (website.id)}
+                                {#each shownWebsites as website (website.id)}
                                     <WebsiteCard {website} />
                                 {/each}
                             </div>
                         </div>
                     {/if}
 
-                    {#if searchResults.entries?.length > 0}
+                    {#if indexEntries.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">📋 Index</h4>
+                            <h4 class="discover-section-title">
+                                {resultFilter === "services" ? "Szolgáltatások" : "📋 Index"}
+                            </h4>
                             <div class="list flex">
-                                {#each orderedEntries as entry}
+                                {#each indexEntries as entry (entry.id)}
                                     <EntryCard {entry} />
                                 {/each}
                             </div>
                         </div>
                     {/if}
 
-                    {#if !searchResults.website_query && searchResults.websites?.length > 0}
+                    {#if shownWebsites.length > 0 && resultFilter !== "websites" && !searchResults.website_query}
                         <div class="discover-section">
                             <h4 class="discover-section-title">Weboldalak</h4>
                             <div class="list flex">
-                                {#each searchResults.websites as website (website.id)}
+                                {#each shownWebsites as website (website.id)}
                                     <WebsiteCard {website} />
                                 {/each}
                             </div>
                         </div>
                     {/if}
 
-                    {#if filteredEvents.length > 0}
+                    {#if showBrowseSections && filteredEvents.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📅 Események</h4>
                             <div class="discover-event-list">
@@ -466,7 +487,7 @@
                         </div>
                     {/if}
 
-                    {#if filteredVenues.length > 0}
+                    {#if showBrowseSections && filteredVenues.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">🏟 Helyszínek</h4>
                             <div class="discover-venue-list">
@@ -485,7 +506,7 @@
                         </div>
                     {/if}
 
-                    {#if filteredAttractions.length > 0}
+                    {#if showBrowseSections && filteredAttractions.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title discover-section-title--attractions">🏔 Látnivalók</h4>
                             <div class="discover-attraction-list">
@@ -505,7 +526,7 @@
                         </div>
                     {/if}
 
-                    {#if filteredLocations.length > 0}
+                    {#if showBrowseSections && filteredLocations.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📍 Települések</h4>
                             <div class="list flex">
@@ -517,7 +538,7 @@
                         </div>
                     {/if}
 
-                    {#if searchResults.historical_seats?.length > 0}
+                    {#if showBrowseSections && searchResults.historical_seats?.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title discover-section-title--szek">⚜ Történelmi székek</h4>
                             <div class="discover-szek-list">
@@ -530,7 +551,7 @@
                         </div>
                     {/if}
 
-                    {#if searchResults.news?.length > 0}
+                    {#if showBrowseSections && searchResults.news?.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📰 Hírek</h4>
                             <div class="discover-news-list">
@@ -555,8 +576,26 @@
                         <a class="btn btn-md duckduckgo" href="https://duckduckgo.com/?q={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">DuckDuckGo</a>
                         <a class="btn btn-md yahoo" href="https://search.yahoo.com/search?p={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">Yahoo</a>
                     </div>
-                    <div class="btn-group">
+                    <div class="btn-group result-filters">
                         <a class="btn btn-md index" href="/index">Lámsza Index</a>
+                        <button
+                            type="button"
+                            class="btn btn-md result-filter"
+                            class:is-on={resultFilter === "services"}
+                            aria-pressed={resultFilter === "services"}
+                            on:click={() => toggleResultFilter("services")}
+                        >
+                            Szolgáltatások
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-md result-filter"
+                            class:is-on={resultFilter === "websites"}
+                            aria-pressed={resultFilter === "websites"}
+                            on:click={() => toggleResultFilter("websites")}
+                        >
+                            Weboldalak
+                        </button>
                     </div>
                     {/if}
                 </div>
@@ -619,6 +658,22 @@
     background: var(--szekely-green);
     color: var(--white);
 }
+.external-search-links button.result-filter {
+    border-color: var(--szekely-green);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+.external-search-links button.result-filter:hover,
+.external-search-links button.result-filter.is-on {
+    background: var(--szekely-green);
+    border-color: var(--szekely-green);
+    color: var(--white);
+}
+.result-filters {
+    margin-left: auto;
+    justify-content: flex-end;
+}
 
 .btn-group {
     display: flex;
@@ -680,9 +735,16 @@
     height: 0.9rem;
     flex-shrink: 0;
 }
+.search-location-name--set {
+    color: #4f4f4f;
+    font-weight: 600;
+}
 .search-location-name:hover,
 .search-location-clear:hover:not(:disabled) {
     color: var(--text-primary);
+}
+.search-location-name--set:hover {
+    color: #333333;
 }
 .search-location-clear {
     display: inline-flex;
@@ -760,6 +822,9 @@
     align-items: center;
     padding: 1rem 1.5rem;
     gap: 1rem;
+}
+.search-place {
+    font-weight: 600;
 }
 .discover-close-btn {
     flex-shrink: 0;
