@@ -3,6 +3,7 @@
     import { apiFetch } from "$lib/api";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import { searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import { isServiceEntry } from "$lib/entryType.js";
     import {
         buildSettlementAnswer,
         pickSettlement,
@@ -33,25 +34,8 @@
     let locationFieldEl;
     /** @type {Array<Record<string, any>>} */
     let locations = [];
-
-    $: hasResults = searchResults && (
-        filteredLocations.length > 0 ||
-        filteredEntries.length > 0 ||
-        filteredEvents.length > 0 ||
-        (searchResults.news && searchResults.news.length > 0) ||
-        filteredAttractions.length > 0 ||
-        filteredVenues.length > 0 ||
-        (searchResults.historical_seats && searchResults.historical_seats.length > 0)
-    );
-    $: totalCount = searchResults
-        ? filteredLocations.length +
-          filteredEntries.length +
-          filteredEvents.length +
-          (searchResults.news?.length || 0) +
-          filteredAttractions.length +
-          filteredVenues.length +
-          (searchResults.historical_seats?.length || 0)
-        : 0;
+    /** @type {null | "services" | "websites"} */
+    let resultFilter = null;
     $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
     $: townChoices = (locations || [])
         .filter((loc) => String(loc?.type || "") !== "megye" && String(loc?.slug || "").trim())
@@ -76,6 +60,39 @@
     $: filteredAttractions = (searchResults?.attractions || []).filter((item) =>
         !selectedCounty || item.county_slug === selectedCounty,
     );
+    $: serviceEntries = orderedEntries.filter((entry) => isServiceEntry(entry));
+    $: websiteEntries = orderedEntries.filter((entry) => websiteHost(entry?.url) !== "");
+    $: shownWebsites =
+        resultFilter === "websites"
+            ? websiteEntries
+            : resultFilter === "services"
+              ? []
+              : queryLooksLikeWebsite(searchInputValue)
+                ? websiteEntries.filter((entry) => entryUrlMatchesQuery(entry, searchInputValue))
+                : [];
+    $: indexEntries =
+        resultFilter === "services" ? serviceEntries : resultFilter === "websites" ? [] : orderedEntries;
+    $: showBrowseSections = !resultFilter;
+    $: hasResults = searchResults && (
+        (showBrowseSections && filteredLocations.length > 0) ||
+        indexEntries.length > 0 ||
+        (showBrowseSections && filteredEvents.length > 0) ||
+        (showBrowseSections && (searchResults.news?.length || 0) > 0) ||
+        (showBrowseSections && filteredAttractions.length > 0) ||
+        (showBrowseSections && filteredVenues.length > 0) ||
+        (showBrowseSections && (searchResults.historical_seats?.length || 0) > 0) ||
+        shownWebsites.length > 0
+    );
+    $: totalCount = searchResults
+        ? (showBrowseSections ? filteredLocations.length : 0) +
+          indexEntries.length +
+          (showBrowseSections ? filteredEvents.length : 0) +
+          (showBrowseSections ? (searchResults.news?.length || 0) : 0) +
+          (showBrowseSections ? filteredAttractions.length : 0) +
+          (showBrowseSections ? filteredVenues.length : 0) +
+          (showBrowseSections ? (searchResults.historical_seats?.length || 0) : 0) +
+          shownWebsites.length
+        : 0;
 
     function placeMatches(slug, selected) {
         if (!selected) return true;
@@ -102,6 +119,34 @@
         event?.stopPropagation();
         selectedLocation = null;
         locationMenuOpen = false;
+    }
+
+    function toggleResultFilter(kind) {
+        resultFilter = resultFilter === kind ? null : kind;
+    }
+
+    function websiteHost(url) {
+        const raw = String(url || "").trim();
+        if (!raw) return "";
+        return raw.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split(/[/?#]/)[0];
+    }
+
+    function websiteHref(url) {
+        const raw = String(url || "").trim();
+        if (!raw) return "";
+        return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+    }
+
+    function queryLooksLikeWebsite(query) {
+        const value = String(query || "").trim();
+        return value.length > 0 && !/\s/.test(value) && value.includes(".");
+    }
+
+    function entryUrlMatchesQuery(entry, query) {
+        const host = websiteHost(entry?.url).toLowerCase();
+        const needle = websiteHost(query).toLowerCase();
+        if (!host || !needle) return false;
+        return host.includes(needle) || needle.includes(host);
     }
 
     function stopAnswerTyping() {
@@ -211,6 +256,7 @@
         searchInputValue = "";
         searchResults = null;
         suggestions = [];
+        resultFilter = null;
         resetAnswer();
         dispatch("discoverClose");
     }
@@ -219,6 +265,7 @@
         searchInputValue = "";
         searchResults = null;
         suggestions = [];
+        resultFilter = null;
         resetAnswer();
     }
 
@@ -286,6 +333,7 @@
                 <button
                     type="button"
                     class="search-location-name"
+                    class:search-location-name--set={!!selectedLocation}
                     aria-expanded={locationMenuOpen}
                     aria-haspopup="listbox"
                     on:click={toggleLocationMenu}
@@ -379,7 +427,13 @@
                             {#if totalCount === 0}
                                 <span>Nincs találat erre a keresésre.</span>
                             {:else}
-                                🔍 Keresés: <span class="active">{searchInputValue}</span>
+                                🔍 Keresés
+                                {#if selectedLocation}
+                                    <span class="search-place">{selectedLocation.name} és környéke:</span>
+                                {:else}
+                                    mindenhol:
+                                {/if}
+                                <span class="active">{searchInputValue}</span>
                             {/if}
                         </p>
                         <p><span>({totalCount} találat)</span></p>
@@ -398,7 +452,7 @@
 
             {#if !loading && searchResults && totalCount > 0}
                 <div class="discover-sections">
-                    {#if answerSettlement}
+                    {#if answerSettlement && !resultFilter}
                         <div class="discover-answer">
                             <p class="discover-answer-text">
                                 {answerShown}<span
@@ -412,18 +466,39 @@
                             {/if}
                         </div>
                     {/if}
-                    {#if searchResults.entries?.length > 0}
+                    {#if shownWebsites.length > 0}
                         <div class="discover-section">
-                            <h4 class="discover-section-title">📋 Index</h4>
+                            <h4 class="discover-section-title">Weboldalak</h4>
+                            <div class="discover-website-list">
+                                {#each shownWebsites as entry (entry.id)}
+                                    <a
+                                        href={websiteHref(entry.url)}
+                                        class="discover-website-card"
+                                        target="_blank"
+                                        rel="nofollow noopener"
+                                    >
+                                        <span class="discover-website-title">{entry.name}</span>
+                                        <span class="discover-website-host">{websiteHost(entry.url)}</span>
+                                    </a>
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
+
+                    {#if indexEntries.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title">
+                                {resultFilter === "services" ? "Szolgáltatások" : "📋 Index"}
+                            </h4>
                             <div class="list flex">
-                                {#each orderedEntries as entry}
+                                {#each indexEntries as entry (entry.id)}
                                     <EntryCard {entry} />
                                 {/each}
                             </div>
                         </div>
                     {/if}
 
-                    {#if filteredEvents.length > 0}
+                    {#if showBrowseSections && filteredEvents.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📅 Események</h4>
                             <div class="discover-event-list">
@@ -440,7 +515,7 @@
                         </div>
                     {/if}
 
-                    {#if filteredVenues.length > 0}
+                    {#if showBrowseSections && filteredVenues.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">🏟 Helyszínek</h4>
                             <div class="discover-venue-list">
@@ -459,7 +534,7 @@
                         </div>
                     {/if}
 
-                    {#if filteredAttractions.length > 0}
+                    {#if showBrowseSections && filteredAttractions.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title discover-section-title--attractions">🏔 Látnivalók</h4>
                             <div class="discover-attraction-list">
@@ -479,7 +554,7 @@
                         </div>
                     {/if}
 
-                    {#if filteredLocations.length > 0}
+                    {#if showBrowseSections && filteredLocations.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📍 Települések</h4>
                             <div class="list flex">
@@ -491,7 +566,7 @@
                         </div>
                     {/if}
 
-                    {#if searchResults.historical_seats?.length > 0}
+                    {#if showBrowseSections && searchResults.historical_seats?.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title discover-section-title--szek">⚜ Történelmi székek</h4>
                             <div class="discover-szek-list">
@@ -504,7 +579,7 @@
                         </div>
                     {/if}
 
-                    {#if searchResults.news?.length > 0}
+                    {#if showBrowseSections && searchResults.news?.length > 0}
                         <div class="discover-section">
                             <h4 class="discover-section-title">📰 Hírek</h4>
                             <div class="discover-news-list">
@@ -529,8 +604,26 @@
                         <a class="btn btn-md duckduckgo" href="https://duckduckgo.com/?q={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">DuckDuckGo</a>
                         <a class="btn btn-md yahoo" href="https://search.yahoo.com/search?p={encodeURIComponent(searchInputValue)}" target="_blank" rel="nofollow noopener">Yahoo</a>
                     </div>
-                    <div class="btn-group">
+                    <div class="btn-group result-filters">
                         <a class="btn btn-md index" href="/index">Lámsza Index</a>
+                        <button
+                            type="button"
+                            class="btn btn-md result-filter"
+                            class:is-on={resultFilter === "services"}
+                            aria-pressed={resultFilter === "services"}
+                            on:click={() => toggleResultFilter("services")}
+                        >
+                            Szolgáltatások
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-md result-filter"
+                            class:is-on={resultFilter === "websites"}
+                            aria-pressed={resultFilter === "websites"}
+                            on:click={() => toggleResultFilter("websites")}
+                        >
+                            Weboldalak
+                        </button>
                     </div>
                     {/if}
                 </div>
@@ -593,6 +686,22 @@
     background: var(--szekely-green);
     color: var(--white);
 }
+.external-search-links button.result-filter {
+    border-color: var(--szekely-green);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 600;
+}
+.external-search-links button.result-filter:hover,
+.external-search-links button.result-filter.is-on {
+    background: var(--szekely-green);
+    border-color: var(--szekely-green);
+    color: var(--white);
+}
+.result-filters {
+    margin-left: auto;
+    justify-content: flex-end;
+}
 
 .btn-group {
     display: flex;
@@ -654,9 +763,16 @@
     height: 0.9rem;
     flex-shrink: 0;
 }
+.search-location-name--set {
+    color: #4f4f4f;
+    font-weight: 600;
+}
 .search-location-name:hover,
 .search-location-clear:hover:not(:disabled) {
     color: var(--text-primary);
+}
+.search-location-name--set:hover {
+    color: #333333;
 }
 .search-location-clear {
     display: inline-flex;
@@ -735,6 +851,9 @@
     padding: 1rem 1.5rem;
     gap: 1rem;
 }
+.search-place {
+    font-weight: 600;
+}
 .discover-close-btn {
     flex-shrink: 0;
     background: none;
@@ -796,10 +915,33 @@
 }
 
 .discover-event-list,
-.discover-news-list {
+.discover-news-list,
+.discover-website-list {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+}
+.discover-website-card {
+    display: block;
+    padding: 0.6rem 0.8rem;
+    background: var(--bg-body);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background 0.2s, border-color 0.2s;
+}
+.discover-website-card:hover {
+    background: var(--tab-hover-bg);
+    border-color: var(--text-muted);
+}
+.discover-website-title {
+    display: block;
+    font-weight: 500;
+}
+.discover-website-host {
+    display: block;
+    color: var(--text-faint);
 }
 .discover-event-card,
 .discover-news-card {

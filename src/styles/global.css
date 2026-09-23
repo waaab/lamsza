@@ -42,7 +42,7 @@
   /* Specific Note Colors */
   --warning-note-bg: rgba(220, 100, 50, 0.06);
   --warning-note-border: rgba(220, 100, 50, 0.4);
-  --info-note-bg: rgba(50, 150, 220, 0.07);
+  --info-note-bg: rgb(42 75 109 / 10%);
   --info-note-border: rgba(50, 150, 220, 0.45);
   --info-box-brown-bg: rgba(50, 150, 220, 0.05);
 
@@ -117,9 +117,9 @@
   /* Specific Note Colors */
   --warning-note-bg: rgba(255, 153, 51, 0.1);
   --warning-note-border: rgba(255, 153, 51, 0.5);
-  --info-note-bg: rgba(102, 178, 255, 0.1);
-  --info-note-border: rgba(102, 178, 255, 0.5);
-  --info-box-brown-bg: rgba(102, 178, 255, 0.05);
+  --info-note-bg: rgb(47 78 113 / 10%);
+  --info-note-border: rgb(42 75 109 / 50%);
+  --info-box-brown-bg: rgb(42 75 109 / 5%);
 
   /* Shadows */
   --shadow-sm: rgba(0, 0, 0, 0.3);
@@ -185,9 +185,9 @@
     /* Specific Note Colors */
     --warning-note-bg: rgba(255, 153, 51, 0.1);
     --warning-note-border: rgba(255, 153, 51, 0.5);
-    --info-note-bg: rgba(102, 178, 255, 0.1);
-    --info-note-border: rgba(102, 178, 255, 0.5);
-    --info-box-brown-bg: rgba(102, 178, 255, 0.05);
+    --info-note-bg: rgb(47 78 113 / 10%);
+    --info-note-border: rgb(42 75 109 / 50%);
+    --info-box-brown-bg: rgb(42 75 109 / 5%);
 
     /* Shadows */
     --shadow-sm: rgba(0, 0, 0, 0.3);
