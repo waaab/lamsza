@@ -36,6 +36,14 @@ func TestGazdátlanVerifiedEntryKeepsShortPublicFields(t *testing.T) {
 	if len(photos) != 0 {
 		t.Fatalf("photos visible before Ellenőrzött: %v", got["photos"])
 	}
+	socialLinks, _ := got["social_links"].([]interface{})
+	if len(socialLinks) != 0 {
+		t.Fatalf("social_links visible on gazdátlan listing: %v", got["social_links"])
+	}
+	hours, _ := got["hours"].(map[string]interface{})
+	if len(hours) != 0 {
+		t.Fatalf("hours visible when hours_enabled false: %v", got["hours"])
+	}
 	if got["verified"] != true || got["claimed"] == true {
 		t.Fatalf("marks: verified %v claimed %v", got["verified"], got["claimed"])
 	}
@@ -81,5 +89,9 @@ func TestClaimedUnverifiedEntryShowsPhoneAndHoursEnabled(t *testing.T) {
 	}
 	if got["hours_enabled"] != true {
 		t.Fatalf("hours_enabled: expected true, got %v", got["hours_enabled"])
+	}
+	photos, _ := got["photos"].([]interface{})
+	if len(photos) != 0 {
+		t.Fatalf("photos visible before Ellenőrzött: %v", got["photos"])
 	}
 }
