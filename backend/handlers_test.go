@@ -1286,6 +1286,16 @@ func TestListingRejectsInvalidURL(t *testing.T) {
 	}
 
 	userCookie := mustLogin("url-test@test.lamsza")
+	// Creating a listing with a URL also reserves that domain. A previous run
+	// leaves the website row behind after the entry is deleted.
+	if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "example.com"); err != nil {
+		t.Fatalf("cleanup reserved example.com: %v", err)
+	}
+	t.Cleanup(func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "example.com"); err != nil {
+			t.Errorf("cleanup reserved example.com: %v", err)
+		}
+	})
 	createBody := map[string]interface{}{
 		"name":        "URL Test Entry",
 		"location_id": locID,
