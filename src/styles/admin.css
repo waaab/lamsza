@@ -480,16 +480,16 @@
     margin-top: 0.75rem;
 }
 
-.admin-cache-panel {
-    margin: 1.75rem 0 2rem;
+.admin-subsection {
+    margin: 1rem 0 2rem;
 }
 
-.admin-cache-panel h3 {
+.admin-subsection > h3 {
     margin: 0 0 0.35rem;
     font-size: var(--text-lg);
 }
 
-.admin-cache-panel p {
+.admin-subsection > p {
     margin: 0 0 0.85rem;
     color: var(--text-muted);
     line-height: 1.45;

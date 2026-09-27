@@ -92,6 +92,53 @@
         adminTabError = null;
     }
 
+    /** Result banner above one admin table. Cleared when the tab changes. */
+    /** @type {{ tab: string, table: string, ok: boolean, text: string } | null} */
+    let adminActionNotice = null;
+    $: if (adminActionNotice && activeTab !== adminActionNotice.tab) {
+        adminActionNotice = null;
+    }
+
+    function noticeTableFor(endpoint) {
+        if (endpoint === "quick_links") return "quicklinks";
+        if (endpoint === "news_feeds") return "newsfeeds";
+        return endpoint;
+    }
+
+    function actionSubject(data) {
+        if (!data || typeof data !== "object") return "";
+        const raw =
+            data.name ??
+            data.title ??
+            data.label_hu ??
+            data.text ??
+            data.source_text ??
+            "";
+        const s = String(raw).replace(/\s+/g, " ").trim();
+        if (!s) return "";
+        return s.length > 60 ? `${s.slice(0, 57)}…` : s;
+    }
+
+    function noteAdminAction(table, text, ok = true) {
+        const msg =
+            String(text || "").trim() ||
+            (ok ? "A művelet sikerült." : "A művelet nem sikerült.");
+        adminActionNotice = { tab: activeTab, table, ok, text: msg };
+        if (ok) clearAdminTabError();
+    }
+
+    async function noteAdminFailure(table, resOrText, prefix = "Hiba: ") {
+        let detail = "";
+        if (resOrText && typeof resOrText.text === "function") {
+            detail = (await resOrText.text()).trim();
+        } else {
+            detail = String(resOrText ?? "").trim();
+        }
+        const msg = detail ? `${prefix}${detail}` : "A művelet nem sikerült.";
+        noteAdminAction(table, msg, false);
+        setAdminTabError(msg);
+    }
+
     let mondasok = [];
     let quickLinks = [];
     let newsFeeds = [];
@@ -660,9 +707,13 @@
             body: JSON.stringify({ entry_id: entryId }),
         });
         if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            const detail = (await res.text()) || `HTTP ${res.status}`;
+            listingQueueError = detail;
+            noteAdminAction("welcome", `A közzététel nem sikerült. ${detail}`, false);
             return;
         }
+        listingQueueError = "";
+        noteAdminAction("welcome", "A bejegyzés közzétéve.");
         await fetchListingQueue();
         await auth.refresh();
     }
@@ -674,9 +725,13 @@
             body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "approve" }),
         });
         if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            const detail = (await res.text()) || `HTTP ${res.status}`;
+            listingQueueError = detail;
+            noteAdminAction("welcome", `A jóváhagyás nem sikerült. ${detail}`, false);
             return;
         }
+        listingQueueError = "";
+        noteAdminAction("welcome", "A tagság jóváhagyva.");
         await fetchListingQueue();
         await auth.refresh();
     }
@@ -688,9 +743,13 @@
             body: JSON.stringify({ entry_id: entryId, user_id: userId, action: "reject" }),
         });
         if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            const detail = (await res.text()) || `HTTP ${res.status}`;
+            listingQueueError = detail;
+            noteAdminAction("welcome", `Az elutasítás nem sikerült. ${detail}`, false);
             return;
         }
+        listingQueueError = "";
+        noteAdminAction("welcome", "A tagság elutasítva.");
         await fetchListingQueue();
         await auth.refresh();
     }
@@ -702,9 +761,21 @@
             body: JSON.stringify({ id: websiteId, action }),
         });
         if (!res.ok) {
-            listingQueueError = (await res.text()) || `HTTP ${res.status}`;
+            const detail = (await res.text()) || `HTTP ${res.status}`;
+            listingQueueError = detail;
+            noteAdminAction("welcome", `A művelet nem sikerült. ${detail}`, false);
             return;
         }
+        listingQueueError = "";
+        const done =
+            action === "approve"
+                ? "A weboldal jóváhagyva."
+                : action === "reject"
+                  ? "A weboldal elutasítva."
+                  : action === "ban"
+                    ? "A felhasználó tiltva."
+                    : "A művelet sikerült.";
+        noteAdminAction("welcome", done);
         await fetchListingQueue();
         await fetchAdminWebsites();
         await auth.refresh();
@@ -1244,11 +1315,11 @@
                 body: JSON.stringify(editingWeatherTrans),
             });
             if (res.ok) {
-                clearAdminTabError();
+                noteAdminAction("weather_translations", "A fordítás mentve.");
                 fetchWeatherTranslations();
                 editingWeatherTrans = null;
             } else {
-                setAdminTabError("Hiba: " + (await res.text()));
+                await noteAdminFailure("weather_translations", res);
             }
         } else {
             const res = await apiCall(`/api/admin/weather_translations`, {
@@ -1257,11 +1328,11 @@
                 body: JSON.stringify(newWeatherTrans),
             });
             if (res.ok) {
-                clearAdminTabError();
+                noteAdminAction("weather_translations", "A fordítás hozzáadva.");
                 fetchWeatherTranslations();
                 newWeatherTrans = { source_text: "", lang: "hu", translated_text: "" };
             } else {
-                setAdminTabError("Hiba: " + (await res.text()));
+                await noteAdminFailure("weather_translations", res);
             }
         }
     }
@@ -1278,8 +1349,12 @@
         const ok = await showConfirm("Biztosan törölni szeretnéd ezt a fordítást?");
         if (!ok) return;
         const res = await apiCall(`/api/admin/weather_translations?id=${id}`, { method: "DELETE" });
-        if (res.ok) fetchWeatherTranslations();
-        else setAdminTabError("Hiba: " + (await res.text()));
+        if (res.ok) {
+            noteAdminAction("weather_translations", "A fordítás törölve.");
+            fetchWeatherTranslations();
+        } else {
+            await noteAdminFailure("weather_translations", res);
+        }
     }
 
     async function fetchSettings() {
@@ -1326,11 +1401,10 @@
                 body: JSON.stringify(payload),
             });
             if (res.ok) {
-                clearAdminTabError();
-                await showAlert("Beállítások mentve.");
-            } else setAdminTabError("Hiba: " + (await res.text()));
+                noteAdminAction("settings", "Beállítások mentve.");
+            } else await noteAdminFailure("settings", res);
         } catch (e) {
-            setAdminTabError("Hiba: " + e.message);
+            await noteAdminFailure("settings", e.message);
         } finally {
             settingsSaving = false;
         }
@@ -1341,12 +1415,14 @@
         try {
             const res = await apiCall(`/api/admin/settings/clear-weather-cache`, { method: "POST" });
             if (res.ok) {
-                clearAdminTabError();
-                await showAlert("Időjárás cache verzió növelve – látogatók friss adatot fognak kapni.");
+                noteAdminAction(
+                    "settings",
+                    "Időjárás cache verzió növelve – látogatók friss adatot fognak kapni.",
+                );
                 fetchSettings();
-            } else setAdminTabError("Hiba: " + (await res.text()));
+            } else await noteAdminFailure("settings", res);
         } catch (e) {
-            setAdminTabError("Hiba: " + e.message);
+            await noteAdminFailure("settings", e.message);
         } finally {
             settingsCacheClearing = false;
         }
@@ -1379,15 +1455,14 @@
                 body: JSON.stringify(editingPage),
             });
             if (res.ok) {
-                clearAdminTabError();
-                await showAlert("Oldal mentve.");
+                noteAdminAction("pages", "Oldal mentve.");
                 editingPage = null;
                 fetchPages();
             } else {
-                setAdminTabError("Hiba: " + (await res.text()));
+                await noteAdminFailure("pages", res);
             }
         } catch (e) {
-            setAdminTabError("Hiba: " + e.message);
+            await noteAdminFailure("pages", e.message);
         } finally {
             pageSaving = false;
         }
@@ -1439,15 +1514,14 @@
                 }),
             });
             if (res.ok) {
-                clearAdminTabError();
-                await showAlert("GYIK / disclaimer mentve.");
+                noteAdminAction("page_faq", "GYIK / disclaimer mentve.");
                 editingPageFaq = null;
                 fetchPageFaq();
             } else {
-                setAdminTabError("Hiba: " + (await res.text()));
+                await noteAdminFailure("page_faq", res);
             }
         } catch (e) {
-            setAdminTabError("Hiba: " + e.message);
+            await noteAdminFailure("page_faq", e.message);
         } finally {
             pageFaqSaving = false;
         }
@@ -1498,7 +1572,7 @@
             .toLowerCase();
         const sort_order = Number(newSettlementLocationType.sort_order) || 0;
         if (!label_hu) {
-            await showAlert("A megnevezés kötelező.");
+            noteAdminAction("settlement_location_types", "A megnevezés kötelező.", false);
             return;
         }
         try {
@@ -1510,13 +1584,14 @@
                 },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("settlement_location_types", res, "");
                 return;
             }
             newSettlementLocationType = { slug: "", label_hu: "", sort_order: 0 };
+            noteAdminAction("settlement_location_types", `„${label_hu}” hozzáadva.`);
             await fetchSettlementLocationTypes();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("settlement_location_types", err.message || err, "");
         }
     }
 
@@ -1554,13 +1629,14 @@
                 },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("settlement_location_types", res, "");
                 return;
             }
             editingSettlementLocationType = null;
+            noteAdminAction("settlement_location_types", `„${label_hu}” mentve.`);
             await fetchSettlementLocationTypes();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("settlement_location_types", err.message || err, "");
         }
     }
     async function deleteSettlementLocationTypeRow(id) {
@@ -1573,12 +1649,13 @@
                 { method: "DELETE" },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("settlement_location_types", res, "");
                 return;
             }
+            noteAdminAction("settlement_location_types", "A településtípus törölve.");
             await fetchSettlementLocationTypes();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("settlement_location_types", err.message || err, "");
         }
     }
 
@@ -1640,7 +1717,7 @@
         const label_hu = String(newCatalogEventType.label_hu || "").trim();
         const sort_order = Number(newCatalogEventType.sort_order) || 0;
         if (!slug || !label_hu) {
-            await showAlert("Slug és megnevezés kötelező.");
+            noteAdminAction("catalog_event_types", "Slug és megnevezés kötelező.", false);
             return;
         }
         try {
@@ -1650,13 +1727,14 @@
                 body: JSON.stringify({ slug, label_hu, sort_order }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("catalog_event_types", res, "");
                 return;
             }
             newCatalogEventType = { slug: "", label_hu: "", sort_order: 0 };
+            noteAdminAction("catalog_event_types", `„${label_hu}” hozzáadva.`);
             await fetchEvents();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("catalog_event_types", err.message || err, "");
         }
     }
 
@@ -1689,13 +1767,14 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("catalog_event_types", res, "");
                 return;
             }
             editingCatalogEventType = null;
+            noteAdminAction("catalog_event_types", `„${label_hu}” mentve.`);
             await fetchEvents();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("catalog_event_types", err.message || err, "");
         }
     }
     async function deleteCatalogEventTypeRow(id) {
@@ -1708,12 +1787,13 @@
                 { method: "DELETE" },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("catalog_event_types", res, "");
                 return;
             }
+            noteAdminAction("catalog_event_types", "Az eseménytípus törölve.");
             await fetchEvents();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("catalog_event_types", err.message || err, "");
         }
     }
 
@@ -1730,7 +1810,7 @@
         const label_hu = String(newCatalogEventSubtype.label_hu || "").trim();
         const sort_order = Number(newCatalogEventSubtype.sort_order) || 0;
         if (!Number.isFinite(event_type_id) || event_type_id < 1 || !slug || !label_hu) {
-            await showAlert("Típus, slug és megnevezés kötelező.");
+            noteAdminAction("catalog_event_subtypes", "Típus, slug és megnevezés kötelező.", false);
             return;
         }
         try {
@@ -1745,7 +1825,7 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("catalog_event_subtypes", res, "");
                 return;
             }
             newCatalogEventSubtype = {
@@ -1754,9 +1834,10 @@
                 label_hu: "",
                 sort_order: 0,
             };
+            noteAdminAction("catalog_event_subtypes", `„${label_hu}” hozzáadva.`);
             await fetchEvents();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("catalog_event_subtypes", err.message || err, "");
         }
     }
 
@@ -1790,13 +1871,14 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("catalog_event_subtypes", res, "");
                 return;
             }
             editingCatalogEventSubtype = null;
+            noteAdminAction("catalog_event_subtypes", `„${label_hu}” mentve.`);
             await fetchEvents();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("catalog_event_subtypes", err.message || err, "");
         }
     }
     async function deleteCatalogEventSubtypeRow(id) {
@@ -1809,12 +1891,13 @@
                 { method: "DELETE" },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("catalog_event_subtypes", res, "");
                 return;
             }
+            noteAdminAction("catalog_event_subtypes", "Az altípus törölve.");
             await fetchEvents();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("catalog_event_subtypes", err.message || err, "");
         }
     }
     async function fetchVenuesCatalog() {
@@ -1857,8 +1940,9 @@
     }
     async function submitNewVenueType(e) {
         e.preventDefault();
-        if (!String(newVenueType.label_hu || "").trim()) {
-            await showAlert("A megnevezés kötelező.");
+        const venueTypeLabel = String(newVenueType.label_hu || "").trim();
+        if (!venueTypeLabel) {
+            noteAdminAction("venue_types", "A megnevezés kötelező.", false);
             return;
         }
         try {
@@ -1866,17 +1950,18 @@
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    label_hu: String(newVenueType.label_hu).trim(),
+                    label_hu: venueTypeLabel,
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("venue_types", res, "");
                 return;
             }
             newVenueType = { label_hu: "" };
+            noteAdminAction("venue_types", `„${venueTypeLabel}” hozzáadva.`);
             await fetchVenueTypes();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("venue_types", err.message || err, "");
         }
     }
     /** @param {Record<string, unknown>} t */
@@ -1904,13 +1989,15 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("venue_types", res, "");
                 return;
             }
+            const savedLabel = String(editingVenueType.label_hu || "").trim();
             editingVenueType = null;
+            noteAdminAction("venue_types", savedLabel ? `„${savedLabel}” mentve.` : "A helyszíntípus mentve.");
             await fetchVenueTypes();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("venue_types", err.message || err, "");
         }
     }
     async function deleteVenueTypeRow(id) {
@@ -1923,12 +2010,13 @@
                 { method: "DELETE" },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("venue_types", res, "");
                 return;
             }
+            noteAdminAction("venue_types", "A helyszíntípus törölve.");
             await fetchVenueTypes();
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("venue_types", err.message || err, "");
         }
     }
     async function loadVenuesForNewEvent() {
@@ -1997,7 +2085,7 @@
         e.preventDefault();
         const sid = parseInt(String(newVenue.settlement_id || ""), 10);
         if (!Number.isFinite(sid) || sid < 1 || !String(newVenue.name || "").trim()) {
-            await showAlert("Válassz települést és adj meg nevet.");
+            noteAdminAction("venues", "Válassz települést és adj meg nevet.", false);
             return;
         }
         try {
@@ -2020,17 +2108,18 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("venues", res, "");
                 return;
             }
+            const savedName = newVenue.name.trim();
             await fetchVenuesCatalog();
             await loadVenuesForNewEvent();
             if (editingEvent)
                 await loadVenuesForEditSettlement(editingEvent.location_id);
             newVenue = emptyNewVenue();
-            await showAlert("Helyszín elmentve.");
+            noteAdminAction("venues", savedName ? `„${savedName}” hozzáadva.` : "Helyszín elmentve.");
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("venues", err.message || err, "");
         }
     }
 
@@ -2069,11 +2158,11 @@
         const sid = parseInt(String(editingVenue.settlement_id || ""), 10);
         const id = parseInt(String(editingVenue.id || ""), 10);
         if (!Number.isFinite(sid) || sid < 1 || !Number.isFinite(id) || id < 1) {
-            await showAlert("Érvénytelen azonosító.");
+            noteAdminAction("venues", "Érvénytelen azonosító.", false);
             return;
         }
         if (!String(editingVenue.name || "").trim()) {
-            await showAlert("A magyar név kötelező.");
+            noteAdminAction("venues", "A magyar név kötelező.", false);
             return;
         }
         try {
@@ -2097,16 +2186,18 @@
                 }),
             });
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("venues", res, "");
                 return;
             }
+            const savedName = String(editingVenue.name || "").trim();
             editingVenue = null;
+            noteAdminAction("venues", savedName ? `„${savedName}” mentve.` : "A helyszín mentve.");
             await fetchVenuesCatalog();
             await loadVenuesForNewEvent();
             if (editingEvent)
                 await loadVenuesForEditSettlement(editingEvent.location_id);
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("venues", err.message || err, "");
         }
     }
     async function deleteVenueRow(id) {
@@ -2117,15 +2208,16 @@
                 { method: "DELETE" },
             );
             if (!res.ok) {
-                await showAlert(await res.text());
+                await noteAdminFailure("venues", res, "");
                 return;
             }
+            noteAdminAction("venues", "A helyszín törölve.");
             await fetchVenuesCatalog();
             await loadVenuesForNewEvent();
             if (editingEvent)
                 await loadVenuesForEditSettlement(editingEvent.location_id);
         } catch (err) {
-            await showAlert(String(err.message || err));
+            await noteAdminFailure("venues", err.message || err, "");
         }
     }
 
@@ -2418,15 +2510,15 @@
                 }),
             });
             if (!res.ok) {
-                setAdminTabError("Hiba (megye): " + (await res.text()));
+                await noteAdminFailure("counties", res, "Hiba (megye): ");
                 return;
             }
             if (ec.seat_location_id) {
                 const ok = await setCountySeat(Number(ec.seat_location_id));
                 if (!ok) {
-                    setAdminTabError(
-                        "A megye szövege mentve, de a megyeszékhely beállítása nem sikerült.",
-                    );
+                    const msg = "A megye szövege mentve, de a megyeszékhely beállítása nem sikerült.";
+                    noteAdminAction("counties", msg, false);
+                    setAdminTabError(msg);
                     editingCounty = null;
                     fetchCountyRegions();
                     fetchLocations();
@@ -2434,12 +2526,11 @@
                 }
             }
             editingCounty = null;
-            clearAdminTabError();
-            await showAlert("Megye mentve: " + ec.name);
+            noteAdminAction("counties", "Megye mentve: " + ec.name);
             fetchCountyRegions();
             fetchLocations();
         } catch (e) {
-            setAdminTabError("Hiba: " + e.message);
+            await noteAdminFailure("counties", e.message);
         }
     }
 
@@ -2476,20 +2567,21 @@
                 }),
             });
             if (!res.ok) {
-                setAdminTabError("Hiba (szék): " + (await res.text()));
+                await noteAdminFailure("historical_seats", res, "Hiba (szék): ");
                 return;
             }
             editingHistoricalSeat = null;
-            clearAdminTabError();
-            await showAlert("Szék mentve: " + h.name);
+            noteAdminAction("historical_seats", "Szék mentve: " + h.name);
             fetchCountyRegions();
         } catch (e) {
-            setAdminTabError("Hiba: " + e.message);
+            await noteAdminFailure("historical_seats", e.message);
         }
     }
 
     // generic create
-    async function createRecord(endpoint, data, reloadFunc, resetFormFunc) {
+    async function createRecord(endpoint, data, reloadFunc, resetFormFunc, noticeTable) {
+        const table = noticeTable || noticeTableFor(endpoint);
+        const subject = actionSubject(data);
         try {
             const res = await apiCall(`/api/admin/${endpoint}`, {
                 method: "POST",
@@ -2497,20 +2589,25 @@
                 body: JSON.stringify(data),
             });
             if (res.ok) {
-                clearAdminTabError();
+                noteAdminAction(
+                    table,
+                    subject ? `„${subject}” hozzáadva.` : "A hozzáadás sikerült.",
+                );
                 reloadFunc();
                 resetFormFunc();
             } else {
-                setAdminTabError("Hiba: " + (await res.text()));
+                await noteAdminFailure(table, res);
             }
         } catch (e) {
             console.error(e);
-            setAdminTabError("Hiba: " + (e && e.message ? e.message : String(e)));
+            await noteAdminFailure(table, e && e.message ? e.message : String(e));
         }
     }
 
     // generic update (PUT)
-    async function updateRecord(endpoint, data, reloadFunc) {
+    async function updateRecord(endpoint, data, reloadFunc, noticeTable) {
+        const table = noticeTable || noticeTableFor(endpoint);
+        const subject = actionSubject(data);
         try {
             const res = await apiCall(`/api/admin/${endpoint}`, {
                 method: "PUT",
@@ -2518,28 +2615,38 @@
                 body: JSON.stringify(data),
             });
             if (res.ok) {
-                clearAdminTabError();
+                noteAdminAction(
+                    table,
+                    subject ? `„${subject}” mentve.` : "A mentés sikerült.",
+                );
                 reloadFunc();
             } else {
-                setAdminTabError("Mentési hiba: " + (await res.text()));
+                await noteAdminFailure(table, res, "Mentési hiba: ");
             }
         } catch (e) {
             console.error(e);
-            setAdminTabError("Hiba: " + (e && e.message ? e.message : String(e)));
+            await noteAdminFailure(table, e && e.message ? e.message : String(e));
         }
     }
 
     // generic delete
-    async function deleteRecord(endpoint, id, reloadFunc) {
+    async function deleteRecord(endpoint, id, reloadFunc, noticeTable) {
+        const table = noticeTable || noticeTableFor(endpoint);
         const ok = await showConfirm("Biztosan törölni szeretnéd?");
         if (!ok) return;
         try {
             const res = await apiCall(`/api/admin/${endpoint}?id=${id}`,
                 { method: "DELETE" },
             );
-            if (res.ok) reloadFunc();
+            if (res.ok) {
+                noteAdminAction(table, "A törlés sikerült.");
+                reloadFunc();
+            } else {
+                await noteAdminFailure(table, res);
+            }
         } catch (e) {
             console.error(e);
+            await noteAdminFailure(table, e && e.message ? e.message : String(e));
         }
     }
 
@@ -2607,9 +2714,13 @@
                 );
                 feedTimestamps = { ...feedTimestamps };
                 localStorage.removeItem("news_cache");
+                noteAdminAction("newsfeeds", "A hírfolyam frissítve.");
+            } else {
+                await noteAdminFailure("newsfeeds", res, "Frissítési hiba: ");
             }
         } catch (e) {
             console.error("Feed frissítési hiba:", e);
+            await noteAdminFailure("newsfeeds", e && e.message ? e.message : String(e), "Frissítési hiba: ");
         } finally {
             loadingFeeds.delete(feed.id);
             loadingFeeds = new Set(loadingFeeds);
@@ -2654,9 +2765,7 @@
                 body: fd,
             });
             if (!res.ok) {
-                await showAlert(
-                    (await res.text()) || "Feltöltés sikertelen.",
-                );
+                await noteAdminFailure("events", res, "Feltöltés sikertelen. ");
                 return;
             }
             const data = await res.json();
@@ -2666,8 +2775,9 @@
             } else {
                 newEvent = { ...newEvent, featured_image: url };
             }
+            noteAdminAction("events", "A kép feltöltve.");
         } catch (err) {
-            await showAlert("Feltöltés hiba: " + err.message);
+            await noteAdminFailure("events", err.message, "Feltöltés hiba: ");
         }
     }
 
@@ -2705,6 +2815,7 @@
         };
         const err = validateEventFields(payload);
         if (err) {
+            noteAdminAction("events", err, false);
             setAdminTabError(err);
             return;
         }
@@ -2761,7 +2872,7 @@
                 languages: ["HU"],
                 tags: "",
             };
-        });
+        }, "events");
     }
 
     // --- Location edit helpers ---
@@ -2974,7 +3085,7 @@
         const s = editingEvent.start_date?.split("T")[0];
         const e = editingEvent.end_date?.split("T")[0];
         if (!s || !e) {
-            await showAlert("Előbb állítsa be a kezdő és befejező dátumot.");
+            noteAdminAction("events", "Előbb állítsa be a kezdő és befejező dátumot.", false);
             return;
         }
         const out = [];
@@ -3064,22 +3175,21 @@
                 body: JSON.stringify(body),
             });
             if (!res.ok) {
-                await showAlert(
-                    "Program mentése sikertelen: " + (await res.text()),
-                );
+                await noteAdminFailure("events", res, "Program mentése sikertelen: ");
                 return;
             }
-            await showAlert("Napi program elmentve.");
+            noteAdminAction("events", "Napi program elmentve.");
             await loadScheduleForEditing(editingEvent.id);
         } catch (err) {
-            await showAlert("Hiba: " + err.message);
+            await noteAdminFailure("events", err.message);
         }
     }
     async function saveEditEvent() {
         if (!editingEvent) return;
         const err = validateEventFields(editingEvent);
         if (err) {
-            await showAlert(err);
+            noteAdminAction("events", err, false);
+            setAdminTabError(err);
             return;
         }
         const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
@@ -3301,9 +3411,15 @@
         if (!confirm("Biztosan törölni szeretnéd ezt a látnivalót?")) return;
         try {
             const res = await apiCall(`/api/admin/attractions?id=${id}`, { method: "DELETE" });
-            if (res.ok) fetchAttractions();
+            if (res.ok) {
+                noteAdminAction("attractions", "A látnivaló törölve.");
+                fetchAttractions();
+            } else {
+                await noteAdminFailure("attractions", res);
+            }
         } catch (e) {
             console.error(e);
+            await noteAdminFailure("attractions", e && e.message ? e.message : String(e));
         }
     }
 </script>
@@ -3311,6 +3427,18 @@
 <svelte:head>
     <title>Lámsza - Adminisztráció</title>
 </svelte:head>
+
+{#snippet adminNotice(table)}
+    {#if adminActionNotice && adminActionNotice.table === table && adminActionNotice.tab === activeTab}
+        <div
+            class="info-box admin-action-notice {adminActionNotice.ok ? 'success' : 'error'}"
+            role={adminActionNotice.ok ? "status" : "alert"}
+        >
+            <p>{adminActionNotice.text}</p>
+        </div>
+    {/if}
+{/snippet}
+
 
 {#if !authenticated}
     <div class="container">
@@ -3569,8 +3697,9 @@
 
             <div class="admin-container w-full">
                 {#if activeTab === "welcome"}
-                    <section aria-labelledby="admin-messages-title">
+                    <section class="admin-subsection" aria-labelledby="admin-messages-title">
                         <h3 id="admin-messages-title">Üzenetek</h3>
+                        {@render adminNotice("welcome")}
                         {#each dashboardMessages as msg (msg.id)}
                             <div
                                 class="info-box {msg.level}"
@@ -3697,7 +3826,7 @@
                             {/each}
                         </div>
                     </div>
-                    <section class="admin-cache-panel" aria-labelledby="admin-cache-title">
+                    <section class="admin-subsection" aria-labelledby="admin-cache-title">
                         <h3 id="admin-cache-title">Gyorsítótár</h3>
                         <p>
                             A kártyák számai nincsenek gyorsítótárazva. Minden megnyitáskor a szerver számolja a táblákat.
@@ -3774,6 +3903,7 @@
                         </form>
                     </details>
 
+                    {@render adminNotice("mondasok")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -3924,6 +4054,7 @@
                         </form>
                     </details>
 
+                    {@render adminNotice("quicklinks")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -4072,6 +4203,7 @@
                         </form>
                     </details>
 
+                    {@render adminNotice("newsfeeds")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -4302,6 +4434,7 @@
                     </form>
                     </details>
 
+                    {@render adminNotice("locations")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -4495,6 +4628,7 @@
                         </form>
                     {/if}
 
+                    {@render adminNotice("settlement_location_types")}
                     <div class="admin-table-wrapper">
                         <table class="admin-table admin-table--compact">
                             <thead>
@@ -4743,6 +4877,7 @@
                         </form>
                     {/if}
 
+                    {@render adminNotice("venue_types")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (típusok)
@@ -4832,6 +4967,7 @@
                             ))}
                     />
 
+                    {@render adminNotice("venues")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (helyszínek)
@@ -5231,6 +5367,7 @@
                     </form>
                     </details>
 
+                    {@render adminNotice("events")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -5452,6 +5589,7 @@
                         </form>
                     {/if}
 
+                    {@render adminNotice("catalog_event_types")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (típusok)
@@ -5621,6 +5759,7 @@
                         </form>
                     {/if}
 
+                    {@render adminNotice("catalog_event_subtypes")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (altípusok)
@@ -5747,6 +5886,7 @@
                         </form>
                     </details>
 
+                    {@render adminNotice("entry_categories")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label">
                             <span class="admin-search-heading">
@@ -5855,6 +5995,7 @@
                             Jóváhagyott és várakozó weboldalak. A jóváhagyás, elutasítás és tiltás a vezérlőpult üzeneteiben történik.
                         </p>
                     {/if}
+                    {@render adminNotice("websites")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -6077,6 +6218,7 @@
                     </form>
                     </details>
 
+                    {@render adminNotice("entries")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -6204,6 +6346,7 @@
                             <p>{adminTabError.message}</p>
                         </div>
                     {/if}
+                    {@render adminNotice("users")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -6289,6 +6432,7 @@
                             A <strong>cache törlése</strong> új verziószámot ad — a látogatók frissebb időjárást kapnak.
                         </p>
                     {/if}
+                    {@render adminNotice("settings")}
                     <section class="admin-form-section">
                         <h3>Alapértelmezett település (MyLocation)</h3>
                         <p class="admin-hint">Ez a vendégek, és a saját település nélküli felhasználók alaphelye a kezdőlapon és az index közelségi rendezésénél. A saját települést mindenki a felhasználói beállításokban állítja; a kereső és az index szűrője csak a találatokat szűri.</p>
@@ -6408,6 +6552,7 @@
                         </form>
                         </details>
                     {/if}
+                    {@render adminNotice("weather_translations")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -6492,6 +6637,7 @@
                         </div>
                     {/if}
                     {#if editingPage}
+                        {@render adminNotice("pages")}
                         <h3>Oldal szerkesztése: {editingPage.title}</h3>
                         <form class="admin-form" on:submit|preventDefault={savePage} style="max-width: 48rem;">
                             <label for="page_title">Cím</label>
@@ -6517,6 +6663,7 @@
                             </p>
                         {/if}
                         <h3 class="admin-subtab-heading">Irányelvek és statikus oldalak</h3>
+                        {@render adminNotice("pages")}
                         <div class="admin-table-toolbar">
                             <label class="admin-search-label"
                                 >Keresés (oldalak)
@@ -6605,6 +6752,7 @@
                         </div>
                     {/if}
                     {#if editingPageFaq}
+                        {@render adminNotice("page_faq")}
                         <h3>GYIK / disclaimer: {editingPageFaq.label_hu || editingPageFaq.section_key}</h3>
                         <p class="admin-info">
                             Kulcs: <code>{editingPageFaq.section_key}</code> — a nyilvános oldalon a
@@ -6675,6 +6823,7 @@
                             <code>.faq-title</code>, <code>.faq-list</code>, <code>.faq-item</code>, <code>#disclaimer</code>,
                             <code>.note.info</code>.
                         </p>
+                        {@render adminNotice("page_faq")}
                         <div class="admin-table-toolbar">
                             <label class="admin-search-label"
                                 >Keresés (GYIK)
@@ -6786,6 +6935,7 @@
                         </form>
                     </details>
 
+                    {@render adminNotice("entry_types")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -6925,6 +7075,7 @@
                         <button type="submit" class="admin-submit-btn">Hozzáadás</button>
                     </form>
                     </details>
+                    {@render adminNotice("attractions")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés
@@ -7025,6 +7176,7 @@
                     {/if}
 
                     <h3 class="admin-region-heading">Megyék</h3>
+                    {@render adminNotice("counties")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (megyék)
@@ -7179,6 +7331,7 @@
                         Megjelenés: <a href="/szekek" target="_blank" rel="noopener">/szekek</a> és
                         <code>/szekek/…</code> oldalak.
                     </p>
+                    {@render adminNotice("historical_seats")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
                             >Keresés (székek)
@@ -8689,6 +8842,10 @@
     .admin-info {
         color: var(--text-faint, #666);
         margin-bottom: 1rem;
+    }
+
+    .admin-action-notice {
+        margin: 0 0 0.75rem;
     }
     .admin-date-field {
         display: flex;
