@@ -78,10 +78,13 @@ type updateListingBody struct {
 	Address        string          `json:"address"`
 	Notes          string          `json:"notes"`
 	Languages      []string        `json:"languages"`
-	Hours          json.RawMessage `json:"hours"`
-	DeliveryHours  json.RawMessage `json:"delivery_hours"`
-	Photos         json.RawMessage `json:"photos"`
-	RatingsEnabled bool            `json:"ratings_enabled"`
+	Hours           json.RawMessage `json:"hours"`
+	HoursEnabled    bool            `json:"hours_enabled"`
+	DeliveryHours   json.RawMessage `json:"delivery_hours"`
+	DeliveryEnabled bool            `json:"delivery_enabled"`
+	SocialLinks     json.RawMessage `json:"social_links"`
+	Photos          json.RawMessage `json:"photos"`
+	RatingsEnabled  bool            `json:"ratings_enabled"`
 }
 
 type listingItem struct {
@@ -507,11 +510,14 @@ type listingDetailResponse struct {
 	Address        string          `json:"address"`
 	Notes          string          `json:"notes"`
 	Languages      []string        `json:"languages"`
-	Hours          json.RawMessage `json:"hours"`
-	DeliveryHours  json.RawMessage `json:"delivery_hours"`
-	Photos         json.RawMessage `json:"photos"`
-	Published      bool            `json:"published"`
-	RatingsEnabled bool            `json:"ratings_enabled"`
+	Hours           json.RawMessage `json:"hours"`
+	HoursEnabled    bool            `json:"hours_enabled"`
+	DeliveryHours   json.RawMessage `json:"delivery_hours"`
+	DeliveryEnabled bool            `json:"delivery_enabled"`
+	SocialLinks     json.RawMessage `json:"social_links"`
+	Photos          json.RawMessage `json:"photos"`
+	Published       bool            `json:"published"`
+	RatingsEnabled  bool            `json:"ratings_enabled"`
 }
 
 func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, idStr string) {
@@ -533,17 +539,20 @@ func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, 
 
 	var detail listingDetailResponse
 	var pqLanguages []string
-	var hours, delivery, photos []byte
+	var hours, delivery, socialLinks, photos []byte
 	err = db.DB.QueryRow(`
 		SELECT e.id, e.name, COALESCE(e.slug, ''), e.location_id, e.category_id, e.type_id,
 			COALESCE(e.url, ''), COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''),
-			e.languages, COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+			e.languages, COALESCE(e.hours, '{}'::jsonb), COALESCE(e.hours_enabled, false),
+			COALESCE(e.delivery_hours, '{}'::jsonb), COALESCE(e.delivery_enabled, false),
+			COALESCE(e.social_links, '[]'::jsonb),
 			COALESCE(e.photos, '[]'::jsonb), e.published, COALESCE(e.ratings_enabled, false)
 		FROM entries e
 		WHERE e.id = $1
 	`, entryID).Scan(&detail.ID, &detail.Name, &detail.Slug, &detail.LocationID, &detail.CategoryID, &detail.TypeID,
 		&detail.URL, &detail.Phone, &detail.Address, &detail.Notes, pq.Array(&pqLanguages),
-		&hours, &delivery, &photos, &detail.Published, &detail.RatingsEnabled)
+		&hours, &detail.HoursEnabled, &delivery, &detail.DeliveryEnabled, &socialLinks,
+		&photos, &detail.Published, &detail.RatingsEnabled)
 	if err == sql.ErrNoRows {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -559,6 +568,7 @@ func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, 
 	}
 	detail.Hours = json.RawMessage(jsonObjectOrEmptyListing(hours))
 	detail.DeliveryHours = json.RawMessage(jsonObjectOrEmptyListing(delivery))
+	detail.SocialLinks = photosArrayOrEmpty(socialLinks)
 	detail.Photos = sanitizeListingPhotos(photos)
 	json.NewEncoder(w).Encode(detail)
 }
@@ -982,6 +992,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
+	socialLinks := string(photosArrayOrEmpty(body.SocialLinks))
 	claimed, err := listingClaimed(entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1010,12 +1021,12 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		UPDATE entries SET
 			type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5,
 			url = $6, phone = $7, address = $8, notes = $9, languages = $10,
-			hours = $11::jsonb, delivery_hours = $12::jsonb, photos = $13::jsonb,
-			ratings_enabled = $14
-		WHERE id = $15
+			hours = $11::jsonb, hours_enabled = $12, delivery_hours = $13::jsonb, delivery_enabled = $14,
+			social_links = $15::jsonb, photos = $16::jsonb, ratings_enabled = $17
+		WHERE id = $18
 	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
 		listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
-		hours, delivery, photos, body.RatingsEnabled, entryID)
+		hours, body.HoursEnabled, delivery, body.DeliveryEnabled, socialLinks, photos, body.RatingsEnabled, entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

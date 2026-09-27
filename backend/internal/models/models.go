@@ -14,8 +14,9 @@ type Entry struct {
 	CountySlug     string          `json:"county_slug"`
 	LocationType   string          `json:"location_type"`
 	LocationRo     string          `json:"location_ro"`
-	LocationDe     string          `json:"location_de"`
-	Phone          string          `json:"phone"`
+	LocationDe          string          `json:"location_de"`
+	LocationCoordinates string          `json:"location_coordinates"`
+	Phone               string          `json:"phone"`
 	Address        string          `json:"address"`
 	Notes          string          `json:"notes"`
 	Tags           []string        `json:"tags"`

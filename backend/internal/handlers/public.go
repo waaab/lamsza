@@ -41,6 +41,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
 				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+				COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE((SELECT l.coordinates FROM locations l WHERE l.id = s.id), ''),
 				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank,
@@ -67,6 +68,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
 				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+				COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE((SELECT l.coordinates FROM locations l WHERE l.id = s.id), ''),
 				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				0 as rank,
@@ -107,9 +109,9 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if q != "" && normalizedQ != "" {
-		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, rank DESC, btrim(e.name) ASC, e.id ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, e.photos ORDER BY is_direct_match DESC, rank DESC, btrim(e.name) ASC, e.id ASC"
 	} else {
-		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.photos ORDER BY is_direct_match DESC, btrim(e.name) ASC, e.id ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, e.photos ORDER BY is_direct_match DESC, btrim(e.name) ASC, e.id ASC"
 	}
 
 	log.Printf("EntriesHandler query: %s", sqlQuery)
@@ -129,8 +131,8 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		var pqLanguages []string
 		var pqTags []string
 		var rank float64
-		var hours, delivery, photos []byte
-		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos, &e.IsDirectMatch, &rank, pq.Array(&pqTags), &e.RatingsEnabled); err != nil {
+		var hours, delivery, socialLinks, photos []byte
+		if err := rows.Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &e.HoursEnabled, &e.DeliveryEnabled, &socialLinks, &e.LocationCoordinates, &photos, &e.IsDirectMatch, &rank, pq.Array(&pqTags), &e.RatingsEnabled); err != nil {
 			log.Printf("EntriesHandler scan error: %v", err)
 			continue
 		}
@@ -139,6 +141,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		e.Type = utils.CanonicalEntryType(e.Type)
 		e.Hours = jsonObjectOrEmpty(hours)
 		e.DeliveryHours = jsonObjectOrEmpty(delivery)
+		e.SocialLinks = jsonArrayOrEmpty(socialLinks)
 		e.Photos = sanitizePhotos(photos)
 		if pqTags != nil {
 			e.Tags = pqTags
@@ -171,7 +174,7 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 
 	var e models.Entry
 	var pqLanguages []string
-	var hours, delivery, photos []byte
+	var hours, delivery, socialLinks, photos []byte
 	err := db.DB.QueryRow(`
 		SELECT 
 			e.id, COALESCE(typ.name, ''), COALESCE(ec.name, ''), e.name, e.slug, 
@@ -180,6 +183,7 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 			e.languages, COALESCE(e.url, ''),
 			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+			COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE((SELECT l.coordinates FROM locations l WHERE l.id = s.id), ''),
 			COALESCE(e.photos, '[]'::jsonb),
 			COALESCE(e.ratings_enabled, false)
 		FROM entries e
@@ -187,7 +191,7 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
-		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &photos, &e.RatingsEnabled)
+		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &e.HoursEnabled, &e.DeliveryEnabled, &socialLinks, &e.LocationCoordinates, &photos, &e.RatingsEnabled)
 
 	if err != nil {
 		http.Error(w, "Entry not found", 404)
@@ -198,6 +202,7 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 	e.Type = utils.CanonicalEntryType(e.Type)
 	e.Hours = jsonObjectOrEmpty(hours)
 	e.DeliveryHours = jsonObjectOrEmpty(delivery)
+	e.SocialLinks = jsonArrayOrEmpty(socialLinks)
 	e.Photos = sanitizePhotos(photos)
 
 	rows, _ := db.DB.Query("SELECT t.name FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = $1", e.ID)

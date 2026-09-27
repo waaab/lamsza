@@ -19,12 +19,21 @@ func ApplyPublicEntryExtras(e *models.Entry, viewerUserID int) {
 // When liteMode is true, only loads rating and review_count (no reviews, no my_review).
 // Use lite mode for list/related views to avoid loading 50 reviews per card.
 func ApplyPublicEntryExtrasMode(e *models.Entry, viewerUserID int, liteMode bool) {
-	if !e.Claimed {
-		// Unclaimed: strip photos, hours, delivery_hours, ratings
+	if !e.Claimed || !e.Verified {
 		e.Photos = json.RawMessage("[]")
-		e.Hours = json.RawMessage("{}")
-		e.DeliveryHours = json.RawMessage("{}")
+	}
+	if !e.Claimed {
+		e.Phone = ""
+		e.SocialLinks = json.RawMessage("[]")
 		e.RatingsEnabled = false
+	}
+	if !e.HoursEnabled {
+		e.Hours = json.RawMessage("{}")
+	}
+	if !e.DeliveryEnabled {
+		e.DeliveryHours = json.RawMessage("{}")
+	}
+	if !e.Claimed {
 		return
 	}
 
