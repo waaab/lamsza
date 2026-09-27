@@ -12,6 +12,7 @@ import {
 
 test('showListingPhotos is true only when claimed, verified, and a photo is stored', () => {
 	assert.equal(showListingPhotos({ verified: true, claimed: false, photos: [{ id: 1 }] }), false);
+	assert.equal(showListingPhotos({ verified: false, claimed: true, photos: [{ id: 1 }] }), false);
 	assert.equal(showListingPhotos({ verified: true, claimed: true, photos: [{ id: 1 }] }), true);
 	assert.equal(showListingPhotos({ verified: true, claimed: true, photos: [] }), false);
 });
