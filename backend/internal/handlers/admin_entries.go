@@ -14,6 +14,16 @@ import (
 	"github.com/lib/pq"
 )
 
+func adminDeliveryEnabled(catName, name string, requested bool) bool {
+	if !requested {
+		return false
+	}
+	if strings.TrimSpace(name) == "Lámsza.com" {
+		return false
+	}
+	return strings.TrimSpace(catName) == utils.EntryCategoryVendeglo
+}
+
 func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -22,7 +32,8 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 				e.id, COALESCE(typ.name, ''), e.location_id, e.category_id, COALESCE(cat.name, ''), e.name, COALESCE(e.slug, ''),
 				COALESCE(e.url, ''), COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages,
-				COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
+				COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.hours_enabled, false),
+				COALESCE(e.delivery_hours, '{}'::jsonb), COALESCE(e.delivery_enabled, false),
 				COALESCE(e.photos, '[]'::jsonb),
 				COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), ARRAY[]::VARCHAR[]) as tags
 			FROM entries e
@@ -30,7 +41,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 			LEFT JOIN entry_categories cat ON cat.id = e.category_id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
-			GROUP BY e.id, typ.name, e.location_id, e.category_id, cat.name, e.name, e.url, e.phone, e.address, e.notes, e.languages, e.verified, e.hours, e.delivery_hours, e.photos
+			GROUP BY e.id, typ.name, e.location_id, e.category_id, cat.name, e.name, e.url, e.phone, e.address, e.notes, e.languages, e.verified, e.hours, e.hours_enabled, e.delivery_hours, e.delivery_enabled, e.photos
 			ORDER BY LOWER(e.name) ASC, e.id ASC
 		`
 		rows, err := db.DB.Query(sqlQuery)
@@ -47,7 +58,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 			var pqTags []string
 			var locID sql.NullInt64
 			var hours, delivery, photos []byte
-			if err := rows.Scan(&s.ID, &s.Type, &locID, &s.CategoryID, &s.Category, &s.Name, &s.Slug, &s.URL, &s.Phone, &s.Address, &s.Notes, pq.Array(&pqLanguages), &s.Verified, &hours, &delivery, &photos, pq.Array(&pqTags)); err == nil {
+			if err := rows.Scan(&s.ID, &s.Type, &locID, &s.CategoryID, &s.Category, &s.Name, &s.Slug, &s.URL, &s.Phone, &s.Address, &s.Notes, pq.Array(&pqLanguages), &s.Verified, &hours, &s.HoursEnabled, &delivery, &s.DeliveryEnabled, &photos, pq.Array(&pqTags)); err == nil {
 				if locID.Valid {
 					v := int(locID.Int64)
 					s.LocationID = &v
@@ -94,9 +105,10 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.Slug = utils.Slugify(s.Name)
 		s.Hours = jsonObjectOrEmpty(s.Hours)
 		s.DeliveryHours = jsonObjectOrEmpty(s.DeliveryHours)
+		s.DeliveryEnabled = adminDeliveryEnabled(catName, s.Name, s.DeliveryEnabled)
 		s.Photos = sanitizePhotos(s.Photos)
-		err = db.DB.QueryRow("INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, hours, delivery_hours, photos) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb, $15::jsonb) RETURNING id",
-			typeID, s.LocationID, catID, catName, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified, string(s.Hours), string(s.DeliveryHours), string(s.Photos)).Scan(&s.ID)
+		err = db.DB.QueryRow("INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, hours, hours_enabled, delivery_hours, delivery_enabled, photos) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15::jsonb, $16, $17::jsonb) RETURNING id",
+			typeID, s.LocationID, catID, catName, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified, string(s.Hours), s.HoursEnabled, string(s.DeliveryHours), s.DeliveryEnabled, string(s.Photos)).Scan(&s.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -139,12 +151,13 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.Slug = utils.Slugify(s.Name)
 		s.Hours = jsonObjectOrEmpty(s.Hours)
 		s.DeliveryHours = jsonObjectOrEmpty(s.DeliveryHours)
+		s.DeliveryEnabled = adminDeliveryEnabled(catName, s.Name, s.DeliveryEnabled)
 		s.Photos = sanitizePhotos(s.Photos)
 		_, err = db.DB.Exec(`UPDATE entries SET 
             type_id=$1, location_id=$2, category_id=$3, cat_name=$4, name=$5, slug=$6, url=$7, 
-            phone=$8, address=$9, notes=$10, languages=$11, verified=$12, hours=$13::jsonb, delivery_hours=$14::jsonb, photos=$15::jsonb 
-            WHERE id=$16`,
-			typeID, s.LocationID, catID, catName, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified, string(s.Hours), string(s.DeliveryHours), string(s.Photos), s.ID)
+            phone=$8, address=$9, notes=$10, languages=$11, verified=$12, hours=$13::jsonb, hours_enabled=$14, delivery_hours=$15::jsonb, delivery_enabled=$16, photos=$17::jsonb 
+            WHERE id=$18`,
+			typeID, s.LocationID, catID, catName, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified, string(s.Hours), s.HoursEnabled, string(s.DeliveryHours), s.DeliveryEnabled, string(s.Photos), s.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return

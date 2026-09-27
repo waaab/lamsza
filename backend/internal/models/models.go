@@ -240,10 +240,12 @@ type AdminEntry struct {
 	Notes         string          `json:"notes"`
 	Languages     []string        `json:"languages"`
 	Tags          []string        `json:"tags"`
-	Verified      bool            `json:"verified"`
-	Hours         json.RawMessage `json:"hours"`
-	DeliveryHours json.RawMessage `json:"delivery_hours"`
-	Photos        json.RawMessage `json:"photos"`
+	Verified        bool            `json:"verified"`
+	Hours           json.RawMessage `json:"hours"`
+	HoursEnabled    bool            `json:"hours_enabled"`
+	DeliveryHours   json.RawMessage `json:"delivery_hours"`
+	DeliveryEnabled bool            `json:"delivery_enabled"`
+	Photos          json.RawMessage `json:"photos"`
 }
 
 type EntryCategory struct {
