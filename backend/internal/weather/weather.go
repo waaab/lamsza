@@ -323,8 +323,46 @@ func fetchOpenMeteoByCoords(lat, lon float64) (*UnifiedWeatherResponse, error) {
 	}, nil
 }
 
+// geocodeNameVariants lists Open-Meteo search strings. The geocoder stores
+// Miercurea Ciuc as "Miercurea-Ciuc", so a spaced Romanian name returns no hit.
+func geocodeNameVariants(city string) []string {
+	city = strings.TrimSpace(city)
+	if city == "" {
+		return nil
+	}
+	variants := []string{city}
+	hyphenated := strings.Join(strings.Fields(city), "-")
+	if hyphenated != city {
+		variants = append(variants, hyphenated)
+	}
+	return variants
+}
+
+func isNoGeocodeResults(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no results")
+}
+
 // Open-Meteo: geocode then current weather
 func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
+	names := geocodeNameVariants(city)
+	if len(names) == 0 {
+		return nil, fmt.Errorf("open-meteo geocode: no results")
+	}
+	var lastErr error
+	for _, name := range names {
+		out, err := fetchOpenMeteoByName(name)
+		if err == nil {
+			return out, nil
+		}
+		lastErr = err
+		if !isNoGeocodeResults(err) {
+			return nil, err
+		}
+	}
+	return nil, lastErr
+}
+
+func fetchOpenMeteoByName(city string) (*UnifiedWeatherResponse, error) {
 	geoURL := "https://geocoding-api.open-meteo.com/v1/search?name=" + url.QueryEscape(city) + "&count=1"
 	resp, err := http.Get(geoURL)
 	if err != nil {
