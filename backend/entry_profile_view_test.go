@@ -180,3 +180,73 @@ func TestAdminEntriesStoreHoursAndDeliverySwitches(t *testing.T) {
 		t.Fatalf("delivery_enabled: expected true for Vendéglő, got %v", found["delivery_enabled"])
 	}
 }
+
+func TestPublicHoursSwitch(t *testing.T) {
+	locID := mustLocID(t)
+	id, slug := createEntry(t, "Public Hours Switch", locID)
+	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+
+	entryIDInt := int(id.(float64))
+	_, err := db.DB.Exec(`
+		UPDATE entries
+		SET hours = '{"mon":{"open":"09:00","close":"17:00","closed":false}}'::jsonb,
+		    hours_enabled = false
+		WHERE id = $1
+	`, entryIDInt)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	payload := map[string]interface{}{
+		"id":            id,
+		"name":          "Public Hours Switch",
+		"location_id":   locID,
+		"type":          "entry",
+		"category":      "Egyéb",
+		"hours_enabled": true,
+		"hours":         map[string]interface{}{},
+	}
+	rr := doRequest(t, "PUT", "/api/admin/entries", payload)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("PUT entries hours on: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry hours on: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	var got map[string]interface{}
+	json.Unmarshal(rr.Body.Bytes(), &got)
+	if got["hours_enabled"] != true {
+		t.Fatalf("hours_enabled: expected true, got %v", got["hours_enabled"])
+	}
+	hours, ok := got["hours"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("hours: expected JSON object, got %T (%v)", got["hours"], got["hours"])
+	}
+	if len(hours) != 0 {
+		t.Fatalf("hours: expected empty object when switch on, got %v", got["hours"])
+	}
+
+	payload["hours_enabled"] = false
+	rr = doRequest(t, "PUT", "/api/admin/entries", payload)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("PUT entries hours off: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET entry hours off: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	json.Unmarshal(rr.Body.Bytes(), &got)
+	if got["hours_enabled"] != false {
+		t.Fatalf("hours_enabled: expected false, got %v", got["hours_enabled"])
+	}
+	hours, ok = got["hours"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("hours: expected JSON object, got %T (%v)", got["hours"], got["hours"])
+	}
+	if len(hours) != 0 {
+		t.Fatalf("hours: expected empty object when switch off, got %v", got["hours"])
+	}
+}
