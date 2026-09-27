@@ -6,7 +6,7 @@ export function offersDelivery(entry) {
 }
 
 export function showListingPhotos(entry) {
-	return Boolean(entry?.verified) && Array.isArray(entry?.photos) && entry.photos.length > 0;
+	return Boolean(entry?.claimed) && Boolean(entry?.verified) && Array.isArray(entry?.photos) && entry.photos.length > 0;
 }
 
 export function showListingHours(entry) {
@@ -42,7 +42,7 @@ export function showListingLanguages(entry) {
 }
 
 export function listingTextExpanded(entry) {
-	return Boolean(entry?.verified);
+	return Boolean(entry?.claimed) && Boolean(entry?.verified);
 }
 
 export { hoursConfigured };

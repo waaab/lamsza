@@ -10,10 +10,10 @@ import {
 	listingTextExpanded
 } from '../src/lib/entryPublicExtras.js';
 
-test('showListingPhotos is true only when verified and a photo is stored', () => {
-	assert.equal(showListingPhotos({ verified: false, claimed: true, photos: [{ id: 1 }] }), false);
-	assert.equal(showListingPhotos({ verified: true, claimed: false, photos: [{ id: 1 }] }), true);
-	assert.equal(showListingPhotos({ verified: true, photos: [] }), false);
+test('showListingPhotos is true only when claimed, verified, and a photo is stored', () => {
+	assert.equal(showListingPhotos({ verified: true, claimed: false, photos: [{ id: 1 }] }), false);
+	assert.equal(showListingPhotos({ verified: true, claimed: true, photos: [{ id: 1 }] }), true);
+	assert.equal(showListingPhotos({ verified: true, claimed: true, photos: [] }), false);
 });
 
 test('showListingHours follows hours_enabled even when gazdátlan or the week is empty', () => {
@@ -47,9 +47,10 @@ test('phone and social show only when claimed and stored', () => {
 	assert.equal(showListingSocial({ claimed: false, social_links: [{ label: 'Facebook', url: 'https://facebook.com/a' }] }), false);
 });
 
-test('listingTextExpanded is true only when verified', () => {
+test('listingTextExpanded is true only when claimed and verified', () => {
+	assert.equal(listingTextExpanded({ verified: true, claimed: false }), false);
+	assert.equal(listingTextExpanded({ verified: true, claimed: true }), true);
 	assert.equal(listingTextExpanded({ verified: false, claimed: true }), false);
-	assert.equal(listingTextExpanded({ verified: true, claimed: false }), true);
 });
 
 test('showListingRatings returns false for unclaimed entry', () => {
