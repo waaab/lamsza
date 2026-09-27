@@ -58,11 +58,11 @@
                 error = "Ez a domain már jóváhagyásra vár.";
             } else if (res.status === 409 && data.error === "domain_taken") {
                 if (data.listing?.name) {
-                    error = `Ezt a domaint már használja: ${data.listing.name}`;
+                    error = `Ez a domain már használatban van: ${data.listing.name}`;
                 } else if (data.website) {
-                    error = `Ezt a domaint már használja: ${data.website.title} (${data.website.domain})`;
+                    error = `Ez a domain már használatban van: ${data.website.title} (${data.website.domain})`;
                 } else {
-                    error = "Ezt a domaint már átvették.";
+                    error = "Ez a domain már használatban van.";
                 }
             } else {
                 error = "A küldés nem sikerült.";
