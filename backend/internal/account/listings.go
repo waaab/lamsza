@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -65,6 +66,8 @@ type createListingBody struct {
 	Languages     []string        `json:"languages"`
 	Hours         json.RawMessage `json:"hours"`
 	DeliveryHours json.RawMessage `json:"delivery_hours"`
+	HoursEnabled  bool            `json:"hours_enabled"`
+	DeliveryEnabled bool          `json:"delivery_enabled"`
 	Photos        json.RawMessage `json:"photos"`
 }
 
@@ -144,6 +147,46 @@ type listingPhoto struct {
 	Description string `json:"description"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
+}
+
+type listingSocialLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
+}
+
+func listingDeliveryEnabled(catName, name string, requested bool) bool {
+	if !requested {
+		return false
+	}
+	if strings.TrimSpace(name) == "Lámsza.com" {
+		return false
+	}
+	return strings.TrimSpace(catName) == utils.EntryCategoryVendeglo
+}
+
+func sanitizeSocialLinks(raw json.RawMessage) json.RawMessage {
+	raw = photosArrayOrEmpty(raw)
+	var in []listingSocialLink
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return json.RawMessage(`[]`)
+	}
+	out := make([]listingSocialLink, 0, len(in))
+	for _, link := range in {
+		url := strings.TrimSpace(link.URL)
+		lower := strings.ToLower(url)
+		if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+			continue
+		}
+		out = append(out, listingSocialLink{
+			Label: strings.TrimSpace(link.Label),
+			URL:   url,
+		})
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return json.RawMessage(`[]`)
+	}
+	return json.RawMessage(b)
 }
 
 func photosOrEmpty(raw json.RawMessage) string {
@@ -836,6 +879,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
+	deliveryEnabled := listingDeliveryEnabled(catName, body.Name, body.DeliveryEnabled)
 	photos := string(sanitizeListingPhotosLimit(body.Photos, 1))
 
 	tx, err := db.DB.Begin()
@@ -879,10 +923,10 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 
 	var entryID int
 	err = tx.QueryRow(`
-		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, delivery_hours, photos, ratings_enabled)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13::jsonb, $14::jsonb, false)
+		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, hours_enabled, delivery_hours, delivery_enabled, photos, ratings_enabled)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13, $14::jsonb, $15, $16::jsonb, false)
 		RETURNING id
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, delivery, photos).Scan(&entryID)
+	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, body.HoursEnabled, delivery, deliveryEnabled, photos).Scan(&entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -964,11 +1008,22 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
-	var body updateListingBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
+	var body updateListingBody
+	if err := json.Unmarshal(rawBody, &body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(rawBody, &rawFields); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	_, hasSocialLinks := rawFields["social_links"]
 	if body.Name == "" || body.LocationID <= 0 || body.CategoryID <= 0 || body.TypeID <= 0 {
 		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
 		return
@@ -992,7 +1047,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 
 	hours := jsonObjectOrEmptyListing(body.Hours)
 	delivery := jsonObjectOrEmptyListing(body.DeliveryHours)
-	socialLinks := string(photosArrayOrEmpty(body.SocialLinks))
+	body.DeliveryEnabled = listingDeliveryEnabled(catName, body.Name, body.DeliveryEnabled)
 	claimed, err := listingClaimed(entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1017,16 +1072,30 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
-	_, err = db.DB.Exec(`
-		UPDATE entries SET
-			type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5,
-			url = $6, phone = $7, address = $8, notes = $9, languages = $10,
-			hours = $11::jsonb, hours_enabled = $12, delivery_hours = $13::jsonb, delivery_enabled = $14,
-			social_links = $15::jsonb, photos = $16::jsonb, ratings_enabled = $17
-		WHERE id = $18
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
-		listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
-		hours, body.HoursEnabled, delivery, body.DeliveryEnabled, socialLinks, photos, body.RatingsEnabled, entryID)
+	if hasSocialLinks {
+		socialLinks := string(sanitizeSocialLinks(body.SocialLinks))
+		_, err = db.DB.Exec(`
+			UPDATE entries SET
+				type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5,
+				url = $6, phone = $7, address = $8, notes = $9, languages = $10,
+				hours = $11::jsonb, hours_enabled = $12, delivery_hours = $13::jsonb, delivery_enabled = $14,
+				social_links = $15::jsonb, photos = $16::jsonb, ratings_enabled = $17
+			WHERE id = $18
+		`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
+			listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
+			hours, body.HoursEnabled, delivery, body.DeliveryEnabled, socialLinks, photos, body.RatingsEnabled, entryID)
+	} else {
+		_, err = db.DB.Exec(`
+			UPDATE entries SET
+				type_id = $1, location_id = $2, category_id = $3, cat_name = $4, name = $5,
+				url = $6, phone = $7, address = $8, notes = $9, languages = $10,
+				hours = $11::jsonb, hours_enabled = $12, delivery_hours = $13::jsonb, delivery_enabled = $14,
+				photos = $15::jsonb, ratings_enabled = $16
+			WHERE id = $17
+		`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
+			listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
+			hours, body.HoursEnabled, delivery, body.DeliveryEnabled, photos, body.RatingsEnabled, entryID)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

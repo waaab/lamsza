@@ -41,7 +41,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
 				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
-				COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE((SELECT l.coordinates FROM locations l WHERE l.id = s.id), ''),
+				COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE(gl.latitude::text || ', ' || gl.longitude::text, ''),
 				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				ts_rank_cd(e.search_vector, plainto_tsquery('simple', $2)) as rank,
@@ -50,6 +50,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 			FROM entries e
 			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
+			LEFT JOIN geo_locations gl ON gl.id = s.location_id
 			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
@@ -68,7 +69,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
 				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
-				COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE((SELECT l.coordinates FROM locations l WHERE l.id = s.id), ''),
+				COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE(gl.latitude::text || ', ' || gl.longitude::text, ''),
 				COALESCE(e.photos, '[]'::jsonb),
 				CASE WHEN unaccent(LOWER(e.name)) = unaccent(LOWER($1)) THEN true ELSE false END as is_direct_match,
 				0 as rank,
@@ -77,6 +78,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 			FROM entries e
 			JOIN entry_types typ ON typ.id = e.type_id
 			JOIN settlements s ON e.location_id = s.id
+			LEFT JOIN geo_locations gl ON gl.id = s.location_id
 			JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
@@ -109,9 +111,9 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if q != "" && normalizedQ != "" {
-		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, e.photos ORDER BY is_direct_match DESC, rank DESC, btrim(e.name) ASC, e.id ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, e.name, e.slug, s.id, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.phone, e.address, e.notes, e.languages, e.url, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, gl.latitude, gl.longitude, e.photos, e.ratings_enabled ORDER BY is_direct_match DESC, rank DESC, btrim(e.name) ASC, e.id ASC"
 	} else {
-		sqlQuery += " GROUP BY e.id, typ.name, ec.name, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, e.photos ORDER BY is_direct_match DESC, btrim(e.name) ASC, e.id ASC"
+		sqlQuery += " GROUP BY e.id, typ.name, ec.name, e.name, e.slug, s.id, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.phone, e.address, e.notes, e.languages, e.url, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, gl.latitude, gl.longitude, e.photos, e.ratings_enabled ORDER BY is_direct_match DESC, btrim(e.name) ASC, e.id ASC"
 	}
 
 	log.Printf("EntriesHandler query: %s", sqlQuery)
@@ -183,12 +185,13 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 			e.languages, COALESCE(e.url, ''),
 			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
-			COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE((SELECT l.coordinates FROM locations l WHERE l.id = s.id), ''),
+			COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE(gl.latitude::text || ', ' || gl.longitude::text, ''),
 			COALESCE(e.photos, '[]'::jsonb),
 			COALESCE(e.ratings_enabled, false)
 		FROM entries e
 		JOIN entry_types typ ON typ.id = e.type_id
 		JOIN settlements s ON e.location_id = s.id
+		LEFT JOIN geo_locations gl ON gl.id = s.location_id
 		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
 		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &e.HoursEnabled, &e.DeliveryEnabled, &socialLinks, &e.LocationCoordinates, &photos, &e.RatingsEnabled)

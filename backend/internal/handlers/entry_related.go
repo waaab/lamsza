@@ -24,6 +24,7 @@ type relatedEntry struct {
 	CountySlug   string          `json:"county_slug"`
 	Photos       json.RawMessage `json:"photos"`
 	Claimed      bool            `json:"claimed"`
+	Verified     bool            `json:"-"`
 }
 
 func HandleEntryRelated(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +59,8 @@ func HandleEntryRelated(w http.ResponseWriter, r *http.Request) {
 	nearby := queryRelatedEntries(`
 		SELECT e.id::text, e.name, COALESCE(e.slug,''), COALESCE(ec.name,''),
 			s.name, s.slug, c.slug, COALESCE(e.photos, '[]'::jsonb),
-			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active')
+			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'),
+			COALESCE(e.verified, false)
 		FROM entries e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
@@ -73,7 +75,8 @@ func HandleEntryRelated(w http.ResponseWriter, r *http.Request) {
 		pad := queryRelatedEntries(`
 			SELECT e.id::text, e.name, COALESCE(e.slug,''), COALESCE(ec.name,''),
 				s.name, s.slug, c.slug, COALESCE(e.photos, '[]'::jsonb),
-				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active')
+				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'),
+				COALESCE(e.verified, false)
 			FROM entries e
 			JOIN settlements s ON e.location_id = s.id
 			JOIN counties c ON s.county_id = c.id
@@ -91,7 +94,8 @@ func HandleEntryRelated(w http.ResponseWriter, r *http.Request) {
 		related = queryRelatedEntries(`
 			SELECT e.id::text, e.name, COALESCE(e.slug,''), COALESCE(ec.name,''),
 				s.name, s.slug, c.slug, COALESCE(e.photos, '[]'::jsonb),
-				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active')
+				EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'),
+				COALESCE(e.verified, false)
 			FROM entries e
 			JOIN settlements s ON e.location_id = s.id
 			JOIN counties c ON s.county_id = c.id
@@ -126,13 +130,12 @@ func queryRelatedEntries(sql string, args ...any) []relatedEntry {
 	for rows.Next() {
 		var e relatedEntry
 		var photos json.RawMessage
-		if err := rows.Scan(&e.ID, &e.Name, &e.Slug, &e.Category, &e.Location, &e.LocationSlug, &e.CountySlug, &photos, &e.Claimed); err != nil {
+		if err := rows.Scan(&e.ID, &e.Name, &e.Slug, &e.Category, &e.Location, &e.LocationSlug, &e.CountySlug, &photos, &e.Claimed, &e.Verified); err != nil {
 			log.Printf("queryRelatedEntries: Scan error: %v", err)
 			continue
 		}
 		e.Photos = sanitizePhotos(photos)
-		// Strip photos for unclaimed entries
-		if !e.Claimed {
+		if !e.Claimed || !e.Verified {
 			e.Photos = json.RawMessage("[]")
 		}
 		out = append(out, e)
