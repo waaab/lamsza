@@ -13,6 +13,7 @@
     import { getApiBase, apiCall } from "$lib/api.js";
     import { ENTRY_TYPE_SERVICE } from "$lib/entryType.js";
     import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import { offersDelivery } from "$lib/entryPublicExtras.js";
     import { emptyPhotos, normalizePhotos } from "$lib/entryPhotos.js";
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
     import EntryPhotosEditor from "$lib/components/EntryPhotosEditor.svelte";
@@ -190,6 +191,8 @@
         verified: false,
         hours: emptyWeekHours(),
         delivery_hours: emptyWeekHours(),
+        hours_enabled: false,
+        delivery_enabled: false,
         photos: emptyPhotos(),
     };
     let newEntryCategory = { name: "" };
@@ -3255,6 +3258,13 @@
         return c ? c.name : "-";
     }
 
+    function adminOffersDelivery(entry) {
+        const categoryName =
+            String(entry?.category ?? "").trim() ||
+            getCategoryName(entry?.category_id);
+        return offersDelivery({ name: entry?.name, category: categoryName });
+    }
+
     // --- Submit entry (Create) ---
     function submitEntry(e) {
         e.preventDefault();
@@ -3268,6 +3278,10 @@
             verified: Boolean(newEntry.verified),
             hours: normalizeHours(newEntry.hours),
             delivery_hours: normalizeHours(newEntry.delivery_hours),
+            hours_enabled: Boolean(newEntry.hours_enabled),
+            delivery_enabled: adminOffersDelivery(newEntry)
+                ? Boolean(newEntry.delivery_enabled)
+                : false,
             photos: normalizePhotos(newEntry.photos),
         };
         createRecord(
@@ -3289,6 +3303,8 @@
                     verified: false,
                     hours: emptyWeekHours(),
                     delivery_hours: emptyWeekHours(),
+                    hours_enabled: false,
+                    delivery_enabled: false,
                     photos: emptyPhotos(),
                 }),
         );
@@ -3304,6 +3320,8 @@
             verified: Boolean(entry.verified),
             hours: normalizeHours(entry.hours),
             delivery_hours: normalizeHours(entry.delivery_hours),
+            hours_enabled: Boolean(entry.hours_enabled),
+            delivery_enabled: Boolean(entry.delivery_enabled),
             photos: normalizePhotos(entry.photos),
         };
         editTagsStr = tagsToStr(entry.tags);
@@ -3326,6 +3344,10 @@
             verified: Boolean(editingEntry.verified),
             hours: normalizeHours(editingEntry.hours),
             delivery_hours: normalizeHours(editingEntry.delivery_hours),
+            hours_enabled: Boolean(editingEntry.hours_enabled),
+            delivery_enabled: adminOffersDelivery(editingEntry)
+                ? Boolean(editingEntry.delivery_enabled)
+                : false,
             photos: normalizePhotos(editingEntry.photos),
         };
         await updateRecord("entries", payload, fetchEntries);
@@ -6200,11 +6222,31 @@
                         </label>
                         <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény).</p>
 
-                        <span class="form-group-label">Nyitvatartás</span>
-                        <EntryHoursEditor bind:hours={newEntry.hours} />
+                        <label class="flex items-center gap-xs font-normal">
+                            <input
+                                type="checkbox"
+                                bind:checked={newEntry.hours_enabled}
+                                class="w-auto"
+                            />
+                            Nyitvatartás / Program
+                        </label>
+                        {#if newEntry.hours_enabled}
+                            <EntryHoursEditor bind:hours={newEntry.hours} />
+                        {/if}
 
-                        <span class="form-group-label">Kiszállítási idő</span>
-                        <EntryHoursEditor bind:hours={newEntry.delivery_hours} />
+                        {#if adminOffersDelivery(newEntry)}
+                            <label class="flex items-center gap-xs font-normal">
+                                <input
+                                    type="checkbox"
+                                    bind:checked={newEntry.delivery_enabled}
+                                    class="w-auto"
+                                />
+                                Kiszállítási idő
+                            </label>
+                            {#if newEntry.delivery_enabled}
+                                <EntryHoursEditor bind:hours={newEntry.delivery_hours} />
+                            {/if}
+                        {/if}
 
                         <span class="form-group-label">Fotók</span>
                         <EntryPhotosEditor
@@ -7772,11 +7814,31 @@
                     </label>
                     <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény).</p>
 
-                    <span class="form-group-label">Nyitvatartás</span>
-                    <EntryHoursEditor bind:hours={editingEntry.hours} />
+                    <label class="flex items-center gap-xs font-normal">
+                        <input
+                            type="checkbox"
+                            bind:checked={editingEntry.hours_enabled}
+                            class="w-auto"
+                        />
+                        Nyitvatartás / Program
+                    </label>
+                    {#if editingEntry.hours_enabled}
+                        <EntryHoursEditor bind:hours={editingEntry.hours} />
+                    {/if}
 
-                    <span class="form-group-label">Kiszállítási idő</span>
-                    <EntryHoursEditor bind:hours={editingEntry.delivery_hours} />
+                    {#if adminOffersDelivery(editingEntry)}
+                        <label class="flex items-center gap-xs font-normal">
+                            <input
+                                type="checkbox"
+                                bind:checked={editingEntry.delivery_enabled}
+                                class="w-auto"
+                            />
+                            Kiszállítási idő
+                        </label>
+                        {#if editingEntry.delivery_enabled}
+                            <EntryHoursEditor bind:hours={editingEntry.delivery_hours} />
+                        {/if}
+                    {/if}
 
                     <span class="form-group-label">Fotók</span>
                     <EntryPhotosEditor

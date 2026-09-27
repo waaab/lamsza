@@ -4,7 +4,8 @@
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import { canonicalDomain } from "$lib/websiteDomain.js";
-    import { emptyWeekHours, hoursConfigured, normalizeHours } from "$lib/entryHours.js";
+    import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import { offersDelivery } from "$lib/entryPublicExtras.js";
     import {
         DEFAULT_PHOTO_HEIGHT,
         DEFAULT_PHOTO_WIDTH,
@@ -77,6 +78,15 @@
     let listingTypes = $state([]);
     let listingForm = $state(emptyListingForm());
     let hoursEnabled = $state(false);
+    let deliveryEnabled = $state(false);
+    let listingOffersDelivery = $derived(
+        offersDelivery({
+            name: listingForm.name,
+            category:
+                listingCategories.find((row) => row.id === Number(listingForm.category_id))?.name ??
+                "",
+        }),
+    );
     let listingWebsiteId = $state(0);
     /** @type {null | { id: number, title: string, description: string, domain: string, url: string, status: string, claimed: boolean, entry_id: number, published: boolean, membership: string }} */
     let matchedWebsite = $state(null);
@@ -331,8 +341,10 @@
             address: String(form.address ?? "").trim(),
             notes: String(form.notes ?? "").trim(),
             languages: languages.length ? languages : ["HU"],
-            hours: hoursEnabled ? normalizeHours(form.hours) : emptyWeekHours(),
+            hours: normalizeHours(form.hours),
+            hours_enabled: hoursEnabled,
             delivery_hours: normalizeHours(form.delivery_hours),
+            delivery_enabled: listingOffersDelivery ? deliveryEnabled : false,
             photos: normalizePhotos(form.photos).slice(0, listingPhotoLimit),
             ratings_enabled: mode === "edit" ? Boolean(form.ratings_enabled) : false,
             ...(mode === "create" && listingWebsiteId > 0 ? { website_id: listingWebsiteId } : {}),
@@ -407,7 +419,8 @@
                 photos: normalizePhotos(detail.photos),
                 ratings_enabled: Boolean(detail.ratings_enabled),
             };
-            hoursEnabled = hoursConfigured(listingForm.hours);
+            hoursEnabled = Boolean(detail.hours_enabled);
+            deliveryEnabled = Boolean(detail.delivery_enabled);
         } catch {
             onError("A betöltés nem sikerült");
             onClose();
@@ -552,9 +565,14 @@
                     <EntryHoursEditor bind:hours={listingForm.hours} />
                 {/if}
 
-                {#if mode === "edit"}
-                    <h4>Kiszállítási idő</h4>
-                    <EntryHoursEditor bind:hours={listingForm.delivery_hours} />
+                {#if mode === "edit" && listingOffersDelivery}
+                    <label class="link-dialog-check">
+                        <input type="checkbox" bind:checked={deliveryEnabled} />
+                        Kiszállítási idő
+                    </label>
+                    {#if deliveryEnabled}
+                        <EntryHoursEditor bind:hours={listingForm.delivery_hours} />
+                    {/if}
                 {/if}
 
                 <div class="profile-listing-photos">
