@@ -8,7 +8,7 @@
         description = "",
         accent = "none",
         external = false,
-        claimed = false,
+        claimed = null,
     } = $props();
 </script>
 
@@ -22,8 +22,8 @@
 >
     <span class="search-result-card__title">
         {title}
-        {#if claimed}
-            <ClaimMark claimed={true} />
+        {#if claimed === true || claimed === false}
+            <ClaimMark {claimed} />
         {/if}
     </span>
     {#if meta}
@@ -59,7 +59,9 @@
     }
 
     .search-result-card__title {
-        display: block;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
         font-weight: 500;
     }
 

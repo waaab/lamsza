@@ -6436,7 +6436,7 @@
                     <section class="admin-form-section">
                         <h3>Alapértelmezett település (MyLocation)</h3>
                         <p class="admin-hint">Ez a vendégek, és a saját település nélküli felhasználók alaphelye a kezdőlapon és az index közelségi rendezésénél. A saját települést mindenki a felhasználói beállításokban állítja; a kereső és az index szűrője csak a találatokat szűri.</p>
-                        <div class="admin-form" style="max-width: 32rem;">
+                        <div class="admin-form">
                             <label for="my_location_slug">Település</label>
                             <select id="my_location_slug" name="my_location_slug" bind:value={siteSettings.my_location_slug}>
                                 {#each settlementsForSelect as loc}
@@ -6453,7 +6453,7 @@
 
                     <section class="admin-form-section">
                         <h3>Időjárás (Weather)</h3>
-                        <div class="admin-form" style="max-width: 32rem;">
+                        <div class="admin-form">
                             <label for="weather_provider_default">Alapértelmezett szolgáltató</label>
                             <select id="weather_provider_default" name="weather_provider_default" bind:value={siteSettings.weather_provider_default}>
                                 <option value="open_meteo">Open-Meteo</option>

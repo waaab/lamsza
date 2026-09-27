@@ -672,7 +672,7 @@ func handleDeleteListingMember(w http.ResponseWriter, r *http.Request, ownerUser
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	writeOK(w)
 }
 
 func handleListListings(w http.ResponseWriter, userID int) {
@@ -1021,7 +1021,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	writeOK(w)
 }
 
 func handleDeleteListing(w http.ResponseWriter, r *http.Request, userID int) {
@@ -1046,5 +1046,5 @@ func handleDeleteListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
+	writeOK(w)
 }

@@ -1,6 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import { get } from "svelte/store";
+    import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { userAccountTabIds } from "$lib/accountPrefs.js";
@@ -34,11 +35,40 @@
     }
 
     let activeTab = $state(userAccountTabIds[0]);
+    let confirmOpen = $state(false);
+    let confirmMessage = $state("");
+    /** @type {((accepted: boolean) => void) | null} */
+    let confirmResolve = null;
     let displayName = $state("");
     let displayNameError = $state("");
+    let displayNameOk = $state("");
     let displayNameSaving = $state(false);
     let linksError = $state("");
+    let linksOk = $state("");
     let historyError = $state("");
+    let historyOk = $state("");
+
+    /** @param {string} message */
+    function askConfirm(message) {
+        if (confirmResolve) {
+            const previous = confirmResolve;
+            confirmResolve = null;
+            previous(false);
+        }
+        confirmMessage = message;
+        confirmOpen = true;
+        return new Promise((resolve) => {
+            confirmResolve = resolve;
+        });
+    }
+
+    /** @param {boolean} accepted */
+    function closeConfirm(accepted) {
+        confirmOpen = false;
+        const resolve = confirmResolve;
+        confirmResolve = null;
+        resolve?.(accepted);
+    }
     /** @type {Array<{ id: number, title: string, url: string, bg_color?: string, position?: number }>} */
     let accountLinks = $state([]);
     /** @type {Array<{ slug: string, name: string, category?: string, location?: string, photo?: string }>} */
@@ -46,6 +76,7 @@
     let linksLoading = $state(false);
     let historyLoading = $state(false);
     let favoritesError = $state("");
+    let favoritesOk = $state("");
     /** @type {{ settlements: Array<{ id: number, name: string, slug?: string | null, county_slug?: string | null }>, attractions: Array<{ id: number, name: string, slug?: string | null, county_slug?: string | null }>, entries: Array<{ id: number, name: string, slug?: string | null }>, events: Array<{ id: number, name: string }> }} */
     let accountFavorites = $state({
         settlements: [],
@@ -69,7 +100,7 @@
         try {
             accountLinks = (await apiFetch("/api/account/links")) || [];
         } catch {
-            linksError = "A mentés nem sikerült";
+            linksError = "A betöltés nem sikerült";
         } finally {
             linksLoading = false;
         }
@@ -77,10 +108,11 @@
 
     async function loadHistory() {
         historyLoading = true;
+        historyError = "";
         try {
             accountHistory = (await apiFetch("/api/account/history")) || [];
         } catch {
-            accountHistory = [];
+            historyError = "A betöltés nem sikerült";
         } finally {
             historyLoading = false;
         }
@@ -98,12 +130,7 @@
                 events: Array.isArray(payload.events) ? payload.events : [],
             };
         } catch {
-            accountFavorites = {
-                settlements: [],
-                attractions: [],
-                entries: [],
-                events: [],
-            };
+            favoritesError = "A betöltés nem sikerült";
         } finally {
             favoritesLoading = false;
         }
@@ -131,7 +158,10 @@
 
     /** @param {"settlement" | "attraction" | "entry" | "event"} type @param {number} id */
     async function removeFavoriteRow(type, id) {
+        const yes = await askConfirm("Biztosan eltávolítod a kedvencek közül?");
+        if (!yes) return;
         favoritesError = "";
+        favoritesOk = "";
         const prev = accountFavorites;
         const key =
             type === "settlement"
@@ -147,9 +177,10 @@
                 ...prev,
                 [key]: prev[key].filter((row) => row.id !== id),
             };
+            favoritesOk = "Az eltávolítás sikerült.";
         } catch {
             accountFavorites = prev;
-            favoritesError = "A mentés nem sikerült";
+            favoritesError = "Az eltávolítás nem sikerült.";
         }
     }
 
@@ -177,7 +208,14 @@
 
     async function saveLinkDialog(e) {
         e.preventDefault();
+        const yes = await askConfirm(
+            linkDialogMode === "add"
+                ? "Biztosan hozzáadod ezt a linket?"
+                : "Biztosan mented a link módosításait?",
+        );
+        if (!yes) return;
         linksError = "";
+        linksOk = "";
         const prevLinks = accountLinks;
         try {
             if (linkDialogMode === "add") {
@@ -206,10 +244,12 @@
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ links: next }),
                 });
+                linksOk = "A mentés sikerült.";
                 closeLinkDialog();
                 return;
             }
             await loadLinks();
+            if (!linksError) linksOk = "A mentés sikerült.";
             closeLinkDialog();
         } catch {
             accountLinks = prevLinks;
@@ -217,25 +257,32 @@
         }
     }
 
+    /** @param {number} id */
     async function deleteLink(id) {
+        const yes = await askConfirm("Biztosan törlöd ezt a linket?");
+        if (!yes) return false;
         linksError = "";
+        linksOk = "";
         const prevLinks = accountLinks;
         try {
             await apiFetch(`/api/account/links?id=${encodeURIComponent(String(id))}`, {
                 method: "DELETE",
             });
             accountLinks = prevLinks.filter((l) => l.id !== id);
+            linksOk = "A törlés sikerült.";
+            return true;
         } catch {
             accountLinks = prevLinks;
-            linksError = "A mentés nem sikerült";
+            linksError = "A törlés nem sikerült.";
+            return false;
         }
     }
 
     async function deleteLinkFromDialog(e) {
         e.preventDefault();
         if (!linkDialogData.id) return;
-        await deleteLink(linkDialogData.id);
-        closeLinkDialog();
+        const deleted = await deleteLink(linkDialogData.id);
+        if (deleted) closeLinkDialog();
     }
 
     /** @param {number} index @param {number} delta */
@@ -243,6 +290,7 @@
         const target = index + delta;
         if (target < 0 || target >= accountLinks.length) return;
         linksError = "";
+        linksOk = "";
         const prevLinks = accountLinks;
         const next = [...accountLinks];
         const tmp = next[index];
@@ -254,15 +302,19 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ links: next }),
             });
+            linksOk = "A sorrend elmentve.";
         } catch {
             accountLinks = prevLinks;
-            linksError = "A mentés nem sikerült";
+            linksError = "A sorrend mentése nem sikerült.";
         }
     }
 
     /** @param {string} slug */
     async function removeHistoryRow(slug) {
+        const yes = await askConfirm("Biztosan eltávolítod ezt az előzményt?");
+        if (!yes) return;
         historyError = "";
+        historyOk = "";
         const prev = accountHistory;
         try {
             await apiFetch(
@@ -270,26 +322,34 @@
                 { method: "DELETE" },
             );
             accountHistory = prev.filter((row) => row.slug !== slug);
+            historyOk = "Az eltávolítás sikerült.";
         } catch {
             accountHistory = prev;
-            historyError = "A mentés nem sikerült";
+            historyError = "Az eltávolítás nem sikerült.";
         }
     }
 
     async function clearAllHistory() {
+        const yes = await askConfirm("Biztosan törlöd az összes böngészési előzményt?");
+        if (!yes) return;
         historyError = "";
+        historyOk = "";
         const prev = accountHistory;
         try {
             await apiFetch("/api/account/history", { method: "DELETE" });
             accountHistory = [];
+            historyOk = "A törlés sikerült.";
         } catch {
             accountHistory = prev;
-            historyError = "A mentés nem sikerült";
+            historyError = "A törlés nem sikerült.";
         }
     }
 
     async function saveDisplayName() {
+        const yes = await askConfirm("Biztosan mented a megjelenített nevet?");
+        if (!yes) return;
         displayNameError = "";
+        displayNameOk = "";
         const name = displayName.trim().replace(/\s+/g, " ");
         if ([...name].length > 24) {
             displayNameError = "A megjelenített név legfeljebb 24 karakter lehet.";
@@ -305,6 +365,7 @@
                 body: JSON.stringify({ display_name: name }),
             });
             await auth.refresh();
+            displayNameOk = "A mentés sikerült.";
         } catch {
             displayName = prev;
             displayNameError = "A mentés nem sikerült";
@@ -314,6 +375,7 @@
     }
 
     let listingsError = $state("");
+    let listingsOk = $state("");
     /** @type {{ owned: Array<Record<string, unknown>>, member: Array<Record<string, unknown>>, pending: Array<Record<string, unknown>>, unpublished: Array<Record<string, unknown>> }} */
     let accountListings = $state({
         owned: [],
@@ -367,7 +429,7 @@
             );
             await Promise.all(memberLoads);
         } catch {
-            listingsError = "A mentés nem sikerült";
+            listingsError = "A betöltés nem sikerült";
         } finally {
             listingsLoading = false;
         }
@@ -389,10 +451,10 @@
     /** @param {Record<string, unknown>} row */
     async function deleteListingRow(row) {
         const label = String(row.name ?? "").trim() || "ezt a bejegyzést";
-        if (!confirm(`Biztosan törlöd: ${label}?`)) {
-            return;
-        }
+        const yes = await askConfirm(`Biztosan törlöd: ${label}?`);
+        if (!yes) return;
         listingsError = "";
+        listingsOk = "";
         const prev = accountListings;
         const entryId = Number(row.id);
         try {
@@ -401,15 +463,19 @@
                 { method: "DELETE" },
             );
             await loadListings();
+            if (!listingsError) listingsOk = "A törlés sikerült.";
         } catch {
             accountListings = prev;
-            listingsError = "A mentés nem sikerült";
+            listingsError = "A törlés nem sikerült.";
         }
     }
 
     /** @param {number} entryId @param {number} userId */
     async function removeListingMember(entryId, userId) {
+        const yes = await askConfirm("Biztosan eltávolítod ezt a tagot?");
+        if (!yes) return;
         listingsError = "";
+        listingsOk = "";
         const prevMembers = listingMembersByEntry;
         try {
             await apiFetch(
@@ -422,9 +488,10 @@
                     (row) => row.user_id !== userId,
                 ),
             };
+            listingsOk = "Az eltávolítás sikerült.";
         } catch {
             listingMembersByEntry = prevMembers;
-            listingsError = "A mentés nem sikerült";
+            listingsError = "Az eltávolítás nem sikerült.";
         }
     }
 
@@ -529,6 +596,9 @@
                 {#if displayNameError}
                     <p class="profile-error">{displayNameError}</p>
                 {/if}
+                {#if displayNameOk}
+                    <p class="profile-ok">{displayNameOk}</p>
+                {/if}
                 <button
                     type="button"
                     class="btn profile-save"
@@ -580,6 +650,9 @@
             <div class="profile-listings">
                 {#if listingsError}
                     <p class="profile-error">{listingsError}</p>
+                {/if}
+                {#if listingsOk}
+                    <p class="profile-ok">{listingsOk}</p>
                 {/if}
                 {#if listingsLoading}
                     <p>Betöltés…</p>
@@ -740,6 +813,9 @@
                 {#if historyError}
                     <p class="profile-error">{historyError}</p>
                 {/if}
+                {#if historyOk}
+                    <p class="profile-ok">{historyOk}</p>
+                {/if}
                 {#if historyLoading}
                     <p>Betöltés…</p>
                 {:else if accountHistory.length === 0}
@@ -771,6 +847,9 @@
             <div class="profile-favorites">
                 {#if favoritesError}
                     <p class="profile-error">{favoritesError}</p>
+                {/if}
+                {#if favoritesOk}
+                    <p class="profile-ok">{favoritesOk}</p>
                 {/if}
                 {#if favoritesLoading}
                     <p>Betöltés…</p>
@@ -864,6 +943,9 @@
             <div class="profile-links">
                 {#if linksError}
                     <p class="profile-error">{linksError}</p>
+                {/if}
+                {#if linksOk}
+                    <p class="profile-ok">{linksOk}</p>
                 {/if}
                 <button type="button" class="btn" onclick={openAddLink}>Új link</button>
                 {#if linksLoading}
@@ -982,9 +1064,20 @@
         entryId={editingListingId}
         onClose={() => (editingListingId = 0)}
         onSaved={loadListings}
+        onNotice={(message) => {
+            listingsOk = message;
+            listingsError = "";
+        }}
         onError={(message) => (listingsError = message)}
     />
 {/if}
+
+<ConfirmDialog
+    open={confirmOpen}
+    message={confirmMessage}
+    onYes={() => closeConfirm(true)}
+    onNo={() => closeConfirm(false)}
+/>
 
 <style>
     .profile-page {
@@ -1049,6 +1142,10 @@
     .profile-error {
         margin: 0;
         color: #b00020;
+    }
+    .profile-ok {
+        margin: 0;
+        color: #3ddc97;
     }
     .profile-empty {
         margin: 0.5rem 0 0;

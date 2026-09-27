@@ -161,7 +161,7 @@
 <section id="esemenyek">
     <div class="event-widget component-box widget">
         <div class="widget-header" title="{filteredItems.length} {typeLabel ? typeLabel + 'i Esemény' : 'Esemény'}">
-            <h3 class="widget-title">Események{#if !loading} <span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel} <span class="type-label"> · {typeLabel}</span>{/if}{#if scoped} <span class="type-label"> · </span> <a href="/esemenyek">Összes esemény</a>{/if}</h3>
+            <h3 class="widget-title">Események{#if !loading}<span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel}<span class="type-label">&nbsp;·&nbsp;{typeLabel}</span>{/if}{#if scoped}<span class="type-label">&nbsp;·&nbsp;</span><a href="/esemenyek">Összes esemény</a>{/if}</h3>
             {#if !loading && (availableTypes.length > 1 || availableLocTypes.length > 1)}
                 <div class="event-type-badges">
                     {#if hasAnyFilter}

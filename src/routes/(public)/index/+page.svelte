@@ -2,6 +2,12 @@
     import { onMount } from "svelte";
     import { page } from "$app/stores";
     import AddWebsiteForm from "$lib/components/AddWebsiteForm.svelte";
+    import {
+        LISTING_CREATE_NOTE,
+        LISTING_CREATE_TITLE,
+        WEBSITE_CREATE_NOTE,
+        WEBSITE_CREATE_TITLE,
+    } from "$lib/indexCreateCopy.js";
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
@@ -345,10 +351,8 @@
                     type="button"
                     class="btn btn-primary btn-lg"
                     on:click={() => (addWebsiteOpen = true)}
-                >Add hozzá a weboldalad</button>
-                <p>
-                    Ingyenes. A webcím, a cím és egy rövid leírás kell. Az admin jóváhagyása után a weboldal megjelenik az indexen.
-                </p>
+                >{WEBSITE_CREATE_TITLE}</button>
+                <p>{WEBSITE_CREATE_NOTE}</p>
             </div>
         {:else}
             <div class="index-heading__add">
@@ -356,7 +360,8 @@
                     type="button"
                     class="btn btn-primary btn-lg"
                     on:click={openCreateListing}
-                >Új bejegyzés</button>
+                >{LISTING_CREATE_TITLE}</button>
+                <p>{LISTING_CREATE_NOTE}</p>
             </div>
         {/if}
     </div>

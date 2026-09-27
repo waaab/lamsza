@@ -1,7 +1,9 @@
 <script>
     import { apiCall } from "$lib/api.js";
+    import { WEBSITE_CREATE_NOTE, WEBSITE_CREATE_TITLE } from "$lib/indexCreateCopy.js";
     import { openLogin } from "$lib/openLogin.js";
     import { auth } from "$lib/stores/auth.js";
+    import { canonicalDomain, plainText } from "$lib/websiteDomain.js";
 
     /** @type {{ onClose: () => void }} */
     let { onClose } = $props();
@@ -12,6 +14,11 @@
     let error = $state("");
     let pending = $state(false);
     let submitted = $state(false);
+    let websiteReady = $derived(
+        canonicalDomain(domain) !== "" &&
+            plainText(title, 120) !== "" &&
+            plainText(description, 300) !== "",
+    );
 
     function fieldError(field) {
         if (field === "domain") return "A webcím nem érvényes.";
@@ -81,19 +88,17 @@
     }}
 >
     <div class="link-dialog add-website-form">
-        <h3 id="add-website-title">Add hozzá a weboldalad</h3>
-        <p class="add-website-form__explain">
-            Ingyenes. A webcím, a cím és egy rövid leírás kell. Az admin jóváhagyása után a weboldal megjelenik az indexen. Bejegyzés csak akkor lesz belőle, ha valaki később átveszi.
-        </p>
+        <h3 id="add-website-title">{WEBSITE_CREATE_TITLE}</h3>
+        <p class="create-form-note">{WEBSITE_CREATE_NOTE}</p>
 
         {#if submitted}
-            <p class="add-website-form__success">Várakozás az admin jóváhagyására.</p>
+            <p class="add-website-form__success">Várakozás a jóváhagyásra.</p>
             <div class="link-dialog-actions">
                 <button type="button" class="btn btn-md" onclick={onClose}>Bezárás</button>
             </div>
         {:else}
             <form class="link-dialog-form add-website-form__fields" onsubmit={handleSubmit}>
-                <label for="website-domain">Webcím</label>
+                <label for="website-domain">Webcím <span class="field-required" aria-hidden="true">*</span></label>
                 <input
                     id="website-domain"
                     name="domain"
@@ -103,7 +108,7 @@
                     required
                 />
 
-                <label for="website-title">Cím</label>
+                <label for="website-title">Cím <span class="field-required" aria-hidden="true">*</span></label>
                 <input
                     id="website-title"
                     name="title"
@@ -113,7 +118,7 @@
                     required
                 />
 
-                <label for="website-description">Rövid leírás</label>
+                <label for="website-description">Rövid leírás <span class="field-required" aria-hidden="true">*</span></label>
                 <textarea
                     id="website-description"
                     name="description"
@@ -128,7 +133,7 @@
                 {/if}
 
                 <div class="link-dialog-actions">
-                    <button type="submit" class="link-dialog-submit" disabled={pending}>
+                    <button type="submit" class="link-dialog-submit" disabled={pending || !websiteReady}>
                         {pending ? "Küldés…" : "Beküldés"}
                     </button>
                     <button type="button" class="btn btn-md" onclick={onClose}>Mégse</button>
@@ -155,12 +160,6 @@
         margin: 0;
         color: var(--szekely-red);
         font-weight: 600;
-    }
-
-    .add-website-form__explain {
-        margin: 0 0 1rem;
-        color: var(--text-muted);
-        line-height: 1.45;
     }
 
     .add-website-form__success {

@@ -58,7 +58,7 @@ export function searchResultCardModel(kind, row) {
             description: item.notes,
             accent: "none",
             external: false,
-            claimed: false,
+            claimed: Boolean(item.claimed),
         });
     }
     if (kind === "attraction") {
@@ -71,7 +71,7 @@ export function searchResultCardModel(kind, row) {
             description: item.description,
             accent: "attraction",
             external: false,
-            claimed: false,
+            claimed: null,
         });
     }
     if (kind === "venue") {
@@ -87,7 +87,7 @@ export function searchResultCardModel(kind, row) {
             description: "",
             accent: "none",
             external: false,
-            claimed: false,
+            claimed: null,
         });
     }
     if (kind === "event") {
@@ -99,7 +99,7 @@ export function searchResultCardModel(kind, row) {
             description: "",
             accent: "none",
             external: false,
-            claimed: false,
+            claimed: null,
         });
     }
     if (kind === "settlement") {
@@ -112,7 +112,7 @@ export function searchResultCardModel(kind, row) {
             description: "",
             accent: "none",
             external: false,
-            claimed: false,
+            claimed: null,
         });
     }
     if (kind === "seat") {
@@ -124,7 +124,7 @@ export function searchResultCardModel(kind, row) {
             description: "",
             accent: "seat",
             external: false,
-            claimed: false,
+            claimed: null,
         });
     }
     if (kind === "news") {
@@ -135,7 +135,7 @@ export function searchResultCardModel(kind, row) {
             description: "",
             accent: "none",
             external: true,
-            claimed: false,
+            claimed: null,
         });
     }
     return null;

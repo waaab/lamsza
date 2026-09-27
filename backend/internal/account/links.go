@@ -188,7 +188,7 @@ func HandleLinks(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
+		writeOK(w)
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

@@ -190,10 +190,10 @@
         margin: 0.5rem 0 0;
     }
     .weather-skeleton-icon{
-        width: 5.5rem;
-        height: 5.5rem;
-        min-width: 5.5rem;
-        min-height: 5.5rem;
+        width: var(--text-display-xl);
+        height: var(--text-display-xl);
+        min-width: var(--text-display-xl);
+        min-height: var(--text-display-xl);
         border-radius: 50%;
         display: block;
     }

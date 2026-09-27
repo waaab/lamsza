@@ -10,13 +10,14 @@
     import NewsWidget from "$lib/components/NewsWidget.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import {
         clampSlotCount,
         DEFAULT_QUICKLINK_SLOTS,
-        MAX_QUICKLINK_SLOTS,
-        MIN_QUICKLINK_SLOTS,
+        isWideQuicklinkLayout,
         readSlotCount,
+        slotsForQuicklinkLayout,
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
     import { homepageAttractionWeather, homepageEventPlace, homepageSettlements } from "$lib/favoriteHomepage.js";
@@ -45,10 +46,16 @@
     let pageHeader = initialPageHeader("home");
     let pageHeaderLoading = false;
 
-    $: quicklinksExpanded = slotCount > DEFAULT_QUICKLINK_SLOTS;
+    $: quicklinkLayoutWide = isWideQuicklinkLayout(slotCount);
     $: skeletonCount = promotedLoading
         ? Math.max(0, DEFAULT_QUICKLINK_SLOTS - 1 - userLinks.length)
         : 0;
+    $: quicklinkItemCount =
+        1 + userLinks.length + (promotedLoading ? 0 : promotedLinks.length);
+    // Fewer than 7 places, including Új, stay on the default seven-wide row.
+    $: showQuicklinkLayout =
+        !promotedLoading && quicklinkItemCount >= DEFAULT_QUICKLINK_SLOTS;
+    $: quicklinksWideRow = showQuicklinkLayout && quicklinkLayoutWide;
     $: siteDefault = { slug: myLocationSlug, name: myLocationName };
     $: settlementPlaces = homepageSettlements(
         siteDefault,
@@ -62,8 +69,8 @@
         return title.slice(0, maxLen) + "...";
     }
 
-    async function setSlotCount(next) {
-        const slots = clampSlotCount(next);
+    async function setQuicklinkLayout(wide) {
+        const slots = slotsForQuicklinkLayout(wide);
         if (get(auth).loggedIn) {
             const prev = slotCount;
             slotCount = slots;
@@ -79,16 +86,8 @@
                 slotCount = prev;
             }
         } else {
-            slotCount = writeSlotCount(next);
+            slotCount = writeSlotCount(slots);
         }
-    }
-
-    function decreaseSlots() {
-        setSlotCount(slotCount - 1);
-    }
-
-    function increaseSlots() {
-        setSlotCount(slotCount + 1);
     }
 
     function generateId() {
@@ -193,8 +192,7 @@
         closeLinkDialog();
     }
 
-    async function initQuicklinks() {
-        await auth.init();
+    async function loadAccountLinks() {
         const state = get(auth);
         if (state.loggedIn) {
             try {
@@ -214,22 +212,25 @@
     }
 
     onMount(async () => {
-        await initQuicklinks();
-        pageHeader = await loadPageMeta("home");
-        pageHeaderLoading = false;
-
+        const configPromise = apiFetch("/api/config/public").catch(() => null);
+        const headerPromise = loadPageMeta("home");
+        // The saved place decides the weather column. Link records do not.
+        await auth.init();
+        const configRes = await configPromise;
         let cacheVersion = null;
-        try {
-            const configRes = await apiFetch("/api/config/public");
-            if (configRes && configRes.quick_links_version != null) {
-                cacheVersion = String(configRes.quick_links_version);
-            }
-            if (configRes?.my_location_slug) {
-                myLocationSlug = configRes.my_location_slug;
-                myLocationName = configRes.my_location_name || "";
-                myLocationCountySlug = configRes.my_location_county_slug || "";
-            }
-        } catch (_) {}
+        if (configRes && configRes.quick_links_version != null) {
+            cacheVersion = String(configRes.quick_links_version);
+        }
+        if (configRes?.my_location_slug) {
+            myLocationSlug = configRes.my_location_slug;
+            myLocationName = configRes.my_location_name || "";
+            myLocationCountySlug = configRes.my_location_county_slug || "";
+        }
+
+        const linksPromise = loadAccountLinks();
+        pageHeader = await headerPromise;
+        pageHeaderLoading = false;
+        await linksPromise;
 
         if (get(auth).loggedIn) {
             try {
@@ -293,36 +294,22 @@
 <section id="home widgets" class="widgets-columns">
     <div
         class="widgets-box--three-col"
-        class:widgets-box--quicklinks-expanded={quicklinksExpanded}
+        class:widgets-box--quicklinks-wide={quicklinksWideRow}
     >
-        <div
-            id="gyorslinkek"
-            class="widget"
-            style:--quicklink-slots={slotCount}
-        >
+        <div id="gyorslinkek" class="widget">
             <div class="widget-header">
                 <h3 class="widget-title">Gyorslinkek</h3>
-                <div
-                    class="quicklinks-slot-stepper"
-                    role="group"
-                    aria-label="Megjelenített gyorslinkek száma"
-                >
-                    <button
-                        type="button"
-                        class="btn btn-xs"
-                        disabled={slotCount <= MIN_QUICKLINK_SLOTS}
-                        aria-label="Kevesebb hely"
-                        on:click={decreaseSlots}
-                    >−</button>
-                    <span class="quicklinks-slot-count" aria-live="polite">{slotCount}</span>
-                    <button
-                        type="button"
-                        class="btn btn-xs"
-                        disabled={slotCount >= MAX_QUICKLINK_SLOTS}
-                        aria-label="Több hely"
-                        on:click={increaseSlots}
-                    >+</button>
-                </div>
+                {#if showQuicklinkLayout}
+                    <div class="quicklinks-layout">
+                        <button
+                            type="button"
+                            class="btn btn-xs"
+                            aria-label={quicklinkLayoutWide ? "Keskeny" : "Széles"}
+                            title={quicklinkLayoutWide ? "Keskeny" : "Széles"}
+                            on:click={() => setQuicklinkLayout(!quicklinkLayoutWide)}
+                        ><AppIcon name={quicklinkLayoutWide ? "expand" : "collapse"} size={14} /></button>
+                    </div>
+                {/if}
             </div>
             <div class="quick-links-wrapper">
                 <div class="quick-links widget-content">
@@ -370,8 +357,10 @@
                     {#if promotedLoading}
                         {#each { length: skeletonCount } as _, i (i)}
                             <div class="link-card link-card--skeleton" aria-hidden="true">
-                                <span class="link-card-icon skeleton"></span>
-                                <span class="link-card-title skeleton"></span>
+                                <span class="link-card-link">
+                                    <span class="link-card-icon skeleton"></span>
+                                    <span class="link-card-title skeleton"></span>
+                                </span>
                             </div>
                         {/each}
                     {:else if !promotedError}
@@ -399,6 +388,28 @@
             </div>
         </div>
         <DateTimeWidget />
+        {#if settlementPlaces.length === 0 && attractionWeatherPlaces.length === 0}
+            <div class="weather-card simple widget weather-card--pending" aria-hidden="true">
+                <div class="widget-header">
+                    <h3 class="widget-title">Időjárás</h3>
+                </div>
+                <div class="widget-content">
+                    <div class="weather-left">
+                        <div class="weather-temp-row">
+                            <span class="skeleton weather-skeleton-temp"></span>
+                        </div>
+                        <span class="skeleton weather-skeleton-desc"></span>
+                    </div>
+                    <div class="weather-right">
+                        <div class="skeleton weather-skeleton-icon"></div>
+                    </div>
+                </div>
+                <div class="weather-footer">
+                    <span class="skeleton weather-skeleton-meta"></span>
+                    <span class="skeleton weather-skeleton-meta"></span>
+                </div>
+            </div>
+        {/if}
         {#each settlementPlaces as place (place.slug)}
             <WeatherWidget settlementSlug={place.slug} />
         {/each}

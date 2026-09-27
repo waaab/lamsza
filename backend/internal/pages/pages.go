@@ -43,7 +43,7 @@ func MigratePages() {
 		{"szekek", "Székelyföld történelmi székei", "A székely székek és a hozzájuk kapcsolódó megyék."},
 		{"index", "Index", "Minden, ami helyi, egy helyen: szakemberek, intézmények, szolgáltatások."},
 		{"index/szolgaltatasok", "Szolgáltatások", "Az index szolgáltatástípusú bejegyzései — nem a teljes címtár."},
-		{"index/weboldalak", "Weboldalak", "Jóváhagyott helyi weboldalak az indexen."},
+		{"index/weboldalak", "Weboldalak", "Ellenőrzött, hiteles, előnyben részesített helyi weboldalak az indexen."},
 		{"terkep", "Székelyföld Térkép", "Hamarosan érkezik az interaktív térképünk helyi adatokkal!"},
 		{"valtozasnaplo", "Változásnapló", "Újítások, javítások - emberi nyelven."},
 		{"iranyelvek", "Irányelvek", "Adatvédelem, sütik és felhasználási feltételek — összefoglaló."},
@@ -105,6 +105,10 @@ func HandleAdminPages(w http.ResponseWriter, r *http.Request) {
 			if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Greeting, &p.Content, &p.UpdatedAt); err == nil {
 				result = append(result, p)
 			}
+		}
+		if err := rows.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 		if result == nil {
 			result = []Page{}

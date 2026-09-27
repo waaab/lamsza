@@ -18,6 +18,23 @@ export function getApiBase() {
 }
 
 /**
+ * Interpret an API body. A 2xx response with an empty body is success (`null`).
+ * Several account mutations reply with `200` and no JSON; parsing that as JSON
+ * made a successful save or delete look like "A mentés nem sikerült".
+ * @param {boolean} ok
+ * @param {number} status
+ * @param {string} text
+ */
+export function parseApiPayload(ok, status, text) {
+    if (!ok) {
+        throw new Error(String(text || "").trim() || `API Error: ${status}`);
+    }
+    const body = String(text ?? "");
+    if (!body.trim()) return null;
+    return JSON.parse(body);
+}
+
+/**
  * Enhanced fetch wrapper for the Lamsza API
  * @param {string} endpoint - The relative endpoint (e.g. '/api/directory')
  * @param {RequestInit} options - Standard fetch options
@@ -31,11 +48,8 @@ export async function apiFetch(endpoint, options = {}) {
 
     try {
         const response = await fetch(url, { credentials: "include", ...options });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || `API Error: ${response.status}`);
-        }
-        return await response.json();
+        const text = await response.text();
+        return parseApiPayload(response.ok, response.status, text);
     } catch (error) {
         console.error(`Fetch error for ${url}:`, error);
         throw error;

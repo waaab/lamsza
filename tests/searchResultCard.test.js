@@ -39,6 +39,17 @@ test("service: place and category, notes, listing link", () => {
     assert.equal(card.claimed, false);
 });
 
+test("service: claimed listing keeps the claim flag", () => {
+    const card = searchResultCardModel("service", {
+        name: "Lámsza.com",
+        slug: "lamsza-com",
+        location: "Kézdivásárhely",
+        category: "Egyéb",
+        claimed: true,
+    });
+    assert.equal(card.claimed, true);
+});
+
 test("service: category aliases use the catalog label", () => {
     const card = searchResultCardModel("service", {
         name: "Étterem",
@@ -153,7 +164,7 @@ test("seat: name only, blue accent", () => {
         description: "",
         accent: "seat",
         external: false,
-        claimed: false,
+        claimed: null,
     });
 });
 
@@ -167,7 +178,7 @@ test("news: title and source, new tab", () => {
     assert.equal(card.meta, "Bihar Napló");
     assert.equal(card.description, "");
     assert.equal(card.external, true);
-    assert.equal(card.claimed, false);
+    assert.equal(card.claimed, null);
     assert.equal(card.accent, "none");
 });
 

@@ -1,6 +1,7 @@
 <script>
     import { page } from "$app/stores";
     import { browser } from "$app/environment";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import { apiFetch } from "$lib/api";
     import { formatDateShort } from "$lib/utils";
@@ -197,9 +198,13 @@
                 <p class="venue-desc-text">{venue.description}</p>
             </div>
         {/if}
-        <span class="note info">
-            <p>Megjegyzés: A pontos nyitvatartásról és a közönségkorcsolya órarendjéről érdemes a város hivatalos oldalán vagy a pálya közösségi felületein tájékozódni, mivel ezek a jégminőség és a hokimeccsek függvényében változhatnak.</p>
-        </span>
+        <div class="note info">
+            <p class="note-title">
+                <AppIcon name="info" size={18} />
+                Megjegyzés
+            </p>
+            <p>A pontos nyitvatartásról és a közönségkorcsolya órarendjéről érdemes a város hivatalos oldalán vagy a pálya közösségi felületein tájékozódni, mivel ezek a jégminőség és a hokimeccsek függvényében változhatnak.</p>
+        </div>
     </article>
 
     {#if venueEvents.length > 0}

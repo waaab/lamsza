@@ -1,20 +1,20 @@
 <script>
     import { onMount } from "svelte";
     import { get } from "svelte/store";
+    import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { userSettingsTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
     import { openLogin } from "$lib/openLogin.js";
     import {
-        clampSlotCount,
-        DEFAULT_QUICKLINK_SLOTS,
-        MAX_QUICKLINK_SLOTS,
-        MIN_QUICKLINK_SLOTS,
+        isWideQuicklinkLayout,
         readSlotCount,
+        slotsForQuicklinkLayout,
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
     import { auth } from "$lib/stores/auth";
-    import { applyTheme, LABELS, theme } from "$lib/stores/theme";
+    import { applyThemeLocal, LABELS, theme } from "$lib/stores/theme";
 
     const TAB_LABELS = {
         tema: "Téma beállítások",
@@ -22,21 +22,67 @@
         location: "Település beállítások",
     };
 
-    /** @returns {Record<string, unknown>} */
-    /** @param {unknown} value */
     let activeTab = $state(userSettingsTabIds[0]);
+    let confirmOpen = $state(false);
+    let confirmMessage = $state("");
+    /** @type {((accepted: boolean) => void) | null} */
+    let confirmResolve = null;
     let saveError = $state("");
+    let saveOk = $state("");
+    let themeNotice = $state("");
+    let themeSaving = $state(false);
     let linkSaveError = $state("");
+    let linkSaveOk = $state("");
+    let linkNotice = $state("");
+    let linkSaving = $state(false);
     let selectedTheme = $state("system");
+    let savedTheme = $state("system");
     let preferredSettlementId = $state("");
     /** @type {Array<{ id: number, name: string, county: string, type: string }>} */
     let locationChoices = $state([]);
     let locationSaveError = $state("");
+    let locationSaveOk = $state("");
+    let locationNotice = $state("");
     let locationSaving = $state(false);
-    let slotCount = $state(DEFAULT_QUICKLINK_SLOTS);
+    let quicklinkLayoutWide = $state(false);
+
+    /** @param {string} message */
+    function askConfirm(message) {
+        if (confirmResolve) {
+            const previous = confirmResolve;
+            confirmResolve = null;
+            previous(false);
+        }
+        confirmMessage = message;
+        confirmOpen = true;
+        return new Promise((resolve) => {
+            confirmResolve = resolve;
+        });
+    }
+
+    /** @param {boolean} accepted */
+    function closeConfirm(accepted) {
+        confirmOpen = false;
+        const resolve = confirmResolve;
+        confirmResolve = null;
+        resolve?.(accepted);
+    }
+
+    /** @param {unknown} value */
+    function isThemeId(value) {
+        return value === "light" || value === "dark" || value === "system";
+    }
+
+    async function refreshAccount() {
+        const preview = get(theme);
+        await auth.refresh();
+        if (isThemeId(preview) && preview !== savedTheme) {
+            applyThemeLocal(preview);
+        }
+    }
     function initSettingsFromAuth() {
         const state = get(auth);
-        slotCount = clampSlotCount(
+        quicklinkLayoutWide = isWideQuicklinkLayout(
             typeof state.quicklinkSlots === "number"
                 ? state.quicklinkSlots
                 : readSlotCount(),
@@ -63,7 +109,11 @@
     }
 
     async function savePreferredLocation() {
+        const yes = await askConfirm("Biztosan mented a települést?");
+        if (!yes) return;
         locationSaveError = "";
+        locationSaveOk = "";
+        locationNotice = "";
         locationSaving = true;
         const id = Number(preferredSettlementId);
         try {
@@ -74,7 +124,8 @@
                     preferred_settlement_id: Number.isFinite(id) && id > 0 ? id : 0,
                 }),
             });
-            await auth.refresh();
+            await refreshAccount();
+            locationSaveOk = "A mentés sikerült.";
         } catch {
             locationSaveError = "A mentés nem sikerült";
         } finally {
@@ -90,11 +141,12 @@
                 accountDataLoaded = false;
                 return;
             }
+            if (accountDataLoaded) return;
+            accountDataLoaded = true;
             preferredSettlementId = state.preferredLocation?.id
                 ? String(state.preferredLocation.id)
                 : "";
-            if (accountDataLoaded) return;
-            accountDataLoaded = true;
+            savedTheme = isThemeId(state.theme) ? state.theme : get(theme);
             initSettingsFromAuth();
             void loadLocationChoices();
         });
@@ -116,28 +168,39 @@
     });
 
     async function saveTheme() {
+        const yes = await askConfirm("Biztosan mented a témát?");
+        if (!yes) return;
         saveError = "";
+        saveOk = "";
+        themeNotice = "";
+        themeSaving = true;
         const themeToSave = get(theme);
-        const prevTheme = themeToSave;
+        const prevTheme = savedTheme;
         try {
             await apiFetch("/api/account/preferences", {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ theme: themeToSave }),
             });
-            applyTheme(themeToSave);
-            await auth.refresh();
+            savedTheme = isThemeId(themeToSave) ? themeToSave : prevTheme;
+            applyThemeLocal(savedTheme);
+            await refreshAccount();
+            saveOk = "A mentés sikerült.";
         } catch {
-            applyTheme(prevTheme);
             saveError = "A mentés nem sikerült";
+        } finally {
+            themeSaving = false;
         }
     }
 
     async function saveLinkSettings() {
+        const yes = await askConfirm("Biztosan mented a gyorslinkek elrendezését?");
+        if (!yes) return;
         linkSaveError = "";
-        const prevSlots = slotCount;
-        const slots = clampSlotCount(slotCount);
-        slotCount = slots;
+        linkSaveOk = "";
+        linkNotice = "";
+        linkSaving = true;
+        const slots = slotsForQuicklinkLayout(quicklinkLayoutWide);
         try {
             await apiFetch("/api/account/preferences", {
                 method: "PUT",
@@ -145,23 +208,37 @@
                 body: JSON.stringify({ quicklink_slots: slots }),
             });
             writeSlotCount(slots);
-            await auth.refresh();
+            await refreshAccount();
+            linkSaveOk = "A mentés sikerült.";
         } catch {
-            slotCount = prevSlots;
             linkSaveError = "A mentés nem sikerült";
+        } finally {
+            linkSaving = false;
         }
     }
 
+    /** @param {string} next */
     function selectTheme(next) {
-        applyTheme(next);
+        applyThemeLocal(next);
+        saveError = "";
+        saveOk = "";
+        themeNotice = `${LABELS[next] || next} kiválasztva. A Mentés gomb menti.`;
     }
 
-    function decreaseSlots() {
-        slotCount = clampSlotCount(slotCount - 1);
+    /** @param {boolean} wide */
+    function chooseQuicklinkLayout(wide) {
+        quicklinkLayoutWide = wide;
+        linkSaveError = "";
+        linkSaveOk = "";
+        linkNotice = wide
+            ? "Széles elrendezés kiválasztva. A Mentés gomb menti."
+            : "Keskeny elrendezés kiválasztva. A Mentés gomb menti.";
     }
 
-    function increaseSlots() {
-        slotCount = clampSlotCount(slotCount + 1);
+    function noteLocationChoice() {
+        locationSaveError = "";
+        locationSaveOk = "";
+        locationNotice = "A település kiválasztva. A Mentés gomb menti.";
     }
 
 </script>
@@ -212,42 +289,61 @@
                 {#if saveError}
                     <p class="profile-error">{saveError}</p>
                 {/if}
-                <button type="button" class="btn profile-save" onclick={saveTheme}>
-                    Mentés
+                {#if saveOk}
+                    <p class="profile-ok">{saveOk}</p>
+                {/if}
+                {#if themeNotice}
+                    <p class="profile-notice">{themeNotice}</p>
+                {/if}
+                <button
+                    type="button"
+                    class="btn profile-save"
+                    disabled={themeSaving}
+                    onclick={saveTheme}
+                >
+                    {themeSaving ? "Mentés…" : "Mentés"}
                 </button>
             </div>
         {:else if activeTab === "linkbeallitasok"}
             <div class="profile-settings">
-                <h3>Gyorslinkek száma a főoldalon</h3>
+                <h3>Gyorslinkek elrendezése a főoldalon</h3>
                 <p class="profile-hint">
-                    Ennyi hely jelenik meg a kezdőlap gyorslinkjei között, a saját linkjeiddel együtt.
+                    Keskeny elrendezésnél a gyorslinkek, a dátum és az időjárás egy sorban marad.
+                    Ha az Új gombbal együtt 7-nél kevesebb gyorslink van, mindig ez a sor látszik, és a kezdőlapon nincs választógomb.
+                    Széles elrendezésnél, ha már legalább 7 van, a gyorslinkek a dátum és az időjárás fölé kerülnek, és a képernyőn túlnyúló linkek új sorban folytatódnak. A dátum balra, az időjárás jobbra kerül.
                 </p>
-                <div
-                    class="quicklinks-slot-stepper"
-                    role="group"
-                    aria-label="Megjelenített gyorslinkek száma"
-                >
+                <div class="profile-theme-buttons" role="group" aria-label="Gyorslinkek elrendezése">
                     <button
                         type="button"
-                        class="btn btn-xs"
-                        disabled={slotCount <= MIN_QUICKLINK_SLOTS}
-                        aria-label="Kevesebb hely"
-                        onclick={decreaseSlots}
-                    >−</button>
-                    <span class="quicklinks-slot-count" aria-live="polite">{slotCount}</span>
+                        class="btn"
+                        class:active={!quicklinkLayoutWide}
+                        aria-pressed={!quicklinkLayoutWide}
+                        onclick={() => chooseQuicklinkLayout(false)}
+                    ><AppIcon name="collapse" size={16} /> Keskeny</button>
                     <button
                         type="button"
-                        class="btn btn-xs"
-                        disabled={slotCount >= MAX_QUICKLINK_SLOTS}
-                        aria-label="Több hely"
-                        onclick={increaseSlots}
-                    >+</button>
+                        class="btn"
+                        class:active={quicklinkLayoutWide}
+                        aria-pressed={quicklinkLayoutWide}
+                        onclick={() => chooseQuicklinkLayout(true)}
+                    ><AppIcon name="expand" size={16} /> Széles</button>
                 </div>
                 {#if linkSaveError}
                     <p class="profile-error">{linkSaveError}</p>
                 {/if}
-                <button type="button" class="btn profile-save" onclick={saveLinkSettings}>
-                    Mentés
+                {#if linkSaveOk}
+                    <p class="profile-ok">{linkSaveOk}</p>
+                {/if}
+                {#if linkNotice}
+                    <p class="profile-notice">{linkNotice}</p>
+                {/if}
+                <button
+                    type="button"
+                    class="btn profile-save"
+                    disabled={linkSaving}
+                    onclick={saveLinkSettings}
+                >
+                    {linkSaving ? "Mentés…" : "Mentés"}
                 </button>
             </div>
         {:else if activeTab === "location"}
@@ -271,6 +367,7 @@
                     id="preferred_settlement"
                     class="profile-location-select"
                     bind:value={preferredSettlementId}
+                    onchange={noteLocationChoice}
                 >
                     <option value="">Nincs kiválasztva</option>
                     {#each locationChoices as loc (loc.id)}
@@ -281,6 +378,12 @@
                 </select>
                 {#if locationSaveError}
                     <p class="profile-error">{locationSaveError}</p>
+                {/if}
+                {#if locationSaveOk}
+                    <p class="profile-ok">{locationSaveOk}</p>
+                {/if}
+                {#if locationNotice}
+                    <p class="profile-notice">{locationNotice}</p>
                 {/if}
                 <button
                     type="button"
@@ -294,6 +397,13 @@
         {/if}
     {/if}
 </section>
+
+<ConfirmDialog
+    open={confirmOpen}
+    message={confirmMessage}
+    onYes={() => closeConfirm(true)}
+    onNo={() => closeConfirm(false)}
+/>
 
 <style>
     .profile-page {
@@ -343,5 +453,13 @@
     .profile-error {
         margin: 0;
         color: #b00020;
+    }
+    .profile-ok {
+        margin: 0;
+        color: #3ddc97;
+    }
+    .profile-notice {
+        margin: 0;
+        color: var(--text-muted, #666);
     }
 </style>

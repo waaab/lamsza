@@ -32,3 +32,13 @@ export function writeSlotCount(n) {
     }
     return v;
 }
+
+/** Stored slot counts above the default mean the wide homepage row. */
+export function isWideQuicklinkLayout(slots) {
+    return clampSlotCount(slots) > DEFAULT_QUICKLINK_SLOTS;
+}
+
+/** @param {boolean} wide */
+export function slotsForQuicklinkLayout(wide) {
+    return wide ? DEFAULT_QUICKLINK_SLOTS + 1 : DEFAULT_QUICKLINK_SLOTS;
+}

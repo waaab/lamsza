@@ -1,4 +1,5 @@
 <script>
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import Markdown from "./Markdown.svelte";
     import { getApiBase } from "$lib/api.js";
 
@@ -74,6 +75,10 @@
     {#if hasDisclaimer}
         <section id="disclaimer" aria-label="Felelősségkizárás">
             <div class="note info">
+                <p class="note-title">
+                    <AppIcon name="info" size={18} />
+                    Megjegyzés
+                </p>
                 <Markdown source={disclaimerMd.trim()} />
             </div>
         </section>

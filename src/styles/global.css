@@ -536,13 +536,61 @@ section.page-section{
   justify-content: flex-start;
 }
 
-.widgets-box--three-col.widgets-box--quicklinks-expanded #gyorslinkek {
-  flex-basis: 100%;
+.widgets-box--three-col.widgets-box--quicklinks-wide {
+  justify-content: space-between;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.widgets-box--three-col.widgets-box--quicklinks-wide #gyorslinkek {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.widgets-box--three-col > .weather-card {
+  margin-left: auto;
+}
+
+.widgets-box--three-col > .weather-card ~ .weather-card {
+  margin-left: 0;
+}
+
+.widgets-box--three-col.widgets-box--quicklinks-wide #gyorslinkek .quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.widgets-box--three-col.widgets-box--quicklinks-wide #gyorslinkek .quick-links > * {
+  flex: 0 0 60px;
+  width: 60px;
+}
+
+.quicklinks-layout {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.quicklinks-layout .btn {
+  padding: 0.15rem;
+  gap: 0;
 }
 
 @media (max-width: 992px) {
   .widgets-box--three-col {
     flex-direction: column;
+    justify-content: flex-start;
+  }
+  .widgets-box--three-col > .weather-card {
+    margin-left: 0;
   }
   .widgets-box--two-col {
     grid-template-columns: 1fr;
@@ -682,15 +730,33 @@ section.page-section{
 
 /* Weather skeleton */
 .weather-skeleton-temp {
-  width: 140px;
-  height: 3rem;
+  width: 8.5rem;
+  height: var(--text-display);
   margin: 0;
+  border-radius: 4px;
 }
 
 .weather-skeleton-desc {
-  width: 180px;
-  height: 1.2rem;
+  width: 8.5rem;
+  height: calc(var(--text-base) * var(--leading-normal));
   margin: 0;
+  border-radius: 2px;
+}
+
+.weather-skeleton-meta {
+  width: 7rem;
+  height: var(--text-xs);
+  margin: 0;
+  border-radius: 2px;
+}
+
+.weather-card--pending .weather-skeleton-icon {
+  width: var(--text-display-xl);
+  height: var(--text-display-xl);
+  min-width: var(--text-display-xl);
+  min-height: var(--text-display-xl);
+  border-radius: 50%;
+  display: block;
 }
 
 .skeleton {
@@ -800,7 +866,7 @@ section.page-section{
 
 .note {
   padding: 1rem;
-  color: var(--text-secondary);
+  color: var(--text-faint);
   font-size: var(--text-base);
   font-style: italic;
   border-radius: 0 6px 6px 0;
@@ -816,6 +882,30 @@ section.page-section{
 .note.info {
   background: var(--info-note-bg);
   border-left: 3px solid var(--info-note-border);
+}
+
+.note-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.5rem;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.note-title .app-icon-wrap {
+  color: var(--info-note-border);
+}
+
+.note.info .markdown-content p:first-child,
+.note.info > p:not(.note-title) {
+  margin-top: 0;
+}
+
+.note.info .markdown-content p:last-child,
+.note.info > p:last-child {
+  margin-bottom: 0;
 }
 
 .note.error {
@@ -863,27 +953,6 @@ section.page-section{
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-
-.quicklinks-slot-stepper {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  flex-shrink: 0;
-}
-
-.quicklinks-slot-stepper .btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-  pointer-events: none;
-}
-
-.quicklinks-slot-count {
-  min-width: 1.5rem;
-  text-align: center;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
 .widget-title, .page-nav-title {
@@ -971,7 +1040,7 @@ section.page-section{
 #gyorslinkek {
   display: flex;
   flex-direction: column;
-  width: calc(var(--quicklink-slots, 7) * (60px + 0.5rem));
+  width: max-content;
   max-width: 100%;
   flex: 0 0 auto;
 }
@@ -992,17 +1061,24 @@ section.page-section{
 }
 
 #gyorslinkek .quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  overflow-x: visible;
+  display: grid;
+  grid-template-columns: repeat(7, 60px);
   gap: 0.5rem;
   padding: 0.25rem 0;
-  width: calc(var(--quicklink-slots, 7) * (60px + 0.5rem));
+  width: max-content;
   max-width: 100%;
 }
 
 #gyorslinkek .quick-links > * {
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 60px;
+  min-width: 0;
+}
+
+#gyorslinkek .link-card-title {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
 }
 
 .link-card-add {
@@ -1191,8 +1267,10 @@ section.page-section{
 
 .link-card--skeleton .link-card-title {
   width: 60px;
-  height: 0.8rem;
+  min-width: 60px;
+  height: calc(var(--text-2xs) * var(--leading-normal));
   margin: 0;
+  border-radius: 2px;
 }
 
 /* Quick Link Add/Edit Dialog */
@@ -1319,8 +1397,24 @@ section.page-section{
   cursor: pointer;
 }
 
-.link-dialog-submit:hover {
+.link-dialog-submit:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.link-dialog-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.field-required {
+  color: var(--szekely-red);
+  font-weight: 700;
+}
+
+.create-form-note {
+  margin: 0 0 1rem;
+  color: var(--text-muted);
+  line-height: 1.45;
 }
 
 .link-dialog-delete {
@@ -2582,7 +2676,7 @@ footer {
 
 .info-box p {
   margin: 0;
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.75rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2918,6 +3012,10 @@ svg {
     grid-template-columns: 1fr;
   }
   #gyorslinkek {
+    width: 100%;
+  }
+  #gyorslinkek .quick-links {
+    grid-template-columns: repeat(auto-fill, 60px);
     width: 100%;
   }
 }

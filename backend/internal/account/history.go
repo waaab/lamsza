@@ -181,7 +181,7 @@ func HandleHistory(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		w.WriteHeader(http.StatusOK)
+		writeOK(w)
 
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

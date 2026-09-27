@@ -6,7 +6,9 @@ import {
     MIN_QUICKLINK_SLOTS,
     QUICKLINK_SLOTS_STORAGE_KEY,
     clampSlotCount,
+    isWideQuicklinkLayout,
     readSlotCount,
+    slotsForQuicklinkLayout,
     writeSlotCount,
 } from "../src/lib/quickLinksDisplay.js";
 
@@ -82,6 +84,14 @@ test("writeSlotCount persists clamped value", () => {
     assert.equal(localStorage.getItem(QUICKLINK_SLOTS_STORAGE_KEY), "9");
     assert.equal(writeSlotCount(99), 14);
     assert.equal(localStorage.getItem(QUICKLINK_SLOTS_STORAGE_KEY), "14");
+});
+
+test("layout: default and 7 are narrow, anything wider is wide", () => {
+    assert.equal(isWideQuicklinkLayout(null), false);
+    assert.equal(isWideQuicklinkLayout(7), false);
+    assert.equal(isWideQuicklinkLayout(8), true);
+    assert.equal(slotsForQuicklinkLayout(false), 7);
+    assert.equal(slotsForQuicklinkLayout(true), 8);
 });
 
 test("readSlotCount without localStorage returns default", () => {

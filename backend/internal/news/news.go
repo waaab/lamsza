@@ -64,8 +64,28 @@ type NewsItem struct {
 	Image   string
 }
 
-// FetchNewsItems fetches and aggregates news from all feeds. Used by unified search.
-func FetchNewsItems(limit int) []NewsItem {
+const newsCacheTTL = 2 * time.Minute
+
+var (
+	newsMu          sync.Mutex
+	newsItemsCached []newsItem
+	newsCachedAt    time.Time
+	newsInflight    bool
+	newsWaiters     []chan struct{}
+	// Replaced in tests so search can be proven not to wait on feeds.
+	loadFeedItems = fetchAllFeedItems
+)
+
+func resetNewsCacheForTest() {
+	newsMu.Lock()
+	defer newsMu.Unlock()
+	newsItemsCached = nil
+	newsCachedAt = time.Time{}
+	newsInflight = false
+	newsWaiters = nil
+}
+
+func fetchAllFeedItems() []newsItem {
 	rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY LOWER(title) ASC, id ASC")
 	if err != nil {
 		return nil
@@ -101,16 +121,88 @@ func FetchNewsItems(limit int) []NewsItem {
 	sort.Slice(allItems, func(i, j int) bool {
 		return allItems[i].PubDate > allItems[j].PubDate
 	})
+	return allItems
+}
 
-	if limit > 0 && len(allItems) > limit {
-		allItems = allItems[:limit]
+func refreshNews() {
+	defer func() {
+		newsMu.Lock()
+		newsInflight = false
+		waiters := newsWaiters
+		newsWaiters = nil
+		newsMu.Unlock()
+		for _, ch := range waiters {
+			close(ch)
+		}
+	}()
+	items := loadFeedItems()
+	newsMu.Lock()
+	newsItemsCached = items
+	newsCachedAt = time.Now()
+	newsMu.Unlock()
+}
+
+// ensureNews returns headlines for the news page, refreshing from the feeds when
+// the cache is cold or older than newsCacheTTL. Search does not call this.
+func ensureNews() []newsItem {
+	newsMu.Lock()
+	fresh := !newsCachedAt.IsZero() && time.Since(newsCachedAt) < newsCacheTTL
+	if fresh {
+		items := append([]newsItem(nil), newsItemsCached...)
+		newsMu.Unlock()
+		return items
 	}
+	if newsInflight {
+		done := make(chan struct{})
+		newsWaiters = append(newsWaiters, done)
+		newsMu.Unlock()
+		<-done
+		newsMu.Lock()
+		items := append([]newsItem(nil), newsItemsCached...)
+		newsMu.Unlock()
+		return items
+	}
+	newsInflight = true
+	newsMu.Unlock()
+	refreshNews()
+	newsMu.Lock()
+	items := append([]newsItem(nil), newsItemsCached...)
+	newsMu.Unlock()
+	return items
+}
 
-	result := make([]NewsItem, len(allItems))
-	for i, it := range allItems {
-		result[i] = NewsItem{Title: it.Title, Link: it.Link, PubDate: it.PubDate, Source: it.Source, BgColor: it.BgColor, Image: it.Image}
+func cachedNewsItems() []newsItem {
+	newsMu.Lock()
+	defer newsMu.Unlock()
+	if newsCachedAt.IsZero() {
+		return nil
+	}
+	return append([]newsItem(nil), newsItemsCached...)
+}
+
+func limitedNews(items []newsItem, limit int) []NewsItem {
+	if limit > 0 && len(items) > limit {
+		items = items[:limit]
+	}
+	result := make([]NewsItem, 0, len(items))
+	for _, it := range items {
+		result = append(result, NewsItem{
+			Title: it.Title, Link: it.Link, PubDate: it.PubDate,
+			Source: it.Source, BgColor: it.BgColor, Image: it.Image,
+		})
 	}
 	return result
+}
+
+// FetchNewsItems returns aggregated headlines, waiting for feeds only when the cache is cold.
+func FetchNewsItems(limit int) []NewsItem {
+	return limitedNews(ensureNews(), limit)
+}
+
+// PeekNewsItems returns headlines already stored for the news page.
+// Search uses this and does not fetch RSS.
+func PeekNewsItems(limit int) []NewsItem {
+	return limitedNews(cachedNewsItems(), limit)
 }
 
 func parsePubDate(s string) int64 {
@@ -194,52 +286,16 @@ func HandleNews(w http.ResponseWriter, r *http.Request) {
 		limit = n
 	}
 
-	rows, err := db.DB.Query("SELECT id, title, feed_url, COALESCE(bg_color, '#ffebd6') FROM news_feeds ORDER BY LOWER(title) ASC, id ASC")
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
+	items := ensureNews()
+	if len(items) > limit {
+		items = items[:limit]
 	}
-	defer rows.Close()
-
-	var feeds []models.NewsFeed
-	for rows.Next() {
-		var nf models.NewsFeed
-		if err := rows.Scan(&nf.ID, &nf.Title, &nf.FeedURL, &nf.BgColor); err == nil {
-			feeds = append(feeds, nf)
-		}
-	}
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var allItems []newsItem
-
-	for _, feed := range feeds {
-		wg.Add(1)
-		go func(f models.NewsFeed) {
-			defer wg.Done()
-			items := fetchAndParseFeed(f, 10)
-			if len(items) > 0 {
-				mu.Lock()
-				allItems = append(allItems, items...)
-				mu.Unlock()
-			}
-		}(feed)
-	}
-	wg.Wait()
-
-	sort.Slice(allItems, func(i, j int) bool {
-		return allItems[i].PubDate > allItems[j].PubDate
-	})
-
-	if len(allItems) > limit {
-		allItems = allItems[:limit]
-	}
-	if allItems == nil {
-		allItems = []newsItem{}
+	if items == nil {
+		items = []newsItem{}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(allItems)
+	json.NewEncoder(w).Encode(items)
 }
 
 func HandlePublicNewsFeeds(w http.ResponseWriter, r *http.Request) {

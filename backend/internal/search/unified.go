@@ -365,7 +365,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			items := news.FetchNewsItems(50)
+			items := news.PeekNewsItems(50)
 			qLower := strings.ToLower(q)
 			for _, item := range items {
 				if strings.Contains(strings.ToLower(item.Title), qLower) {

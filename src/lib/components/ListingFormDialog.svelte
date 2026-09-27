@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import { canonicalDomain } from "$lib/websiteDomain.js";
@@ -11,6 +12,8 @@
         normalizePhotos,
     } from "$lib/entryPhotos.js";
     import { apiFetch } from "$lib/api.js";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
+    import { LISTING_CREATE_NOTE, LISTING_CREATE_TITLE } from "$lib/indexCreateCopy.js";
 
     const LISTING_LANGUAGES = ["RO", "HU", "DE", "EN"];
 
@@ -20,6 +23,7 @@
      *   entryId?: number,
      *   onClose: () => void,
      *   onSaved?: () => void | Promise<void>,
+     *   onNotice?: (message: string) => void,
      *   onError?: (message: string) => void,
      * }}
      */
@@ -28,6 +32,7 @@
         entryId = 0,
         onClose,
         onSaved = async () => {},
+        onNotice = () => {},
         onError = () => {},
     } = $props();
 
@@ -58,6 +63,11 @@
     }
 
     let listingsError = $state("");
+    let formNotice = $state("");
+    let confirmOpen = $state(false);
+    let confirmMessage = $state("");
+    /** @type {((accepted: boolean) => void) | null} */
+    let confirmResolve = null;
     let listingCatalogLoading = $state(false);
     /** @type {Array<{ id: number, name: string }>} */
     let listingLocations = $state([]);
@@ -74,6 +84,13 @@
     /** @type {ReturnType<typeof setTimeout> | null} */
     let listingUrlTimer = null;
     let listingPhotoLimit = $derived(mode === "create" ? 1 : MAX_ENTRY_PHOTOS);
+    let listingFormReady = $derived(
+        String(listingForm.name ?? "").trim() !== "" &&
+            Number(listingForm.location_id) > 0 &&
+            Number(listingForm.category_id) > 0 &&
+            Number(listingForm.type_id) > 0 &&
+            listingUrlOk(listingForm.url),
+    );
     let listingPhotoHeading = $derived(listingPhotoLimit === 1 ? "Fotó" : "Fotók");
     let newListingPhotoUrl = $state("");
     let newListingPhotoAlt = $state("");
@@ -113,6 +130,28 @@
         }
     }
 
+    /** @param {string} message */
+    function askConfirm(message) {
+        if (confirmResolve) {
+            const previous = confirmResolve;
+            confirmResolve = null;
+            previous(false);
+        }
+        confirmMessage = message;
+        confirmOpen = true;
+        return new Promise((resolve) => {
+            confirmResolve = resolve;
+        });
+    }
+
+    /** @param {boolean} accepted */
+    function closeConfirm(accepted) {
+        confirmOpen = false;
+        const resolve = confirmResolve;
+        confirmResolve = null;
+        resolve?.(accepted);
+    }
+
     function clearNewListingPhotoFields() {
         newListingPhotoUrl = "";
         newListingPhotoAlt = "";
@@ -126,11 +165,15 @@
     }
 
     /** @param {number} index */
-    function removeListingPhoto(index) {
+    async function removeListingPhoto(index) {
+        const yes = await askConfirm("Biztosan eltávolítod ezt a képet?");
+        if (!yes) return;
         listingForm = {
             ...listingForm,
             photos: normalizePhotos(listingForm.photos).filter((_, i) => i !== index),
         };
+        listingsError = "";
+        formNotice = "A kép eltávolítva a listából. A Mentés gomb menti a változást.";
     }
 
     /** @param {number} index @param {string} alt */
@@ -143,12 +186,20 @@
         };
     }
 
-    function addListingPhotoFromUrl() {
+    async function addListingPhotoFromUrl() {
         const url = String(newListingPhotoUrl ?? "").trim();
-        if (!isHttpPhotoUrl(url)) return;
+        if (!isHttpPhotoUrl(url)) {
+            listingsError = "";
+            formNotice = "";
+            listingsError = "A kép URL-je http vagy https kell legyen.";
+            return;
+        }
         const current = normalizePhotos(listingForm.photos);
         if (current.length >= listingPhotoLimit) return;
         if (current.some((photo) => photo.url === url)) {
+            listingsError = "";
+            formNotice = "";
+            listingsError = "Ez a kép már szerepel a listában.";
             clearNewListingPhotoFields();
             return;
         }
@@ -167,6 +218,8 @@
             ],
         };
         clearNewListingPhotoFields();
+        listingsError = "";
+        formNotice = "A kép hozzáadva. A Mentés gomb menti a változást.";
     }
 
     function toggleListingLanguage(code) {
@@ -236,7 +289,10 @@
     async function claimMatchedWebsite() {
         if (!matchedWebsite) return;
         if (matchedWebsiteCanJoin()) {
+            const yes = await askConfirm("Biztosan átveszed ezt a bejegyzést?");
+            if (!yes) return;
             listingsError = "";
+            formNotice = "";
             try {
                 await apiFetch("/api/account/listings/claim", {
                     method: "POST",
@@ -244,6 +300,7 @@
                     body: JSON.stringify({ entry_id: matchedWebsite.entry_id }),
                 });
                 await onSaved();
+                onNotice("Az átvétel sikerült.");
                 onClose();
             } catch {
                 listingsError = "Az átvétel nem sikerült";
@@ -257,6 +314,8 @@
             url: matchedWebsite.url,
             name: String(listingForm.name ?? "").trim() ? listingForm.name : matchedWebsite.title,
         };
+        listingsError = "";
+        formNotice = "A weboldal kijelölve. A Beküldés gomb hozza létre a bejegyzést.";
     }
 
     /** @param {Record<string, unknown>} form */
@@ -283,7 +342,12 @@
     /** @param {SubmitEvent} event */
     async function saveListingDialog(event) {
         event.preventDefault();
+        const yes = await askConfirm(
+            mode === "create" ? "Biztosan beküldöd a bejegyzést?" : "Biztosan mented a bejegyzést?",
+        );
+        if (!yes) return;
         listingsError = "";
+        formNotice = "";
         if (mode === "create" && matchedWebsiteCanClaim() && listingWebsiteId <= 0) {
             listingsError = "Ez a weboldal már létezik. Az Átveszem gombbal veheted át.";
             return;
@@ -315,6 +379,7 @@
                 );
             }
             await onSaved();
+            onNotice("A mentés sikerült.");
             onClose();
         } catch {
             listingsError = "A mentés nem sikerült";
@@ -344,9 +409,17 @@
             };
             hoursEnabled = hoursConfigured(listingForm.hours);
         } catch {
-            onError("A mentés nem sikerült");
+            onError("A betöltés nem sikerült");
             onClose();
         }
+    }
+
+    /** @param {string} url */
+    function listingUrlOk(url) {
+        const value = String(url ?? "").trim();
+        if (value === "") return true;
+        const lower = value.toLowerCase();
+        return lower.startsWith("http://") || lower.startsWith("https://");
     }
 
     function closeDialog() {
@@ -375,16 +448,19 @@
 >
     <div class="link-dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
         <h3 id="listing-form-dialog-title">
-            {mode === "create" ? "Új bejegyzés" : "Bejegyzés szerkesztése"}
+            {mode === "create" ? LISTING_CREATE_TITLE : "Bejegyzés szerkesztése"}
         </h3>
+        {#if mode === "create"}
+            <p class="create-form-note">{LISTING_CREATE_NOTE}</p>
+        {/if}
         {#if listingCatalogLoading}
             <p>Katalógus betöltése…</p>
         {:else}
             <form class="link-dialog-form" onsubmit={saveListingDialog}>
-                <label for="profile_listing_name">Név</label>
+                <label for="profile_listing_name">Név <span class="field-required" aria-hidden="true">*</span></label>
                 <input id="profile_listing_name" type="text" bind:value={listingForm.name} required />
 
-                <label for="profile_listing_location">Település</label>
+                <label for="profile_listing_location">Település <span class="field-required" aria-hidden="true">*</span></label>
                 <select id="profile_listing_location" bind:value={listingForm.location_id} required>
                     <option value={0} disabled>Válassz települést</option>
                     {#each listingLocations as loc (loc.id)}
@@ -392,7 +468,7 @@
                     {/each}
                 </select>
 
-                <label for="profile_listing_category">Kategória</label>
+                <label for="profile_listing_category">Kategória <span class="field-required" aria-hidden="true">*</span></label>
                 <select id="profile_listing_category" bind:value={listingForm.category_id} required>
                     <option value={0} disabled>Válassz kategóriát</option>
                     {#each listingCategories as cat (cat.id)}
@@ -400,7 +476,7 @@
                     {/each}
                 </select>
 
-                <label for="profile_listing_type">Típus</label>
+                <label for="profile_listing_type">Típus <span class="field-required" aria-hidden="true">*</span></label>
                 <select id="profile_listing_type" bind:value={listingForm.type_id} required>
                     <option value={0} disabled>Válassz típust</option>
                     {#each listingTypes as typ (typ.id)}
@@ -440,6 +516,9 @@
                 {/if}
                 {#if listingsError}
                     <p class="profile-error">{listingsError}</p>
+                {/if}
+                {#if formNotice}
+                    <p class="profile-ok">{formNotice}</p>
                 {/if}
 
                 <label for="profile_listing_phone">Telefon</label>
@@ -527,10 +606,13 @@
                             />
                             <button
                                 type="button"
-                                class="btn btn-xs"
+                                class="btn"
                                 disabled={!isHttpPhotoUrl(newListingPhotoUrl)}
                                 onclick={addListingPhotoFromUrl}
-                            >Hozzáadás</button>
+                            >
+                                <AppIcon name="upload" size={16} />
+                                Hozzáadás
+                            </button>
                         </div>
                     {/if}
                 </div>
@@ -543,7 +625,9 @@
                 {/if}
 
                 <div class="link-dialog-actions">
-                    <button type="submit" class="link-dialog-submit">Mentés</button>
+                    <button type="submit" class="link-dialog-submit" disabled={!listingFormReady}>
+                        {mode === "create" ? "Beküldés" : "Mentés"}
+                    </button>
                     <button type="button" class="link-dialog-cancel" onclick={closeDialog}>
                         Mégse
                     </button>
@@ -552,6 +636,13 @@
         {/if}
     </div>
 </div>
+
+<ConfirmDialog
+    open={confirmOpen}
+    message={confirmMessage}
+    onYes={() => closeConfirm(true)}
+    onNo={() => closeConfirm(false)}
+/>
 
 <style>
     .profile-hint {
@@ -562,6 +653,10 @@
     .profile-error {
         margin: 0;
         color: #b00020;
+    }
+    .profile-ok {
+        margin: 0;
+        color: #3ddc97;
     }
     .listing-url-match {
         display: flex;
@@ -629,5 +724,8 @@
         flex-direction: column;
         gap: 0.35rem;
         margin-top: 0.25rem;
+    }
+    .profile-listing-photos-add .btn {
+        align-self: flex-start;
     }
 </style>

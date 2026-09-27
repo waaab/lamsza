@@ -3,6 +3,7 @@
     import { apiFetch } from "$lib/api";
     import SearchResultCard from "$lib/components/SearchResultCard.svelte";
     import { searchResultCardModel } from "$lib/searchResultCard.js";
+    import { formatSearchElapsed } from "$lib/searchElapsed.js";
     import { locationMenuTowns, searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
     import { isServiceEntry } from "$lib/entryType.js";
     import {
@@ -20,8 +21,9 @@
 
     let searchInputValue = "";
     let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats, websites, website_query }
-    let suggestions = [];
     let loading = false;
+    /** @type {number | null} */
+    let searchElapsedMs = null;
     let searchInputEl;
     let searchRootEl;
     let answerSettlement = null;
@@ -37,6 +39,16 @@
     let locations = [];
     /** @type {"index" | "services" | "websites"} */
     let resultFilter = "index";
+    let searchGen = 0;
+    // Results belong to the last submitted query. Clearing the box drops them
+    // and retires any search still in flight, so a late response cannot redraw them.
+    $: if (!searchInputValue.trim() && (searchResults || loading || searchElapsedMs != null)) {
+        searchGen += 1;
+        searchResults = null;
+        loading = false;
+        searchElapsedMs = null;
+        resetAnswer();
+    }
     $: preferredLocation = searchPreferredLocation($auth.preferredLocation, $auth.loggedIn);
     $: townChoices = locationMenuTowns(locations, preferredLocation);
     $: selectedSlug = selectedLocation?.slug || "";
@@ -117,6 +129,14 @@
         resultFilter = kind;
     }
 
+    $: searchScope = resultFilter === "services"
+        ? "szolgáltatásokban:"
+        : resultFilter === "websites"
+          ? "weboldalakban:"
+          : selectedLocation?.name
+            ? `${selectedLocation.name} és környéke:`
+            : "mindenhol:";
+
     function stopAnswerTyping() {
         if (answerTimer) clearInterval(answerTimer);
         answerTimer = null;
@@ -181,24 +201,27 @@
     }
 
     async function executeSearch() {
-        if (!searchInputValue.trim()) return;
+        const query = searchInputValue.trim();
+        if (!query) return;
 
+        const gen = ++searchGen;
+        const started = typeof performance !== "undefined" ? performance.now() : Date.now();
         loading = true;
         showDiscover = true;
+        searchElapsedMs = null;
         resetAnswer();
         try {
             const data = await apiFetch(
-                `/api/search?q=${encodeURIComponent(searchInputValue)}`,
+                `/api/search?q=${encodeURIComponent(query)}`,
             );
+            if (gen !== searchGen) return;
             searchResults = data;
-            presentSettlementAnswer(data, searchInputValue);
-
-            const suggestionsData = await apiFetch(
-                `/api/autosuggest?q=${encodeURIComponent(searchInputValue)}`,
-            );
-            suggestions = suggestionsData || [];
+            searchElapsedMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - started;
+            presentSettlementAnswer(data, query);
         } catch (err) {
+            if (gen !== searchGen) return;
             console.error("Search error:", err);
+            searchElapsedMs = (typeof performance !== "undefined" ? performance.now() : Date.now()) - started;
             searchResults = {
                 locations: [],
                 entries: [],
@@ -210,7 +233,7 @@
                 websites: [],
             };
         } finally {
-            loading = false;
+            if (gen === searchGen) loading = false;
         }
     }
 
@@ -224,7 +247,7 @@
         showDiscover = false;
         searchInputValue = "";
         searchResults = null;
-        suggestions = [];
+        searchElapsedMs = null;
         resultFilter = "index";
         resetAnswer();
         dispatch("discoverClose");
@@ -376,26 +399,28 @@
                         <p>Keresés...</p>
                     {:else if searchResults && searchInputValue}
                         <p>
+                            🔍 Keresés
+                            {#if resultFilter === "index" && selectedLocation}
+                                <span class="search-place">{searchScope}</span>
+                            {:else}
+                                {searchScope}
+                            {/if}
+                            <span class="active">{searchInputValue}</span>
+                        </p>
+                        <p class:search-result-count={totalCount > 0}>
                             {#if totalCount === 0}
                                 <span>Nincs találat erre a keresésre.</span>
                             {:else}
-                                🔍 Keresés
-                                {#if selectedLocation}
-                                    <span class="search-place">{selectedLocation.name} és környéke:</span>
-                                {:else}
-                                    mindenhol:
-                                {/if}
-                                <span class="active">{searchInputValue}</span>
+                                <span>{totalCount} találat{#if searchElapsedMs != null}, {formatSearchElapsed(searchElapsedMs)} alatt{/if}</span>
                             {/if}
                         </p>
-                        <p><span>({totalCount} találat)</span></p>
                     {:else}
                         <p>Írd be a keresett szót, majd kattints a „Na lámsza!" gombra.</p>
                     {/if}
                 </span>
             </div>
 
-            {#if !loading && searchResults && totalCount > 0}
+            {#if !loading && searchResults && searchInputValue.trim() && totalCount > 0}
                 <div class="discover-sections">
                     {#if answerSettlement && resultFilter === "index"}
                         <div class="discover-answer">
@@ -813,6 +838,10 @@
 }
 .search-place {
     font-weight: 600;
+}
+.search-result-count {
+    color: var(--text-faintest);
+    font-weight: 400;
 }
 
 .discover-sections {

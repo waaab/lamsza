@@ -1,11 +1,18 @@
 <script>
     let { claimed = false, showLabel = false } = $props();
+
+    const claimTitle = $derived(
+        claimed
+            ? "Átvéve. Ezt a bejegyzést vagy weboldalt a tulajdonosa átvette. Ő kezeli az adatokat, ezért a pipa kék."
+            : "Gazdátlan. Ezt a bejegyzést vagy weboldalt még senki nem vette át. A halvány pipa jelzi, hogy nincs gazdája, és a tulajdonos később átveheti.",
+    );
 </script>
 
 <span
     class="claim-mark"
     class:claim-mark--on={claimed}
-    aria-label={claimed ? "Átvéve" : "Gazdátlan"}
+    title={claimTitle}
+    aria-label={claimTitle}
 >
     <svg
         viewBox="0 0 24 24"
