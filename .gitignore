@@ -40,5 +40,8 @@ backend/server.pid
 # Linked git worktrees
 .worktrees/
 
+# Local agent session scratch (brainstorm server, review diffs)
+.superpowers/
+
 # Extension Build Output
 extension/
