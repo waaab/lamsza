@@ -610,7 +610,7 @@
 
 /* Collapsible “create new” blocks + table search toolbars */
 .admin-create-panel {
-    margin-bottom: 1.25rem;
+    margin: 1rem 0;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--entry-category-bg);
