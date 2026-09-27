@@ -36,6 +36,7 @@ func init() {
 	mondasok.Migrate()
 	handlers.MigrateEntryVerified()
 	handlers.MigrateEntryReviews()
+	handlers.MigrateEntryProfileView()
 	handlers.MigrateEntryLocationSearch()
 	handlers.MigrateSettlementLocationTypes()
 	events.Migrate()

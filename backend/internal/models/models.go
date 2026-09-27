@@ -23,8 +23,11 @@ type Entry struct {
 	URL            string          `json:"url"`
 	Claimed        bool            `json:"claimed"`
 	Verified       bool            `json:"verified"`
-	Hours          json.RawMessage `json:"hours"`
-	DeliveryHours  json.RawMessage `json:"delivery_hours"`
+	Hours           json.RawMessage `json:"hours"`
+	HoursEnabled    bool            `json:"hours_enabled"`
+	DeliveryHours   json.RawMessage `json:"delivery_hours"`
+	DeliveryEnabled bool            `json:"delivery_enabled"`
+	SocialLinks     json.RawMessage `json:"social_links"`
 	Photos         json.RawMessage `json:"photos"`
 	IsDirectMatch  bool            `json:"is_direct_match"`
 	RatingsEnabled bool            `json:"ratings_enabled"`
