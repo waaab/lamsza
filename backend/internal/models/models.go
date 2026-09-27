@@ -3,39 +3,42 @@ package models
 import "encoding/json"
 
 type Entry struct {
-	ID             string          `json:"id"`
-	Type           string          `json:"type"`
-	Category       string          `json:"category"`
-	Name           string          `json:"name"`
-	Slug           string          `json:"slug"`
-	Location       string          `json:"location"`
-	LocationSlug   string          `json:"location_slug"`
-	LocationCounty string          `json:"location_county"`
-	CountySlug     string          `json:"county_slug"`
-	LocationType   string          `json:"location_type"`
-	LocationRo     string          `json:"location_ro"`
+	ID                  string          `json:"id"`
+	Type                string          `json:"type"`
+	Category            string          `json:"category"`
+	Name                string          `json:"name"`
+	Slug                string          `json:"slug"`
+	Location            string          `json:"location"`
+	LocationSlug        string          `json:"location_slug"`
+	LocationCounty      string          `json:"location_county"`
+	CountySlug          string          `json:"county_slug"`
+	LocationType        string          `json:"location_type"`
+	LocationRo          string          `json:"location_ro"`
 	LocationDe          string          `json:"location_de"`
 	LocationCoordinates string          `json:"location_coordinates"`
 	Phone               string          `json:"phone"`
-	Address        string          `json:"address"`
-	Notes          string          `json:"notes"`
-	Tags           []string        `json:"tags"`
-	Languages      []string        `json:"languages"`
-	URL            string          `json:"url"`
-	Claimed        bool            `json:"claimed"`
-	Verified       bool            `json:"verified"`
-	Hours           json.RawMessage `json:"hours"`
-	HoursEnabled    bool            `json:"hours_enabled"`
-	DeliveryHours   json.RawMessage `json:"delivery_hours"`
-	DeliveryEnabled bool            `json:"delivery_enabled"`
-	SocialLinks     json.RawMessage `json:"social_links"`
-	Photos         json.RawMessage `json:"photos"`
-	IsDirectMatch  bool            `json:"is_direct_match"`
-	RatingsEnabled bool            `json:"ratings_enabled"`
-	Rating         *float64        `json:"rating,omitempty"`
-	ReviewCount    int             `json:"review_count,omitempty"`
-	Reviews        *[]PublicReview `json:"reviews,omitempty"`
-	MyReview       *PublicReview   `json:"my_review,omitempty"`
+	Address             string          `json:"address"`
+	Notes               string          `json:"notes"`
+	Tags                []string        `json:"tags"`
+	Languages           []string        `json:"languages"`
+	URL                 string          `json:"url"`
+	Claimed             bool            `json:"claimed"`
+	ClaimPending        bool            `json:"claim_pending"`
+	SuggestionPending   bool            `json:"suggestion_pending"`
+	Verified            bool            `json:"verified"`
+	Hours               json.RawMessage `json:"hours"`
+	HoursEnabled        bool            `json:"hours_enabled"`
+	DeliveryHours       json.RawMessage `json:"delivery_hours"`
+	DeliveryEnabled     bool            `json:"delivery_enabled"`
+	SocialLinks         json.RawMessage `json:"social_links"`
+	Photos              json.RawMessage `json:"photos"`
+	IsDirectMatch       bool            `json:"is_direct_match"`
+	RatingsEnabled      bool            `json:"ratings_enabled"`
+	Rating              *float64        `json:"rating,omitempty"`
+	ReviewCount         int             `json:"review_count,omitempty"`
+	FeaturedReview      string          `json:"featured_review,omitempty"`
+	Reviews             *[]PublicReview `json:"reviews,omitempty"`
+	MyReview            *PublicReview   `json:"my_review,omitempty"`
 }
 
 type PublicReview struct {
@@ -227,19 +230,19 @@ type Location struct {
 }
 
 type AdminEntry struct {
-	ID            int             `json:"id"`
-	Type          string          `json:"type"`
-	LocationID    *int            `json:"location_id"`
-	CategoryID    *int            `json:"category_id"`
-	Category      string          `json:"category"`
-	Name          string          `json:"name"`
-	Slug          string          `json:"slug"`
-	URL           string          `json:"url"`
-	Phone         string          `json:"phone"`
-	Address       string          `json:"address"`
-	Notes         string          `json:"notes"`
-	Languages     []string        `json:"languages"`
-	Tags          []string        `json:"tags"`
+	ID              int             `json:"id"`
+	Type            string          `json:"type"`
+	LocationID      *int            `json:"location_id"`
+	CategoryID      *int            `json:"category_id"`
+	Category        string          `json:"category"`
+	Name            string          `json:"name"`
+	Slug            string          `json:"slug"`
+	URL             string          `json:"url"`
+	Phone           string          `json:"phone"`
+	Address         string          `json:"address"`
+	Notes           string          `json:"notes"`
+	Languages       []string        `json:"languages"`
+	Tags            []string        `json:"tags"`
 	Verified        bool            `json:"verified"`
 	Hours           json.RawMessage `json:"hours"`
 	HoursEnabled    bool            `json:"hours_enabled"`

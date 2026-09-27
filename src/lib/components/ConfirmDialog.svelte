@@ -53,11 +53,13 @@
         z-index: 1100;
     }
     .confirm-dialog {
-        width: min(28rem, calc(100vw - 2rem));
+        width: min(36rem, calc(100vw - 2rem));
         min-width: 0;
         padding: 1.25rem 1.5rem;
     }
     .confirm-message {
         margin: 0;
+        white-space: pre-line;
+        line-height: 1.45;
     }
 </style>

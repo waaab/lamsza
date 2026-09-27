@@ -8,8 +8,8 @@
 
     /**
      * Directory listing card. `layout` is `grid` (Rács) or `list` (Lista).
-     * Reviews are not wired yet — `rating`, `review_count`, and `featured_review`
-     * are optional placeholders.
+     * `rating` and `review_count` come from the list payload.
+     * `featured_review` is the newest written review, when one exists.
      * @type {{
      *   entry?: Record<string, any> | null,
      *   showBadge?: boolean,
@@ -247,7 +247,7 @@
                                 <span class="entry-listing__review-text"
                                     >„{featuredReview}”</span
                                 >
-                            {:else}
+                            {:else if reviewCount === 0}
                                 <span
                                     class="entry-listing__review-text entry-listing__review-text--empty"
                                     >Még nincs értékelés.</span

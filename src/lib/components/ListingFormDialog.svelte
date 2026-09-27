@@ -60,7 +60,28 @@
             delivery_hours: emptyWeekHours(),
             photos: [],
             ratings_enabled: false,
+            tags: "",
+            social_links: [],
         };
+    }
+
+    /** @param {unknown} raw */
+    function socialList(raw) {
+        return (Array.isArray(raw) ? raw : [])
+            .map((row) => ({
+                label: String(row?.label ?? "").trim(),
+                url: String(row?.url ?? "").trim(),
+            }))
+            .filter((row) => row.url);
+    }
+
+    function addSocialLink() {
+        listingForm.social_links = [...listingForm.social_links, { label: "", url: "" }];
+    }
+
+    /** @param {number} index */
+    function removeSocialLink(index) {
+        listingForm.social_links = listingForm.social_links.filter((_, i) => i !== index);
     }
 
     let listingsError = $state("");
@@ -328,6 +349,23 @@
         formNotice = "A weboldal kijelölve. A Beküldés gomb hozza létre a bejegyzést.";
     }
 
+    /** @param {unknown} raw */
+    function tagsToField(raw) {
+        return (Array.isArray(raw) ? raw : [])
+            .map((tag) => String(tag ?? "").trim().replace(/^#/, ""))
+            .filter(Boolean)
+            .map((tag) => `#${tag}`)
+            .join(" ");
+    }
+
+    /** @param {unknown} raw */
+    function tagsFromField(raw) {
+        return String(raw ?? "")
+            .split(/[\s,]+/)
+            .map((tag) => tag.replace(/^#/, "").trim())
+            .filter(Boolean);
+    }
+
     /** @param {Record<string, unknown>} form */
     function listingRequestBody(form) {
         const languages = listingLanguages(form.languages);
@@ -347,6 +385,12 @@
             delivery_enabled: listingOffersDelivery ? deliveryEnabled : false,
             photos: normalizePhotos(form.photos).slice(0, listingPhotoLimit),
             ratings_enabled: mode === "edit" ? Boolean(form.ratings_enabled) : false,
+            ...(mode === "edit"
+                ? {
+                      tags: tagsFromField(form.tags),
+                      social_links: socialList(form.social_links),
+                  }
+                : {}),
             ...(mode === "create" && listingWebsiteId > 0 ? { website_id: listingWebsiteId } : {}),
         };
     }
@@ -418,6 +462,8 @@
                 delivery_hours: normalizeHours(detail.delivery_hours),
                 photos: normalizePhotos(detail.photos),
                 ratings_enabled: Boolean(detail.ratings_enabled),
+                tags: tagsToField(detail.tags),
+                social_links: socialList(detail.social_links),
             };
             hoursEnabled = Boolean(detail.hours_enabled);
             deliveryEnabled = Boolean(detail.delivery_enabled);
@@ -542,6 +588,25 @@
 
                 <label for="profile_listing_notes">Megjegyzés</label>
                 <textarea id="profile_listing_notes" bind:value={listingForm.notes} rows="3"></textarea>
+
+                {#if mode === "edit"}
+                    <label for="profile_listing_tags">Címkék (#cimke1 #cimke2)</label>
+                    <input id="profile_listing_tags" type="text" bind:value={listingForm.tags} />
+
+                    <fieldset class="link-dialog-choices">
+                        <legend>Közösségi oldalak</legend>
+                        {#each listingForm.social_links as link, index (index)}
+                            <div class="listing-social">
+                                <input type="text" placeholder="Név" bind:value={link.label} />
+                                <input type="url" placeholder="https://" bind:value={link.url} />
+                                <button type="button" class="btn btn-xs" onclick={() => removeSocialLink(index)}>
+                                    Eltávolítás
+                                </button>
+                            </div>
+                        {/each}
+                        <button type="button" class="btn btn-xs" onclick={addSocialLink}>Hozzáadás</button>
+                    </fieldset>
+                {/if}
 
                 <fieldset class="link-dialog-choices">
                     <legend>Nyelvek</legend>
@@ -745,5 +810,12 @@
     }
     .profile-listing-photos-add .btn {
         align-self: flex-start;
+    }
+    .listing-social {
+        display: grid;
+        grid-template-columns: minmax(6rem, 8rem) 1fr auto;
+        gap: 0.4rem;
+        align-items: center;
+        width: 100%;
     }
 </style>

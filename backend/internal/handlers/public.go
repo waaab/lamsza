@@ -187,14 +187,16 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'active'), COALESCE(e.verified, false), COALESCE(e.hours, '{}'::jsonb), COALESCE(e.delivery_hours, '{}'::jsonb),
 			COALESCE(e.hours_enabled, false), COALESCE(e.delivery_enabled, false), COALESCE(e.social_links, '[]'::jsonb), COALESCE(gl.latitude::text || ', ' || gl.longitude::text, ''),
 			COALESCE(e.photos, '[]'::jsonb),
-			COALESCE(e.ratings_enabled, false)
+			COALESCE(e.ratings_enabled, false),
+			EXISTS (SELECT 1 FROM entry_members m WHERE m.entry_id = e.id AND m.role = 'owner' AND m.status = 'pending'),
+			EXISTS (SELECT 1 FROM entry_suggestions sg WHERE sg.entry_id = e.id AND sg.status = 'open')
 		FROM entries e
 		JOIN entry_types typ ON typ.id = e.type_id
 		JOIN settlements s ON e.location_id = s.id
 		LEFT JOIN geo_locations gl ON gl.id = s.location_id
 		JOIN counties c ON s.county_id = c.id
 		LEFT JOIN entry_categories ec ON e.category_id = ec.id
-		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &e.HoursEnabled, &e.DeliveryEnabled, &socialLinks, &e.LocationCoordinates, &photos, &e.RatingsEnabled)
+		WHERE e.slug = $1 AND e.published = true`, slug).Scan(&e.ID, &e.Type, &e.Category, &e.Name, &e.Slug, &e.Location, &e.LocationSlug, &e.LocationCounty, &e.CountySlug, &e.LocationType, &e.LocationRo, &e.LocationDe, &e.Phone, &e.Address, &e.Notes, pq.Array(&pqLanguages), &e.URL, &e.Claimed, &e.Verified, &hours, &delivery, &e.HoursEnabled, &e.DeliveryEnabled, &socialLinks, &e.LocationCoordinates, &photos, &e.RatingsEnabled, &e.ClaimPending, &e.SuggestionPending)
 
 	if err != nil {
 		http.Error(w, "Entry not found", 404)

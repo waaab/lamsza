@@ -48,7 +48,7 @@ export async function addFavorite(type, id) {
     return apiFetch("/api/account/favorites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, id }),
+        body: JSON.stringify({ type, id: Number(id) }),
     });
 }
 

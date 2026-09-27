@@ -59,6 +59,19 @@ func ApplyPublicEntryExtrasMode(e *models.Entry, viewerUserID int, liteMode bool
 	}
 
 	if liteMode {
+		if reviewCount > 0 {
+			var body string
+			err = db.DB.QueryRow(`
+				SELECT COALESCE(body, '')
+				FROM entry_reviews
+				WHERE entry_id = $1 AND btrim(body) <> ''
+				ORDER BY created_at DESC
+				LIMIT 1
+			`, entryIDInt).Scan(&body)
+			if err == nil {
+				e.FeaturedReview = body
+			}
+		}
 		return
 	}
 

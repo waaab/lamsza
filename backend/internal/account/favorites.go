@@ -30,8 +30,8 @@ type favoritesResponse struct {
 }
 
 type favoriteBody struct {
-	Type string `json:"type"`
-	ID   int    `json:"id"`
+	Type string  `json:"type"`
+	ID   jsonInt `json:"id"`
 }
 
 type favoriteRow struct {
@@ -315,7 +315,7 @@ func HandleFavorites(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid json", http.StatusBadRequest)
 			return
 		}
-		entityType, entityID, err := NormalizeFavorite(body.Type, body.ID)
+		entityType, entityID, err := NormalizeFavorite(body.Type, int(body.ID))
 		if err != nil {
 			http.Error(w, "invalid favorite", http.StatusBadRequest)
 			return

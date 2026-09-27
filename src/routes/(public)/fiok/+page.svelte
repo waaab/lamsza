@@ -451,7 +451,7 @@
     /** @param {Record<string, unknown>} row */
     async function deleteListingRow(row) {
         const label = String(row.name ?? "").trim() || "ezt a bejegyzést";
-        const yes = await askConfirm(`Biztosan törlöd: ${label}?`);
+        const yes = await askConfirm(`Biztosan törlöd a nyilvános bejegyzést: ${label}?`);
         if (!yes) return;
         listingsError = "";
         listingsOk = "";
@@ -467,6 +467,27 @@
         } catch {
             accountListings = prev;
             listingsError = "A törlés nem sikerült.";
+        }
+    }
+
+    /** @param {number} entryId @param {number} userId @param {"accept" | "deny"} action */
+    async function decideListingMember(entryId, userId, action) {
+        listingsError = "";
+        listingsOk = "";
+        try {
+            await apiFetch("/api/account/listings/members", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    entry_id: entryId,
+                    user_id: userId,
+                    action,
+                }),
+            });
+            await loadListings();
+            listingsOk = action === "accept" ? "A tagság elfogadva." : "A tagságkérés elutasítva.";
+        } catch {
+            listingsError = "A döntés nem sikerült.";
         }
     }
 
@@ -689,15 +710,39 @@
                                                 {#each listingMembersByEntry[Number(row.id)] || [] as member (member.user_id)}
                                                     <li class="profile-listings-member-row">
                                                         <span>{member.email || member.user_id}</span>
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-xs"
-                                                            onclick={() =>
-                                                                removeListingMember(
-                                                                    Number(row.id),
-                                                                    Number(member.user_id),
-                                                                )}
-                                                        >Eltávolítás</button>
+                                                        {#if member.status === "pending"}
+                                                            <span>Tagságkérés</span>
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-xs"
+                                                                onclick={() =>
+                                                                    decideListingMember(
+                                                                        Number(row.id),
+                                                                        Number(member.user_id),
+                                                                        "accept",
+                                                                    )}
+                                                            >Elfogad</button>
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-xs"
+                                                                onclick={() =>
+                                                                    decideListingMember(
+                                                                        Number(row.id),
+                                                                        Number(member.user_id),
+                                                                        "deny",
+                                                                    )}
+                                                            >Elutasít</button>
+                                                        {:else}
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-xs"
+                                                                onclick={() =>
+                                                                    removeListingMember(
+                                                                        Number(row.id),
+                                                                        Number(member.user_id),
+                                                                    )}
+                                                            >Eltávolítás</button>
+                                                        {/if}
                                                     </li>
                                                 {/each}
                                             </ul>
@@ -739,7 +784,7 @@
                     <section class="profile-listings-group">
                         <h3>Jóváhagyásra vár</h3>
                         {#if accountListings.pending.length === 0}
-                            <p class="profile-empty">Nincs függő tagságkérés.</p>
+                            <p class="profile-empty">Nincs függő kérés.</p>
                         {:else}
                             <ul class="profile-listings-list">
                                 {#each accountListings.pending as row (row.id)}
@@ -751,6 +796,9 @@
                                         {:else}
                                             <span class="profile-listings-name">{row.name}</span>
                                         {/if}
+                                        <span class="profile-listings-status">
+                                            {row.role === "owner" ? "Átvételre vár" : "Tagságkérés elküldve"}
+                                        </span>
                                     </li>
                                 {/each}
                             </ul>

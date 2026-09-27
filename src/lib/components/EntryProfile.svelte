@@ -8,6 +8,7 @@
         formatDayHours,
         normalizeHours,
         openStatus,
+        todayWeekdayKey,
     } from "$lib/entryHours.js";
     import {
         ENTRY_PHOTO_SLOTS,
@@ -36,12 +37,15 @@
      *   isFavorite?: boolean,
      *   onFavorite?: () => void,
      *   showClaim?: boolean,
+     *   showClaimWaiting?: boolean,
      *   showJoin?: boolean,
+     *   showJoinWaiting?: boolean,
      *   claimBusy?: boolean,
      *   onClaim?: () => void,
      *   onJoin?: () => void,
-     *   isOwner?: boolean,
-     *   isMember?: boolean,
+     *   showOwnerEdit?: boolean,
+     *   suggestionState?: "hidden" | "open" | "waiting",
+     *   onSuggest?: () => void,
      *   onEdit?: () => void,
      * }} */
     let {
@@ -51,12 +55,15 @@
         isFavorite = false,
         onFavorite = () => {},
         showClaim = false,
+        showClaimWaiting = false,
         showJoin = false,
+        showJoinWaiting = false,
         claimBusy = false,
         onClaim = () => {},
         onJoin = () => {},
-        isOwner = false,
-        isMember = false,
+        showOwnerEdit = false,
+        suggestionState = "hidden",
+        onSuggest = () => {},
         onEdit = () => {},
     } = $props();
 
@@ -140,13 +147,13 @@
     let verified = $derived(Boolean(entry?.verified));
     let hours = $derived(normalizeHours(entry?.hours));
     let deliveryHours = $derived(normalizeHours(entry?.delivery_hours));
+    let todayKey = $derived(todayWeekdayKey());
     let status = $derived(openStatus(hours));
-    let deliveryStatus = $derived(openStatus(deliveryHours));
     let slides = $derived(gallerySlides(entry));
 </script>
 
 {#snippet suggestEdit()}
-    {#if isOwner}
+    {#if showOwnerEdit}
         <button type="button" class="entry-profile__suggest" onclick={() => onEdit()}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 20h9" />
@@ -154,13 +161,21 @@
             </svg>
             Szerkesztés
         </button>
-    {:else if loggedIn && !isMember}
-        <button type="button" class="entry-profile__suggest">
+    {:else if suggestionState === "open"}
+        <button type="button" class="entry-profile__suggest" onclick={() => onSuggest()}>
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M12 20h9" />
                 <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
             </svg>
             Javaslat módosításra
+        </button>
+    {:else if suggestionState === "waiting"}
+        <button type="button" class="entry-profile__suggest" disabled>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            Javaslat elküldve
         </button>
     {/if}
 {/snippet}
@@ -278,7 +293,9 @@
                         <span class="entry-profile__open-detail">—</span>
                     {:else}
                         <span>{status.label}</span>
-                        <span class="entry-profile__open-detail">{status.detail}</span>
+                        {#if status.detail}
+                            <span class="entry-profile__open-detail">{status.detail}</span>
+                        {/if}
                     {/if}
                 </span>
             {/if}
@@ -337,14 +354,9 @@
             </section>
 
             <section class="entry-profile__section" aria-labelledby="entry-place-title">
-                <div class="entry-profile__section-head">
-                    <h2 id="entry-place-title" class="entry-profile__section-title">
-                        Helyszín és nyitvatartás
-                    </h2>
-                    {#if isOwner || (loggedIn && !isMember)}
-                        {@render suggestEdit()}
-                    {/if}
-                </div>
+                <h2 id="entry-place-title" class="entry-profile__section-title">
+                    Helyszín és nyitvatartás
+                </h2>
                 <div class="entry-profile__place">
                     <p class="entry-profile__address">
                         {#if locationHref && locationName !== EMPTY_PLACEHOLDER}
@@ -370,14 +382,10 @@
                 {#if showListingHours(entry)}
                     <div class="entry-profile__hours-block">
                         <h3 class="entry-profile__hours-title">Nyitvatartás</h3>
-                        <p class={["entry-profile__hours-now", `entry-profile__open--${status.state}`]}>
-                            {status.state === "unknown" ? "Nyitvatartás ma" : status.label}
-                            <span class="entry-profile__open-detail">{status.detail}</span>
-                        </p>
                         <table class="entry-profile__hours">
                             <tbody>
                                 {#each WEEKDAYS as day (day.key)}
-                                    <tr>
+                                    <tr class:entry-profile__hours-today={day.key === todayKey}>
                                         <th scope="row">{day.label}</th>
                                         <td>{formatDayHours(hours[day.key])}</td>
                                     </tr>
@@ -389,14 +397,10 @@
                 {#if showListingDeliveryHours(entry)}
                     <div class="entry-profile__hours-block">
                         <h3 class="entry-profile__hours-title">Kiszállítás</h3>
-                        <p class={["entry-profile__hours-now", `entry-profile__open--${deliveryStatus.state}`]}>
-                            {deliveryStatus.state === "unknown" ? "Kiszállítási idő" : deliveryStatus.label}
-                            <span class="entry-profile__open-detail">{deliveryStatus.detail}</span>
-                        </p>
                         <table class="entry-profile__hours">
                             <tbody>
                                 {#each WEEKDAYS as day (day.key)}
-                                    <tr>
+                                    <tr class:entry-profile__hours-today={day.key === todayKey}>
                                         <th scope="row">{day.label}</th>
                                         <td>{formatDayHours(deliveryHours[day.key])}</td>
                                     </tr>
@@ -410,6 +414,32 @@
             {#if showListingRatings(entry)}
                 <section class="entry-profile__section" aria-labelledby="entry-reviews-title">
                     <EntryReviews {entry} />
+                </section>
+            {/if}
+
+            <section class="entry-profile__section" aria-labelledby="entry-tags-title">
+                <h2 id="entry-tags-title" class="entry-profile__section-title">Címkék</h2>
+                {#if tags.length}
+                    <ul class="entry-profile__tags">
+                        {#each tags as tag (tag)}
+                            <li>#{tag.replace(/^#/, "")}</li>
+                        {/each}
+                    </ul>
+                {:else}
+                    <p class="entry-profile__empty">{EMPTY_PLACEHOLDER}</p>
+                {/if}
+            </section>
+
+            {#if socialLinks.length}
+                <section class="entry-profile__section" aria-labelledby="entry-social-title">
+                    <h2 id="entry-social-title" class="entry-profile__section-title">Közösségi oldalak</h2>
+                    <ul class="entry-profile__social">
+                        {#each socialLinks as link (link.url)}
+                            <li>
+                                <a href={link.url} target="_blank" rel="noopener noreferrer">{link.label || link.url}</a>
+                            </li>
+                        {/each}
+                    </ul>
                 </section>
             {/if}
         </div>
@@ -508,6 +538,13 @@
                         </button>
                     </div>
                 {/if}
+                {#if showClaimWaiting}
+                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                        <button type="button" class="entry-profile__action" disabled>
+                            Átvételre vár
+                        </button>
+                    </div>
+                {/if}
                 {#if showJoin}
                     <div class="entry-profile__contact-row entry-profile__contact-row--static">
                         <button
@@ -520,7 +557,14 @@
                         </button>
                     </div>
                 {/if}
-                {#if isOwner || (loggedIn && !isMember)}
+                {#if showJoinWaiting}
+                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                        <button type="button" class="entry-profile__action" disabled>
+                            Tagságkérés elküldve
+                        </button>
+                    </div>
+                {/if}
+                {#if showOwnerEdit || suggestionState === "open" || suggestionState === "waiting"}
                     <div class="entry-profile__contact-row entry-profile__contact-row--static">
                         {@render suggestEdit()}
                     </div>
@@ -638,17 +682,6 @@
     .entry-profile__section:first-child {
         margin: 0;
     }
-    .entry-profile__section-head {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.5rem 1rem;
-        margin-bottom: 0.75rem;
-    }
-    .entry-profile__section-head .entry-profile__section-title {
-        margin: 0;
-    }
     .entry-profile__section-title {
         margin: 0 0 0.75rem;
         font-weight: 700;
@@ -668,8 +701,12 @@
         color: var(--szekely-blue);
         cursor: pointer;
     }
-    .entry-profile__suggest:hover {
+    .entry-profile__suggest:hover:not(:disabled) {
         text-decoration: underline;
+    }
+    .entry-profile__suggest:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
     .entry-profile__photos-skel {
         display: flex;
@@ -775,13 +812,6 @@
         font-weight: 700;
         color: var(--text-primary);
     }
-    .entry-profile__hours-now {
-        margin: 0 0 0.45rem;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem;
-        font-weight: 700;
-    }
     .entry-profile__hours {
         width: 100%;
         border-collapse: collapse;
@@ -797,6 +827,29 @@
         width: 40%;
         color: var(--text-secondary);
         font-weight: 500;
+    }
+    .entry-profile__hours-today th,
+    .entry-profile__hours-today td {
+        color: var(--szekely-blue);
+        font-weight: 700;
+    }
+    .entry-profile__tags,
+    .entry-profile__social {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .entry-profile__tags li {
+        padding: 0.2rem 0.55rem;
+        border: 1px solid var(--border-color);
+        border-radius: 999px;
+        color: var(--text-secondary);
+    }
+    .entry-profile__social a {
+        color: var(--szekely-blue);
     }
     .entry-profile__review-card {
         display: flex;

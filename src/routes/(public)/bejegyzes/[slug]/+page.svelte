@@ -13,10 +13,11 @@
     } from "$lib/favorites.js";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
-    import EntryHistoryStrip from "$lib/components/EntryHistoryStrip.svelte";
     import EntryProfile from "$lib/components/EntryProfile.svelte";
     import EntryRelatedLinks from "$lib/components/EntryRelatedLinks.svelte";
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
+    import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
+    import SuggestionFormDialog from "$lib/components/SuggestionFormDialog.svelte";
     import { apiFetch } from "$lib/api";
     import {
         historyForDisplay,
@@ -35,7 +36,7 @@
     let fetchGen = 0;
     /** @type {{ type: string, id: number }[]} */
     let favoriteList = [];
-    /** @type {{ owned: Array<{ id: number }>, member: Array<{ id: number }>, pending: Array<{ id: number }> }} */
+    /** @type {{ owned: Array<{ id: number, role?: string }>, member: Array<{ id: number, role?: string }>, pending: Array<{ id: number, role?: string }> }} */
     let accountListings = {
         owned: [],
         member: [],
@@ -43,39 +44,81 @@
     };
     let claimError = "";
     let claimBusy = false;
+    let requestKind = "";
+    let listingsLoaded = false;
+    let loadedListingsKey = "";
+    let listingsGen = 0;
+    const claimRequestMessage =
+        "Ezzel kéred, hogy egy admin tegyen a bejegyzés gazdájává.\n\nA kérés a bejelentkezett fiókodat és ezt a bejegyzést küldi el. Megjegyzés nem megy vele.\n\nA bejegyzés Gazdátlan marad, amíg egy admin el nem fogadja. Elfogadás után a bejegyzés Átvéve lesz, és te szerkesztheted. Elutasításkor a kérés törlődik, a bejegyzés Gazdátlan marad. Egyszerre egy átvételi kérés lehet nyitva, és a küldő nem vonhatja vissza.";
+    const joinRequestMessage =
+        "Ezzel kéred, hogy a bejegyzés gazdája, vagy egy admin, tagként vegyen fel.\n\nA kérés a bejelentkezett fiókodat és ezt a bejegyzést küldi el. Megjegyzés nem megy vele.\n\nA gazda a Bejegyzéseim oldalon fogadja el vagy utasítja el. Egy admin ugyanezt a tagjelölések között teheti meg. Elfogadás után ugyanazokat a mezőket szerkesztheted, mint a gazda. Törölni csak a gazda tudja. Több tagságkérés is nyitva lehet egyszerre.";
     let editingListingId = 0;
+    let suggestionOpen = false;
 
-    /** @param {number | null | undefined} entryId */
-    function listingMembership(entryId) {
+    /**
+     * @param {number | string | null | undefined} entryId
+     * @param {{ owned: Array<{ id: number, role?: string }>, member: Array<{ id: number, role?: string }>, pending: Array<{ id: number, role?: string }> }} listings
+     */
+    function listingMembership(entryId, listings) {
         const id = Number(entryId);
-        if (!id) return null;
-        if (accountListings.owned.some((row) => Number(row.id) === id)) {
+        if (!id || !listings) return null;
+        if (listings.owned.some((row) => Number(row.id) === id)) {
             return "owner";
         }
-        if (accountListings.member.some((row) => Number(row.id) === id)) {
+        if (listings.member.some((row) => Number(row.id) === id)) {
             return "member";
         }
-        if (accountListings.pending.some((row) => Number(row.id) === id)) {
-            return "pending";
+        const pending = listings.pending.find((row) => Number(row.id) === id);
+        if (pending) {
+            return pending.role === "owner" ? "pending-owner" : "pending-member";
         }
         return null;
     }
 
+    function openClaimRequest() {
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        claimError = "";
+        requestKind = "claim";
+    }
+
+    function openJoinRequest() {
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        claimError = "";
+        requestKind = "join";
+    }
+
+    function closeRequestDialog() {
+        requestKind = "";
+    }
+
     async function loadAccountListings() {
+        const gen = ++listingsGen;
         await auth.init();
+        if (gen !== listingsGen) return;
         if (!get(auth).loggedIn) {
             accountListings = { owned: [], member: [], pending: [] };
+            listingsLoaded = true;
             return;
         }
         try {
             const payload = (await apiFetch("/api/account/listings")) || {};
+            if (gen !== listingsGen) return;
             accountListings = {
                 owned: Array.isArray(payload.owned) ? payload.owned : [],
                 member: Array.isArray(payload.member) ? payload.member : [],
                 pending: Array.isArray(payload.pending) ? payload.pending : [],
             };
         } catch {
+            if (gen !== listingsGen) return;
             accountListings = { owned: [], member: [], pending: [] };
+        } finally {
+            if (gen === listingsGen) listingsLoaded = true;
         }
     }
 
@@ -91,27 +134,70 @@
             await apiFetch("/api/account/listings/claim", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ entry_id: entry.id }),
+                body: JSON.stringify({ entry_id: Number(entry.id) }),
             });
             await loadAccountListings();
             await fetchEntry();
-        } catch {
-            claimError = "A mentés nem sikerült";
+        } catch (err) {
+            const text = String(err && err.message ? err.message : "");
+            if (text.includes("claim_pending")) {
+                claimError = "Már van nyitott átvételi kérés ehhez a bejegyzéshez.";
+                await fetchEntry();
+            } else {
+                claimError = "A kérés elküldése nem sikerült.";
+            }
         } finally {
             claimBusy = false;
         }
     }
 
-    $: membership = entry ? listingMembership(entry.id) : null;
+    $: membership = entry ? listingMembership(entry.id, accountListings) : null;
     $: isOwner = membership === "owner";
     $: isMember = membership === "member";
+    $: listingsUserKey = browser && $auth.loggedIn ? $auth.email || "in" : "";
+    $: if (browser && listingsUserKey !== loadedListingsKey) {
+        loadedListingsKey = listingsUserKey;
+        listingsLoaded = false;
+        loadAccountListings();
+    }
+    $: claimPending = Boolean(entry && entry.claim_pending);
     $: showClaimButton =
-        $auth.loggedIn && entry && !entry.claimed && membership == null;
+        $auth.loggedIn &&
+        listingsLoaded &&
+        entry &&
+        !entry.claimed &&
+        membership == null &&
+        !claimPending;
+    $: showClaimWaiting =
+        $auth.loggedIn &&
+        listingsLoaded &&
+        entry &&
+        !entry.claimed &&
+        (claimPending || membership === "pending-owner");
     $: showJoinButton =
         $auth.loggedIn &&
+        listingsLoaded &&
         entry &&
         entry.claimed &&
         membership == null;
+    $: showJoinWaiting =
+        $auth.loggedIn &&
+        listingsLoaded &&
+        entry &&
+        entry.claimed &&
+        membership === "pending-member";
+    $: showOwnerEdit = $auth.loggedIn && listingsLoaded && isOwner;
+    $: suggestionState =
+        !$auth.loggedIn || !listingsLoaded || isOwner || isMember
+            ? "hidden"
+            : entry && entry.suggestion_pending
+              ? "waiting"
+              : "open";
+
+    async function sendMembershipRequest() {
+        closeRequestDialog();
+        await submitListingClaim();
+    }
 
     async function initFavorites() {
         await auth.init();
@@ -157,7 +243,6 @@
 
     onMount(() => {
         initFavorites();
-        loadAccountListings();
     });
 
     $: slug = $page.params.slug;
@@ -274,12 +359,15 @@
                     isFavorite(favoriteList, "entry", entry.id),
                 )}
             showClaim={showClaimButton}
+            showClaimWaiting={showClaimWaiting}
             showJoin={showJoinButton}
+            showJoinWaiting={showJoinWaiting}
             {claimBusy}
-            onClaim={submitListingClaim}
-            onJoin={submitListingClaim}
-            {isOwner}
-            {isMember}
+            onClaim={openClaimRequest}
+            onJoin={openJoinRequest}
+            {showOwnerEdit}
+            {suggestionState}
+            onSuggest={() => (suggestionOpen = true)}
             onEdit={() => (editingListingId = entry.id)}
         />
 
@@ -288,9 +376,34 @@
         {/if}
 
         <EventsWidget organizerName={entry.name} />
-        <EntryRelatedLinks {nearby} {related} currentLocationSlug={entry.location_slug} />
-        <EntryHistoryStrip items={historyItems} />
+        <EntryRelatedLinks
+            {nearby}
+            {related}
+            history={historyItems}
+            currentLocationSlug={entry.location_slug}
+        />
     </article>
+
+    <ConfirmDialog
+        open={requestKind === "claim" || requestKind === "join"}
+        title={requestKind === "join" ? "Tagság kérése" : "Sajátnak jelölöm"}
+        message={requestKind === "join" ? joinRequestMessage : claimRequestMessage}
+        yesLabel="Kérés elküldése"
+        noLabel="Mégse"
+        onYes={sendMembershipRequest}
+        onNo={closeRequestDialog}
+    />
+
+    {#if suggestionOpen && entry}
+        <SuggestionFormDialog
+            slug={entry.slug}
+            onClose={() => (suggestionOpen = false)}
+            onSent={async () => {
+                suggestionOpen = false;
+                await fetchEntry();
+            }}
+        />
+    {/if}
 
     {#if editingListingId > 0}
         <ListingFormDialog

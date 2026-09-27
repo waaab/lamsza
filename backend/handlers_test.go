@@ -36,6 +36,7 @@ func init() {
 	mondasok.Migrate()
 	handlers.MigrateEntryVerified()
 	handlers.MigrateEntryReviews()
+	handlers.MigrateEntrySuggestions()
 	handlers.MigrateEntryProfileView()
 	handlers.MigrateEntryLocationSearch()
 	handlers.MigrateSettlementLocationTypes()
@@ -69,11 +70,15 @@ func init() {
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	testMux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
 	testMux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))
+	testMux.HandleFunc("/api/entry/suggestion-form", middleware.ApplyCORS(account.HandleSuggestionForm))
+	testMux.HandleFunc("/api/entry/suggestions", middleware.ApplyCORS(account.HandleEntrySuggestions))
 	testMux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandlePublicLocations))
 	testMux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
 	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
 	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
 	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
+	testMux.HandleFunc("/api/admin/listing-queue/claim", admin(account.HandleListingQueueClaim))
+	testMux.HandleFunc("/api/admin/listing-queue/suggestion", admin(account.HandleListingQueueSuggestion))
 	testMux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
 	testMux.HandleFunc("/api/admin/entries", admin(handlers.HandleAdminEntries))
 	testMux.HandleFunc("/api/admin/entry_categories", admin(handlers.HandleAdminEntryCategories))
@@ -1002,6 +1007,22 @@ func TestAdminPublishDoesNotVerify(t *testing.T) {
 	}
 }
 
+func acceptPendingClaim(t *testing.T, entryID interface{}, email string) {
+	t.Helper()
+	var userID int
+	if err := db.DB.QueryRow(`SELECT id FROM users WHERE email = $1`, email).Scan(&userID); err != nil {
+		t.Fatalf("user %s: %v", email, err)
+	}
+	rr := doRequestWithCookie(t, "POST", "/api/admin/listing-queue/claim", map[string]interface{}{
+		"entry_id": entryID,
+		"user_id":  userID,
+		"action":   "accept",
+	}, testAdminCookie)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("accept claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+}
+
 func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	rr := doRequest(t, "GET", "/api/locations", nil)
 	var locs []map[string]interface{}
@@ -1039,8 +1060,8 @@ func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	if claimResp["role"] != "owner" {
 		t.Fatalf("claim role: expected owner, got %v", claimResp["role"])
 	}
-	if claimResp["status"] != "active" {
-		t.Fatalf("claim status: expected active, got %v", claimResp["status"])
+	if claimResp["status"] != "pending" {
+		t.Fatalf("claim status: expected pending, got %v", claimResp["status"])
 	}
 
 	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
@@ -1049,8 +1070,30 @@ func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	}
 	var pub map[string]interface{}
 	json.Unmarshal(rr.Body.Bytes(), &pub)
+	if pub["claimed"] != false {
+		t.Fatalf("public claimed should stay false until an admin accepts, got %v", pub["claimed"])
+	}
+	if pub["claim_pending"] != true {
+		t.Fatalf("claim_pending should be true, got %v", pub["claim_pending"])
+	}
+
+	otherCookie := mustLogin("other-claim@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
+		"entry_id": entryID,
+	}, otherCookie)
+	if rr.Code != http.StatusConflict {
+		t.Fatalf("second claim while pending: expected 409, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+
+	acceptPendingClaim(t, entryID, "owner@test.lamsza")
+
+	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	json.Unmarshal(rr.Body.Bytes(), &pub)
 	if pub["claimed"] != true {
-		t.Fatalf("public claimed should be true after owner claim, got %v", pub["claimed"])
+		t.Fatalf("public claimed should be true after admin accepts, got %v", pub["claimed"])
+	}
+	if pub["claim_pending"] != false {
+		t.Fatalf("claim_pending should be false after accept, got %v", pub["claim_pending"])
 	}
 
 	memberCookie := mustLogin("member@test.lamsza")
@@ -1118,6 +1161,7 @@ func TestMemberCanPatchListing(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner@test.lamsza")
 
 	memberCookie := mustLogin("member@test.lamsza")
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -1223,6 +1267,7 @@ func TestMemberCannotDeleteListing(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner@test.lamsza")
 
 	memberCookie := mustLogin("member@test.lamsza")
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{

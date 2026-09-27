@@ -181,6 +181,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		id := r.URL.Query().Get("id")
 		if id != "" {
+			db.DB.Exec("DELETE FROM websites WHERE entry_id = $1", id)
 			db.DB.Exec("DELETE FROM entries WHERE id = $1", id)
 		}
 		w.WriteHeader(http.StatusOK)

@@ -96,6 +96,7 @@ func TestClaimedRatingsEnabledEmptyReviews(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner@test.lamsza")
 
 	entryIDInt := int(entryID.(float64))
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
@@ -172,6 +173,7 @@ func TestReviewClaimedButRatingsDisabledFails(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner2@test.lamsza")
 
 	userCookie := mustLogin("reviewer2@test.lamsza")
 	payload := map[string]interface{}{
@@ -197,6 +199,7 @@ func TestReviewPostAndUpdateWorks(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner3@test.lamsza")
 
 	entryIDInt := int(entryID.(float64))
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
@@ -266,6 +269,7 @@ func TestReviewTwoUsersAverage(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner4@test.lamsza")
 
 	entryIDInt := int(entryID.(float64))
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
@@ -316,6 +320,7 @@ func TestReviewDeleteWorks(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner5@test.lamsza")
 
 	entryIDInt := int(entryID.(float64))
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
@@ -368,6 +373,7 @@ func TestReviewValidationErrors(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner6@test.lamsza")
 
 	entryIDInt := int(entryID.(float64))
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
@@ -452,6 +458,7 @@ func TestMemberPatchRatingsEnabled(t *testing.T) {
 	if rr.Code != http.StatusOK {
 		t.Fatalf("claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
+	acceptPendingClaim(t, entryID, "owner-ratings@test.lamsza")
 
 	patchBody := map[string]interface{}{
 		"name":            "PatchRatings A",

@@ -439,6 +439,10 @@
     let listingQueueUnpublished = [];
     /** @type {{ entry_id: number, entry_name: string, user_id: number, email: string }[]} */
     let listingQueueMembers = [];
+    /** @type {{ entry_id: number, entry_name: string, user_id: number, email: string }[]} */
+    let listingQueueClaims = [];
+    /** @type {{ id: number, entry_id: number, entry_name: string, email: string, changes: Record<string, unknown>, note: string }[]} */
+    let listingQueueSuggestions = [];
     /** @type {{ id: number, domain: string, title: string, description: string, submitter: string }[]} */
     let listingQueueWebsites = [];
     let listingQueueError = "";
@@ -694,6 +698,8 @@
             const data = await res.json();
             listingQueueUnpublished = Array.isArray(data.unpublished) ? data.unpublished : [];
             listingQueueMembers = Array.isArray(data.members) ? data.members : [];
+            listingQueueClaims = Array.isArray(data.claims) ? data.claims : [];
+            listingQueueSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
             listingQueueWebsites = Array.isArray(data.websites) ? data.websites : [];
             listingQueueFetched = true;
         } catch (e) {
@@ -735,6 +741,95 @@
         }
         listingQueueError = "";
         noteAdminAction("welcome", "A tagság jóváhagyva.");
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    const SUGGESTION_FIELD_LABELS = {
+        name: "Név",
+        tags: "Szolgáltatások",
+        notes: "Bemutatkozás",
+        location_id: "Település",
+        address: "Cím",
+        hours: "Nyitvatartás",
+        delivery_hours: "Kiszállítás",
+        url: "Weboldal",
+        phone: "Telefon",
+        social_links: "Közösségi oldalak",
+        languages: "Nyelvek",
+    };
+
+    /** @param {unknown} value */
+    function suggestionValueText(value) {
+        if (Array.isArray(value)) {
+            if (value.every((item) => typeof item === "string")) return value.join(", ") || "—";
+            return value
+                .map((item) => {
+                    if (item && typeof item === "object") {
+                        const label = String(item.label ?? "").trim();
+                        const url = String(item.url ?? "").trim();
+                        return label ? `${label}: ${url}` : url;
+                    }
+                    return String(item ?? "");
+                })
+                .filter(Boolean)
+                .join(", ") || "—";
+        }
+        if (value && typeof value === "object") return JSON.stringify(value);
+        const text = String(value ?? "").trim();
+        return text || "—";
+    }
+
+    async function decideListingQueueSuggestion(id, action) {
+        const res = await apiCall("/api/admin/listing-queue/suggestion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, action }),
+        });
+        if (!res.ok) {
+            const detail = (await res.text()) || `HTTP ${res.status}`;
+            listingQueueError = detail;
+            noteAdminAction(
+                "welcome",
+                action === "accept"
+                    ? `A javaslat elfogadása nem sikerült. ${detail}`
+                    : `A javaslat elutasítása nem sikerült. ${detail}`,
+                false,
+            );
+            return;
+        }
+        listingQueueError = "";
+        noteAdminAction(
+            "welcome",
+            action === "accept" ? "A javaslat elfogadva." : "A javaslat elutasítva.",
+        );
+        await fetchListingQueue();
+        await auth.refresh();
+    }
+
+    async function decideListingQueueClaim(entryId, userId, action) {
+        const res = await apiCall("/api/admin/listing-queue/claim", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entry_id: entryId, user_id: userId, action }),
+        });
+        if (!res.ok) {
+            const detail = (await res.text()) || `HTTP ${res.status}`;
+            listingQueueError = detail;
+            noteAdminAction(
+                "welcome",
+                action === "accept"
+                    ? `Az átvétel elfogadása nem sikerült. ${detail}`
+                    : `Az átvétel elutasítása nem sikerült. ${detail}`,
+                false,
+            );
+            return;
+        }
+        listingQueueError = "";
+        noteAdminAction(
+            "welcome",
+            action === "accept" ? "Az átvétel elfogadva." : "Az átvétel elutasítva.",
+        );
         await fetchListingQueue();
         await auth.refresh();
     }
@@ -2349,6 +2444,8 @@
         const siteRows = Array.isArray(websites) ? websites : [];
         const waiting =
             listingQueueUnpublished.length +
+            listingQueueClaims.length +
+            listingQueueSuggestions.length +
             listingQueueMembers.length +
             siteRows.length;
         if (listingQueueFetched && !listingQueueError) {
@@ -2356,13 +2453,13 @@
                 messages.push({
                     id: "queue",
                     level: "info",
-                    text: `${listingQueueUnpublished.length} bejegyzés, ${listingQueueMembers.length} tag és ${siteRows.length} weboldal vár jóváhagyásra.`,
+                    text: `${listingQueueUnpublished.length} bejegyzés, ${listingQueueClaims.length} átvétel, ${listingQueueSuggestions.length} javaslat, ${listingQueueMembers.length} tag és ${siteRows.length} weboldal vár jóváhagyásra.`,
                 });
             } else {
                 messages.push({
                     id: "queue-ok",
                     level: "success",
-                    text: "Nincs jóváhagyásra váró bejegyzés, tag vagy weboldal.",
+                    text: "Nincs jóváhagyásra váró bejegyzés, átvétel, tag vagy weboldal.",
                 });
             }
         }
@@ -2385,6 +2482,8 @@
         settingsLoadError,
         listingQueueError,
         listingQueueUnpublished,
+        listingQueueClaims,
+        listingQueueSuggestions,
         listingQueueMembers,
         mondasok,
         mondasokTodayCount,
@@ -3752,7 +3851,7 @@
                                 {/if}
                             </div>
                         {/each}
-                        {#if listingQueueFetched && !listingQueueError && (listingQueueUnpublished.length > 0 || listingQueueMembers.length > 0)}
+                        {#if listingQueueFetched && !listingQueueError && (listingQueueUnpublished.length > 0 || listingQueueClaims.length > 0 || listingQueueSuggestions.length > 0 || listingQueueMembers.length > 0)}
                             {#if listingQueueUnpublished.length > 0}
                                 <h4>Közzétételre váró bejegyzések</h4>
                                 <div class="admin-table-wrapper">
@@ -3775,6 +3874,40 @@
                                                             class="admin-submit-btn"
                                                             on:click={() => publishListingQueueEntry(row.id)}
                                                         >Közzététel</button>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {/if}
+                            {#if listingQueueClaims.length > 0}
+                                <h4>Átvételi kérések</h4>
+                                <div class="admin-table-wrapper">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Bejegyzés</th>
+                                                <th>Felhasználó</th>
+                                                <th class="admin-table-col--action">Művelet</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each listingQueueClaims as row}
+                                                <tr>
+                                                    <td>{row.entry_name}</td>
+                                                    <td>{row.email}</td>
+                                                    <td class="admin-table-col--action">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={() => decideListingQueueClaim(row.entry_id, row.user_id, "accept")}
+                                                        >Elfogad</button>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm"
+                                                            on:click={() => decideListingQueueClaim(row.entry_id, row.user_id, "deny")}
+                                                        >Elutasít</button>
                                                     </td>
                                                 </tr>
                                             {/each}
@@ -3809,6 +3942,52 @@
                                                             class="btn btn-sm"
                                                             on:click={() => rejectListingQueueMember(row.entry_id, row.user_id)}
                                                         >Elutasítás</button>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {/if}
+                            {#if listingQueueSuggestions.length > 0}
+                                <h4>Javaslatok</h4>
+                                <div class="admin-table-wrapper">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Bejegyzés</th>
+                                                <th>Felhasználó</th>
+                                                <th>Változások</th>
+                                                <th class="admin-table-col--action">Művelet</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each listingQueueSuggestions as row}
+                                                <tr>
+                                                    <td>{row.entry_name}</td>
+                                                    <td>{row.email}</td>
+                                                    <td>
+                                                        {#each Object.entries(row.changes || {}) as [key, value] (key)}
+                                                            <div>
+                                                                <strong>{SUGGESTION_FIELD_LABELS[key] || key}:</strong>
+                                                                {suggestionValueText(value)}
+                                                            </div>
+                                                        {/each}
+                                                        {#if row.note}
+                                                            <div><strong>Megjegyzés:</strong> {row.note}</div>
+                                                        {/if}
+                                                    </td>
+                                                    <td class="admin-table-col--action">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={() => decideListingQueueSuggestion(row.id, "accept")}
+                                                        >Elfogad</button>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm"
+                                                            on:click={() => decideListingQueueSuggestion(row.id, "deny")}
+                                                        >Elutasít</button>
                                                     </td>
                                                 </tr>
                                             {/each}

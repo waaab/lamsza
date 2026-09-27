@@ -5,6 +5,7 @@ import (
 	"backend/internal/db"
 	"backend/internal/utils"
 	"backend/internal/webdomain"
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -49,38 +50,66 @@ type membershipResponse struct {
 	Status  string `json:"status"`
 }
 
+// jsonInt accepts a JSON number or a numeric string. Public entries expose id as a string.
+type jsonInt int
+
+func (n *jsonInt) UnmarshalJSON(data []byte) error {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 || string(data) == "null" {
+		return fmt.Errorf("invalid number")
+	}
+	if data[0] == '"' {
+		var s string
+		if err := json.Unmarshal(data, &s); err != nil {
+			return err
+		}
+		v, err := strconv.Atoi(strings.TrimSpace(s))
+		if err != nil {
+			return err
+		}
+		*n = jsonInt(v)
+		return nil
+	}
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*n = jsonInt(v)
+	return nil
+}
+
 type claimBody struct {
-	EntryID int `json:"entry_id"`
+	EntryID jsonInt `json:"entry_id"`
 }
 
 type createListingBody struct {
-	WebsiteID     int             `json:"website_id"`
-	Name          string          `json:"name"`
-	LocationID    int             `json:"location_id"`
-	CategoryID    int             `json:"category_id"`
-	TypeID        int             `json:"type_id"`
-	URL           string          `json:"url"`
-	Phone         string          `json:"phone"`
-	Address       string          `json:"address"`
-	Notes         string          `json:"notes"`
-	Languages     []string        `json:"languages"`
-	Hours         json.RawMessage `json:"hours"`
-	DeliveryHours json.RawMessage `json:"delivery_hours"`
-	HoursEnabled  bool            `json:"hours_enabled"`
-	DeliveryEnabled bool          `json:"delivery_enabled"`
-	Photos        json.RawMessage `json:"photos"`
+	WebsiteID       int             `json:"website_id"`
+	Name            string          `json:"name"`
+	LocationID      int             `json:"location_id"`
+	CategoryID      int             `json:"category_id"`
+	TypeID          int             `json:"type_id"`
+	URL             string          `json:"url"`
+	Phone           string          `json:"phone"`
+	Address         string          `json:"address"`
+	Notes           string          `json:"notes"`
+	Languages       []string        `json:"languages"`
+	Hours           json.RawMessage `json:"hours"`
+	DeliveryHours   json.RawMessage `json:"delivery_hours"`
+	HoursEnabled    bool            `json:"hours_enabled"`
+	DeliveryEnabled bool            `json:"delivery_enabled"`
+	Photos          json.RawMessage `json:"photos"`
 }
 
 type updateListingBody struct {
-	Name           string          `json:"name"`
-	LocationID     int             `json:"location_id"`
-	CategoryID     int             `json:"category_id"`
-	TypeID         int             `json:"type_id"`
-	URL            string          `json:"url"`
-	Phone          string          `json:"phone"`
-	Address        string          `json:"address"`
-	Notes          string          `json:"notes"`
-	Languages      []string        `json:"languages"`
+	Name            string          `json:"name"`
+	LocationID      int             `json:"location_id"`
+	CategoryID      int             `json:"category_id"`
+	TypeID          int             `json:"type_id"`
+	URL             string          `json:"url"`
+	Phone           string          `json:"phone"`
+	Address         string          `json:"address"`
+	Notes           string          `json:"notes"`
+	Languages       []string        `json:"languages"`
 	Hours           json.RawMessage `json:"hours"`
 	HoursEnabled    bool            `json:"hours_enabled"`
 	DeliveryHours   json.RawMessage `json:"delivery_hours"`
@@ -88,6 +117,7 @@ type updateListingBody struct {
 	SocialLinks     json.RawMessage `json:"social_links"`
 	Photos          json.RawMessage `json:"photos"`
 	RatingsEnabled  bool            `json:"ratings_enabled"`
+	Tags            []string        `json:"tags"`
 }
 
 type listingItem struct {
@@ -390,7 +420,8 @@ func HandleClaimListing(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if body.EntryID <= 0 {
+	entryID := int(body.EntryID)
+	if entryID <= 0 {
 		http.Error(w, "entry_id required", http.StatusBadRequest)
 		return
 	}
@@ -405,7 +436,7 @@ func HandleClaimListing(w http.ResponseWriter, r *http.Request) {
 	var published bool
 	err = tx.QueryRow(`
 		SELECT published FROM entries WHERE id = $1 FOR UPDATE
-	`, body.EntryID).Scan(&published)
+	`, entryID).Scan(&published)
 	if err == sql.ErrNoRows {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -419,7 +450,23 @@ func HandleClaimListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existing, found, err := scanMembership(tx, body.EntryID, u.ID)
+	var pendingClaim bool
+	err = tx.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1 FROM entry_members
+			WHERE entry_id = $1 AND role = 'owner' AND status = 'pending'
+		)
+	`, entryID).Scan(&pendingClaim)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if pendingClaim {
+		writeListingConflict(w, http.StatusConflict, "claim_pending")
+		return
+	}
+
+	existing, found, err := scanMembership(tx, entryID, u.ID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -433,7 +480,7 @@ func HandleClaimListing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ownerExists, err := hasActiveOwner(tx, body.EntryID)
+	ownerExists, err := hasActiveOwner(tx, entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -441,9 +488,9 @@ func HandleClaimListing(w http.ResponseWriter, r *http.Request) {
 
 	var resp membershipResponse
 	if !ownerExists {
-		resp, err = insertMembership(tx, body.EntryID, u.ID, "owner", "active")
+		resp, err = insertMembership(tx, entryID, u.ID, "owner", "pending")
 	} else {
-		resp, err = insertMembership(tx, body.EntryID, u.ID, "member", "pending")
+		resp, err = insertMembership(tx, entryID, u.ID, "member", "pending")
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -542,17 +589,17 @@ func HandleListingCatalog(w http.ResponseWriter, r *http.Request) {
 }
 
 type listingDetailResponse struct {
-	ID             int             `json:"id"`
-	Name           string          `json:"name"`
-	Slug           string          `json:"slug"`
-	LocationID     int             `json:"location_id"`
-	CategoryID     int             `json:"category_id"`
-	TypeID         int             `json:"type_id"`
-	URL            string          `json:"url"`
-	Phone          string          `json:"phone"`
-	Address        string          `json:"address"`
-	Notes          string          `json:"notes"`
-	Languages      []string        `json:"languages"`
+	ID              int             `json:"id"`
+	Name            string          `json:"name"`
+	Slug            string          `json:"slug"`
+	LocationID      int             `json:"location_id"`
+	CategoryID      int             `json:"category_id"`
+	TypeID          int             `json:"type_id"`
+	URL             string          `json:"url"`
+	Phone           string          `json:"phone"`
+	Address         string          `json:"address"`
+	Notes           string          `json:"notes"`
+	Languages       []string        `json:"languages"`
 	Hours           json.RawMessage `json:"hours"`
 	HoursEnabled    bool            `json:"hours_enabled"`
 	DeliveryHours   json.RawMessage `json:"delivery_hours"`
@@ -561,6 +608,7 @@ type listingDetailResponse struct {
 	Photos          json.RawMessage `json:"photos"`
 	Published       bool            `json:"published"`
 	RatingsEnabled  bool            `json:"ratings_enabled"`
+	Tags            []string        `json:"tags"`
 }
 
 func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, idStr string) {
@@ -613,6 +661,14 @@ func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, 
 	detail.DeliveryHours = json.RawMessage(jsonObjectOrEmptyListing(delivery))
 	detail.SocialLinks = photosArrayOrEmpty(socialLinks)
 	detail.Photos = sanitizeListingPhotos(photos)
+	detail.Tags, err = loadSuggestionTags(db.DB, entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if detail.Tags == nil {
+		detail.Tags = []string{}
+	}
 	json.NewEncoder(w).Encode(detail)
 }
 
@@ -632,6 +688,8 @@ func HandleListingMembers(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		handleListListingMembers(w, r, u.ID)
+	case http.MethodPost:
+		handleDecideListingMember(w, r, u.ID)
 	case http.MethodDelete:
 		handleDeleteListingMember(w, r, u.ID)
 	default:
@@ -660,7 +718,7 @@ func handleListListingMembers(w http.ResponseWriter, r *http.Request, ownerUserI
 		SELECT m.user_id, COALESCE(u.email, ''), m.role, m.status
 		FROM entry_members m
 		JOIN users u ON u.id = m.user_id
-		WHERE m.entry_id = $1 AND m.role = 'member' AND m.status = 'active'
+		WHERE m.entry_id = $1 AND m.role = 'member' AND m.status IN ('pending', 'active')
 		ORDER BY u.email ASC, m.user_id ASC
 	`, entryID)
 	if err != nil {
@@ -679,6 +737,70 @@ func handleListListingMembers(w http.ResponseWriter, r *http.Request, ownerUserI
 		out = append(out, row)
 	}
 	json.NewEncoder(w).Encode(out)
+}
+
+func handleDecideListingMember(w http.ResponseWriter, r *http.Request, ownerUserID int) {
+	var body struct {
+		EntryID int    `json:"entry_id"`
+		UserID  int    `json:"user_id"`
+		Action  string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.EntryID <= 0 || body.UserID <= 0 {
+		http.Error(w, "entry_id and user_id required", http.StatusBadRequest)
+		return
+	}
+	if body.Action != "accept" && body.Action != "deny" {
+		http.Error(w, "action must be accept or deny", http.StatusBadRequest)
+		return
+	}
+
+	owner, found, err := scanMembershipDB(body.EntryID, ownerUserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !found || !isActiveOwner(owner.Role, owner.Status) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var targetRole, targetStatus string
+	err = db.DB.QueryRow(`
+		SELECT role, status FROM entry_members WHERE entry_id = $1 AND user_id = $2
+	`, body.EntryID, body.UserID).Scan(&targetRole, &targetStatus)
+	if err == sql.ErrNoRows {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if targetRole != "member" || targetStatus != "pending" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if body.Action == "accept" {
+		_, err = db.DB.Exec(`
+			UPDATE entry_members SET status = 'active'
+			WHERE entry_id = $1 AND user_id = $2 AND role = 'member' AND status = 'pending'
+		`, body.EntryID, body.UserID)
+	} else {
+		_, err = db.DB.Exec(`
+			DELETE FROM entry_members
+			WHERE entry_id = $1 AND user_id = $2 AND role = 'member' AND status = 'pending'
+		`, body.EntryID, body.UserID)
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeOK(w)
 }
 
 func handleDeleteListingMember(w http.ResponseWriter, r *http.Request, ownerUserID int) {
@@ -1024,6 +1146,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 	_, hasSocialLinks := rawFields["social_links"]
+	_, hasTags := rawFields["tags"]
 	if body.Name == "" || body.LocationID <= 0 || body.CategoryID <= 0 || body.TypeID <= 0 {
 		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
 		return
@@ -1100,8 +1223,45 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if hasTags {
+		if err := replaceListingTags(entryID, normalizeListingTags(body.Tags)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
 
 	writeOK(w)
+}
+
+func normalizeListingTags(in []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(in))
+	for _, tag := range in {
+		tag = strings.TrimSpace(tag)
+		tag = strings.TrimPrefix(tag, "#")
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		if _, ok := seen[tag]; ok {
+			continue
+		}
+		seen[tag] = struct{}{}
+		out = append(out, tag)
+	}
+	return out
+}
+
+func replaceListingTags(entryID int, tags []string) error {
+	tx, err := db.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := replaceSuggestionTags(tx, entryID, tags); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func handleDeleteListing(w http.ResponseWriter, r *http.Request, userID int) {
@@ -1121,6 +1281,11 @@ func handleDeleteListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
+	_, err = db.DB.Exec(`DELETE FROM websites WHERE entry_id = $1`, entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	_, err = db.DB.Exec(`DELETE FROM entries WHERE id = $1`, entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

@@ -409,7 +409,9 @@ func WriteMe(w http.ResponseWriter, userID int) error {
 		err = db.DB.QueryRow(`
 			SELECT
 			  (SELECT COUNT(*) FROM entries WHERE published = false) +
-			  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending') +
+			  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending' AND role = 'member') +
+			  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending' AND role = 'owner') +
+			  (SELECT COUNT(*) FROM entry_suggestions WHERE status = 'open') +
 			  (SELECT COUNT(*) FROM websites WHERE status = 'pending')
 		`).Scan(&queueCount)
 		if err != nil {

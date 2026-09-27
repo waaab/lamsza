@@ -85,6 +85,11 @@ function minutesNow(date, timeZone) {
     return hour * 60 + minute;
 }
 
+/** @param {Date} [now] @param {string} [timeZone] */
+export function todayWeekdayKey(now = new Date(), timeZone = "Europe/Bucharest") {
+    return weekdayKeyFromDate(now, timeZone);
+}
+
 /** @param {unknown} hours */
 export function openStatus(hours, now = new Date(), timeZone = "Europe/Bucharest") {
     const normalized = normalizeHours(hours);
@@ -95,7 +100,7 @@ export function openStatus(hours, now = new Date(), timeZone = "Europe/Bucharest
     const slot = normalized[key];
     const today = formatDayHours(slot);
     if (slot.closed) {
-        return { state: "closed", label: "Zárva", detail: today };
+        return { state: "closed", label: "Zárva", detail: "" };
     }
     const openMinutes = minutesFromHHMM(slot.open);
     const closeMinutes = minutesFromHHMM(slot.close);

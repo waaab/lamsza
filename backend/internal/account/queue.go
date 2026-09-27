@@ -2,6 +2,7 @@ package account
 
 import (
 	"backend/internal/db"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 )
@@ -28,9 +29,27 @@ type queueWebsite struct {
 	Submitter   string `json:"submitter"`
 }
 
+type queueClaim struct {
+	EntryID   int    `json:"entry_id"`
+	EntryName string `json:"entry_name"`
+	UserID    int    `json:"user_id"`
+	Email     string `json:"email"`
+}
+
+type queueSuggestion struct {
+	ID        int             `json:"id"`
+	EntryID   int             `json:"entry_id"`
+	EntryName string          `json:"entry_name"`
+	Email     string          `json:"email"`
+	Changes   json.RawMessage `json:"changes"`
+	Note      string          `json:"note"`
+}
+
 type queueResponse struct {
 	Unpublished []queueUnpublished `json:"unpublished"`
 	Members     []queueMember      `json:"members"`
+	Claims      []queueClaim       `json:"claims"`
+	Suggestions []queueSuggestion  `json:"suggestions"`
 	Websites    []queueWebsite     `json:"websites"`
 }
 
@@ -39,7 +58,9 @@ func QueueCount() (int, error) {
 	err := db.DB.QueryRow(`
 		SELECT
 		  (SELECT COUNT(*) FROM entries WHERE published = false) +
-		  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending') +
+		  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending' AND role = 'member') +
+		  (SELECT COUNT(*) FROM entry_members WHERE status = 'pending' AND role = 'owner') +
+		  (SELECT COUNT(*) FROM entry_suggestions WHERE status = 'open') +
 		  (SELECT COUNT(*) FROM websites WHERE status = 'pending')
 	`).Scan(&count)
 	return count, err
@@ -54,6 +75,8 @@ func HandleListingQueue(w http.ResponseWriter, r *http.Request) {
 	resp := queueResponse{
 		Unpublished: []queueUnpublished{},
 		Members:     []queueMember{},
+		Claims:      []queueClaim{},
+		Suggestions: []queueSuggestion{},
 		Websites:    []queueWebsite{},
 	}
 
@@ -84,7 +107,7 @@ func HandleListingQueue(w http.ResponseWriter, r *http.Request) {
 		FROM entry_members m
 		JOIN entries e ON e.id = m.entry_id
 		JOIN users u ON u.id = m.user_id
-		WHERE m.status = 'pending'
+		WHERE m.status = 'pending' AND m.role = 'member'
 		ORDER BY e.name ASC, m.user_id ASC
 	`)
 	if err != nil {
@@ -99,6 +122,50 @@ func HandleListingQueue(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		resp.Members = append(resp.Members, item)
+	}
+
+	rows, err = db.DB.Query(`
+		SELECT m.entry_id, e.name, m.user_id, u.email
+		FROM entry_members m
+		JOIN entries e ON e.id = m.entry_id
+		JOIN users u ON u.id = m.user_id
+		WHERE m.status = 'pending' AND m.role = 'owner'
+		ORDER BY e.name ASC, m.user_id ASC
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item queueClaim
+		if err := rows.Scan(&item.EntryID, &item.EntryName, &item.UserID, &item.Email); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Claims = append(resp.Claims, item)
+	}
+
+	rows, err = db.DB.Query(`
+		SELECT s.id, s.entry_id, e.name, COALESCE(u.email, ''), s.changes, COALESCE(s.note, '')
+		FROM entry_suggestions s
+		JOIN entries e ON e.id = s.entry_id
+		JOIN users u ON u.id = s.user_id
+		WHERE s.status = 'open'
+		ORDER BY e.name ASC, s.id ASC
+	`)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item queueSuggestion
+		if err := rows.Scan(&item.ID, &item.EntryID, &item.EntryName, &item.Email, &item.Changes, &item.Note); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		resp.Suggestions = append(resp.Suggestions, item)
 	}
 
 	rows, err = db.DB.Query(`
@@ -189,7 +256,7 @@ func HandleListingQueueMember(w http.ResponseWriter, r *http.Request) {
 	case "approve":
 		res, err := db.DB.Exec(`
 			UPDATE entry_members SET status = 'active'
-			WHERE entry_id = $1 AND user_id = $2 AND status = 'pending'
+			WHERE entry_id = $1 AND user_id = $2 AND role = 'member' AND status = 'pending'
 		`, body.EntryID, body.UserID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -203,7 +270,7 @@ func HandleListingQueueMember(w http.ResponseWriter, r *http.Request) {
 	case "reject":
 		res, err := db.DB.Exec(`
 			DELETE FROM entry_members
-			WHERE entry_id = $1 AND user_id = $2 AND status = 'pending'
+			WHERE entry_id = $1 AND user_id = $2 AND role = 'member' AND status = 'pending'
 		`, body.EntryID, body.UserID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -216,6 +283,96 @@ func HandleListingQueueMember(w http.ResponseWriter, r *http.Request) {
 		}
 	default:
 		http.Error(w, "action must be approve or reject", http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func HandleListingQueueClaim(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var body memberActionBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.EntryID <= 0 || body.UserID <= 0 {
+		http.Error(w, "entry_id and user_id required", http.StatusBadRequest)
+		return
+	}
+	if body.Action != "accept" && body.Action != "deny" {
+		http.Error(w, "action must be accept or deny", http.StatusBadRequest)
+		return
+	}
+
+	tx, err := db.DB.Begin()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	var lockedID int
+	err = tx.QueryRow(`SELECT id FROM entries WHERE id = $1 FOR UPDATE`, body.EntryID).Scan(&lockedID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if body.Action == "accept" {
+		var activeOwner bool
+		err = tx.QueryRow(`
+			SELECT EXISTS (
+				SELECT 1 FROM entry_members
+				WHERE entry_id = $1 AND role = 'owner' AND status = 'active'
+			)
+		`, body.EntryID).Scan(&activeOwner)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if activeOwner {
+			http.Error(w, "already claimed", http.StatusConflict)
+			return
+		}
+		res, err := tx.Exec(`
+			UPDATE entry_members SET status = 'active'
+			WHERE entry_id = $1 AND user_id = $2 AND role = 'owner' AND status = 'pending'
+		`, body.EntryID, body.UserID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	} else {
+		res, err := tx.Exec(`
+			DELETE FROM entry_members
+			WHERE entry_id = $1 AND user_id = $2 AND role = 'owner' AND status = 'pending'
+		`, body.EntryID, body.UserID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		n, _ := res.RowsAffected()
+		if n == 0 {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
