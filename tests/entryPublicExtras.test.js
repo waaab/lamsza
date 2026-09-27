@@ -5,47 +5,51 @@ import {
 	showListingHours,
 	showListingDeliveryHours,
 	showListingRatings,
-	showListingTodayHours
+	showListingPhone,
+	showListingSocial,
+	listingTextExpanded
 } from '../src/lib/entryPublicExtras.js';
 
-test('showListingPhotos returns false for unclaimed entry', () => {
-	const entry = { claimed: false, photos: [{ id: 1 }] };
-	assert.equal(showListingPhotos(entry), false);
+test('showListingPhotos is true only when verified and a photo is stored', () => {
+	assert.equal(showListingPhotos({ verified: false, claimed: true, photos: [{ id: 1 }] }), false);
+	assert.equal(showListingPhotos({ verified: true, claimed: false, photos: [{ id: 1 }] }), true);
+	assert.equal(showListingPhotos({ verified: true, photos: [] }), false);
 });
 
-test('showListingPhotos returns false for claimed entry with empty photos', () => {
-	const entry = { claimed: true, photos: [] };
-	assert.equal(showListingPhotos(entry), false);
+test('showListingHours follows hours_enabled even when gazdátlan or the week is empty', () => {
+	assert.equal(showListingHours({ claimed: false, hours_enabled: true, hours: {} }), true);
+	assert.equal(showListingHours({ claimed: true, hours_enabled: false, hours: { mon: { open: '09:00', close: '17:00' } } }), false);
 });
 
-test('showListingPhotos returns true for claimed entry with photos', () => {
-	const entry = { claimed: true, photos: [{ id: 1 }] };
-	assert.equal(showListingPhotos(entry), true);
+test('showListingDeliveryHours requires the switch and a delivery category', () => {
+	assert.equal(showListingDeliveryHours({
+		delivery_enabled: true,
+		category: 'Vendéglő',
+		name: 'Példa'
+	}), true);
+	assert.equal(showListingDeliveryHours({
+		delivery_enabled: true,
+		category: 'Vendéglő',
+		name: 'Lámsza.com'
+	}), false);
+	assert.equal(showListingDeliveryHours({
+		delivery_enabled: true,
+		category: 'Bolt',
+		name: 'Példa'
+	}), false);
 });
 
-test('showListingHours returns false for unclaimed entry', () => {
-	const entry = { claimed: false, hours: { mon: { open: '09:00', close: '17:00' } } };
-	assert.equal(showListingHours(entry), false);
+test('phone and social show only when claimed and stored', () => {
+	assert.equal(showListingPhone({ claimed: false, phone: '0700000000' }), false);
+	assert.equal(showListingPhone({ claimed: true, phone: '0700000000' }), true);
+	assert.equal(showListingPhone({ claimed: true, phone: '  ' }), false);
+	assert.equal(showListingSocial({ claimed: true, social_links: [{ label: 'Facebook', url: 'https://facebook.com/a' }] }), true);
+	assert.equal(showListingSocial({ claimed: false, social_links: [{ label: 'Facebook', url: 'https://facebook.com/a' }] }), false);
 });
 
-test('showListingHours returns false for claimed entry with no hours', () => {
-	const entry = { claimed: true, hours: null };
-	assert.equal(showListingHours(entry), false);
-});
-
-test('showListingHours returns true for claimed entry with hours', () => {
-	const entry = { claimed: true, hours: { mon: { open: '09:00', close: '17:00' } } };
-	assert.equal(showListingHours(entry), true);
-});
-
-test('showListingDeliveryHours returns false for unclaimed entry', () => {
-	const entry = { claimed: false, delivery_hours: { mon: { open: '09:00', close: '17:00' } } };
-	assert.equal(showListingDeliveryHours(entry), false);
-});
-
-test('showListingDeliveryHours returns true for claimed entry with delivery hours', () => {
-	const entry = { claimed: true, delivery_hours: { mon: { open: '09:00', close: '17:00' } } };
-	assert.equal(showListingDeliveryHours(entry), true);
+test('listingTextExpanded is true only when verified', () => {
+	assert.equal(listingTextExpanded({ verified: false, claimed: true }), false);
+	assert.equal(listingTextExpanded({ verified: true, claimed: false }), true);
 });
 
 test('showListingRatings returns false for unclaimed entry', () => {
@@ -61,14 +65,4 @@ test('showListingRatings returns false for claimed entry without ratings_enabled
 test('showListingRatings returns true for claimed entry with ratings_enabled', () => {
 	const entry = { claimed: true, ratings_enabled: true };
 	assert.equal(showListingRatings(entry), true);
-});
-
-test('showListingTodayHours returns false for unclaimed entry', () => {
-	const entry = { claimed: false, hours: { mon: { open: '09:00', close: '17:00' } } };
-	assert.equal(showListingTodayHours(entry), false);
-});
-
-test('showListingTodayHours returns true for claimed entry with hours', () => {
-	const entry = { claimed: true, hours: { mon: { open: '09:00', close: '17:00' } } };
-	assert.equal(showListingTodayHours(entry), true);
 });

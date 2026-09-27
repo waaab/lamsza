@@ -1,17 +1,48 @@
 import { hoursConfigured } from "./entryHours.js";
 
+export function offersDelivery(entry) {
+	if (String(entry?.name ?? "").trim() === "Lámsza.com") return false;
+	return String(entry?.category ?? "").trim() === "Vendéglő";
+}
+
 export function showListingPhotos(entry) {
-    return Boolean(entry?.claimed) && Array.isArray(entry?.photos) && entry.photos.length > 0;
+	return Boolean(entry?.verified) && Array.isArray(entry?.photos) && entry.photos.length > 0;
 }
+
 export function showListingHours(entry) {
-    return Boolean(entry?.claimed) && hoursConfigured(entry?.hours);
+	return Boolean(entry?.hours_enabled);
 }
+
 export function showListingDeliveryHours(entry) {
-    return Boolean(entry?.claimed) && hoursConfigured(entry?.delivery_hours);
+	return Boolean(entry?.delivery_enabled) && offersDelivery(entry);
 }
+
 export function showListingRatings(entry) {
-    return Boolean(entry?.claimed) && Boolean(entry?.ratings_enabled);
+	return Boolean(entry?.claimed) && Boolean(entry?.ratings_enabled);
 }
+
 export function showListingTodayHours(entry) {
-    return showListingHours(entry);
+	return showListingHours(entry);
 }
+
+export function showListingPhone(entry) {
+	return Boolean(entry?.claimed) && String(entry?.phone ?? "").trim() !== "";
+}
+
+export function showListingSocial(entry) {
+	return Boolean(entry?.claimed) && Array.isArray(entry?.social_links) && entry.social_links.some((row) => String(row?.url ?? "").trim() !== "");
+}
+
+export function showListingWebsite(entry) {
+	return String(entry?.url ?? "").trim() !== "";
+}
+
+export function showListingLanguages(entry) {
+	return Array.isArray(entry?.languages) && entry.languages.some((row) => String(row ?? "").trim() !== "");
+}
+
+export function listingTextExpanded(entry) {
+	return Boolean(entry?.verified);
+}
+
+export { hoursConfigured };
