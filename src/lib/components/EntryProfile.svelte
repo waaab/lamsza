@@ -1,5 +1,6 @@
 <script>
     import ClaimMark from "$lib/components/ClaimMark.svelte";
+    import FavoriteButton from "$lib/components/FavoriteButton.svelte";
     import { canonicalEntryType } from "$lib/entryType.js";
     import { displayText, displayInitials, EMPTY_PLACEHOLDER } from "$lib/displayValue.js";
     import {
@@ -13,18 +14,51 @@
     } from "$lib/entryDemoPhotos.js";
     import { gallerySlides } from "$lib/entryPhotos.js";
     import {
+        listingTextExpanded,
         showListingPhotos,
         showListingHours,
         showListingDeliveryHours,
+        showListingLanguages,
+        showListingPhone,
         showListingRatings,
+        showListingSocial,
         showListingTodayHours,
+        showListingWebsite,
     } from "$lib/entryPublicExtras.js";
     import EntryStars from "$lib/components/EntryStars.svelte";
     import EntryPhotoGallery from "$lib/components/EntryPhotoGallery.svelte";
     import EntryReviews from "$lib/components/EntryReviews.svelte";
 
-    /** @type {{ entry?: Record<string, any> | null, placeholder?: boolean }} */
-    let { entry = null, placeholder = false } = $props();
+    /** @type {{
+     *   entry?: Record<string, any> | null,
+     *   placeholder?: boolean,
+     *   loggedIn?: boolean,
+     *   isFavorite?: boolean,
+     *   onFavorite?: () => void,
+     *   showClaim?: boolean,
+     *   showJoin?: boolean,
+     *   claimBusy?: boolean,
+     *   onClaim?: () => void,
+     *   onJoin?: () => void,
+     *   isOwner?: boolean,
+     *   isMember?: boolean,
+     *   onEdit?: () => void,
+     * }} */
+    let {
+        entry = null,
+        placeholder = false,
+        loggedIn = false,
+        isFavorite = false,
+        onFavorite = () => {},
+        showClaim = false,
+        showJoin = false,
+        claimBusy = false,
+        onClaim = () => {},
+        onJoin = () => {},
+        isOwner = false,
+        isMember = false,
+        onEdit = () => {},
+    } = $props();
 
     let typeLabel = $derived(displayText(canonicalEntryType(entry?.type)));
     let categoryLabel = $derived(displayText(entry?.category));
@@ -63,12 +97,36 @@
         }),
     );
     let reviewCountLabel = $derived(`${reviewCount} értékelés`);
+    let coordinates = $derived.by(() => {
+        const raw = String(entry?.location_coordinates ?? "").trim();
+        if (!raw) return null;
+        const parts = raw.split(",").map((part) => part.trim());
+        if (parts.length !== 2) return null;
+        const lat = Number(parts[0]);
+        const lng = Number(parts[1]);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return { lat, lng };
+    });
     let mapsHref = $derived.by(() => {
+        if (coordinates) {
+            return `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`;
+        }
         const parts = [];
         if (address !== EMPTY_PLACEHOLDER) parts.push(address);
         if (locationName !== EMPTY_PLACEHOLDER) parts.push(locationName);
         if (!parts.length) return "";
         return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(parts.join(", "))}`;
+    });
+    let showMapsPin = $derived(Boolean(coordinates));
+    let textExpanded = $derived(listingTextExpanded(entry));
+    let socialLinks = $derived.by(() => {
+        if (!showListingSocial(entry)) return [];
+        return (Array.isArray(entry?.social_links) ? entry.social_links : [])
+            .map((row) => ({
+                label: String(row?.label ?? "").trim(),
+                url: String(row?.url ?? "").trim(),
+            }))
+            .filter((row) => row.url);
     });
     let hostLabel = $derived.by(() => {
         if (!url) return "";
@@ -88,13 +146,23 @@
 </script>
 
 {#snippet suggestEdit()}
-    <button type="button" class="entry-profile__suggest">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-        </svg>
-        Javaslat módosításra
-    </button>
+    {#if isOwner}
+        <button type="button" class="entry-profile__suggest" onclick={() => onEdit()}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            Szerkesztés
+        </button>
+    {:else if loggedIn && !isMember}
+        <button type="button" class="entry-profile__suggest">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            Javaslat módosításra
+        </button>
+    {/if}
 {/snippet}
 
 {#if placeholder}
@@ -155,6 +223,16 @@
 {:else}
 <article class="entry-profile">
     <header class="entry-profile__hero">
+        {#if loggedIn}
+            <div class="entry-profile__favorite">
+                <FavoriteButton
+                    type="entry"
+                    id={entry.id}
+                    active={isFavorite}
+                    ontoggle={onFavorite}
+                />
+            </div>
+        {/if}
         {#if categoryLabel !== EMPTY_PLACEHOLDER}
             <div class="badge">Index: {categoryLabel}</div>
         {/if}
@@ -175,8 +253,8 @@
                 class={[
                     "entry-profile__claim",
                     verified
-                        ? "entry-profile__claim--claimed"
-                        : "entry-profile__claim--unclaimed",
+                        ? "entry-profile__claim--verified"
+                        : "entry-profile__claim--unverified",
                 ]}
             >
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -228,7 +306,12 @@
                     Szolgáltatások
                 </h2>
                 {#if tags.length}
-                    <ul class="entry-profile__services">
+                    <ul
+                        class={[
+                            "entry-profile__services",
+                            !textExpanded && "entry-profile__services--clamp",
+                        ]}
+                    >
                         {#each tags as tag (tag)}
                             <li>{tag.startsWith("#") ? tag.slice(1) : tag}</li>
                         {/each}
@@ -246,6 +329,7 @@
                     class={[
                         "entry-profile__about",
                         notes === EMPTY_PLACEHOLDER && "entry-profile__empty",
+                        !textExpanded && "entry-profile__about--clamp",
                     ]}
                 >
                     {notes}
@@ -257,7 +341,9 @@
                     <h2 id="entry-place-title" class="entry-profile__section-title">
                         Helyszín és nyitvatartás
                     </h2>
-                    {@render suggestEdit()}
+                    {#if isOwner || (loggedIn && !isMember)}
+                        {@render suggestEdit()}
+                    {/if}
                 </div>
                 <div class="entry-profile__place">
                     <p class="entry-profile__address">
@@ -330,7 +416,7 @@
 
         <aside class="entry-profile__aside" aria-label="Elérhetőség">
             <div class="entry-profile__contact">
-                {#if url}
+                {#if showListingWebsite(entry)}
                     <a
                         class="entry-profile__contact-row"
                         href={url}
@@ -346,19 +432,8 @@
                         </span>
                         <span>{hostLabel}</span>
                     </a>
-                {:else}
-                    <div class="entry-profile__contact-row">
-                        <span class="entry-profile__contact-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
-                            </svg>
-                        </span>
-                        <span class="entry-profile__empty">{EMPTY_PLACEHOLDER}</span>
-                    </div>
                 {/if}
-                {#if phone}
+                {#if showListingPhone(entry)}
                     <a class="entry-profile__contact-row" href={`tel:${phoneHref}`}>
                         <span class="entry-profile__contact-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -367,17 +442,25 @@
                         </span>
                         <span>{phone}</span>
                     </a>
-                {:else}
-                    <div class="entry-profile__contact-row">
+                {/if}
+                {#each socialLinks as link (link.url)}
+                    <a
+                        class="entry-profile__contact-row"
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
                         <span class="entry-profile__contact-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+                                <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
                             </svg>
                         </span>
-                        <span class="entry-profile__empty">{EMPTY_PLACEHOLDER}</span>
-                    </div>
-                {/if}
-                {#if mapsHref}
+                        <span>{link.label || link.url}</span>
+                    </a>
+                {/each}
+                {#if showMapsPin && mapsHref}
                     <a
                         class="entry-profile__contact-row"
                         href={mapsHref}
@@ -400,32 +483,48 @@
                             {/if}
                         </span>
                     </a>
-                {:else}
-                    <div class="entry-profile__contact-row">
+                {/if}
+                {#if showListingLanguages(entry)}
+                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
                         <span class="entry-profile__contact-icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                <circle cx="12" cy="10" r="3" />
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="2" y1="12" x2="22" y2="12" />
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                             </svg>
                         </span>
-                        <span class="entry-profile__empty">{EMPTY_PLACEHOLDER}</span>
+                        <span>{languages}</span>
                     </div>
                 {/if}
-                <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                    <span class="entry-profile__contact-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="2" y1="12" x2="22" y2="12" />
-                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                        </svg>
-                    </span>
-                    <span class={{ "entry-profile__empty": languages === EMPTY_PLACEHOLDER }}>
-                        {languages}
-                    </span>
-                </div>
-                <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                    {@render suggestEdit()}
-                </div>
+                {#if showClaim}
+                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                        <button
+                            type="button"
+                            class="entry-profile__action"
+                            disabled={claimBusy}
+                            onclick={() => onClaim()}
+                        >
+                            Sajátnak jelölöm
+                        </button>
+                    </div>
+                {/if}
+                {#if showJoin}
+                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                        <button
+                            type="button"
+                            class="entry-profile__action"
+                            disabled={claimBusy}
+                            onclick={() => onJoin()}
+                        >
+                            Tagság kérése
+                        </button>
+                    </div>
+                {/if}
+                {#if isOwner || (loggedIn && !isMember)}
+                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                        {@render suggestEdit()}
+                    </div>
+                {/if}
             </div>
         </aside>
     </div>
@@ -437,7 +536,13 @@
         color: var(--text-primary);
     }
     .entry-profile__hero {
+        position: relative;
         margin-bottom: 1.5rem;
+    }
+    .entry-profile__favorite {
+        position: absolute;
+        top: 0;
+        right: 0;
     }
     .entry-profile__title {
         margin: 0.35rem 0 0.4rem;
@@ -468,11 +573,11 @@
         font-weight: 700;
         line-height: 1;
     }
-    .entry-profile__claim--claimed {
-        color: var(--szekely-green);
+    .entry-profile__claim--verified {
+        color: var(--szekely-blue);
     }
-    .entry-profile__claim--unclaimed {
-        color: var(--text-muted);
+    .entry-profile__claim--unverified {
+        color: var(--text-faint);
     }
     .entry-profile__owned {
         font-weight: 700;
@@ -600,6 +705,36 @@
     .entry-profile__services li:first-child {
         border-top: none;
         padding-top: 0;
+    }
+    .entry-profile__services--clamp {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .entry-profile__about--clamp {
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .entry-profile__action {
+        appearance: none;
+        border: none;
+        background: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        font-weight: 600;
+        color: var(--szekely-blue);
+        cursor: pointer;
+    }
+    .entry-profile__action:hover:not(:disabled) {
+        text-decoration: underline;
+    }
+    .entry-profile__action:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
     .entry-profile__about {
         margin: 0;

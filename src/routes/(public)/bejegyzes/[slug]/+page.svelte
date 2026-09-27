@@ -4,7 +4,6 @@
     import { browser } from "$app/environment";
     import { get } from "svelte/store";
     import { openLogin } from "$lib/openLogin.js";
-    import FavoriteButton from "$lib/components/FavoriteButton.svelte";
     import {
         addFavorite,
         favoriteListWithToggle,
@@ -17,6 +16,7 @@
     import EntryHistoryStrip from "$lib/components/EntryHistoryStrip.svelte";
     import EntryProfile from "$lib/components/EntryProfile.svelte";
     import EntryRelatedLinks from "$lib/components/EntryRelatedLinks.svelte";
+    import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import { apiFetch } from "$lib/api";
     import {
         historyForDisplay,
@@ -43,6 +43,7 @@
     };
     let claimError = "";
     let claimBusy = false;
+    let editingListingId = 0;
 
     /** @param {number | null | undefined} entryId */
     function listingMembership(entryId) {
@@ -102,6 +103,8 @@
     }
 
     $: membership = entry ? listingMembership(entry.id) : null;
+    $: isOwner = membership === "owner";
+    $: isMember = membership === "member";
     $: showClaimButton =
         $auth.loggedIn && entry && !entry.claimed && membership == null;
     $: showJoinButton =
@@ -260,41 +263,26 @@
     />
 
     <article class="profile-detail">
-        <EntryProfile {entry} />
+        <EntryProfile
+            {entry}
+            loggedIn={$auth.loggedIn}
+            isFavorite={isFavorite(favoriteList, "entry", entry.id)}
+            onFavorite={() =>
+                handleFavoriteToggle(
+                    "entry",
+                    entry.id,
+                    isFavorite(favoriteList, "entry", entry.id),
+                )}
+            showClaim={showClaimButton}
+            showJoin={showJoinButton}
+            {claimBusy}
+            onClaim={submitListingClaim}
+            onJoin={submitListingClaim}
+            {isOwner}
+            {isMember}
+            onEdit={() => (editingListingId = entry.id)}
+        />
 
-        <div class="page-actions">
-            <FavoriteButton
-                type="entry"
-                id={entry.id}
-                active={isFavorite(favoriteList, "entry", entry.id)}
-                ontoggle={() =>
-                    handleFavoriteToggle(
-                        "entry",
-                        entry.id,
-                        isFavorite(favoriteList, "entry", entry.id),
-                    )}
-            />
-            {#if showClaimButton}
-                <button
-                    type="button"
-                    class="btn"
-                    disabled={claimBusy}
-                    onclick={() => submitListingClaim()}
-                >
-                    Sajátnak jelölöm
-                </button>
-            {/if}
-            {#if showJoinButton}
-                <button
-                    type="button"
-                    class="btn"
-                    disabled={claimBusy}
-                    onclick={() => submitListingClaim()}
-                >
-                    Tagság kérése
-                </button>
-            {/if}
-        </div>
         {#if claimError}
             <p class="entry-claim-error">{claimError}</p>
         {/if}
@@ -303,6 +291,15 @@
         <EntryRelatedLinks {nearby} {related} currentLocationSlug={entry.location_slug} />
         <EntryHistoryStrip items={historyItems} />
     </article>
+
+    {#if editingListingId > 0}
+        <ListingFormDialog
+            mode="edit"
+            entryId={editingListingId}
+            onClose={() => (editingListingId = 0)}
+            onSaved={fetchEntry}
+        />
+    {/if}
 {/if}
 
 <style>
