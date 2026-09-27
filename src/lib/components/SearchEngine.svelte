@@ -1,8 +1,8 @@
 <script>
     import { createEventDispatcher, onDestroy, onMount } from "svelte";
     import { apiFetch } from "$lib/api";
-    import EntryCard from "$lib/components/EntryCard.svelte";
-    import WebsiteCard from "$lib/components/WebsiteCard.svelte";
+    import SearchResultCard from "$lib/components/SearchResultCard.svelte";
+    import { searchResultCardModel } from "$lib/searchResultCard.js";
     import { locationMenuTowns, searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
     import { isServiceEntry } from "$lib/entryType.js";
     import {
@@ -12,7 +12,7 @@
     } from "$lib/settlementSearchAnswer.js";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { auth } from "$lib/stores/auth";
-    import { formatDateShort, weatherIconEmoji } from "$lib/utils";
+    import { weatherIconEmoji } from "$lib/utils";
 
     const dispatch = createEventDispatcher();
 
@@ -258,15 +258,6 @@
         closeDiscover();
     }
 
-    function locationToEntry(loc) {
-        return {
-            entity_type: "settlement",
-            name: loc.name,
-            slug: loc.slug,
-            county_slug: loc.county_slug,
-            location: loc.county,
-        };
-    }
 </script>
 
 <svelte:window on:pointerdown={handleWindowPointerDown} />
@@ -426,9 +417,12 @@
                                 <AppIcon name="websites" size={18} />
                                 Weboldalak
                             </h4>
-                            <div class="list flex">
+                            <div class="discover-result-list">
                                 {#each shownWebsites as website (website.id)}
-                                    <WebsiteCard {website} />
+                                    {@const card = searchResultCardModel("website", website)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -440,9 +434,12 @@
                                 <AppIcon name="entries" size={18} />
                                 Szolgáltatások
                             </h4>
-                            <div class="list flex">
+                            <div class="discover-result-list">
                                 {#each indexEntries as entry (entry.id)}
-                                    <EntryCard {entry} />
+                                    {@const card = searchResultCardModel("service", entry)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -454,9 +451,12 @@
                                 <AppIcon name="websites" size={18} />
                                 Weboldalak
                             </h4>
-                            <div class="list flex">
+                            <div class="discover-result-list">
                                 {#each shownWebsites as website (website.id)}
-                                    <WebsiteCard {website} />
+                                    {@const card = searchResultCardModel("website", website)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -468,15 +468,12 @@
                                 <AppIcon name="events" size={18} />
                                 Események
                             </h4>
-                            <div class="discover-event-list">
-                                {#each filteredEvents as ev}
-                                    <a href="/esemenyek/{ev.id}" class="discover-event-card">
-                                        <span class="discover-event-title">{ev.title}</span>
-                                        <span class="discover-event-meta">
-                                            {formatDateShort(ev.start_date)}
-                                            {#if ev.location_name} · {ev.location_name}{/if}
-                                        </span>
-                                    </a>
+                            <div class="discover-result-list">
+                                {#each filteredEvents as ev (ev.id)}
+                                    {@const card = searchResultCardModel("event", ev)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -488,17 +485,12 @@
                                 <AppIcon name="venues" size={18} />
                                 Helyszínek
                             </h4>
-                            <div class="discover-venue-list">
-                                {#each filteredVenues as venue}
-                                    <a
-                                        href="/{venue.county_slug}-megye/{venue.settlement_slug}/helyszin/{venue.slug}"
-                                        class="discover-venue-card"
-                                    >
-                                        <span class="discover-venue-title">{venue.name}</span>
-                                        <span class="discover-venue-meta">
-                                            {venue.settlement_name}{#if venue.kind_label} · {venue.kind_label}{/if}
-                                        </span>
-                                    </a>
+                            <div class="discover-result-list">
+                                {#each filteredVenues as venue (venue.id)}
+                                    {@const card = searchResultCardModel("venue", venue)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -510,18 +502,12 @@
                                 <AppIcon name="attractions" size={18} />
                                 Látnivalók
                             </h4>
-                            <div class="discover-attraction-list">
-                                {#each filteredAttractions as att}
-                                    <a
-                                        href="/{att.county_slug}-megye/{att.slug}"
-                                        class="discover-attraction-card"
-                                    >
-                                        <span class="discover-attraction-title">{att.name}</span>
-                                        <span class="discover-attraction-meta">{att.county_name}</span>
-                                        {#if att.description}
-                                            <span class="discover-attraction-desc">{att.description}</span>
-                                        {/if}
-                                    </a>
+                            <div class="discover-result-list">
+                                {#each filteredAttractions as att (att.id)}
+                                    {@const card = searchResultCardModel("attraction", att)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -533,10 +519,12 @@
                                 <AppIcon name="locations" size={18} />
                                 Települések
                             </h4>
-                            <div class="list flex">
-                                {#each filteredLocations as loc}
-                                    {@const entry = locationToEntry(loc)}
-                                    <EntryCard entry={entry} />
+                            <div class="discover-result-list">
+                                {#each filteredLocations as loc (loc.id)}
+                                    {@const card = searchResultCardModel("settlement", loc)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -548,11 +536,12 @@
                                 <AppIcon name="szekek" size={18} />
                                 Történelmi székek
                             </h4>
-                            <div class="discover-szek-list">
-                                {#each searchResults.historical_seats as seat}
-                                    <a href="/szekek/{seat.slug}" class="discover-szek-card">
-                                        <span class="discover-szek-title">{seat.name}</span>
-                                    </a>
+                            <div class="discover-result-list">
+                                {#each searchResults.historical_seats as seat (seat.id)}
+                                    {@const card = searchResultCardModel("seat", seat)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -564,12 +553,12 @@
                                 <AppIcon name="newsfeeds" size={18} />
                                 Hírek
                             </h4>
-                            <div class="discover-news-list">
-                                {#each searchResults.news as item}
-                                    <a href={item.link} target="_blank" rel="nofollow noopener" class="discover-news-card">
-                                        <span class="discover-news-title">{item.title}</span>
-                                        <span class="discover-news-source">{item.source}</span>
-                                    </a>
+                            <div class="discover-result-list">
+                                {#each searchResults.news as item (item.link)}
+                                    {@const card = searchResultCardModel("news", item)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
                                 {/each}
                             </div>
                         </div>
@@ -886,105 +875,17 @@
     stroke: none;
 }
 
-.discover-event-list,
-.discover-news-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.discover-event-card,
-.discover-news-card {
-    display: block;
-    padding: 0.6rem 0.8rem;
-    background: var(--bg-body);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    text-decoration: none;
-    transition: background 0.2s, border-color 0.2s;
-}
-.discover-event-card:hover,
-.discover-news-card:hover {
-    background: var(--tab-hover-bg);
-    border-color: var(--text-muted);
-}
-.discover-event-title,
-.discover-news-title {
-    display: block;
-    font-weight: 500;
-}
-.discover-event-meta,
-.discover-news-source {
-    color: var(--text-faint);
-}
-
-.discover-venue-list,
-.discover-attraction-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-.discover-venue-card,
-.discover-attraction-card {
-    display: block;
-    padding: 0.6rem 0.8rem;
-    background: var(--bg-body);
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    text-decoration: none;
-    transition: background 0.2s, border-color 0.2s;
-}
 .discover-section-title--attractions {
     color: var(--szekely-brown, #6d4c41);
-}
-.discover-attraction-card {
-    border-color: var(--szekely-brown, #8d6e63);
-}
-.discover-venue-card:hover,
-.discover-attraction-card:hover {
-    background: var(--tab-hover-bg);
-    border-color: var(--text-muted);
-}
-.discover-venue-title,
-.discover-attraction-title {
-    display: block;
-    font-weight: 500;
-}
-.discover-venue-meta,
-.discover-attraction-meta {
-    color: var(--text-faint);
-}
-.discover-attraction-desc {
-    display: block;
-    color: var(--text-muted);
-    margin-top: 0.25rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .discover-section-title--szek {
     color: var(--szekely-blue, #1565c0);
 }
-.discover-szek-list {
+
+.discover-result-list {
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 0.5rem;
-}
-.discover-szek-card {
-    padding: 0.5rem 0.85rem;
-    background: var(--bg-body);
-    border-radius: 8px;
-    border: 1px solid var(--szekely-blue, #42a5f5);
-    color: var(--text-primary);
-    text-decoration: none;
-    font-weight: 500;
-    transition: background 0.2s;
-}
-.discover-szek-card:hover {
-    background: var(--tab-hover-bg);
-}
-.discover-szek-title {
 }
 </style>

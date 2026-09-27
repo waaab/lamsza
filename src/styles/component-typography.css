@@ -322,20 +322,6 @@
   font-size: var(--text-base);
 }
 
-.discover-event-meta,
-.discover-news-source,
-.discover-attraction-meta {
-  font-size: var(--text-sm);
-}
-
-.discover-attraction-desc {
-  font-size: var(--text-sm);
-}
-
-.discover-szek-title {
-  font-size: var(--text-base);
-}
-
 /* Admin page extras (admin.css covers most shell typography) */
 .admin-modal .badge {
   font-size: var(--text-xs);
