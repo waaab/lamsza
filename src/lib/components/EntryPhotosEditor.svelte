@@ -49,6 +49,7 @@
                         alt: "",
                         title: "",
                         description: "",
+                        copyright: "",
                         width: Number(data.width) || 1600,
                         height: Number(data.height) || 1200,
                     },
@@ -121,6 +122,7 @@
                             Alt
                             <input
                                 type="text"
+                                name={`photo-alt-${i}`}
                                 value={photo.alt}
                                 oninput={(event) =>
                                     patch(i, "alt", event.currentTarget.value)}
@@ -130,6 +132,7 @@
                             Cím
                             <input
                                 type="text"
+                                name={`photo-title-${i}`}
                                 value={photo.title}
                                 oninput={(event) =>
                                     patch(i, "title", event.currentTarget.value)}
@@ -138,11 +141,22 @@
                         <label>
                             Leírás
                             <textarea
+                                name={`photo-description-${i}`}
                                 rows="2"
                                 value={photo.description}
                                 oninput={(event) =>
                                     patch(i, "description", event.currentTarget.value)}
                             ></textarea>
+                        </label>
+                        <label>
+                            Szerzői jog
+                            <input
+                                type="text"
+                                name={`photo-copyright-${i}`}
+                                value={photo.copyright}
+                                oninput={(event) =>
+                                    patch(i, "copyright", event.currentTarget.value)}
+                            />
                         </label>
                         <p class="entry-photos-editor__meta">
                             {photo.width}×{photo.height}

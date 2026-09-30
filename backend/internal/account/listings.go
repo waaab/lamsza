@@ -175,6 +175,8 @@ type listingPhoto struct {
 	Alt         string `json:"alt"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Copyright   string `json:"copyright"`
+	Uploader    string `json:"uploader"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
 }
@@ -257,6 +259,8 @@ func sanitizeListingPhotosLimit(raw json.RawMessage, limit int) json.RawMessage 
 			Alt:         clipListingPhotoRunes(strings.TrimSpace(p.Alt), maxListingPhotoTextRunes),
 			Title:       clipListingPhotoRunes(strings.TrimSpace(p.Title), maxListingPhotoTextRunes),
 			Description: clipListingPhotoRunes(strings.TrimSpace(p.Description), maxListingPhotoTextRunes),
+			Copyright:   clipListingPhotoRunes(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p.Copyright), "©")), maxListingPhotoTextRunes),
+			Uploader:    clipListingPhotoRunes(strings.TrimSpace(p.Uploader), maxListingPhotoTextRunes),
 			Width:       w,
 			Height:      h,
 		})

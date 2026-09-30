@@ -628,6 +628,8 @@ section.page-section{
   grid-template-columns: 1fr auto;
   grid-template-areas: "left right";
   justify-items: start;
+  width: 100%;
+  align-self: stretch;
   margin-bottom: 0.5rem;
 }
 
@@ -718,45 +720,28 @@ section.page-section{
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  align-items: center;
+  align-items: flex-end;
+  justify-self: end;
 }
 
 .weather-icon {
+  position: relative;
   font-size: var(--text-display-xl);
-  opacity: 0.5;
   display: block;
   line-height: 1;
 }
 
-/* Weather skeleton */
-.weather-skeleton-temp {
-  width: 8.5rem;
-  height: var(--text-display);
-  margin: 0;
-  border-radius: 4px;
+.weather-icon-emoji,
+.weather-icon-svg {
+  opacity: 0.5;
 }
 
-.weather-skeleton-desc {
-  width: 8.5rem;
-  height: calc(var(--text-base) * var(--leading-normal));
-  margin: 0;
-  border-radius: 2px;
-}
-
-.weather-skeleton-meta {
-  width: 7rem;
-  height: var(--text-xs);
-  margin: 0;
-  border-radius: 2px;
-}
-
-.weather-card--pending .weather-skeleton-icon {
-  width: var(--text-display-xl);
-  height: var(--text-display-xl);
-  min-width: var(--text-display-xl);
-  min-height: var(--text-display-xl);
-  border-radius: 50%;
+/* Circle matches the painted emoji width and shares its right edge. */
+.weather-skeleton-icon {
+  width: 1.1em;
+  height: 1.1em;
   display: block;
+  margin-right: 0.09em;
 }
 
 .skeleton {
@@ -765,6 +750,10 @@ section.page-section{
   animation: pulse 1.5s infinite;
   color: transparent !important;
   pointer-events: none;
+}
+
+.skeleton.weather-skeleton-icon {
+  border-radius: 50%;
 }
 
 .skeleton-text {
@@ -2513,7 +2502,6 @@ footer {
 .nav-btn.active {
   background: var(--card-bg);
   color: var(--szekely-red);
-  transform: translateY(-1px);
   text-decoration: none;
 }
 
@@ -2703,14 +2691,19 @@ footer {
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   white-space: nowrap;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-drag: none;
   box-sizing: border-box;
+}
+
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+[role="button"] {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 svg {
@@ -2722,7 +2715,6 @@ svg {
   text-decoration: none;
   border-color: var(--szekely-red);
   color: var(--szekely-red);
-  transform: translateY(-1px);
 }
 
 .filter-actions .btn.active {

@@ -27,6 +27,21 @@ func TestSanitizePhotosKeepsHttpAndMedia(t *testing.T) {
 	}
 }
 
+func TestSanitizePhotosKeepsCredit(t *testing.T) {
+	raw := []byte(`[{"url":"https://cdn.example.com/p.jpg","copyright":"© Iliuta Goean","uploader":"Iliuta Goean"}]`)
+	got := sanitizePhotos(raw)
+	var photos []entryPhoto
+	if err := json.Unmarshal(got, &photos); err != nil {
+		t.Fatal(err)
+	}
+	if len(photos) != 1 {
+		t.Fatalf("expected 1 photo, got %d (%s)", len(photos), string(got))
+	}
+	if photos[0].Copyright != "Iliuta Goean" || photos[0].Uploader != "Iliuta Goean" {
+		t.Fatalf("credit was not kept: %+v", photos[0])
+	}
+}
+
 func TestJsonArrayOrEmpty(t *testing.T) {
 	if string(jsonArrayOrEmpty(nil)) != "[]" {
 		t.Fatal("nil should be []")

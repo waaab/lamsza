@@ -10,6 +10,9 @@
     export let countySlug = null;
     export let organizerName = null;
     export let locationName = null;
+    export let attractionId = null;
+    export let nearLat = null;
+    export let nearLon = null;
     export let limit = 3;
     export let ticker = false;
 
@@ -39,11 +42,22 @@
     const TICKER_RESUME_DELAY_MS = 4000;
 
     let pageStart = 0;
+    let showNearby = false;
+    let nearbyItems = [];
+    let nearbyLoading = false;
+
+    function hasNearbyCoords() {
+        const lat = Number(nearLat);
+        const lon = Number(nearLon);
+        return Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0);
+    }
 
     async function fetchEvents() {
         try {
             let url = `/api/events`;
-            if (organizerName) {
+            if (attractionId) {
+                url += `?attraction_id=${encodeURIComponent(attractionId)}`;
+            } else if (organizerName) {
                 url += `?organizer=${encodeURIComponent(organizerName)}`;
             } else if (settlementSlug) {
                 url += `?location_slug=${encodeURIComponent(settlementSlug)}`;
@@ -67,14 +81,38 @@
         void settlementSlug;
         void countySlug;
         void organizerName;
+        void attractionId;
+        showNearby = false;
+        nearbyItems = [];
         fetchEvents();
     }
 
     $: scoped = Boolean(
         String(settlementSlug ?? "").trim()
         || String(countySlug ?? "").trim()
-        || String(organizerName ?? "").trim(),
+        || String(organizerName ?? "").trim()
+        || attractionId,
     );
+
+    async function toggleNearby() {
+        if (!attractionId || !hasNearbyCoords()) return;
+        if (showNearby) {
+            showNearby = false;
+            return;
+        }
+        showNearby = true;
+        nearbyLoading = true;
+        nearbyItems = [];
+        try {
+            const url = `/api/events?near_lat=${encodeURIComponent(nearLat)}&near_lon=${encodeURIComponent(nearLon)}&near_km=30&exclude_attraction_id=${encodeURIComponent(attractionId)}`;
+            const data = await apiFetch(url);
+            nearbyItems = data.events || [];
+        } catch {
+            nearbyItems = [];
+        } finally {
+            nearbyLoading = false;
+        }
+    }
 
     function startTicker() {
         if (!ticker || tickerInterval) return;
@@ -162,7 +200,17 @@
     <div class="event-widget component-box widget">
         <div class="widget-header" title="{filteredItems.length} {typeLabel ? typeLabel + 'i Esemény' : 'Esemény'}">
             <h3 class="widget-title">Események{#if !loading}<span class="widget-title-count">({filteredItems.length})</span>{/if}{#if typeLabel}<span class="type-label">&nbsp;·&nbsp;{typeLabel}</span>{/if}{#if scoped}<span class="type-label">&nbsp;·&nbsp;</span><a href="/esemenyek">Összes esemény</a>{/if}</h3>
-            {#if !loading && (availableTypes.length > 1 || availableLocTypes.length > 1)}
+            {#if loading && ticker}
+                <div class="event-type-badges" aria-hidden="true">
+                    {#each ['Sport', 'Egyéb'] as label}
+                        <span class="btn btn-xs event-type-badge skeleton">{label}</span>
+                    {/each}
+                    <span class="badge-separator">·</span>
+                    {#each ['Községek', 'Városok'] as label}
+                        <span class="btn btn-xs event-type-badge event-loc-badge skeleton">{label}</span>
+                    {/each}
+                </div>
+            {:else if !loading && (availableTypes.length > 1 || availableLocTypes.length > 1)}
                 <div class="event-type-badges">
                     {#if hasAnyFilter}
                         <button class="btn btn-xs event-type-badge--clear" on:click={clearAllFilters}>✕</button>
@@ -192,15 +240,29 @@
             {#if loading && ticker}
                 <div class="event-ticker">
                     <span class="event-ticker-item">
-                        <span class="event-ticker-title">...</span>
-                        <span class="event-ticker-meta">...</span>
+                        <span class="event-ticker-title">
+                            <span class="event-widget-badges">
+                                <span class="event-type-inline">...</span>
+                            </span>
+                            betöltés...
+                        </span>
+                        <span class="event-ticker-meta">
+                            <span class="event-ticker-date-row">
+                                <span class="datetime-text">betöltés...</span>
+                            </span>
+                            <span class="event-location-container">betöltés...</span>
+                        </span>
                     </span>
-                </div>
-                {#if !scoped}
                     <div class="widget-nav">
-                        <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                        <div class="arrows-container">
+                            <button class="btn btn-xs scroll-arrow left" disabled aria-label="Előző esemény">&#8249;</button>
+                            <button class="btn btn-xs scroll-arrow right" disabled aria-label="Következő esemény">&#8250;</button>
+                        </div>
+                        {#if !scoped}
+                            <a href="/esemenyek" class="btn nav-btn">Összes esemény</a>
+                        {/if}
                     </div>
-                {/if}
+                </div>
             {:else if loading}
                 <div class="event-cards-row">
                     {#each Array(limit) as _}
@@ -219,7 +281,7 @@
                     </div>
                 {/if}
             {:else if error || items.length === 0}
-                <span class="info-box"><p>Nincsenek közeli események.</p></span>
+                <span class="info-box"><p>{attractionId ? "Ehhez a látnivalóhoz nincs hozzárendelt esemény." : "Nincsenek közeli események."}</p></span>
             {:else if ticker}
                 <div class="event-ticker">
                     {#key tickerIndex}
@@ -374,6 +436,34 @@
                 </div>
                 {/if}
             {/if}
+            {#if attractionId && hasNearbyCoords()}
+                <div class="attraction-nearby">
+                    <button type="button" class="btn" on:click={toggleNearby}>
+                        {showNearby ? "Közeli események elrejtése" : "Közeli események"}
+                    </button>
+                    {#if showNearby}
+                        {#if nearbyLoading}
+                            <p class="attraction-nearby-status">betöltés...</p>
+                        {:else if nearbyItems.length === 0}
+                            <p class="attraction-nearby-status">Nincsenek közeli események.</p>
+                        {:else}
+                            <ul class="attraction-nearby-list">
+                                {#each nearbyItems as event (event.id)}
+                                    <li>
+                                        <a href="/esemenyek/{event.id}">{event.title}</a>
+                                        {#if event.location_name}
+                                            <span> · {event.location_name}</span>
+                                        {/if}
+                                        {#if event.start_date}
+                                            <span> · {formatDateShort(event.start_date)}</span>
+                                        {/if}
+                                    </li>
+                                {/each}
+                            </ul>
+                        {/if}
+                    {/if}
+                </div>
+            {/if}
         </div>
     </div>
 </section>
@@ -383,6 +473,16 @@
         display: flex;
         flex-direction: column;
         flex: 1;
+    }
+    .attraction-nearby {
+        margin-top: 0.85rem;
+    }
+    .attraction-nearby-status {
+        margin: 0.55rem 0 0;
+    }
+    .attraction-nearby-list {
+        margin: 0.55rem 0 0;
+        padding-left: 1.1rem;
     }
 
     .event-cards-row {
@@ -481,6 +581,10 @@
     .event-type-badges {
         display: flex;
         gap: 0.4rem;
+    }
+    .event-type-badge.skeleton {
+        border-radius: 1rem;
+        cursor: default;
     }
     .event-type-badge {
         padding: 0.15rem 0.5rem;

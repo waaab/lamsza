@@ -24,10 +24,14 @@
     import EntryPhotoGallery from "$lib/components/EntryPhotoGallery.svelte";
     import { attractionGallerySlides } from "$lib/entryPhotos.js";
     import { kindLabel } from "$lib/venueKindLabels.js";
+    import AttractionSuggestionDialog from "$lib/components/AttractionSuggestionDialog.svelte";
+    import NoticeDialog from "$lib/components/NoticeDialog.svelte";
 
     let settlementData = null;
     let attractionData = null;
     let countyAttractions = [];
+    let nearbyAttractions = [];
+    let nearbyScope = "";
     /** @type {Record<string, unknown>[]} */
     let settlementVenues = [];
     let entries = [];
@@ -86,6 +90,8 @@
     let sortMode = "title";
     let visibleCount = 12;
     let sortOpen = false;
+    let suggestionOpen = false;
+    let suggestionSent = false;
 
     const sortLabels = { title: "Név (A→Z)", newest: "Legújabb" };
 
@@ -108,6 +114,20 @@
     $: totalCount = sortedEntries.length;
     $: displayItems = sortedEntries.slice(0, visibleCount);
 
+    function openAttractionSuggestion() {
+        if (!get(auth).loggedIn) {
+            openLogin();
+            return;
+        }
+        if (attractionData?.suggestion_pending) return;
+        suggestionOpen = true;
+    }
+
+    function contributorInitial(name) {
+        const text = String(name ?? "").trim();
+        return text ? text.charAt(0).toLocaleUpperCase("hu") : "?";
+    }
+
     function loadMore() {
         visibleCount += 12;
     }
@@ -118,6 +138,12 @@
 
     $: pageTitle = settlementData?.name || attractionData?.name || town;
     $: isAttraction = !!attractionData;
+    $: attractionActivities = Array.isArray(attractionData?.activities)
+        ? attractionData.activities.map((item) => String(item ?? "").trim()).filter(Boolean)
+        : [];
+    $: attractionProhibitions = Array.isArray(attractionData?.prohibitions)
+        ? attractionData.prohibitions.map((item) => String(item ?? "").trim()).filter(Boolean)
+        : [];
     $: attractionSlides = attractionData
         ? attractionGallerySlides(attractionData, { apiBase: getApiBase() })
         : [];
@@ -127,6 +153,8 @@
         settlementData = null;
         attractionData = null;
         countyAttractions = [];
+        nearbyAttractions = [];
+        nearbyScope = "";
         settlementVenues = [];
         entries = [];
         entriesError = null;
@@ -172,6 +200,14 @@
                 );
                 if (att && att.id) {
                     attractionData = att;
+                    try {
+                        const near = await apiFetch(`/api/attractions?near_id=${encodeURIComponent(att.id)}`);
+                        nearbyAttractions = Array.isArray(near?.attractions) ? near.attractions : [];
+                        nearbyScope = typeof near?.scope === "string" ? near.scope : "";
+                    } catch {
+                        nearbyAttractions = [];
+                        nearbyScope = "";
+                    }
                 }
             }
         } catch (err) {
@@ -211,10 +247,14 @@
         />
     </div>
     <h2 class="greeting">
-        Látnivaló {attractionData.county_name} megyében.
+        {#if attractionData.description}
+            {attractionData.description}
+        {:else}
+            Látnivaló {attractionData.county_name} megyében.
+        {/if}
     </h2>
 
-    <div class="widgets-box">
+    <div class="widgets-box widgets-box--attraction">
         <div id="attekintes" class="widget">
             <div class="widget-header">
                 <h3 class="widget-title">Áttekintés</h3>
@@ -259,6 +299,142 @@
         <div class="attraction-content">
             <Markdown source={attractionData.content} />
         </div>
+    {/if}
+
+    <section id="tevekenysegek" aria-labelledby="attraction-activities-title">
+        <div class="event-widget widget">
+            <div class="widget-header">
+                <h3 id="attraction-activities-title" class="widget-title">
+                    Mit lehet itt csinálni?
+                </h3>
+            </div>
+            <div class="widget-content">
+                {#if attractionActivities.length === 0}
+                    <span class="info-box"><p>Még nincs megadott tevékenység.</p></span>
+                {:else}
+                    <ul class="attraction-activity-list">
+                        {#each attractionActivities as activity}
+                            <li>{activity}</li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
+        </div>
+    </section>
+
+    <section id="tiltasok" aria-labelledby="attraction-prohibitions-title">
+        <div class="event-widget widget">
+            <div class="widget-header">
+                <h3 id="attraction-prohibitions-title" class="widget-title">
+                    Mit nem szabad itt csinálni?
+                </h3>
+            </div>
+            <div class="widget-content">
+                {#if attractionProhibitions.length === 0}
+                    <span class="info-box"><p>Még nincs megadva, mit nem szabad.</p></span>
+                {:else}
+                    <ul class="attraction-activity-list">
+                        {#each attractionProhibitions as item}
+                            <li>{item}</li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
+        </div>
+    </section>
+
+    <section id="kozeli-latnivalok" aria-labelledby="nearby-attractions-title">
+        <div class="event-widget widget">
+            <div class="widget-header">
+                <h3 id="nearby-attractions-title" class="widget-title">Közeli látnivalók</h3>
+            </div>
+            <div class="widget-content">
+                {#if nearbyScope === "vicinity"}
+                    <p class="attraction-contributors-lead">A környék falvaiból és községeiből.</p>
+                {:else if nearbyScope === "area"}
+                    <p class="attraction-contributors-lead">A környező városokból és a tágabb környékről.</p>
+                {:else if nearbyScope === "county"}
+                    <p class="attraction-contributors-lead">A megyéből, mert közelebb nem találtunk másikat.</p>
+                {/if}
+                {#if nearbyAttractions.length === 0}
+                    <span class="info-box"><p>Nincs más látnivaló a közelben vagy a megyében.</p></span>
+                {:else}
+                    <ul class="attraction-activity-list">
+                        {#each nearbyAttractions as att (att.id)}
+                            <li>
+                                <a href="/{att.county_slug}-megye/{att.slug}">{att.name}</a>
+                                {#if att.county_slug !== $page.params.countySlug}
+                                    <span class="type-label">&nbsp;·&nbsp;{att.county_name}</span>
+                                {/if}
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
+        </div>
+    </section>
+
+    <EventsWidget
+        attractionId={attractionData.id}
+        nearLat={attractionData.latitude}
+        nearLon={attractionData.longitude}
+        locationName={attractionData.name}
+    />
+
+    <section id="kozremukodok" aria-labelledby="attraction-contributors-title">
+        <div class="event-widget widget">
+            <div class="widget-header">
+                <h3 id="attraction-contributors-title" class="widget-title">
+                    Közreműködők<span class="widget-title-count">({(attractionData.contributors || []).length})</span>
+                </h3>
+                <button
+                    type="button"
+                    class="btn"
+                    disabled={!!attractionData.suggestion_pending}
+                    on:click={openAttractionSuggestion}
+                >
+                    {attractionData.suggestion_pending ? "Javaslat elküldve" : "Javaslat módosításra"}
+                </button>
+            </div>
+            <div class="widget-content">
+                <p class="attraction-contributors-lead">
+                    Akik szerkesztették ezt az oldalt, vagy elfogadott javaslatukkal hozzájárultak hozzá.
+                </p>
+                {#if !(attractionData.contributors || []).length}
+                    <span class="info-box"><p>Még nincs közreműködő.</p></span>
+                {:else}
+                    <ul class="attraction-contributor-list">
+                        {#each attractionData.contributors as person (person.id)}
+                            <li>
+                                <span class="attraction-contributor" title={person.name}>
+                                    {#if person.picture}
+                                        <img src={person.picture} alt="" />
+                                    {:else}
+                                        <span class="attraction-contributor-fallback" aria-hidden="true">{contributorInitial(person.name)}</span>
+                                    {/if}
+                                    <span class="sr-only">{person.name}</span>
+                                </span>
+                            </li>
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
+        </div>
+    </section>
+
+    {#if suggestionOpen}
+        <AttractionSuggestionDialog
+            attraction={attractionData}
+            onClose={() => (suggestionOpen = false)}
+            onSent={async () => {
+                suggestionOpen = false;
+                suggestionSent = true;
+                await fetchData();
+            }}
+        />
+    {/if}
+    {#if suggestionSent}
+        <NoticeDialog onClose={() => (suggestionSent = false)} />
     {/if}
 {:else if settlementData}
     <Breadcrumbs
@@ -551,6 +727,9 @@
         gap: 2rem;
         margin-bottom: 2rem;
     }
+    .widgets-box--attraction :global(#idojaras) {
+        grid-column: 3;
+    }
     :global(.news-widget),
     :global(.event-widget) {
         grid-column: span 3;
@@ -558,6 +737,9 @@
     @media (max-width: 992px) {
         .widgets-box {
             grid-template-columns: 1fr;
+        }
+        .widgets-box--attraction :global(#idojaras) {
+            grid-column: auto;
         }
         :global(.news-widget),
         :global(.event-widget) {
@@ -589,6 +771,43 @@
     }
     .attraction-content {
         margin: 1.5rem 0;
+    }
+    .attraction-activity-list {
+        margin: 0;
+        padding-left: 1.2rem;
+    }
+    .attraction-contributors-lead {
+        margin: 0 0 0.75rem;
+        color: var(--text-secondary);
+    }
+    .attraction-contributor-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .attraction-contributor {
+        display: inline-flex;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        background: var(--card-bg);
+    }
+    .attraction-contributor img,
+    .attraction-contributor-fallback {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .attraction-contributor-fallback {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
     }
 
     .component-box {

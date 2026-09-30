@@ -334,6 +334,9 @@
                     loading="eager"
                     decoding="async"
                 />
+                {#if event.featured_image_copyright}
+                    <p class="event-image-copyright">© {event.featured_image_copyright}</p>
+                {/if}
             </div>
         </div>
 
@@ -587,6 +590,11 @@
         height: 100%;
         object-fit: cover;
         display: block;
+    }
+    .event-image-copyright {
+        margin: 0.4rem 0 0;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
     }
 
     .event-detail-header {

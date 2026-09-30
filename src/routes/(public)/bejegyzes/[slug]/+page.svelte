@@ -18,6 +18,7 @@
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import SuggestionFormDialog from "$lib/components/SuggestionFormDialog.svelte";
+    import NoticeDialog from "$lib/components/NoticeDialog.svelte";
     import { apiFetch } from "$lib/api";
     import {
         historyForDisplay,
@@ -54,6 +55,7 @@
         "Ezzel kéred, hogy a bejegyzés gazdája, vagy egy admin, tagként vegyen fel.\n\nA kérés a bejelentkezett fiókodat és ezt a bejegyzést küldi el. Megjegyzés nem megy vele.\n\nA gazda a Bejegyzéseim oldalon fogadja el vagy utasítja el. Egy admin ugyanezt a tagjelölések között teheti meg. Elfogadás után ugyanazokat a mezőket szerkesztheted, mint a gazda. Törölni csak a gazda tudja. Több tagságkérés is nyitva lehet egyszerre.";
     let editingListingId = 0;
     let suggestionOpen = false;
+    let suggestionSent = false;
 
     /**
      * @param {number | string | null | undefined} entryId
@@ -400,9 +402,13 @@
             onClose={() => (suggestionOpen = false)}
             onSent={async () => {
                 suggestionOpen = false;
+                suggestionSent = true;
                 await fetchEntry();
             }}
         />
+    {/if}
+    {#if suggestionSent}
+        <NoticeDialog onClose={() => (suggestionSent = false)} />
     {/if}
 
     {#if editingListingId > 0}

@@ -217,6 +217,16 @@
         };
     }
 
+    /** @param {number} index @param {string} copyright */
+    function updateListingPhotoCopyright(index, copyright) {
+        listingForm = {
+            ...listingForm,
+            photos: normalizePhotos(listingForm.photos).map((photo, i) =>
+                i === index ? { ...photo, copyright } : photo,
+            ),
+        };
+    }
+
     async function addListingPhotoFromUrl() {
         const url = String(newListingPhotoUrl ?? "").trim();
         if (!isHttpPhotoUrl(url)) {
@@ -597,8 +607,8 @@
                         <legend>Közösségi oldalak</legend>
                         {#each listingForm.social_links as link, index (index)}
                             <div class="listing-social">
-                                <input type="text" placeholder="Név" bind:value={link.label} />
-                                <input type="url" placeholder="https://" bind:value={link.url} />
+                                <input type="text" name={`social-label-${index}`} placeholder="Név" aria-label="Közösségi oldal neve" bind:value={link.label} />
+                                <input type="url" name={`social-url-${index}`} placeholder="https://" aria-label="Közösségi oldal címe" bind:value={link.url} />
                                 <button type="button" class="btn btn-xs" onclick={() => removeSocialLink(index)}>
                                     Eltávolítás
                                 </button>
@@ -614,6 +624,7 @@
                         <label>
                             <input
                                 type="checkbox"
+                                name={`listing-language-${code}`}
                                 checked={listingLanguages(listingForm.languages).includes(code)}
                                 onchange={() => toggleListingLanguage(code)}
                             />
@@ -623,7 +634,7 @@
                 </fieldset>
 
                 <label class="link-dialog-check">
-                    <input type="checkbox" bind:checked={hoursEnabled} />
+                    <input type="checkbox" name="hours_enabled" bind:checked={hoursEnabled} />
                     Nyitvatartás / Program
                 </label>
                 {#if hoursEnabled}
@@ -632,7 +643,7 @@
 
                 {#if mode === "edit" && listingOffersDelivery}
                     <label class="link-dialog-check">
-                        <input type="checkbox" bind:checked={deliveryEnabled} />
+                        <input type="checkbox" name="delivery_enabled" bind:checked={deliveryEnabled} />
                         Kiszállítási idő
                     </label>
                     {#if deliveryEnabled}
@@ -658,9 +669,20 @@
                                         Alt
                                         <input
                                             type="text"
+                                            name={`listing-photo-alt-${i}`}
                                             value={photo.alt}
                                             oninput={(e) =>
                                                 updateListingPhotoAlt(i, e.currentTarget.value)}
+                                        />
+                                    </label>
+                                    <label class="profile-listing-photos-alt">
+                                        Szerzői jog
+                                        <input
+                                            type="text"
+                                            name={`listing-photo-copyright-${i}`}
+                                            value={photo.copyright}
+                                            oninput={(e) =>
+                                                updateListingPhotoCopyright(i, e.currentTarget.value)}
                                         />
                                     </label>
                                     <button
@@ -702,7 +724,7 @@
 
                 {#if mode === "edit"}
                     <label class="link-dialog-check">
-                        <input type="checkbox" bind:checked={listingForm.ratings_enabled} />
+                        <input type="checkbox" name="ratings_enabled" bind:checked={listingForm.ratings_enabled} />
                         Értékelések
                     </label>
                 {/if}

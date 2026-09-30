@@ -70,7 +70,10 @@
         }
         if (tab === "locations") fetchSettlementLocationTypes();
         if (tab === "attractions") fetchAttractions();
-        if (tab === "events") fetchEvents();
+        if (tab === "events") {
+            fetchEvents();
+            fetchAttractions();
+        }
         if (tab === "settings") fetchSettings();
         if (tab === "weather_translations") fetchWeatherTranslations();
         if (tab === "pages") fetchPages();
@@ -211,7 +214,9 @@
         access_type: "public",
         organizer: "",
         featured_image: "",
+        featured_image_copyright: "",
         entry_price: "",
+        attraction_id: "",
     };
     /** @type {{ id: number, slug: string, label_hu: string, sort_order: number }[]} */
     let catalogEventTypes = [];
@@ -319,8 +324,12 @@
         latitude: "",
         longitude: "",
         featured_image: "",
+        featured_image_copyright: "",
         content: "",
+        activities: "",
+        prohibitions: "",
         images: "",
+        image_copyrights: "",
     };
 
     let newOrganizerModalVisible = false;
@@ -447,6 +456,8 @@
     let listingQueueWebsites = [];
     let listingQueueError = "";
     let listingQueueFetched = false;
+    /** @type {{ id: number, attraction_id: number, attraction_name: string, user_name: string, changes: Record<string, unknown>, note: string, created_at: string }[]} */
+    let attractionSuggestions = [];
 
     function describeApiFailure(subject, status, body) {
         const raw = String(body || "").trim();
@@ -757,6 +768,12 @@
         phone: "Telefon",
         social_links: "Közösségi oldalak",
         languages: "Nyelvek",
+        description: "Rövid leírás",
+        content: "Tartalom",
+        name_ro: "Román név",
+        name_de: "Német név",
+        activities: "Tevékenységek",
+        prohibitions: "Mit nem szabad",
     };
 
     /** @param {unknown} value */
@@ -2446,6 +2463,7 @@
             listingQueueUnpublished.length +
             listingQueueClaims.length +
             listingQueueSuggestions.length +
+            attractionSuggestions.length +
             listingQueueMembers.length +
             siteRows.length;
         if (listingQueueFetched && !listingQueueError) {
@@ -2453,13 +2471,13 @@
                 messages.push({
                     id: "queue",
                     level: "info",
-                    text: `${listingQueueUnpublished.length} bejegyzés, ${listingQueueClaims.length} átvétel, ${listingQueueSuggestions.length} javaslat, ${listingQueueMembers.length} tag és ${siteRows.length} weboldal vár jóváhagyásra.`,
+                    text: `${listingQueueUnpublished.length} bejegyzés, ${listingQueueClaims.length} átvétel, ${listingQueueSuggestions.length} bejegyzés-javaslat, ${attractionSuggestions.length} látnivaló-javaslat, ${listingQueueMembers.length} tag és ${siteRows.length} weboldal vár jóváhagyásra.`,
                 });
             } else {
                 messages.push({
                     id: "queue-ok",
                     level: "success",
-                    text: "Nincs jóváhagyásra váró bejegyzés, átvétel, tag vagy weboldal.",
+                    text: "Nincs jóváhagyásra váró bejegyzés, átvétel, javaslat, tag vagy weboldal.",
                 });
             }
         }
@@ -2492,9 +2510,25 @@
         browserCacheNotices,
         apiNotices,
         listingQueueFetched,
+        attractionSuggestions,
     );
     function fetchAttractions() {
         loadData("attractions", (d) => (attractions = d));
+        loadData("/api/admin/attraction-suggestions", (d) => (attractionSuggestions = Array.isArray(d) ? d : []));
+    }
+    async function decideAttractionSuggestion(id, action) {
+        const res = await apiCall("/api/admin/attraction-suggestions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, action }),
+        });
+        if (!res.ok) {
+            await noteAdminFailure("attractions", res);
+            return;
+        }
+        noteAdminAction(activeTab === "welcome" ? "welcome" : "attractions", action === "accept" ? "A javaslat elfogadva." : "A javaslat elutasítva.");
+        fetchAttractions();
+        await auth.refresh();
     }
 
     async function fetchCountyRegions() {
@@ -2905,6 +2939,8 @@
             title: String(newEvent.title ?? "").trim(),
             description: String(newEvent.description ?? ""),
             featured_image: String(newEvent.featured_image ?? "").trim(),
+            featured_image_copyright: String(newEvent.featured_image_copyright ?? "").trim(),
+            attraction_id: positiveIdOrNull(newEvent.attraction_id),
             start_date: normalizeYmdInput(newEvent.start_date),
             end_date: normalizeYmdInput(newEvent.end_date),
             start_time: String(newEvent.start_time ?? "").trim(),
@@ -2942,7 +2978,9 @@
                     access_type: "public",
                     organizer: "",
                     featured_image: "",
+                    featured_image_copyright: "",
                     entry_price: "",
+                    attraction_id: "",
                 }),
         );
     }
@@ -3121,6 +3159,11 @@
             ...ev,
             entry_price: ev.entry_price != null ? String(ev.entry_price) : "",
             featured_image: ev.featured_image || "",
+            featured_image_copyright: ev.featured_image_copyright || "",
+            attraction_id:
+                ev.attraction_id != null && ev.attraction_id !== ""
+                    ? String(ev.attraction_id)
+                    : "",
             default_venue_id:
                 ev.default_venue_id != null && ev.default_venue_id !== ""
                     ? String(ev.default_venue_id)
@@ -3324,6 +3367,8 @@
             title: String(editingEvent.title ?? "").trim(),
             description: String(editingEvent.description ?? ""),
             featured_image: String(editingEvent.featured_image ?? "").trim(),
+            featured_image_copyright: String(editingEvent.featured_image_copyright ?? "").trim(),
+            attraction_id: positiveIdOrNull(editingEvent.attraction_id),
             start_date: normalizeYmdInput(editingEvent.start_date),
             end_date: normalizeYmdInput(editingEvent.end_date),
             start_time: String(editingEvent.start_time ?? "").trim(),
@@ -3456,9 +3501,7 @@
     // --- Attractions ---
     function submitNewAttraction(e) {
         e.preventDefault();
-        const imgs = newAttraction.images
-            ? newAttraction.images.split("\n").map((s) => s.trim()).filter(Boolean)
-            : [];
+        const imgs = attractionImagePayload(newAttraction.images, newAttraction.image_copyrights);
         createRecord(
             "attractions",
             {
@@ -3471,7 +3514,10 @@
                 latitude: parseFloat(newAttraction.latitude) || 0,
                 longitude: parseFloat(newAttraction.longitude) || 0,
                 featured_image: newAttraction.featured_image || "",
+                featured_image_copyright: newAttraction.featured_image_copyright || "",
                 content: newAttraction.content || "",
+                activities: activityLines(newAttraction.activities),
+                prohibitions: activityLines(newAttraction.prohibitions),
                 images: imgs,
             },
             fetchAttractions,
@@ -3486,12 +3532,53 @@
                     latitude: "",
                     longitude: "",
                     featured_image: "",
+                    featured_image_copyright: "",
                     content: "",
+                    activities: "",
+                    prohibitions: "",
                     images: "",
+                    image_copyrights: "",
                 }),
         );
     }
+    function activityLines(text) {
+        return String(text || "")
+            .split("\n")
+            .map((line) => line.trim())
+            .filter(Boolean);
+    }
+    function attractionImagePayload(urlsText, copyrightsText) {
+        const urls = String(urlsText || "").split("\n");
+        const credits = String(copyrightsText || "").split("\n");
+        const out = [];
+        const count = Math.max(urls.length, credits.length);
+        for (let i = 0; i < count; i++) {
+            const url = (urls[i] || "").trim();
+            if (!url) continue;
+            out.push({
+                url,
+                copyright: (credits[i] || "").trim().replace(/^©\s*/, ""),
+            });
+        }
+        return out;
+    }
+    function attractionImageLines(images) {
+        const rows = Array.isArray(images) ? images : [];
+        return {
+            images: rows
+                .map((img) => (typeof img === "string" ? img : img?.url || ""))
+                .join("\n"),
+            image_copyrights: rows
+                .map((img) => (typeof img === "string" ? "" : img?.copyright || ""))
+                .join("\n"),
+        };
+    }
+    function positiveIdOrNull(value) {
+        const id = parseInt(String(value ?? "").trim(), 10);
+        return Number.isFinite(id) && id > 0 ? id : null;
+    }
     function openEditAttraction(att) {
+        const lines = attractionImageLines(att.images);
         editingAttraction = {
             id: att.id,
             county_slug: att.county_slug,
@@ -3503,8 +3590,12 @@
             latitude: att.latitude ? String(att.latitude) : "",
             longitude: att.longitude ? String(att.longitude) : "",
             featured_image: att.featured_image || "",
+            featured_image_copyright: att.featured_image_copyright || "",
             content: att.content || "",
-            images: (att.images || []).join("\n"),
+            activities: Array.isArray(att.activities) ? att.activities.join("\n") : "",
+            prohibitions: Array.isArray(att.prohibitions) ? att.prohibitions.join("\n") : "",
+            images: lines.images,
+            image_copyrights: lines.image_copyrights,
         };
     }
     function cancelEditAttraction() {
@@ -3513,15 +3604,27 @@
     async function saveEditAttraction(e) {
         e.preventDefault();
         if (!editingAttraction) return;
-        const imgs = editingAttraction.images
-            ? editingAttraction.images.split("\n").map((s) => s.trim()).filter(Boolean)
-            : [];
+        const imgs = attractionImagePayload(
+            editingAttraction.images,
+            editingAttraction.image_copyrights,
+        );
         await updateRecord(
             "attractions",
             {
-                ...editingAttraction,
+                id: editingAttraction.id,
+                county_slug: editingAttraction.county_slug,
+                name: editingAttraction.name,
+                name_ro: editingAttraction.name_ro || "",
+                name_de: editingAttraction.name_de || "",
+                slug: editingAttraction.slug || "",
+                description: editingAttraction.description || "",
                 latitude: parseFloat(editingAttraction.latitude) || 0,
                 longitude: parseFloat(editingAttraction.longitude) || 0,
+                featured_image: editingAttraction.featured_image || "",
+                featured_image_copyright: editingAttraction.featured_image_copyright || "",
+                content: editingAttraction.content || "",
+                activities: activityLines(editingAttraction.activities),
+                prohibitions: activityLines(editingAttraction.prohibitions),
                 images: imgs,
             },
             fetchAttractions,
@@ -3851,7 +3954,7 @@
                                 {/if}
                             </div>
                         {/each}
-                        {#if listingQueueFetched && !listingQueueError && (listingQueueUnpublished.length > 0 || listingQueueClaims.length > 0 || listingQueueSuggestions.length > 0 || listingQueueMembers.length > 0)}
+                        {#if listingQueueFetched && !listingQueueError && (listingQueueUnpublished.length > 0 || listingQueueClaims.length > 0 || listingQueueSuggestions.length > 0 || listingQueueMembers.length > 0 || attractionSuggestions.length > 0)}
                             {#if listingQueueUnpublished.length > 0}
                                 <h4>Közzétételre váró bejegyzések</h4>
                                 <div class="admin-table-wrapper">
@@ -3987,6 +4090,52 @@
                                                             type="button"
                                                             class="btn btn-sm"
                                                             on:click={() => decideListingQueueSuggestion(row.id, "deny")}
+                                                        >Elutasít</button>
+                                                    </td>
+                                                </tr>
+                                            {/each}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {/if}
+                            {#if attractionSuggestions.length > 0}
+                                <h4>Látnivaló-javaslatok</h4>
+                                <div class="admin-table-wrapper">
+                                    <table class="admin-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Látnivaló</th>
+                                                <th>Felhasználó</th>
+                                                <th>Változások</th>
+                                                <th class="admin-table-col--action">Művelet</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {#each attractionSuggestions as suggestion (suggestion.id)}
+                                                <tr>
+                                                    <td>{suggestion.attraction_name}</td>
+                                                    <td>{suggestion.user_name}</td>
+                                                    <td>
+                                                        {#each Object.entries(suggestion.changes || {}) as [key, value] (key)}
+                                                            <div>
+                                                                <strong>{SUGGESTION_FIELD_LABELS[key] || key}:</strong>
+                                                                {suggestionValueText(value)}
+                                                            </div>
+                                                        {/each}
+                                                        {#if suggestion.note}
+                                                            <div><strong>Megjegyzés:</strong> {suggestion.note}</div>
+                                                        {/if}
+                                                    </td>
+                                                    <td class="admin-table-col--action">
+                                                        <button
+                                                            type="button"
+                                                            class="admin-submit-btn"
+                                                            on:click={() => decideAttractionSuggestion(suggestion.id, "accept")}
+                                                        >Elfogad</button>
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm"
+                                                            on:click={() => decideAttractionSuggestion(suggestion.id, "deny")}
                                                         >Elutasít</button>
                                                     </td>
                                                 </tr>
@@ -4908,6 +5057,8 @@
                             <label class="flex-1" style="min-width:12rem"
                                 >Település (város / falu)
                                 <select
+                                    id="new-venue-settlement"
+                                    name="settlement_id"
                                     bind:value={newVenue.settlement_id}
                                     required
                                 >
@@ -4922,6 +5073,8 @@
                             <label class="flex-1" style="min-width:12rem"
                                 >Név (HU) *
                                 <input
+                                    id="new-venue-name"
+                                    name="name"
                                     type="text"
                                     bind:value={newVenue.name}
                                     required
@@ -4959,6 +5112,8 @@
                             <label class="flex-1" style="min-width:8rem"
                                 >Slug (opcionális)
                                 <input
+                                    id="new-venue-slug"
+                                    name="slug"
                                     type="text"
                                     bind:value={newVenue.slug}
                                     placeholder="auto, ha üres"
@@ -4966,7 +5121,7 @@
                             </label>
                             <label class="flex-1" style="min-width:10rem"
                                 >Típus
-                                <select bind:value={newVenue.kind}>
+                                <select id="new-venue-kind" name="kind" bind:value={newVenue.kind}>
                                     {#each venueTypesList as vt}
                                         <option value={vt.slug}
                                             >{vt.label_hu}</option
@@ -4986,6 +5141,8 @@
                             <label class="flex-1" style="min-width:8rem"
                                 >Szélesség (lat)
                                 <input
+                                    id="new-venue-latitude"
+                                    name="latitude"
                                     type="text"
                                     bind:value={newVenue.latitude}
                                     placeholder="pl. 46.1234"
@@ -4994,6 +5151,8 @@
                             <label class="flex-1" style="min-width:8rem"
                                 >Hosszúság (lon)
                                 <input
+                                    id="new-venue-longitude"
+                                    name="longitude"
                                     type="text"
                                     bind:value={newVenue.longitude}
                                     placeholder="pl. 25.5678"
@@ -5002,6 +5161,8 @@
                             <label class="flex-1" style="min-width:8rem"
                                 >Férőhely
                                 <input
+                                    id="new-venue-seating"
+                                    name="seating_capacity"
                                     type="text"
                                     bind:value={newVenue.seating_capacity}
                                     placeholder="ülőhely / kapacitás"
@@ -5350,6 +5511,14 @@
                             {/each}
                         </select>
 
+                        <label for="event_attraction">Látnivaló (opcionális)</label>
+                        <select id="event_attraction" name="attraction_id" bind:value={newEvent.attraction_id}>
+                            <option value="">— nincs hozzárendelve —</option>
+                            {#each attractions as att}
+                                <option value={String(att.id)}>{att.name} ({att.county_name || att.county_slug})</option>
+                            {/each}
+                        </select>
+
                         <label for="event_title"
                             >Esemény neve <span class="admin-req" title="Kötelező">*</span
                             ></label
@@ -5408,6 +5577,14 @@
                                     >Kép törlése</button
                                 >
                             {/if}
+                            <label for="event_featured_copyright">Szerzői jogi információ</label>
+                            <input
+                                id="event_featured_copyright"
+                                name="featured_image_copyright"
+                                type="text"
+                                bind:value={newEvent.featured_image_copyright}
+                                placeholder="A feltöltő által megadott szerzői jog"
+                            />
                         </div>
 
                         <div class="flex gap-lg">
@@ -5795,6 +5972,8 @@
                         <label class="admin-search-label"
                             >Keresés (típusok)
                             <input
+                                id="search-catalog-types"
+                                name="search_catalog_types"
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchCatalogTypes}
@@ -5965,6 +6144,8 @@
                         <label class="admin-search-label"
                             >Keresés (altípusok)
                             <input
+                                id="search-catalog-subtypes"
+                                name="search_catalog_subtypes"
                                 type="search"
                                 class="admin-search-input"
                                 bind:value={searchCatalogSubtypes}
@@ -6369,6 +6550,7 @@
                                 >
                                     <input
                                         type="checkbox"
+                                        name={`new-entry-lang-${lang}`}
                                         checked={newEntry.languages.includes(
                                             lang,
                                         )}
@@ -6393,6 +6575,8 @@
 
                         <label class="flex items-center gap-xs font-normal">
                             <input
+                                id="new-entry-verified"
+                                name="verified"
                                 type="checkbox"
                                 bind:checked={newEntry.verified}
                                 class="w-auto"
@@ -6403,6 +6587,8 @@
 
                         <label class="flex items-center gap-xs font-normal">
                             <input
+                                id="new-entry-hours-enabled"
+                                name="hours_enabled"
                                 type="checkbox"
                                 bind:checked={newEntry.hours_enabled}
                                 class="w-auto"
@@ -6416,6 +6602,8 @@
                         {#if adminOffersDelivery(newEntry)}
                             <label class="flex items-center gap-xs font-normal">
                                 <input
+                                    id="new-entry-delivery-enabled"
+                                    name="delivery_enabled"
                                     type="checkbox"
                                     bind:checked={newEntry.delivery_enabled}
                                     class="w-auto"
@@ -7255,7 +7443,32 @@
                         <p class="admin-info">
                             Megyéhez kötött látnivalók (természet, kultúra): név, slug, rövid leírás, koordináták,
                             kiemelt kép és bővebb tartalom (Markdown). A megye és település oldalakon jelennek meg.
+                            A nyilvános oldalról érkező módosítási javaslatokat itt lehet elfogadni vagy elutasítani.
                         </p>
+                    {/if}
+                    {#if attractionSuggestions.length}
+                        <div class="admin-form mb-lg">
+                            <h3>Nyitott látnivaló-javaslatok</h3>
+                            {#each attractionSuggestions as suggestion (suggestion.id)}
+                                <article class="admin-info">
+                                    <p>
+                                        <strong>{suggestion.attraction_name}</strong>
+                                        · {suggestion.user_name}
+                                        {#if suggestion.created_at}· {suggestion.created_at}{/if}
+                                    </p>
+                                    {#each Object.entries(suggestion.changes || {}) as [key, value]}
+                                        <p>{key}: {suggestionValueText(value)}</p>
+                                    {/each}
+                                    {#if suggestion.note}
+                                        <p>Megjegyzés: {suggestion.note}</p>
+                                    {/if}
+                                    <div class="modal-actions">
+                                        <button type="button" class="admin-submit-btn" on:click={() => decideAttractionSuggestion(suggestion.id, "accept")}>Elfogadás</button>
+                                        <button type="button" class="btn-delete" on:click={() => decideAttractionSuggestion(suggestion.id, "deny")}>Elutasítás</button>
+                                    </div>
+                                </article>
+                            {/each}
+                        </div>
                     {/if}
                     <details class="admin-create-panel">
                         <summary class="admin-create-summary"><span>Új látnivaló</span><AdminPlusIcon /></summary>
@@ -7286,12 +7499,28 @@
                             <input id="att_featured" name="featured_image" type="url" bind:value={newAttraction.featured_image} placeholder="https://..." />
                         </div>
                         <div class="form-row">
+                            <label for="att_featured_copyright">Szerzői jog (kiemelt kép)</label>
+                            <input id="att_featured_copyright" name="featured_image_copyright" type="text" bind:value={newAttraction.featured_image_copyright} placeholder="pl. Iliuta Goean" />
+                        </div>
+                        <div class="form-row">
+                            <label for="att_activities">Tevékenységek / aktivitások (soronként egy)</label>
+                            <textarea id="att_activities" name="activities" bind:value={newAttraction.activities} rows="4" placeholder="Túrázás&#10;Fürdés"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label for="att_prohibitions">Mit nem szabad itt csinálni? (soronként egy)</label>
+                            <textarea id="att_prohibitions" name="prohibitions" bind:value={newAttraction.prohibitions} rows="4" placeholder="Szemetelés&#10;Tűzgyújtás"></textarea>
+                        </div>
+                        <div class="form-row">
                             <label for="att_content">Tartalom (Markdown)</label>
                             <textarea id="att_content" name="content" bind:value={newAttraction.content} rows="6" placeholder="## Cím&#10;Szöveg..."></textarea>
                         </div>
                         <div class="form-row">
                             <label for="att_images">Galéria URL-ek (soronként egy)</label>
                             <textarea id="att_images" name="images" bind:value={newAttraction.images} rows="3" placeholder="https://kep1.jpg&#10;https://kep2.jpg"></textarea>
+                        </div>
+                        <div class="form-row">
+                            <label for="att_image_copyrights">Galéria szerzői jog (ugyanabban a sorrendben, soronként)</label>
+                            <textarea id="att_image_copyrights" name="image_copyrights" bind:value={newAttraction.image_copyrights} rows="3" placeholder="Iliuta Goean"></textarea>
                         </div>
                         <button type="submit" class="admin-submit-btn">Hozzáadás</button>
                     </form>
@@ -7961,6 +8190,7 @@
                             <label class="flex items-center gap-xs font-normal">
                                 <input
                                     type="checkbox"
+                                    name={`edit-entry-lang-${lang}`}
                                     checked={editingEntry.languages.includes(
                                         lang,
                                     )}
@@ -7985,6 +8215,8 @@
 
                     <label class="flex items-center gap-xs font-normal">
                         <input
+                            id="edit-entry-verified"
+                            name="verified"
                             type="checkbox"
                             bind:checked={editingEntry.verified}
                             class="w-auto"
@@ -7995,6 +8227,8 @@
 
                     <label class="flex items-center gap-xs font-normal">
                         <input
+                            id="edit-entry-hours-enabled"
+                            name="hours_enabled"
                             type="checkbox"
                             bind:checked={editingEntry.hours_enabled}
                             class="w-auto"
@@ -8008,6 +8242,8 @@
                     {#if adminOffersDelivery(editingEntry)}
                         <label class="flex items-center gap-xs font-normal">
                             <input
+                                id="edit-entry-delivery-enabled"
+                                name="delivery_enabled"
                                 type="checkbox"
                                 bind:checked={editingEntry.delivery_enabled}
                                 class="w-auto"
@@ -8218,13 +8454,15 @@
                         <label class="flex-1" style="min-width:8rem"
                             >Slug
                             <input
+                                id="ev-venue-slug"
+                                name="slug"
                                 type="text"
                                 bind:value={editingVenue.slug}
                             />
                         </label>
                         <label class="flex-1" style="min-width:10rem"
                             >Típus
-                            <select bind:value={editingVenue.kind}>
+                            <select id="ev-venue-kind" name="kind" bind:value={editingVenue.kind}>
                                 {#each venueTypesList as vt}
                                     <option value={vt.slug}>{vt.label_hu}</option>
                                 {/each}
@@ -8243,6 +8481,8 @@
                         <label class="flex-1" style="min-width:8rem"
                             >Szélesség (lat)
                             <input
+                                id="ev-venue-latitude"
+                                name="latitude"
                                 type="text"
                                 bind:value={editingVenue.latitude}
                             />
@@ -8250,6 +8490,8 @@
                         <label class="flex-1" style="min-width:8rem"
                             >Hosszúság (lon)
                             <input
+                                id="ev-venue-longitude"
+                                name="longitude"
                                 type="text"
                                 bind:value={editingVenue.longitude}
                             />
@@ -8257,6 +8499,8 @@
                         <label class="flex-1" style="min-width:8rem"
                             >Férőhely
                             <input
+                                id="ev-venue-seating"
+                                name="seating_capacity"
                                 type="text"
                                 bind:value={editingVenue.seating_capacity}
                             />
@@ -8401,10 +8645,18 @@
                     <input id="eatt_lon" name="longitude" type="text" bind:value={editingAttraction.longitude} placeholder="25.8876" style="width:6rem" />
                     <label for="eatt_featured">Kiemelt kép URL</label>
                     <input id="eatt_featured" name="featured_image" type="url" bind:value={editingAttraction.featured_image} />
+                    <label for="eatt_featured_copyright">Szerzői jog (kiemelt kép)</label>
+                    <input id="eatt_featured_copyright" name="featured_image_copyright" type="text" bind:value={editingAttraction.featured_image_copyright} />
+                    <label for="eatt_activities">Tevékenységek / aktivitások (soronként egy)</label>
+                    <textarea id="eatt_activities" name="activities" bind:value={editingAttraction.activities} rows="4"></textarea>
+                    <label for="eatt_prohibitions">Mit nem szabad itt csinálni? (soronként egy)</label>
+                    <textarea id="eatt_prohibitions" name="prohibitions" bind:value={editingAttraction.prohibitions} rows="4"></textarea>
                     <label for="eatt_content">Tartalom (Markdown)</label>
                     <textarea id="eatt_content" name="content" bind:value={editingAttraction.content} rows="6"></textarea>
                     <label for="eatt_images">Galéria URL-ek (soronként egy)</label>
                     <textarea id="eatt_images" name="images" bind:value={editingAttraction.images} rows="3"></textarea>
+                    <label for="eatt_image_copyrights">Galéria szerzői jog (ugyanabban a sorrendben, soronként)</label>
+                    <textarea id="eatt_image_copyrights" name="image_copyrights" bind:value={editingAttraction.image_copyrights} rows="3"></textarea>
                     <div class="modal-actions">
                         <button type="submit" class="admin-submit-btn">Mentés</button>
                         <button type="button" class="btn-delete" on:click={cancelEditAttraction}>Mégse</button>
@@ -8493,6 +8745,14 @@
                         {/each}
                     </select>
 
+                    <label for="edit_ev_attraction">Látnivaló (opcionális)</label>
+                    <select id="edit_ev_attraction" name="attraction_id" bind:value={editingEvent.attraction_id}>
+                        <option value="">— nincs hozzárendelve —</option>
+                        {#each attractions as att}
+                            <option value={String(att.id)}>{att.name} ({att.county_name || att.county_slug})</option>
+                        {/each}
+                    </select>
+
                     <label for="edit_ev_title"
                         >Cím <span class="admin-req" title="Kötelező">*</span></label
                     >
@@ -8552,6 +8812,13 @@
                                 >Kép törlése</button
                             >
                         {/if}
+                        <label for="edit_ev_featured_copyright">Szerzői jogi információ</label>
+                        <input
+                            id="edit_ev_featured_copyright"
+                            name="featured_image_copyright"
+                            type="text"
+                            bind:value={editingEvent.featured_image_copyright}
+                        />
                     </div>
 
                     <div class="flex gap-lg">

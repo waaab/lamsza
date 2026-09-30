@@ -248,8 +248,8 @@
                     <legend>Közösségi oldalak</legend>
                     {#each socialLinks as link, index (index)}
                         <div class="suggestion-social">
-                            <input type="text" placeholder="Név" bind:value={link.label} />
-                            <input type="url" placeholder="https://" bind:value={link.url} />
+                            <input type="text" name={`social-label-${index}`} placeholder="Név" aria-label="Közösségi oldal neve" bind:value={link.label} />
+                            <input type="url" name={`social-url-${index}`} placeholder="https://" aria-label="Közösségi oldal címe" bind:value={link.url} />
                             <button type="button" class="btn btn-xs" onclick={() => removeSocialLink(index)}>
                                 Eltávolítás
                             </button>
@@ -264,6 +264,7 @@
                         <label>
                             <input
                                 type="checkbox"
+                                name={`suggestion-language-${code}`}
                                 checked={languages.includes(code)}
                                 onchange={() => toggleLanguage(code)}
                             />

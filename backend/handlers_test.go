@@ -41,6 +41,7 @@ func init() {
 	handlers.MigrateEntryLocationSearch()
 	handlers.MigrateSettlementLocationTypes()
 	events.Migrate()
+	handlers.MigrateAttractions()
 	auth.Migrate()
 	account.Migrate()
 	account.MigrateWebsites()
@@ -328,6 +329,35 @@ func TestCountyWeather(t *testing.T) {
 // Set County Seat
 // ---------------------------------------------------------------------------
 
+// Real megyeszékhely for each county. Tests must leave these in place.
+var canonicalCountySeats = []struct {
+	countySlug     string
+	settlementSlug string
+}{
+	{"hargita", "csikszereda"},
+	{"kovaszna", "sepsiszentgyorgy"},
+	{"maros", "marosvasarhely"},
+}
+
+func ensureCanonicalCountySeats(t *testing.T) {
+	t.Helper()
+	for _, seat := range canonicalCountySeats {
+		var id int
+		err := db.DB.QueryRow(`
+			SELECT s.id FROM settlements s
+			JOIN counties c ON c.id = s.county_id
+			WHERE c.slug = $1 AND s.slug = $2`, seat.countySlug, seat.settlementSlug).Scan(&id)
+		if err != nil {
+			t.Errorf("canonical seat %s/%s: %v", seat.countySlug, seat.settlementSlug, err)
+			continue
+		}
+		rr := doRequest(t, "PUT", "/api/admin/county_seat", map[string]interface{}{"location_id": id})
+		if rr.Code != http.StatusOK {
+			t.Errorf("set %s seat: expected 200, got %d; body: %s", seat.countySlug, rr.Code, rr.Body.String())
+		}
+	}
+}
+
 func TestSetCountySeat(t *testing.T) {
 	// Get a location to use
 	rr := doRequest(t, "GET", "/api/locations", nil)
@@ -349,6 +379,11 @@ func TestSetCountySeat(t *testing.T) {
 	if locID == 0 {
 		t.Skip("No city-type locations found")
 	}
+
+	// The probe above picks Barót, the first town by name. Put the real seats back.
+	t.Cleanup(func() {
+		ensureCanonicalCountySeats(t)
+	})
 
 	// Set as county seat
 	rr = doRequest(t, "PUT", "/api/admin/county_seat", map[string]interface{}{"location_id": locID})

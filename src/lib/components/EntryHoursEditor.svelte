@@ -25,6 +25,7 @@
                 <label class="entry-hours-editor__closed">
                     <input
                         type="checkbox"
+                        name={`hours-${row.key}-closed`}
                         checked={row.slot.closed}
                         onchange={(event) =>
                             patchDay(row.key, { closed: event.currentTarget.checked })}
@@ -35,6 +36,7 @@
             <div class="entry-hours-editor__times">
                 <input
                     type="time"
+                    name={`hours-${row.key}-open`}
                     aria-label="{row.label} nyitás"
                     value={row.slot.open}
                     disabled={row.slot.closed}
@@ -42,6 +44,7 @@
                 />
                 <input
                     type="time"
+                    name={`hours-${row.key}-close`}
                     aria-label="{row.label} zárás"
                     value={row.slot.close}
                     disabled={row.slot.closed}

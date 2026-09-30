@@ -9,6 +9,7 @@ import {
     firstPhotoSrc,
     gallerySlides,
     normalizePhotos,
+    photoCredit,
     proxiedMediaUrl,
     uniquePhotoUrls,
     upgradePhotoUrl,
@@ -36,6 +37,8 @@ test("normalizePhotos: keeps url, alt, title, description, width, height", () =>
     assert.equal(photos[0].alt, "Udvar");
     assert.equal(photos[0].title, "Udvar");
     assert.equal(photos[0].description, "Nyári fény");
+    assert.equal(photos[0].copyright, "");
+    assert.equal(photos[0].uploader, "");
     assert.equal(photos[0].width, 800);
     assert.equal(photos[0].height, 600);
 });
@@ -70,6 +73,18 @@ test("gallerySlides: stored photos win over demo and set eager/lazy", () => {
     assert.equal(slides[1].loading, "lazy");
     assert.equal(slides[0].alt, "A");
     assert.equal(slides[0].description, "Első");
+});
+
+test("photoCredit: always has a copyright line and an uploader line", () => {
+    assert.deepEqual(photoCredit(null), {
+        copyright: "A szerzői jogi információt a feltöltő nem adta meg",
+        uploaderLine: "Admin töltötte fel",
+    });
+    assert.deepEqual(photoCredit({ copyright: "© Iliuta Goean", uploader: "Iliuta Goean" }), {
+        copyright: "Iliuta Goean",
+        uploaderLine: "Feltöltötte: Iliuta Goean",
+    });
+    assert.equal(photoCredit({ uploaded_by: "Kovács Anna" }).uploaderLine, "Feltöltötte: Kovács Anna");
 });
 
 test("firstPhotoSrc: uses first stored photo", () => {
@@ -122,7 +137,7 @@ test("attractionGallerySlides: featured first, unique images, proxy + fullSrc", 
             name: "Szent Anna-tó",
             description: "Vulkanikus tó.",
             featured_image: featured,
-            images: [featured, extra],
+            images: [{ url: featured, copyright: "ignored duplicate" }, { url: extra, copyright: "CC BY-SA" }],
         },
         { apiBase: "http://127.0.0.1:3000" },
     );
@@ -135,6 +150,7 @@ test("attractionGallerySlides: featured first, unique images, proxy + fullSrc", 
         slides[1].src,
         `http://127.0.0.1:3000/api/proxy?url=${encodeURIComponent(extra)}`,
     );
+    assert.equal(slides[1].copyright, "CC BY-SA");
     assert.notEqual(slides[0].fullSrc, slides[0].src);
     assert.match(slides[0].fullSrc, /w%3D1600|w=1600/);
     assert.equal(slides[0].title, "Szent Anna-tó");

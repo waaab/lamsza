@@ -52,50 +52,53 @@ type PublicReview struct {
 }
 
 type Event struct {
-	ID                    int    `json:"id"`
-	LocationID            int    `json:"location_id"`
-	LocationName          string `json:"location_name"`
-	LocationSlug          string `json:"location_slug"`
-	County                string `json:"county"`
-	CountySlug            string `json:"county_slug"`
-	Title                 string `json:"title"`
-	Description           string `json:"description"`
-	FeaturedImage         string `json:"featured_image,omitempty"`
-	StartDate             string `json:"start_date"`
-	StartTime             string `json:"start_time"`
-	EndDate               string `json:"end_date"`
-	EndTime               string `json:"end_time"`
-	EventType             string `json:"event_type"`
-	EventTypeLabel        string `json:"event_type_label,omitempty"`
-	EventSubtype          string `json:"event_subtype,omitempty"`
-	EventSubtypeLabel     string `json:"event_subtype_label,omitempty"`
-	AccessType            string `json:"access_type"`
-	Organizer             string `json:"organizer"`
-	EntryPrice            string `json:"entry_price"`
-	LocationType          string `json:"location_type"`
-	DefaultVenueID        *int   `json:"default_venue_id,omitempty"`
-	DefaultVenueName      string `json:"default_venue_name,omitempty"`
-	DefaultVenueSlug      string `json:"default_venue_slug,omitempty"`
-	DefaultVenueKind      string `json:"default_venue_kind,omitempty"`
-	DefaultVenueKindLabel string `json:"default_venue_kind_label,omitempty"`
+	ID                     int    `json:"id"`
+	LocationID             int    `json:"location_id"`
+	LocationName           string `json:"location_name"`
+	LocationSlug           string `json:"location_slug"`
+	County                 string `json:"county"`
+	CountySlug             string `json:"county_slug"`
+	Title                  string `json:"title"`
+	Description            string `json:"description"`
+	FeaturedImage          string `json:"featured_image,omitempty"`
+	FeaturedImageCopyright string `json:"featured_image_copyright,omitempty"`
+	StartDate              string `json:"start_date"`
+	StartTime              string `json:"start_time"`
+	EndDate                string `json:"end_date"`
+	EndTime                string `json:"end_time"`
+	EventType              string `json:"event_type"`
+	EventTypeLabel         string `json:"event_type_label,omitempty"`
+	EventSubtype           string `json:"event_subtype,omitempty"`
+	EventSubtypeLabel      string `json:"event_subtype_label,omitempty"`
+	AccessType             string `json:"access_type"`
+	Organizer              string `json:"organizer"`
+	EntryPrice             string `json:"entry_price"`
+	LocationType           string `json:"location_type"`
+	DefaultVenueID         *int   `json:"default_venue_id,omitempty"`
+	DefaultVenueName       string `json:"default_venue_name,omitempty"`
+	DefaultVenueSlug       string `json:"default_venue_slug,omitempty"`
+	DefaultVenueKind       string `json:"default_venue_kind,omitempty"`
+	DefaultVenueKindLabel  string `json:"default_venue_kind_label,omitempty"`
 	// HasSchedule is true when the event has at least one napi program day (same idea as the detail #program block).
 	HasSchedule bool `json:"has_schedule"`
 }
 
 type AdminEvent struct {
-	ID               int    `json:"id"`
-	LocationID       *int   `json:"location_id"`
-	DefaultVenueID   *int   `json:"default_venue_id"`
-	DefaultVenueName string `json:"default_venue_name,omitempty"`
-	Title            string `json:"title"`
-	Description      string `json:"description"`
-	FeaturedImage    string `json:"featured_image"`
-	StartDate        string `json:"start_date"`
-	StartTime        string `json:"start_time"`
-	EndDate          string `json:"end_date"`
-	EndTime          string `json:"end_time"`
-	EventTypeID      int    `json:"event_type_id"`
-	EventSubtypeID   *int   `json:"event_subtype_id,omitempty"`
+	ID                     int    `json:"id"`
+	LocationID             *int   `json:"location_id"`
+	DefaultVenueID         *int   `json:"default_venue_id"`
+	DefaultVenueName       string `json:"default_venue_name,omitempty"`
+	Title                  string `json:"title"`
+	Description            string `json:"description"`
+	FeaturedImage          string `json:"featured_image"`
+	FeaturedImageCopyright string `json:"featured_image_copyright"`
+	AttractionID           *int   `json:"attraction_id"`
+	StartDate              string `json:"start_date"`
+	StartTime              string `json:"start_time"`
+	EndDate                string `json:"end_date"`
+	EndTime                string `json:"end_time"`
+	EventTypeID            int    `json:"event_type_id"`
+	EventSubtypeID         *int   `json:"event_subtype_id,omitempty"`
 	// EventType / EventSubtype are catalog slugs (for forms and legacy clients).
 	EventType    string `json:"event_type,omitempty"`
 	EventSubtype string `json:"event_subtype,omitempty"`

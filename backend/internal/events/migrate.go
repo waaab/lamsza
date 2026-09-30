@@ -184,4 +184,13 @@ ALTER TABLE events ADD CONSTRAINT events_access_type_check
 	if err != nil {
 		log.Printf("events.Migrate (access_type default): %v", err)
 	}
+
+	_, err = db.DB.Exec(`ALTER TABLE events ADD COLUMN IF NOT EXISTS attraction_id INTEGER REFERENCES attractions(id) ON DELETE SET NULL`)
+	if err != nil {
+		log.Printf("events.Migrate (attraction_id): %v", err)
+	}
+	_, err = db.DB.Exec(`ALTER TABLE events ADD COLUMN IF NOT EXISTS featured_image_copyright TEXT NOT NULL DEFAULT ''`)
+	if err != nil {
+		log.Printf("events.Migrate (featured_image_copyright): %v", err)
+	}
 }

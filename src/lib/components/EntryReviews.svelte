@@ -162,8 +162,11 @@
             {/each}
         </div>
         <textarea
+            id="entry-review-text"
+            name="review_text"
             class="entry-reviews__textarea"
             placeholder="Ossza meg véleményét..."
+            aria-label="Vélemény"
             bind:value={text}
             disabled={busy}
             rows="4"

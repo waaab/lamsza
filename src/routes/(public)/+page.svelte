@@ -21,6 +21,7 @@
         writeSlotCount,
     } from "$lib/quickLinksDisplay.js";
     import { homepageAttractionWeather, homepageEventPlace, homepageSettlements } from "$lib/favoriteHomepage.js";
+    import { weatherDescPlaceholder, weatherSourcePlaceholder } from "$lib/weatherDescPlaceholder.js";
 
     const USER_LINKS_KEY = "user_quick_links";
     const PROMOTED_CACHE_KEY = "promoted_links_cache";
@@ -389,24 +390,27 @@
         </div>
         <DateTimeWidget />
         {#if settlementPlaces.length === 0 && attractionWeatherPlaces.length === 0}
-            <div class="weather-card simple widget weather-card--pending" aria-hidden="true">
+            <div class="weather-card simple widget weather-card--pending" aria-busy="true">
                 <div class="widget-header">
                     <h3 class="widget-title">Időjárás</h3>
                 </div>
                 <div class="widget-content">
                     <div class="weather-left">
                         <div class="weather-temp-row">
-                            <span class="skeleton weather-skeleton-temp"></span>
+                            <span class="weather-temp">--</span><span class="weather-temp-unit">°C</span>
+                            <span class="weather-temp-min">/ --°C</span>
                         </div>
-                        <span class="skeleton weather-skeleton-desc"></span>
+                        <span class="weather-desc">{weatherDescPlaceholder}</span>
                     </div>
                     <div class="weather-right">
-                        <div class="skeleton weather-skeleton-icon"></div>
+                        <span class="weather-icon" aria-hidden="true">
+                            <span class="skeleton weather-skeleton-icon"></span>
+                        </span>
                     </div>
                 </div>
                 <div class="weather-footer">
-                    <span class="skeleton weather-skeleton-meta"></span>
-                    <span class="skeleton weather-skeleton-meta"></span>
+                    <small class="weather-timestamp">Utoljára frissítve: <span class="weather-timestamp-value">00:00</span></small>
+                    <small class="weather-source">Forrás: <span class="weather-source-value">{weatherSourcePlaceholder}</span></small>
                 </div>
             </div>
         {/if}

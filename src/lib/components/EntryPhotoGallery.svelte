@@ -1,5 +1,6 @@
 <script>
     import { fade } from "svelte/transition";
+    import { photoCredit } from "$lib/entryPhotos.js";
 
     /**
      * Native Svelte slideshow (no carousel package): stacked imgs + CSS opacity,
@@ -13,6 +14,8 @@
      *     alt: string,
      *     title: string,
      *     description: string,
+     *     copyright?: string,
+     *     uploader?: string,
      *     width: number,
      *     height: number,
      *     loading?: string,
@@ -105,29 +108,10 @@
             return;
         }
         viewerOpen = false;
-        if (document.fullscreenElement) {
-            document.exitFullscreen?.().catch(() => {});
-        }
-    }
-
-    function onDialogClick(event) {
-        if (event.target === lightbox) closeViewer();
     }
 
     function onDialogClose() {
         viewerOpen = false;
-        if (document.fullscreenElement) {
-            document.exitFullscreen?.().catch(() => {});
-        }
-    }
-
-    function toggleFullscreen() {
-        if (!lightbox) return;
-        if (document.fullscreenElement) {
-            document.exitFullscreen?.().catch(() => {});
-            return;
-        }
-        lightbox.requestFullscreen?.().catch(() => {});
     }
 
     $effect(() => {
@@ -144,6 +128,17 @@
 </script>
 
 <svelte:window onkeydown={onWindowKey} />
+
+{#snippet captionDesc(slide)}
+    {@const credit = photoCredit(slide)}
+    <p class="entry-gallery__caption-desc">
+        {#if visibleBody(slide)}
+            <span class="entry-gallery__caption-text">{visibleBody(slide)}</span>
+        {/if}
+        <span class="entry-gallery__credit">© {credit.copyright}</span>
+        <span class="entry-gallery__credit">{credit.uploaderLine}</span>
+    </p>
+{/snippet}
 
 {#if !slides.length}
     <div class="entry-gallery entry-gallery--empty">
@@ -209,9 +204,7 @@
                     {#if current?.title}
                         <strong class="entry-gallery__caption-title">{current.title}</strong>
                     {/if}
-                    {#if visibleBody(current)}
-                        <p class="entry-gallery__caption-desc">{visibleBody(current)}</p>
-                    {/if}
+                    {@render captionDesc(current)}
                 </figcaption>
             {/key}
         </figure>
@@ -225,7 +218,7 @@
                         role="tab"
                         aria-selected={i === safeIndex}
                         aria-label={slide.title || slide.alt || `Fotó ${i + 1}`}
-                        onclick={() => openViewer(i)}
+                        onclick={() => (index = i)}
                     >
                         <img
                             src={slide.src}
@@ -248,7 +241,6 @@
         bind:this={lightbox}
         class="entry-gallery__lightbox"
         aria-label={`${label} — nagyobb méret`}
-        onclick={onDialogClick}
         onclose={onDialogClose}
     >
         <button
@@ -267,68 +259,54 @@
         >
             ×
         </button>
-        <button
-            type="button"
-            class="entry-gallery__lightbox-fs"
-            aria-label="Teljes képernyő"
-            onclick={toggleFullscreen}
-        >
-            ⛶
-        </button>
-        <div class="entry-gallery__lightbox-frame">
-            <div class="entry-gallery__lightbox-stage">
-                {#if slides.length > 1}
-                    <button
-                        type="button"
-                        class="entry-gallery__nav entry-gallery__nav--prev"
-                        aria-label="Előző fotó"
-                        onclick={() => go(safeIndex - 1)}
-                    >
-                        ‹
-                    </button>
-                    <button
-                        type="button"
-                        class="entry-gallery__nav entry-gallery__nav--next"
-                        aria-label="Következő fotó"
-                        onclick={() => go(safeIndex + 1)}
-                    >
-                        ›
-                    </button>
-                {/if}
-                {#if current}
-                    {#key safeIndex}
-                        <img
-                            class="entry-gallery__lightbox-img"
-                            src={viewerSrc}
-                            alt={current.alt || ""}
-                            title={current.title || current.alt || ""}
-                            width={current.width}
-                            height={current.height}
-                            decoding="async"
-                            onerror={(event) =>
-                                handleError(event, current.src || current.fallback)}
-                        />
-                    {/key}
-                {/if}
-            </div>
-        </div>
-        <div class="entry-gallery__lightbox-footer">
-            {#if slides.length > 1}
-                <p class="entry-gallery__count" aria-live="polite">
-                    {safeIndex + 1} / {slides.length}
-                </p>
-            {/if}
-            {#key safeIndex}
-                <div class="entry-gallery__lightbox-caption" in:fade={{ duration: 160 }}>
-                    {#if current?.title}
-                        <strong class="entry-gallery__caption-title">{current.title}</strong>
-                    {/if}
-                    {#if visibleBody(current)}
-                        <p class="entry-gallery__caption-desc">{visibleBody(current)}</p>
-                    {/if}
-                </div>
-            {/key}
-        </div>
+        {#if slides.length > 1}
+            <button
+                type="button"
+                class="entry-gallery__nav entry-gallery__nav--prev"
+                aria-label="Előző fotó"
+                onclick={() => go(safeIndex - 1)}
+            >
+                ‹
+            </button>
+            <button
+                type="button"
+                class="entry-gallery__nav entry-gallery__nav--next"
+                aria-label="Következő fotó"
+                onclick={() => go(safeIndex + 1)}
+            >
+                ›
+            </button>
+        {/if}
+        {#if current}
+            <figure class="entry-gallery__lightbox-slide">
+                {#key safeIndex}
+                    <img
+                        class="entry-gallery__lightbox-img"
+                        src={viewerSrc}
+                        alt={current.alt || ""}
+                        width={current.width}
+                        height={current.height}
+                        decoding="async"
+                        in:fade={{ duration: 180 }}
+                        onerror={(event) =>
+                            handleError(event, current.src || current.fallback)}
+                    />
+                    <figcaption class="entry-gallery__lightbox-caption" in:fade={{ duration: 160 }}>
+                        <div>
+                            {#if current.title}
+                                <strong class="entry-gallery__caption-title">{current.title}</strong>
+                            {/if}
+                            {@render captionDesc(current)}
+                        </div>
+                        {#if slides.length > 1}
+                            <p class="entry-gallery__count" aria-live="polite">
+                                {safeIndex + 1} / {slides.length}
+                            </p>
+                        {/if}
+                    </figcaption>
+                {/key}
+            </figure>
+        {/if}
     </dialog>
     {/if}
 {/if}
@@ -444,6 +422,14 @@
         color: var(--text-secondary);
         line-height: 1.4;
     }
+    .entry-gallery__caption-text,
+    .entry-gallery__credit {
+        display: block;
+    }
+    .entry-gallery__caption-text + .entry-gallery__credit,
+    .entry-gallery__credit + .entry-gallery__credit {
+        margin-top: 0.25rem;
+    }
     .entry-gallery__thumbs {
         display: flex;
         gap: 0.4rem;
@@ -459,7 +445,7 @@
         border-radius: 8px;
         overflow: hidden;
         background: var(--card-bg);
-        cursor: zoom-in;
+        cursor: pointer;
     }
     .entry-gallery__thumb.is-active {
         border-color: var(--szekely-blue, #1d4ed8);
@@ -472,19 +458,26 @@
         pointer-events: none;
     }
     .entry-gallery__lightbox {
-        position: relative;
+        position: fixed;
+        inset: 0;
         width: 100%;
         height: 100%;
         max-width: none;
         max-height: none;
         margin: 0;
-        padding: 0;
+        padding: 3.25rem 4.25rem 1.5rem;
         border: none;
-        background: #0b1220;
+        box-sizing: border-box;
+        background: rgb(4 6 10 / 0.94);
         color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+        animation: entry-gallery-in 180ms ease;
     }
     .entry-gallery__lightbox::backdrop {
-        background: #0b1220;
+        background: rgb(4 6 10 / 0.94);
     }
     .entry-gallery__lightbox-backdrop {
         position: absolute;
@@ -494,85 +487,64 @@
         background: transparent;
         cursor: zoom-out;
     }
-    .entry-gallery__lightbox-frame {
+    .entry-gallery__lightbox-slide {
         position: relative;
         z-index: 1;
-        width: 100%;
-        height: 100%;
+        margin: 0;
         display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 3.5rem 0.75rem 5.75rem;
-        box-sizing: border-box;
-        pointer-events: none;
-    }
-    .entry-gallery__lightbox-stage {
-        position: relative;
-        width: min(94vw, 90rem);
-        height: calc(100vh - 8.25rem);
-        pointer-events: auto;
+        flex-direction: column;
+        width: fit-content;
+        max-width: min(92vw, 76rem);
     }
     .entry-gallery__lightbox-img {
-        position: absolute;
-        inset: 0;
         display: block;
-        width: 100%;
-        height: 100%;
-        max-width: none;
-        max-height: none;
+        width: auto;
+        height: auto;
+        max-width: min(92vw, 76rem);
+        max-height: calc(100vh - 10rem);
+        margin: 0 auto;
         object-fit: contain;
-        background: transparent;
-    }
-    .entry-gallery__lightbox-close,
-    .entry-gallery__lightbox-fs {
-        position: fixed;
-        top: 0.7rem;
-        z-index: 3;
-        width: 2.25rem;
-        height: 2.25rem;
-        border: none;
-        border-radius: 999px;
-        background: color-mix(in srgb, #0f172a 55%, transparent);
-        color: #fff;
-        font-size: 1.35rem;
-        line-height: 1;
-        cursor: pointer;
-    }
-    .entry-gallery__lightbox-close:hover,
-    .entry-gallery__lightbox-fs:hover {
-        background: color-mix(in srgb, #0f172a 75%, transparent);
     }
     .entry-gallery__lightbox-close {
-        right: 0.7rem;
+        position: fixed;
+        top: 0.85rem;
+        right: 0.85rem;
+        z-index: 3;
+        width: 2.75rem;
+        height: 2.75rem;
+        border: none;
+        border-radius: 999px;
+        background: transparent;
+        color: #fff;
+        font-size: 2rem;
+        line-height: 1;
+        cursor: pointer;
+        text-shadow: 0 1px 3px rgb(0 0 0 / 0.65);
     }
-    .entry-gallery__lightbox-fs {
-        right: 3.2rem;
+    .entry-gallery__lightbox-close:hover {
+        background: rgb(255 255 255 / 0.14);
     }
     .entry-gallery__lightbox .entry-gallery__nav {
+        position: fixed;
+        z-index: 3;
         width: 2.75rem;
         height: 2.75rem;
         font-size: 1.8rem;
-        background: color-mix(in srgb, #0f172a 65%, transparent);
+        background: rgb(15 23 42 / 0.55);
     }
-    .entry-gallery__lightbox-footer {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: 2;
-        display: flex;
-        flex-direction: column;
-        gap: 0.35rem;
-        padding: 1.5rem 1.25rem 1.1rem;
-        background: linear-gradient(transparent, color-mix(in srgb, #0b1220 88%, transparent));
-        pointer-events: auto;
+    .entry-gallery__lightbox .entry-gallery__nav--prev {
+        left: 0.85rem;
     }
-    .entry-gallery__lightbox-footer .entry-gallery__count {
-        position: static;
-        align-self: flex-end;
+    .entry-gallery__lightbox .entry-gallery__nav--next {
+        right: 0.85rem;
     }
     .entry-gallery__lightbox-caption {
-        max-width: 52rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        width: 100%;
+        margin-top: 0.85rem;
     }
     .entry-gallery__lightbox-caption .entry-gallery__caption-title,
     .entry-gallery__lightbox-caption .entry-gallery__caption-desc {
@@ -581,12 +553,36 @@
     .entry-gallery__lightbox-caption .entry-gallery__caption-desc {
         opacity: 0.88;
     }
-    @media (max-width: 640px) {
-        .entry-gallery__lightbox-frame {
-            padding: 3rem 0.35rem 6rem;
+    .entry-gallery__lightbox-caption .entry-gallery__count {
+        position: static;
+        flex: 0 0 auto;
+        margin: 0.1rem 0 0;
+        padding: 0;
+        background: none;
+        color: #fff;
+        font-size: 0.9rem;
+    }
+    @keyframes entry-gallery-in {
+        from {
+            opacity: 0;
         }
-        .entry-gallery__lightbox-footer {
-            padding: 1.25rem 1rem 1rem;
+        to {
+            opacity: 1;
+        }
+    }
+    @media (max-width: 640px) {
+        .entry-gallery__lightbox {
+            padding: 3.25rem 0.75rem 1rem;
+        }
+        .entry-gallery__lightbox-img {
+            max-width: 94vw;
+            max-height: calc(100vh - 11rem);
+        }
+        .entry-gallery__lightbox .entry-gallery__nav--prev {
+            left: 0.35rem;
+        }
+        .entry-gallery__lightbox .entry-gallery__nav--next {
+            right: 0.35rem;
         }
     }
 </style>

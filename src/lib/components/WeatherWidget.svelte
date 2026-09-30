@@ -3,6 +3,7 @@
     import { apiFetch } from "$lib/api";
     import { formatTime } from "$lib/utils";
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
+    import { weatherDescPlaceholder, weatherSourcePlaceholder } from "$lib/weatherDescPlaceholder.js";
 
     export let settlementSlug = "csikszereda";
     /** When set, fetch weather by coordinates (e.g. for attractions) */
@@ -135,17 +136,16 @@
             </span>
             {:else}
                 <div class="weather-temp-row">
-                    <span class="weather-temp">{weatherData ? weatherData.temp : '-'}</span><span class="weather-temp-unit">°C</span>
-                    <span class="weather-temp-min">/ {weatherData?.tempMin != null ? weatherData.tempMin : '-'}°C</span>
+                    <span class="weather-temp">{weatherData ? weatherData.temp : '--'}</span><span class="weather-temp-unit">°C</span>
+                    <span class="weather-temp-min">/ {weatherData?.tempMin != null ? weatherData.tempMin : '--'}°C</span>
                 </div>
 
-                {#if loading}
-                    <span class="weather-desc">adat betöltés...</span>
-                {/if}
                 {#if weatherData}
                     <span class="weather-desc">
                         {weatherData.desc || 'nincs adat'}
                     </span>
+                {:else}
+                    <span class="weather-desc">{weatherDescPlaceholder}</span>
                 {/if}
                 {#if advanced}
                     <span class="weather-details">
@@ -167,7 +167,9 @@
         </div>
         <div class="weather-right">
             {#if loading}
-                <div class="skeleton weather-skeleton-icon" aria-hidden="true"></div>
+                <span class="weather-icon" aria-hidden="true">
+                    <span class="skeleton weather-skeleton-icon"></span>
+                </span>
             {:else if weatherData}
                 <span class="weather-icon">
                     <WeatherIcon code={weatherData.icon} style={weatherIconStyle} />
@@ -177,7 +179,7 @@
     </div>
     <div class="weather-footer">
         <small class="weather-timestamp">Utoljára frissítve: <span class="weather-timestamp-value">{weatherData ? formatTime(weatherData.timestamp) : '00:00'}</span></small>
-        <small class="weather-source">Forrás: <span class="weather-source-value">{weatherData?.source ? weatherData.source : 'adat betöltés...'}</span></small>
+        <small class="weather-source">Forrás: <span class="weather-source-value">{weatherData?.source ? weatherData.source : weatherSourcePlaceholder}</span></small>
     </div>
 </div>
 
@@ -189,13 +191,9 @@
         color: var(--text-faint);
         margin: 0.5rem 0 0;
     }
-    .weather-skeleton-icon{
-        width: var(--text-display-xl);
-        height: var(--text-display-xl);
-        min-width: var(--text-display-xl);
-        min-height: var(--text-display-xl);
-        border-radius: 50%;
-        display: block;
+    .widget-content {
+        width: 100%;
+        align-self: stretch;
     }
     .weather-details {
         display: flex;

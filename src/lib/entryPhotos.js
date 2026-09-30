@@ -94,7 +94,7 @@ export function upgradePhotoUrl(url) {
     return s;
 }
 
-/** @typedef {{ url: string, alt: string, title: string, description: string, width: number, height: number }} EntryPhoto */
+/** @typedef {{ url: string, alt: string, title: string, description: string, copyright: string, uploader: string, width: number, height: number }} EntryPhoto */
 
 /** @returns {EntryPhoto[]} */
 export function emptyPhotos() {
@@ -116,6 +116,8 @@ export function normalizePhotos(raw) {
             alt: String(item.alt ?? "").trim(),
             title: String(item.title ?? "").trim(),
             description: String(item.description ?? "").trim(),
+            copyright: String(item.copyright ?? "").trim().replace(/^©\s*/, ""),
+            uploader: String(item.uploader ?? item.uploaded_by ?? "").trim(),
             width: clampSize(item.width, DEFAULT_PHOTO_WIDTH),
             height: clampSize(item.height, DEFAULT_PHOTO_HEIGHT),
         });
@@ -147,6 +149,8 @@ export function gallerySlides(entry, opts = {}) {
                     alt: name || "Fotó",
                     title: name,
                     description: "",
+                    copyright: "",
+                    uploader: "",
                     width: DEFAULT_PHOTO_WIDTH,
                     height: DEFAULT_PHOTO_HEIGHT,
                 },
@@ -157,6 +161,23 @@ export function gallerySlides(entry, opts = {}) {
     }
 
     return [];
+}
+
+export const PHOTO_COPYRIGHT_MISSING = "A szerzői jogi információt a feltöltő nem adta meg";
+export const PHOTO_UPLOADED_BY_ADMIN = "Admin töltötte fel";
+
+/**
+ * Copyright text (without the © mark) and uploader line for a gallery caption.
+ * A missing copyright still gets a line; a missing uploader is the admin.
+ * @param {Record<string, unknown> | null | undefined} slide
+ */
+export function photoCredit(slide) {
+    const copyright = String(slide?.copyright ?? "").trim().replace(/^©\s*/, "");
+    const uploader = String(slide?.uploader ?? slide?.uploaded_by ?? "").trim();
+    return {
+        copyright: copyright || PHOTO_COPYRIGHT_MISSING,
+        uploaderLine: uploader ? `Feltöltötte: ${uploader}` : PHOTO_UPLOADED_BY_ADMIN,
+    };
 }
 
 export function firstPhotoSrc(entry, apiBase) {
@@ -186,26 +207,59 @@ export function attractionGallerySlides(attraction, opts = {}) {
     const apiBase = opts.apiBase;
     const name = String(attraction?.name ?? "").trim();
     const description = String(attraction?.description ?? "").trim();
-    const urls = uniquePhotoUrls([
-        attraction?.featured_image,
-        ...(Array.isArray(attraction?.images) ? attraction.images : []),
-    ]);
+    const refs = attractionPhotoRefs(attraction);
 
-    return urls.map((url, i) => {
-        const src = proxiedMediaUrl(url, apiBase);
-        const fullSrc = proxiedMediaUrl(upgradePhotoUrl(url), apiBase);
+    return refs.map((photo, i) => {
+        const src = proxiedMediaUrl(photo.url, apiBase);
+        const fullSrc = proxiedMediaUrl(upgradePhotoUrl(photo.url), apiBase);
         return {
-            url,
+            url: photo.url,
             src,
             fullSrc,
             fallback: src,
             alt: name ? `${name} — fotó ${i + 1}` : `Fotó ${i + 1}`,
             title: name,
             description,
+            copyright: photo.copyright,
+            uploader: "",
             width: DEFAULT_PHOTO_WIDTH,
             height: DEFAULT_PHOTO_HEIGHT,
             loading: i === 0 ? "eager" : "lazy",
             fetchpriority: i === 0 ? "high" : "low",
         };
     });
+}
+
+/** @param {Record<string, unknown> | null | undefined} attraction */
+function attractionPhotoRefs(attraction) {
+    /** @type {{ url: string, copyright: string }[]} */
+    const refs = [];
+    const featured = String(attraction?.featured_image ?? "").trim();
+    if (featured) {
+        refs.push({
+            url: featured,
+            copyright: String(attraction?.featured_image_copyright ?? "").trim().replace(/^©\s*/, ""),
+        });
+    }
+    const images = Array.isArray(attraction?.images) ? attraction.images : [];
+    for (const raw of images) {
+        if (raw && typeof raw === "object") {
+            refs.push({
+                url: String(raw.url ?? "").trim(),
+                copyright: String(raw.copyright ?? "").trim().replace(/^©\s*/, ""),
+            });
+        } else {
+            refs.push({ url: String(raw ?? "").trim(), copyright: "" });
+        }
+    }
+    const seen = new Set();
+    /** @type {{ url: string, copyright: string }[]} */
+    const out = [];
+    for (const ref of refs) {
+        if (!ref.url || seen.has(ref.url)) continue;
+        seen.add(ref.url);
+        out.push(ref);
+        if (out.length >= MAX_ENTRY_PHOTOS) break;
+    }
+    return out;
 }

@@ -14,6 +14,8 @@ type entryPhoto struct {
 	Alt         string `json:"alt"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Copyright   string `json:"copyright"`
+	Uploader    string `json:"uploader"`
 	Width       int    `json:"width"`
 	Height      int    `json:"height"`
 }
@@ -45,6 +47,8 @@ func sanitizePhotos(raw json.RawMessage) json.RawMessage {
 			Alt:         clipRunes(strings.TrimSpace(p.Alt), maxPhotoTextRunes),
 			Title:       clipRunes(strings.TrimSpace(p.Title), maxPhotoTextRunes),
 			Description: clipRunes(strings.TrimSpace(p.Description), maxPhotoTextRunes),
+			Copyright:   clipRunes(strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p.Copyright), "©")), maxPhotoTextRunes),
+			Uploader:    clipRunes(strings.TrimSpace(p.Uploader), maxPhotoTextRunes),
 			Width:       w,
 			Height:      h,
 		})

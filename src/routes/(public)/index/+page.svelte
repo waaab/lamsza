@@ -102,6 +102,10 @@
               ? "services"
               : "all";
     $: viewEntries = filterServiceEntries(entries);
+    $: serviceTotal = viewEntries.length;
+    $: serviceClaimed = viewEntries.filter((entry) => entry.claimed).length;
+    $: websiteTotal = websites.length;
+    $: websiteClaimed = websites.filter((site) => site.claimed).length;
 
     /**
      * @param {"services" | "websites"} kind
@@ -729,24 +733,42 @@
 {/if}
 
 
-{#if indexView !== "websites"}
 <section class="index-stats-section">
     <h2 class="index-stats-section-title">Index statisztikák:</h2>
     <div class="index-stats-items">
-        <div class="card index-stats-item">
-            <div class="index-stats-item-content">
-                <div class="index-stats-item-icon"><svg xmlns="http://www.w3.org/2000/svg" height="50px" viewBox="0 -960 960 960" width="50px" fill="currentColor"><path d="m599-538 138-138-35-34-103 104-53-54-35 35 88 87ZM143-192v-72h432v72H143Zm345-296q-56-56-56-136t56-136q56-56 136-56t136 56q56 56 56 136t-56 136q-56 56-136 56t-136-56Zm-345-4v-72h224q5 20 12 37.5t17 34.5H143Zm0 150v-72h322q24 18 51.5 30.5T575-365v23H143Z"/></svg></div>
-                <span class="index-stats-item-value">{totalCount}</span>
-                <h3 class="index-stats-item-title">Ellenőrzött Bejegyzés</h3>
+        {#if indexView !== "websites"}
+            <div class="card index-stats-item">
+                <div class="index-stats-item-content">
+                    <div class="index-stats-item-icon"><AppIcon name="entries" size={50} /></div>
+                    <span class="index-stats-item-value">{serviceTotal}</span>
+                    <h3 class="index-stats-item-title">Szolgáltatás</h3>
+                </div>
             </div>
-        </div>
-        <div class="card index-stats-item">
-            <div class="index-stats-item-content">
-                <div class="index-stats-item-icon"><AppIcon name="entry_categories" size={50} /></div>
-                <span class="index-stats-item-value">10</span>
-                <h3 class="index-stats-item-title">Kategória</h3>
+            <div class="card index-stats-item">
+                <div class="index-stats-item-content">
+                    <div class="index-stats-item-icon"><AppIcon name="entries" size={50} /></div>
+                    <span class="index-stats-item-value">{serviceClaimed}</span>
+                    <h3 class="index-stats-item-title">Átvett szolgáltatás</h3>
+                </div>
             </div>
-        </div>
+        {/if}
+        {#if indexView !== "services"}
+            <div class="card index-stats-item">
+                <div class="index-stats-item-content">
+                    <div class="index-stats-item-icon"><AppIcon name="websites" size={50} /></div>
+                    <span class="index-stats-item-value">{websiteTotal}</span>
+                    <h3 class="index-stats-item-title">Weboldal</h3>
+                </div>
+            </div>
+            <div class="card index-stats-item">
+                <div class="index-stats-item-content">
+                    <div class="index-stats-item-icon"><AppIcon name="websites" size={50} /></div>
+                    <span class="index-stats-item-value">{websiteClaimed}</span>
+                    <h3 class="index-stats-item-title">Átvett weboldal</h3>
+                </div>
+            </div>
+        {/if}
+        <!--
         <div class="card index-stats-item">
             <div class="index-stats-item-content">
                 <div class="index-stats-item-icon">
@@ -756,9 +778,9 @@
                 <h3 class="index-stats-item-title">Havi felhasználó</h3>
             </div>
         </div>
+        -->
     </div>
 </section>
-{/if}
 <style>
     .index-directory + .index-directory {
         margin-top: 2.5rem;
