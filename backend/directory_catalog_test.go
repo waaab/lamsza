@@ -49,4 +49,23 @@ func TestDirectoryCatalogSeedIds(t *testing.T) {
 	if towns == 0 {
 		t.Fatal("settlements were wiped")
 	}
+	var seqName string
+	if err := db.DB.QueryRow(`SELECT pg_get_serial_sequence('entries', 'id')`).Scan(&seqName); err != nil {
+		t.Fatal(err)
+	}
+	if seqName == "" {
+		t.Fatal("entries has no serial sequence")
+	}
+	var lastValue int64
+	var isCalled bool
+	if err := db.DB.QueryRow(`SELECT last_value, is_called FROM `+seqName).Scan(&lastValue, &isCalled); err != nil {
+		t.Fatal(err)
+	}
+	nextID := lastValue
+	if isCalled {
+		nextID++
+	}
+	if nextID != 1 {
+		t.Fatalf("entries next id = %d, want 1 (last_value=%d is_called=%v)", nextID, lastValue, isCalled)
+	}
 }
