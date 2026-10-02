@@ -93,8 +93,30 @@ func TestLegacyCategoryMigrateDoesNotPruneTree(t *testing.T) {
 	}
 }
 
+func restoreSeedEtteremCategory(t *testing.T) {
+	t.Helper()
+	var hasSeed bool
+	if err := db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM entry_categories WHERE id = 11)`).Scan(&hasSeed); err != nil {
+		t.Fatal(err)
+	}
+	if !hasSeed {
+		if _, err := db.DB.Exec(`
+			INSERT INTO entry_categories (id, name, slug, parent_id, sort_order)
+			VALUES (11, 'Étterem', 'etterem', 1, 1)`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := db.DB.Exec(`
+		DELETE FROM entry_categories c
+		WHERE c.name = 'Étterem' AND c.id != 11
+		AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.category_id = c.id)`); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDeleteCategoryRequiresMove(t *testing.T) {
 	handlers.MigrateDirectoryCatalog()
+	restoreSeedEtteremCategory(t)
 	// Étterem is 11. Attach nothing. Delete succeeds.
 	rr := doRequest(t, "DELETE", "/api/admin/entry_categories?id=11", nil)
 	if rr.Code != 200 {
@@ -132,4 +154,5 @@ func TestDeleteCategoryRequiresMove(t *testing.T) {
 		t.Fatalf("moved category = %d, want 12 Kávézó", cat)
 	}
 	_, _ = db.DB.Exec(`DELETE FROM entries WHERE name = 'Próba étterem'`)
+	restoreSeedEtteremCategory(t)
 }

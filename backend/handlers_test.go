@@ -17,6 +17,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -127,15 +128,24 @@ func mustLogin(email string) *http.Cookie {
 	panic("test google login missing session cookie")
 }
 
+func requestBody(t *testing.T, body interface{}) *bytes.Buffer {
+	if body == nil {
+		return bytes.NewBuffer(nil)
+	}
+	if r, ok := body.(io.Reader); ok {
+		data, err := io.ReadAll(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return bytes.NewBuffer(data)
+	}
+	b, _ := json.Marshal(body)
+	return bytes.NewBuffer(b)
+}
+
 func doRequestWithCookie(t *testing.T, method, path string, body interface{}, cookie *http.Cookie) *httptest.ResponseRecorder {
 	t.Helper()
-	var reqBody *bytes.Buffer
-	if body != nil {
-		b, _ := json.Marshal(body)
-		reqBody = bytes.NewBuffer(b)
-	} else {
-		reqBody = bytes.NewBuffer(nil)
-	}
+	reqBody := requestBody(t, body)
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	if cookie != nil {
@@ -153,13 +163,7 @@ func doAnonRequest(t *testing.T, method, path string, body interface{}) *httptes
 
 func doRequest(t *testing.T, method, path string, body interface{}) *httptest.ResponseRecorder {
 	t.Helper()
-	var reqBody *bytes.Buffer
-	if body != nil {
-		b, _ := json.Marshal(body)
-		reqBody = bytes.NewBuffer(b)
-	} else {
-		reqBody = bytes.NewBuffer(nil)
-	}
+	reqBody := requestBody(t, body)
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	if strings.HasPrefix(strings.Split(path, "?")[0], "/api/admin/") && testAdminCookie != nil {
