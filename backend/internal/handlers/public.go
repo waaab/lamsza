@@ -21,6 +21,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	category := r.URL.Query().Get("category")
 	tag := r.URL.Query().Get("tag")
 	locationSlug := r.URL.Query().Get("location_slug")
+	locationID := r.URL.Query().Get("location_id")
 	countySlug := r.URL.Query().Get("county_slug")
 
 	var rows *sql.Rows
@@ -36,7 +37,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery = `
 			SELECT 
 				e.id, COALESCE(typ.name, ''), COALESCE(ec.name, ''), e.name, e.slug, 
-				s.name, s.slug, c.name, c.slug, s.type, 
+				COALESCE(s.name, ''), COALESCE(s.slug, ''), COALESCE(c.name, ''), COALESCE(c.slug, ''), COALESCE(s.type, ''), 
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
@@ -49,10 +50,11 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.ratings_enabled, false)
 			FROM entries e
 			JOIN entry_types typ ON typ.id = e.type_id
-			JOIN settlements s ON e.location_id = s.id
+			LEFT JOIN settlements s ON e.location_id = s.id
 			LEFT JOIN geo_locations gl ON gl.id = s.location_id
-			JOIN counties c ON s.county_id = c.id
+			LEFT JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_categories ec_parent ON ec_parent.id = ec.parent_id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.search_vector @@ plainto_tsquery('simple', $2)
@@ -64,7 +66,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery = `
 			SELECT 
 				e.id, COALESCE(typ.name, ''), COALESCE(ec.name, ''), e.name, e.slug, 
-				s.name, s.slug, c.name, c.slug, s.type, 
+				COALESCE(s.name, ''), COALESCE(s.slug, ''), COALESCE(c.name, ''), COALESCE(c.slug, ''), COALESCE(s.type, ''), 
 				COALESCE(s.name_ro, ''), COALESCE(s.name_de, ''),
 				COALESCE(e.phone, ''), COALESCE(e.address, ''), COALESCE(e.notes, ''), 
 				e.languages, COALESCE(e.url, ''),
@@ -77,10 +79,11 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 				COALESCE(e.ratings_enabled, false)
 			FROM entries e
 			JOIN entry_types typ ON typ.id = e.type_id
-			JOIN settlements s ON e.location_id = s.id
+			LEFT JOIN settlements s ON e.location_id = s.id
 			LEFT JOIN geo_locations gl ON gl.id = s.location_id
-			JOIN counties c ON s.county_id = c.id
+			LEFT JOIN counties c ON s.county_id = c.id
 			LEFT JOIN entry_categories ec ON e.category_id = ec.id
+			LEFT JOIN entry_categories ec_parent ON ec_parent.id = ec.parent_id
 			LEFT JOIN entry_tags et ON e.id = et.entry_id
 			LEFT JOIN tags t ON et.tag_id = t.id
 			WHERE e.published = true
@@ -90,7 +93,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if category != "" {
-		sqlQuery += " AND (unaccent(ec.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + ") OR pg_slugify(ec.name) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + "))"
+		sqlQuery += " AND (pg_slugify(ec.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR pg_slugify(ec_parent.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR unaccent(ec.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + "))"
 		params = append(params, category)
 		paramIdx++
 	}
@@ -102,6 +105,11 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	if locationSlug != "" {
 		sqlQuery += " AND s.slug = $" + fmt.Sprintf("%d", paramIdx)
 		params = append(params, locationSlug)
+		paramIdx++
+	}
+	if locationID != "" {
+		sqlQuery += " AND e.location_id = $" + fmt.Sprintf("%d", paramIdx)
+		params = append(params, locationID)
 		paramIdx++
 	}
 	if countySlug != "" {

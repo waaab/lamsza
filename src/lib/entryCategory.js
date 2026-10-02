@@ -62,12 +62,31 @@ const DIRECTORY_TREE = [
     ["Pénzügy", ["Bank", "Biztosító"]],
 ];
 
+/** @type {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} */
+export const DIRECTORY_CATALOG = DIRECTORY_TREE.flatMap(([parentName, children], parentIndex) => {
+    const parentSlug = foldCategory(parentName);
+    const parent = {
+        id: parentSlug,
+        name: parentName,
+        slug: parentSlug,
+        parent_id: null,
+        sort_order: parentIndex + 1,
+    };
+    const childRows = children.map((childName, childIndex) => ({
+        id: foldCategory(childName),
+        name: childName,
+        slug: foldCategory(childName),
+        parent_id: parentSlug,
+        sort_order: childIndex + 1,
+    }));
+    return [parent, ...childRows];
+});
+
 /** @type {Map<string, string>} child slug -> parent slug */
 const CATEGORY_PARENT_SLUG = new Map(
-    DIRECTORY_TREE.flatMap(([parent, children]) => {
-        const parentSlug = foldCategory(parent);
-        return children.map((child) => [foldCategory(child), parentSlug]);
-    }),
+    DIRECTORY_CATALOG
+        .filter((row) => row.parent_id)
+        .map((row) => [row.slug, row.parent_id]),
 );
 
 /**
@@ -98,22 +117,68 @@ export function entryMatchesCategory(entry, slug) {
     return CATEGORY_PARENT_SLUG.get(catKey) === filterKey;
 }
 
-/**
- * @param {Array<{ category?: string }> | null | undefined} entries
- */
-export function directoryCategoryTabs(entries) {
-    /** @type {Map<string, { id: string, label: string, url: string }>} */
-    const seen = new Map();
-    for (const e of entries || []) {
-        const label = canonicalEntryCategory(e?.category);
-        if (!label) continue;
-        const id = canonicalEntryCategoryKey(label);
-        if (!seen.has(id)) {
-            seen.set(id, { id, label, url: `/index/${id}` });
-        }
+/** @param {Array<{ category?: string, category_id?: number }>} rows */
+function visibleChildSlugs(rows) {
+    /** @type {Set<string>} */
+    const visible = new Set();
+    for (const row of rows || []) {
+        const slug = canonicalEntryCategoryKey(row?.category);
+        if (slug) visible.add(slug);
     }
-    const generated = [...seen.values()].sort((a, b) =>
-        a.label.localeCompare(b.label, "hu"),
-    );
-    return [{ id: "osszes", label: "Összes", url: "/index" }, ...generated];
+    return visible;
+}
+
+/**
+ * @param {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} catalog
+ * @param {Array<{ category?: string }>} entries
+ * @param {Array<{ category?: string, category_id?: number, entry_id?: number }>} [websites]
+ */
+export function directoryCategoryTabs(catalog, entries, websites = []) {
+    const visible = visibleChildSlugs([
+        ...(entries || []),
+        ...(websites || []).filter((site) => !site?.entry_id),
+    ]);
+    const parents = (catalog || DIRECTORY_CATALOG).filter((row) => !row.parent_id);
+    const tabs = parents
+        .filter((parent) => {
+            const children = (catalog || DIRECTORY_CATALOG).filter(
+                (row) => row.parent_id === parent.slug,
+            );
+            return children.some((child) => visible.has(child.slug));
+        })
+        .map((parent) => ({
+            id: parent.slug,
+            label: parent.name,
+            url: `/index/${parent.slug}`,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, "hu"));
+    return [{ id: "osszes", label: "Összes", url: "/index" }, ...tabs];
+}
+
+/**
+ * @param {string} parentSlug
+ * @param {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} catalog
+ * @param {Array<{ category?: string }>} entries
+ * @param {Array<{ category?: string, category_id?: number, entry_id?: number }>} [websites]
+ */
+export function directoryChildTabs(parentSlug, catalog, entries, websites = []) {
+    const parentKey = foldCategory(parentSlug);
+    if (!parentKey || parentKey === "osszes") return [];
+    const visible = visibleChildSlugs([
+        ...(entries || []),
+        ...(websites || []).filter((site) => !site?.entry_id),
+    ]);
+    return (catalog || DIRECTORY_CATALOG)
+        .filter((row) => row.parent_id === parentKey && visible.has(row.slug))
+        .map((child) => ({
+            id: child.slug,
+            label: child.name,
+            url: `/index/${child.slug}`,
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, "hu"));
+}
+
+/** @param {{ location_slug?: string } | null | undefined} entry */
+export function entryHasTown(entry) {
+    return Boolean(String(entry?.location_slug || "").trim());
 }

@@ -254,6 +254,111 @@ func TestDeleteCategoryRequiresMove(t *testing.T) {
 	restoreSeedEtteremCategory(t)
 }
 
+func TestCategoryBrowseIncludesWebshop(t *testing.T) {
+	const domain = "browse-webshop-test.ro"
+	cleanup := func() {
+		if _, err := db.DB.Exec(`
+			DELETE FROM entries WHERE slug IN ('butor-bolt-browse-test', 'butor-webshop-browse-test')
+		`); err != nil {
+			t.Errorf("cleanup entries: %v", err)
+		}
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+			t.Errorf("cleanup website: %v", err)
+		}
+	}
+	cleanup()
+	defer cleanup()
+
+	handlers.MigrateDirectoryCatalog()
+
+	locID := mustLocID(t)
+	var townEntryID int
+	if err := db.DB.QueryRow(`
+		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, languages, published)
+		VALUES (2, $1, 39, 'Bútor', 'Bútor bolt', 'butor-bolt-browse-test', '{HU}', true)
+		RETURNING id
+	`, locID).Scan(&townEntryID); err != nil {
+		t.Fatal(err)
+	}
+	var webshopEntryID int
+	if err := db.DB.QueryRow(`
+		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, languages, published)
+		VALUES (2, NULL, 39, 'Bútor', 'Bútor webshop', 'butor-webshop-browse-test', '{HU}', true)
+		RETURNING id
+	`).Scan(&webshopEntryID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DB.Exec(`
+		INSERT INTO websites (domain_key, submitted_host, title, description, status, category_id)
+		VALUES ($1, $1, 'Browse Test Shop', 'Bútor webshop', 'approved', 39)
+	`, domain); err != nil {
+		t.Fatal(err)
+	}
+
+	entryIDsFrom := func(path string) map[int]bool {
+		rr := doRequest(t, "GET", path, nil)
+		if rr.Code != 200 {
+			t.Fatalf("%s: %d %s", path, rr.Code, rr.Body.String())
+		}
+		var rows []map[string]interface{}
+		if err := json.Unmarshal(rr.Body.Bytes(), &rows); err != nil {
+			t.Fatalf("%s json: %v", path, err)
+		}
+		ids := map[int]bool{}
+		for _, row := range rows {
+			switch v := row["id"].(type) {
+			case float64:
+				ids[int(v)] = true
+			case string:
+				n, _ := strconv.Atoi(v)
+				if n > 0 {
+					ids[n] = true
+				}
+			}
+		}
+		return ids
+	}
+
+	butor := entryIDsFrom("/api/entries?category=butor")
+	if !butor[townEntryID] || !butor[webshopEntryID] {
+		t.Fatalf("category=butor: got ids %v, want %d and %d", butor, townEntryID, webshopEntryID)
+	}
+
+	vasarlas := entryIDsFrom("/api/entries?category=vasarlas")
+	if !vasarlas[townEntryID] || !vasarlas[webshopEntryID] {
+		t.Fatalf("category=vasarlas: got ids %v, want %d and %d", vasarlas, townEntryID, webshopEntryID)
+	}
+
+	townOnly := entryIDsFrom("/api/entries?location_id=" + formatID(locID))
+	if !townOnly[townEntryID] || townOnly[webshopEntryID] {
+		t.Fatalf("location_id filter: got ids %v, want only %d", townOnly, townEntryID)
+	}
+
+	rr := doRequest(t, "GET", "/api/websites", nil)
+	if rr.Code != 200 {
+		t.Fatalf("GET /api/websites: %d %s", rr.Code, rr.Body.String())
+	}
+	var webPayload struct {
+		Websites []struct {
+			Domain   string `json:"domain"`
+			Category string `json:"category"`
+		} `json:"websites"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &webPayload); err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, w := range webPayload.Websites {
+		if w.Domain == domain && w.Category == "Bútor" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("approved unlinked website missing from list: %+v", webPayload.Websites)
+	}
+}
+
 func TestEntryTypesStayClosed(t *testing.T) {
 	handlers.MigrateDirectoryCatalog()
 	rr := doRequest(t, "POST", "/api/admin/entry_types", strings.NewReader(`{"name":"Weboldal"}`))

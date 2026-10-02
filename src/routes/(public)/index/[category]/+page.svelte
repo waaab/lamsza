@@ -17,7 +17,9 @@
     } from "$lib/entryType.js";
     import {
         canonicalEntryCategory,
+        DIRECTORY_CATALOG,
         directoryCategoryTabs,
+        directoryChildTabs,
         entryMatchesCategory,
     } from "$lib/entryCategory.js";
     import { apiFetch } from "$lib/api.js";
@@ -29,6 +31,7 @@
     let pageHeaderLoading = false;
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
+    let childCategories = [];
     let entries = [];
     let loading = true;
     let error = null;
@@ -82,7 +85,9 @@
     );
 
     $: categoryFilterLabel =
-        canonicalEntryCategory(currentCategory) || currentCategory;
+        DIRECTORY_CATALOG.find((row) => row.slug === currentCategory)?.name ||
+        canonicalEntryCategory(currentCategory) ||
+        currentCategory;
 
     $: typeFilterLabel =
         selectedTypeKey &&
@@ -160,9 +165,23 @@
         loading = true;
         error = null;
         try {
-            const allEntries = (await apiFetch("/api/directory")) || [];
-            dynamicCategories = directoryCategoryTabs(allEntries);
-            entries = allEntries.filter((e) =>
+            const [allEntries, websitesData] = await Promise.all([
+                apiFetch("/api/directory"),
+                apiFetch("/api/websites"),
+            ]);
+            const websites = websitesData?.websites || [];
+            dynamicCategories = directoryCategoryTabs(
+                DIRECTORY_CATALOG,
+                allEntries || [],
+                websites,
+            );
+            childCategories = directoryChildTabs(
+                categoryId,
+                DIRECTORY_CATALOG,
+                allEntries || [],
+                websites,
+            );
+            entries = (allEntries || []).filter((e) =>
                 entryMatchesCategory(e, categoryId),
             );
         } catch (err) {
@@ -198,6 +217,16 @@
                 on:click={() => goto(cat.url)}>{cat.label}</button
             >
         {/each}
+        {#if childCategories.length > 0}
+            <div class="header-tabs-filters-row header-tabs-filters-row--children">
+                {#each childCategories as cat}
+                    <button
+                        class="btn btn-sm {cat.id === currentCategory ? 'active' : ''}"
+                        on:click={() => goto(cat.url)}>{cat.label}</button
+                    >
+                {/each}
+            </div>
+        {/if}
     {/if}
 </div>
 

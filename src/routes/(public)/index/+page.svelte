@@ -27,7 +27,10 @@
     } from "$lib/entryType.js";
     import {
         canonicalEntryCategory,
+        DIRECTORY_CATALOG,
         directoryCategoryTabs,
+        directoryChildTabs,
+        entryHasTown,
         entryMatchesCategory,
     } from "$lib/entryCategory.js";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
@@ -41,6 +44,7 @@
     let pageHeaderLoading = false;
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
+    let childCategories = [];
     let entries = [];
     /** @type {Array<{ id: number, title: string, description: string, domain: string, url: string, claimed?: boolean }>} */
     let websites = [];
@@ -100,11 +104,16 @@
             : $page.url.pathname === "/index/szolgaltatasok"
               ? "services"
               : "all";
-    $: viewEntries = entries;
-    $: serviceTotal = viewEntries.length;
-    $: serviceClaimed = viewEntries.filter((entry) => entry.claimed).length;
-    $: websiteTotal = websites.length;
-    $: websiteClaimed = websites.filter((site) => site.claimed).length;
+    $: serviceEntries = entries.filter((entry) => entryHasTown(entry));
+    $: websiteEntries = entries.filter((entry) => !entryHasTown(entry));
+    $: unlinkedWebsites = websites.filter((site) => !site.entry_id);
+    $: viewEntries = indexView === "websites" ? websiteEntries : serviceEntries;
+    $: serviceTotal = serviceEntries.length;
+    $: serviceClaimed = serviceEntries.filter((entry) => entry.claimed).length;
+    $: websiteTotal = websiteEntries.length + unlinkedWebsites.length;
+    $: websiteClaimed =
+        websiteEntries.filter((entry) => entry.claimed).length +
+        unlinkedWebsites.filter((site) => site.claimed).length;
 
     /**
      * @param {"services" | "websites"} kind
@@ -216,6 +225,7 @@
         currentCategory === "osszes"
             ? null
             : dynamicCategories.find((c) => c.id === currentCategory)?.label ||
+              DIRECTORY_CATALOG.find((row) => row.slug === currentCategory)?.name ||
               canonicalEntryCategory(currentCategory);
 
     $: typeFilterLabel =
@@ -240,13 +250,30 @@
     $: sortedEntries = sortDirectoryEntries(filteredEntries, { sortMode: serviceSortMode });
     $: totalCount = sortedEntries.length;
     $: displayItems = sortedEntries.slice(0, visibleServiceCount);
-    $: filteredWebsites = websites.filter((site) => matchesClaim(site, websiteClaimFilter));
+    $: filteredWebsiteEntries = websiteEntries.filter(
+        (e) =>
+            (currentCategory === "osszes" ||
+                entryMatchesCategory(e, currentCategory)) &&
+            matchesClaim(e, websiteClaimFilter),
+    );
+    $: filteredWebsites = unlinkedWebsites.filter((site) =>
+        matchesClaim(site, websiteClaimFilter),
+    );
+    $: sortedWebsiteEntries = sortDirectoryEntries(filteredWebsiteEntries, {
+        sortMode: websiteSortMode,
+    });
     $: sortedWebsites = sortWebsites(filteredWebsites, websiteSortMode);
     $: websiteClaimCounts = {
-        claimed: websites.filter((site) => site.claimed).length,
-        unclaimed: websites.filter((site) => !site.claimed).length,
+        claimed:
+            websiteEntries.filter((entry) => entry.claimed).length +
+            unlinkedWebsites.filter((site) => site.claimed).length,
+        unclaimed:
+            websiteEntries.filter((entry) => !entry.claimed).length +
+            unlinkedWebsites.filter((site) => !site.claimed).length,
     };
+    $: displayWebsiteEntries = sortedWebsiteEntries.slice(0, visibleWebsiteCount);
     $: displayWebsites = sortedWebsites.slice(0, visibleWebsiteCount);
+    $: websiteResultCount = sortedWebsiteEntries.length + sortedWebsites.length;
 
     function loadMoreServices() {
         visibleServiceCount += 12;
@@ -267,6 +294,13 @@
         visibleServiceCount = 12;
         visibleWebsiteCount = 12;
     }
+
+    $: childCategories = directoryChildTabs(
+        currentCategory,
+        DIRECTORY_CATALOG,
+        entries,
+        websites,
+    );
 
     $: activeHeader =
         indexView === "services"
@@ -295,7 +329,17 @@
                 ]);
                 entries = directory || [];
                 websites = websitesData?.websites || [];
-                dynamicCategories = directoryCategoryTabs(entries);
+                dynamicCategories = directoryCategoryTabs(
+                    DIRECTORY_CATALOG,
+                    entries,
+                    websites,
+                );
+                childCategories = directoryChildTabs(
+                    currentCategory,
+                    DIRECTORY_CATALOG,
+                    entries,
+                    websites,
+                );
                 locations = Array.isArray(locs) ? locs : [];
             } catch (err) {
                 console.error(err);
@@ -435,7 +479,7 @@
                     >
                 {/if}
             </p>
-            <p><span>({kind === "websites" ? displayWebsites.length : displayItems.length}/{kind === "websites" ? sortedWebsites.length : totalCount})</span></p>
+            <p><span>({kind === "websites" ? displayWebsiteEntries.length + displayWebsites.length : displayItems.length}/{kind === "websites" ? websiteResultCount : totalCount})</span></p>
         </span>
 
         <div class="view-mode-toggle">
@@ -630,6 +674,16 @@
                     >
                 {/each}
             </div>
+            {#if kind !== "websites" && childCategories.length > 0}
+                <div class="header-tabs-filters-row header-tabs-filters-row--children">
+                    {#each childCategories as cat}
+                        <button
+                            class="btn btn-sm {cat.id === currentCategory ? 'active' : ''}"
+                            on:click={() => (currentCategory = cat.id)}>{cat.label}</button
+                        >
+                    {/each}
+                </div>
+            {/if}
         {/if}
     </div>
     {@render indexFilterBar(kind, "start")}
@@ -644,15 +698,18 @@
                     </div>
                 {:else if error}
                     <span class="info-box error"><p>{error}</p></span>
-                {:else if displayWebsites.length === 0}
-                    <span class="info-box info"><p>{websites.length === 0 ? "Még nincs jóváhagyott weboldal." : "Nincs találat a szűrésre."}</p></span>
+                {:else if displayWebsiteEntries.length === 0 && displayWebsites.length === 0}
+                    <span class="info-box info"><p>{websiteTotal === 0 ? "Még nincs jóváhagyott weboldal." : "Nincs találat a szűrésre."}</p></span>
                 {:else}
                     <div class="list {(kind === 'websites' ? websiteViewMode : serviceViewMode) === 'grid' ? 'grid' : 'flex'}">
+                        {#each displayWebsiteEntries as entry (entry.id)}
+                            <EntryCard {entry} layout={(kind === "websites" ? websiteViewMode : serviceViewMode) === "grid" ? "grid" : "list"} />
+                        {/each}
                         {#each displayWebsites as website (website.id)}
                             <WebsiteCard {website} />
                         {/each}
                     </div>
-                    {#if visibleWebsiteCount < sortedWebsites.length}
+                    {#if visibleWebsiteCount < websiteResultCount}
                         <div class="load-more">
                             <button class="btn nav-btn" on:click={loadMoreWebsites}>Több betöltése ↓</button>
                         </div>

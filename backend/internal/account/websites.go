@@ -32,6 +32,7 @@ type websiteListItem struct {
 	Claimed     bool   `json:"claimed"`
 	CategoryID  int    `json:"category_id"`
 	Category    string `json:"category"`
+	EntryID     int    `json:"entry_id"`
 }
 
 type websitesListResponse struct {
@@ -257,6 +258,7 @@ func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	resp := websitesListResponse{Websites: []websiteListItem{}}
 	rows, err := db.DB.Query(`
 		SELECT w.id, w.title, w.description, w.domain_key, COALESCE(w.category_id, 0), COALESCE(c.name, ''),
+			COALESCE(w.entry_id, 0),
 			EXISTS (
 				SELECT 1 FROM entry_members m
 				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
@@ -273,7 +275,7 @@ func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	for rows.Next() {
 		var item websiteListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.CategoryID, &item.Category, &item.Claimed); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.CategoryID, &item.Category, &item.EntryID, &item.Claimed); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
