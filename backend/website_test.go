@@ -11,6 +11,8 @@ import (
 	"testing"
 )
 
+const testLeafCategoryID = 39 // Bútor
+
 func TestMigrateWebsitesBackfillsListingURL(t *testing.T) {
 	if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "backfill-sorozo.com"); err != nil {
 		t.Fatal(err)
@@ -54,10 +56,11 @@ func TestWebsiteSubmitPendingRaisesQueue(t *testing.T) {
 	cookie := mustLogin("website-submit@test.lamsza")
 	adminCookie := mustLogin("admin@test.lamsza")
 	before := adminQueueCount(t, adminCookie)
-	rr := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	rr := doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain":      "https://www.submit-example.com/a",
 		"title":       "<b>Submit Example</b>",
 		"description": "A short page.",
+		"category_id": testLeafCategoryID,
 	}, cookie)
 	if rr.Code != 201 {
 		t.Fatalf("submit: %d %s", rr.Code, rr.Body.String())
@@ -74,8 +77,9 @@ func TestWebsiteSubmitPendingRaisesQueue(t *testing.T) {
 	if strings.Contains(pub.Body.String(), "submit-example.com") {
 		t.Fatal("pending website was public")
 	}
-	dup := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	dup := doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": "submit-example.com", "title": "Other", "description": "Other page.",
+		"category_id": testLeafCategoryID,
 	}, cookie)
 	if dup.Code != 409 || !strings.Contains(dup.Body.String(), "domain_pending") {
 		t.Fatalf("dup: %d %s", dup.Code, dup.Body.String())
@@ -89,8 +93,9 @@ func TestWebsiteSubmitRejectsBannedAndSignedOut(t *testing.T) {
 		}
 	}()
 
-	rr := doRequest(t, "POST", "/api/websites", map[string]string{
+	rr := doRequest(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": "banned-example.com", "title": "T", "description": "D",
+		"category_id": testLeafCategoryID,
 	})
 	if rr.Code != 401 {
 		t.Fatalf("signed out: %d", rr.Code)
@@ -99,8 +104,9 @@ func TestWebsiteSubmitRejectsBannedAndSignedOut(t *testing.T) {
 	if _, err := db.DB.Exec(`UPDATE users SET website_banned = true WHERE email = $1`, "website-banned@test.lamsza"); err != nil {
 		t.Fatal(err)
 	}
-	rr = doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	rr = doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": "banned-example.com", "title": "T", "description": "D",
+		"category_id": testLeafCategoryID,
 	}, cookie)
 	if rr.Code != 403 || !strings.Contains(rr.Body.String(), "website_banned") {
 		t.Fatalf("banned: %d %s", rr.Code, rr.Body.String())
@@ -109,8 +115,9 @@ func TestWebsiteSubmitRejectsBannedAndSignedOut(t *testing.T) {
 
 func submitWebsite(t *testing.T, cookie *http.Cookie, domain, title, description string) int {
 	t.Helper()
-	rr := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	rr := doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": domain, "title": title, "description": description,
+		"category_id": testLeafCategoryID,
 	}, cookie)
 	if rr.Code != 201 {
 		t.Fatalf("submit %s: %d %s", domain, rr.Code, rr.Body.String())
@@ -214,8 +221,9 @@ func TestWebsiteApproveRejectAndBan(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("ban %d %s", rr.Code, rr.Body.String())
 	}
-	rr = doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	rr = doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": "after-ban.com", "title": "T", "description": "D",
+		"category_id": testLeafCategoryID,
 	}, user)
 	if rr.Code != 403 {
 		t.Fatalf("banned resubmit %d", rr.Code)
@@ -403,10 +411,8 @@ func TestWebsiteListingCreateReservesDomain(t *testing.T) {
 
 	owner := mustLogin("listing-reserve@test.lamsza")
 	locID := mustLocID(t)
-	var catID, typeID int
-	if err := db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&catID); err != nil {
-		t.Fatal(err)
-	}
+	catID := testLeafCategoryID
+	var typeID int
 	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {
 		t.Fatal(err)
 	}
@@ -445,8 +451,9 @@ func TestWebsiteListingCreateReservesDomain(t *testing.T) {
 		t.Fatalf("website text title=%q description=%q", title, description)
 	}
 
-	dup := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	dup := doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": domain, "title": "Other Site", "description": "Taken.",
+		"category_id": testLeafCategoryID,
 	}, owner)
 	if dup.Code != 409 || !strings.Contains(dup.Body.String(), "domain_taken") {
 		t.Fatalf("duplicate submit: %d %s", dup.Code, dup.Body.String())
@@ -480,14 +487,16 @@ func TestAccountWebsitesListsOnlyTheSignedInUser(t *testing.T) {
 
 	mine := mustLogin("website-mine@test.lamsza")
 	other := mustLogin("website-other@test.lamsza")
-	created := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	created := doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": "account-mine.example", "title": "Mine", "description": "My page.",
+		"category_id": testLeafCategoryID,
 	}, mine)
 	if created.Code != 201 {
 		t.Fatalf("mine submit: %d %s", created.Code, created.Body.String())
 	}
-	otherCreated := doRequestWithCookie(t, "POST", "/api/websites", map[string]string{
+	otherCreated := doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
 		"domain": "account-other.example", "title": "Other", "description": "Their page.",
+		"category_id": testLeafCategoryID,
 	}, other)
 	if otherCreated.Code != 201 {
 		t.Fatalf("other submit: %d %s", otherCreated.Code, otherCreated.Body.String())
