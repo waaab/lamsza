@@ -3,7 +3,9 @@ import { test } from "node:test";
 import {
     canonicalEntryCategory,
     canonicalEntryCategoryKey,
+    DIRECTORY_CATALOG,
     directoryCategoryTabs,
+    directoryChildTabs,
     entryMatchesCategory,
 } from "../src/lib/entryCategory.js";
 
@@ -28,19 +30,31 @@ test("entryMatchesCategory matches parent slug for a child category", () => {
     assert.equal(entryMatchesCategory({ category: "Bútor" }, "auto"), false);
 });
 
-test("directoryCategoryTabs uses slugs in /index URLs", () => {
-    const tabs = directoryCategoryTabs([
-        { category: "Bútor" },
-        { category: "Bútor" },
-        { category: "Bank" },
-        { category: "" },
-    ]);
+test("directoryCategoryTabs shows parent shelves with visible children", () => {
+    const tabs = directoryCategoryTabs(
+        DIRECTORY_CATALOG,
+        [{ category: "Bútor" }],
+        [{ category: "Bank", entry_id: 0 }],
+    );
     assert.equal(tabs[0].id, "osszes");
     const ids = tabs.map((t) => t.id);
-    assert.ok(ids.includes("butor"));
-    assert.ok(ids.includes("bank"));
-    assert.equal(tabs.filter((t) => t.id === "butor").length, 1);
-    const furniture = tabs.find((t) => t.id === "butor");
-    assert.equal(furniture.label, "Bútor");
-    assert.equal(furniture.url, "/index/butor");
+    assert.ok(ids.includes("vasarlas"));
+    assert.ok(ids.includes("penzugy"));
+    assert.equal(tabs.filter((t) => t.id === "butor").length, 0);
+    const shopping = tabs.find((t) => t.id === "vasarlas");
+    assert.equal(shopping.label, "Vásárlás");
+    assert.equal(shopping.url, "/index/vasarlas");
+});
+
+test("directoryChildTabs hides empty child shelves", () => {
+    const children = directoryChildTabs(
+        "vasarlas",
+        DIRECTORY_CATALOG,
+        [{ category: "Bútor" }],
+        [],
+    );
+    assert.deepEqual(
+        children.map((row) => row.id),
+        ["butor"],
+    );
 });
