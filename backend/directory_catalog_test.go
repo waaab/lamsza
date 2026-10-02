@@ -156,3 +156,22 @@ func TestDeleteCategoryRequiresMove(t *testing.T) {
 	_, _ = db.DB.Exec(`DELETE FROM entries WHERE name = 'Próba étterem'`)
 	restoreSeedEtteremCategory(t)
 }
+
+func TestEntryTypesStayClosed(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+	rr := doRequest(t, "POST", "/api/admin/entry_types", strings.NewReader(`{"name":"Weboldal"}`))
+	if rr.Code != 403 {
+		t.Fatalf("create type: %d", rr.Code)
+	}
+	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id=1", nil)
+	if rr.Code != 403 {
+		t.Fatalf("delete type: %d", rr.Code)
+	}
+	var n int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 3 {
+		t.Fatalf("types = %d", n)
+	}
+}

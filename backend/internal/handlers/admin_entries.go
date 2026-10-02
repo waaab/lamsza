@@ -510,51 +510,15 @@ func HandleAdminEntryTypes(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(res)
 
 	case "POST":
-		var et models.EntryType
-		if err := json.NewDecoder(r.Body).Decode(&et); err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-		err := db.DB.QueryRow("INSERT INTO entry_types (name) VALUES ($1) RETURNING id", et.Name).Scan(&et.ID)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		json.NewEncoder(w).Encode(et)
+		http.Error(w, "A típuslista zárt.", http.StatusForbidden)
+		return
 
 	case "PUT":
-		var et models.EntryType
-		if err := json.NewDecoder(r.Body).Decode(&et); err != nil {
-			http.Error(w, err.Error(), 400)
-			return
-		}
-		_, err := db.DB.Exec("UPDATE entry_types SET name=$1 WHERE id=$2", et.Name, et.ID)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+		http.Error(w, "A típuslista zárt.", http.StatusForbidden)
+		return
 
 	case "DELETE":
-		id := r.URL.Query().Get("id")
-		if id == "" {
-			http.Error(w, "missing id", http.StatusBadRequest)
-			return
-		}
-		var n int
-		err := db.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE type_id = $1`, id).Scan(&n)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		if n > 0 {
-			http.Error(w, fmt.Sprintf("Nem törölhető: %d bejegyzés használja ezt a típust.", n), http.StatusConflict)
-			return
-		}
-		if _, err := db.DB.Exec("DELETE FROM entry_types WHERE id = $1", id); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+		http.Error(w, "A típuslista zárt.", http.StatusForbidden)
+		return
 	}
 }
