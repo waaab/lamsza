@@ -290,7 +290,7 @@
                     ]}
                 >
                     {#if status.state === "unknown"}
-                        <span class="entry-profile__open-detail">—</span>
+                        <span class="entry-profile__open-detail">-</span>
                     {:else}
                         <span>{status.label}</span>
                         {#if status.detail}

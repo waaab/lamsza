@@ -196,7 +196,7 @@ type EventWithSchedule struct {
 type Mondas struct {
 	ID          int    `json:"id"`
 	Text        string `json:"text"`
-	DisplayDate string `json:"display_date"` // YYYY-MM-DD — day the quote is shown on the homepage
+	DisplayDate string `json:"display_date"` // YYYY-MM-DD - day the quote is shown on the homepage
 	CreatedAt   string `json:"created_at"`
 }
 

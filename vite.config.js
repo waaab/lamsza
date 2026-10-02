@@ -4,6 +4,8 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [sveltekit()],
 	server: {
+		port: 5173,
+		strictPort: true,
 		allowedHosts: ['.test', 'localhost', '127.0.0.1', '::1'],
 		proxy: {
 			'/api': {
@@ -14,4 +16,4 @@ export default defineConfig({
 	}
 });
 
-console.log('Vite config loaded — allowedHosts:', ['.test', 'localhost', '127.0.0.1', '::1']);
+console.log('Vite config loaded - allowedHosts:', ['.test', 'localhost', '127.0.0.1', '::1']);

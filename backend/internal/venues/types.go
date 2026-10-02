@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// HandlePublicVenueTypes GET /api/venue_types — ordered list for public UIs
+// HandlePublicVenueTypes GET /api/venue_types - ordered list for public UIs
 func HandlePublicVenueTypes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

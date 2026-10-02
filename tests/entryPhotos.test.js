@@ -155,5 +155,5 @@ test("attractionGallerySlides: featured first, unique images, proxy + fullSrc", 
     assert.match(slides[0].fullSrc, /w%3D1600|w=1600/);
     assert.equal(slides[0].title, "Szent Anna-tó");
     assert.equal(slides[0].description, "Vulkanikus tó.");
-    assert.equal(slides[0].alt, "Szent Anna-tó — fotó 1");
+    assert.equal(slides[0].alt, "Szent Anna-tó - fotó 1");
 });

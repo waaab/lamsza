@@ -31,7 +31,7 @@ var dashboardCountTables = []struct {
 	{"settings", "site_settings"},
 }
 
-// HandleAdminDashboardStats GET /api/admin/dashboard_stats — row counts for admin welcome cards.
+// HandleAdminDashboardStats GET /api/admin/dashboard_stats - row counts for admin welcome cards.
 func HandleAdminDashboardStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

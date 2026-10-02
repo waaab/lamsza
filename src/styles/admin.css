@@ -46,7 +46,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    /* No height:% here — stretch from .admin-layout gives a definite column height */
+    /* No height:% here - stretch from .admin-layout gives a definite column height */
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
@@ -380,7 +380,7 @@
     white-space: nowrap;
 }
 
-/* Never use display:flex on <td> — it breaks table grid and causes bogus “inner borders”. */
+/* Never use display:flex on <td> - it breaks table grid and causes bogus “inner borders”. */
 .admin-table th.admin-table-col--action,
 .admin-table td.admin-table-col--action {
     text-align: center;
@@ -435,7 +435,7 @@
     background: var(--btn-submit-hover);
 }
 
-/* Secondary / edit — outline, matches table + modal “Szerkesztés” across admin */
+/* Secondary / edit - outline, matches table + modal “Szerkesztés” across admin */
 .btn-update {
     display: inline-block;
     box-sizing: border-box;
@@ -719,7 +719,7 @@
     color: var(--text-primary);
 }
 
-/* List cell previews — 20 chars max in JS (contentPreview / urlPreview); full text in title */
+/* List cell previews - 20 chars max in JS (contentPreview / urlPreview); full text in title */
 .admin-table-cell-preview {
     max-width: 9rem;
     font-size: var(--text-sm);

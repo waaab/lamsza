@@ -49,7 +49,7 @@ export function hoursConfigured(raw) {
     });
 }
 
-export function formatDayHours(slot, placeholder = "—") {
+export function formatDayHours(slot, placeholder = "-") {
     if (!slot) return placeholder;
     if (slot.closed) return "Zárva";
     if (slot.open && slot.close) return `${slot.open}–${slot.close}`;
@@ -94,7 +94,7 @@ export function todayWeekdayKey(now = new Date(), timeZone = "Europe/Bucharest")
 export function openStatus(hours, now = new Date(), timeZone = "Europe/Bucharest") {
     const normalized = normalizeHours(hours);
     if (!hoursConfigured(normalized)) {
-        return { state: "unknown", label: "Nyitvatartás", detail: "—" };
+        return { state: "unknown", label: "Nyitvatartás", detail: "-" };
     }
     const key = weekdayKeyFromDate(now, timeZone);
     const slot = normalized[key];

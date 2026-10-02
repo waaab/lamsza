@@ -3,7 +3,7 @@ import { getApiBase } from "$lib/api";
 /**
  * Absolute URL for an event's featured image, or the built-in placeholder SVG path.
  * @param {Record<string, unknown>} event
- * @param {string} [apiBase] — override API origin (e.g. admin `getBase()`); default uses getApiBase().
+ * @param {string} [apiBase] - override API origin (e.g. admin `getBase()`); default uses getApiBase().
  */
 export function eventFeaturedImageUrl(event, apiBase) {
     const u = event?.featured_image;
@@ -13,7 +13,7 @@ export function eventFeaturedImageUrl(event, apiBase) {
 }
 
 /**
- * @param {string} stored — absolute http(s) URL or path starting with /
+ * @param {string} stored - absolute http(s) URL or path starting with /
  * @param {string} [apiBase]
  */
 export function absoluteMediaUrl(stored, apiBase) {

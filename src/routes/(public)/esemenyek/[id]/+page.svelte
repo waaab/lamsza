@@ -174,10 +174,10 @@
         if (ev.start_time) res += `, ${ev.start_time.slice(0, 5)}`;
 
         if (ev.end_date && ev.end_date !== ev.start_date) {
-            res += ` — ${formatDate(ev.end_date)}`;
+            res += ` - ${formatDate(ev.end_date)}`;
             if (ev.end_time) res += `, ${ev.end_time.slice(0, 5)}`;
         } else if (ev.end_time) {
-            res += ` — ${ev.end_time.slice(0, 5)}`;
+            res += ` - ${ev.end_time.slice(0, 5)}`;
         }
         return res;
     }
@@ -457,7 +457,7 @@
                     class:active={scheduleFilterDay ===
                         null}
                     aria-pressed={scheduleFilterDay === null}
-                    title="Teljes program — minden nap"
+                    title="Teljes program - minden nap"
                     aria-label="Teljes napi program megjelenítése, minden nap"
                     on:click={() => (scheduleFilterDay = null)}
                 >
@@ -481,7 +481,7 @@
                             dayKey}
                         aria-pressed={scheduleFilterDay === dayKey}
                         title={fullDateLine +
-                            (isToday ? " — ma" : "")}
+                            (isToday ? " - ma" : "")}
                         aria-label={"Napi program szűrése: " +
                             fullDateLine +
                             (isToday ? ", mai nap" : "")}

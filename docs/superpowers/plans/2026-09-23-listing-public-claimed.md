@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Hungarian copy: section **Értékelések**, switch **Értékelések**, save error **A mentés nem sikerült**.
-- Unclaimed public listing: directory facts only. No gallery, hours, hero “Nyitvatartás ma”, stars, recommend row, or demo slides — even if admin data exists.
+- Unclaimed public listing: directory facts only. No gallery, hours, hero “Nyitvatartás ma”, stars, recommend row, or demo slides - even if admin data exists.
 - Claimed extras: photos if stored photos exist; hours if `hoursConfigured`; ratings block if `ratings_enabled` (even when count is 0).
 - No demo / staging slides on the public listing page (claimed or not).
 - Ratings: integer 1–5, optional plain text max 2000 runes, one row per `(entry_id, user_id)`, HTML stripped.
@@ -23,7 +23,7 @@
 - No comments in this version. Do not add comment tables or UI.
 - Do not put email, Google sub, or session ids on public review JSON.
 - New `.svelte` files: Svelte 5 runes. Do not migrate `src/routes/(public)/bejegyzes/[slug]/+page.svelte` or `src/routes/(public)/profil/+page.svelte` to runes. Run Svelte MCP `svelte-autofixer` on new/edited `.svelte` files until clean (ignore `$:` complaints on the two legacy pages).
-- Commit only this task’s files on branch `user-profile`. Never `git add -A`. `handlers_test.go` and `main.go` are dirty with unrelated WIP: add the one-line route/migrate hooks there, but put new tests in `backend/entry_claimed_extras_test.go` (`package main`). Skip a commit step only if it would stage unrelated hunks — then report the files left unstaged.
+- Commit only this task’s files on branch `user-profile`. Never `git add -A`. `handlers_test.go` and `main.go` are dirty with unrelated WIP: add the one-line route/migrate hooks there, but put new tests in `backend/entry_claimed_extras_test.go` (`package main`). Skip a commit step only if it would stage unrelated hunks - then report the files left unstaged.
 - Do not merge to `main` in these tasks.
 
 ---
@@ -153,7 +153,7 @@ type PublicReview struct {
 `ApplyPublicEntryExtras` in `entry_public_extras.go`:
 
 - If `!e.Claimed`: set `Photos` to `[]`, `Hours` and `DeliveryHours` to `{}`, `RatingsEnabled = false`, leave rating/reviews unset.
-- If claimed: keep stored photos/hours; scan `ratings_enabled`. If false, stop. If true, fill average (one decimal), count, up to 50 reviews newest first (join `users` for `COALESCE(NULLIF(name,''), 'Felhasználó')` and photo URL only — never email), and `MyReview` when `viewerUserID > 0`.
+- If claimed: keep stored photos/hours; scan `ratings_enabled`. If false, stop. If true, fill average (one decimal), count, up to 50 reviews newest first (join `users` for `COALESCE(NULLIF(name,''), 'Felhasználó')` and photo URL only - never email), and `MyReview` when `viewerUserID > 0`.
 
 Call it at the end of `EntryDetailHandler` and each list row in `EntriesHandler`. Pass `0` for anonymous. For a signed-in public GET, read the session user id if `auth.UserFromRequest` already exists; if that helper is awkward on the public handler, pass `0` in this task and attach `my_review` in Task 3. Prefer attaching here if `UserFromRequest` is one call.
 

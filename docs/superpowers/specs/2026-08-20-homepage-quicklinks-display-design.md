@@ -51,9 +51,9 @@ Let each visitor choose how many quicklink **slots wide** the Gyorslinkek widget
 
 Three units:
 
-1. **`src/lib/quickLinksDisplay.js`** — `DEFAULT_QUICKLINK_SLOTS = 7`, `MIN = 7`, `MAX = 14`, `STORAGE_KEY`, `clampSlotCount(value)`, `readSlotCount()`, `writeSlotCount(n)`. No UI, no fetch.
-2. **Homepage `+page.svelte`** — owns stepper, `--quicklink-slots`, expanded class, skeleton `{#each}`, card lists. Drops `LINKS_BEFORE_ARROWS`, `showArrows`, arrow buttons, `dragScroll` / `scrollLinks` / scroll state used only for arrows.
-3. **`src/styles/global.css`** — slot width, wrap, compact vs expanded row. No JS.
+1. **`src/lib/quickLinksDisplay.js`** - `DEFAULT_QUICKLINK_SLOTS = 7`, `MIN = 7`, `MAX = 14`, `STORAGE_KEY`, `clampSlotCount(value)`, `readSlotCount()`, `writeSlotCount(n)`. No UI, no fetch.
+2. **Homepage `+page.svelte`** - owns stepper, `--quicklink-slots`, expanded class, skeleton `{#each}`, card lists. Drops `LINKS_BEFORE_ARROWS`, `showArrows`, arrow buttons, `dragScroll` / `scrollLinks` / scroll state used only for arrows.
+3. **`src/styles/global.css`** - slot width, wrap, compact vs expanded row. No JS.
 
 Data flow:
 

@@ -217,7 +217,7 @@ export function attractionGallerySlides(attraction, opts = {}) {
             src,
             fullSrc,
             fallback: src,
-            alt: name ? `${name} — fotó ${i + 1}` : `Fotó ${i + 1}`,
+            alt: name ? `${name} - fotó ${i + 1}` : `Fotó ${i + 1}`,
             title: name,
             description,
             copyright: photo.copyright,

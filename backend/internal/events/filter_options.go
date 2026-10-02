@@ -33,7 +33,7 @@ type locationOption struct {
 	CountyName   string `json:"county_name"`
 }
 
-// HandleEventFilterOptions GET — distinct types and locations among upcoming events.
+// HandleEventFilterOptions GET - distinct types and locations among upcoming events.
 func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

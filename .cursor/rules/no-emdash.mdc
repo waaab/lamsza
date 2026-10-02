@@ -1,0 +1,12 @@
+---
+description: Never use an em dash in any text
+alwaysApply: true
+---
+
+# No em dash
+
+Do not use an em dash (U+2014) in copy, comments, docs, or code strings.
+
+End the sentence, or rewrite the line. When a dash is still needed, use a hyphen with spaces: ` - `.
+
+Empty placeholders use `-`.

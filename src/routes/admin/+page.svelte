@@ -596,7 +596,7 @@
         }
 
         const weatherServer = settingsLoaded
-            ? `A szerver TTL ${ttlMin || "—"} perc, verzió ${weatherVersion || "—"}.`
+            ? `A szerver TTL ${ttlMin || "-"} perc, verzió ${weatherVersion || "-"}.`
             : "A szerver verziója most nem ismert.";
         rows.push({
             name: "Időjárás",
@@ -605,7 +605,7 @@
         rows.push({
             name: "Gyorslinkek",
             detail: `${
-                settingsLoaded ? `szerververzió ${linksVersion || "—"}, böngésző TTL 60 perc` : "szerververzió még nincs betöltve"
+                settingsLoaded ? `szerververzió ${linksVersion || "-"}, böngésző TTL 60 perc` : "szerververzió még nincs betöltve"
             }. ${promotedDetail}.`,
         });
         rows.push({
@@ -643,7 +643,7 @@
         }
 
         const linksServer = settingsLoaded
-            ? `Szerververzió ${linksVersion || "—"}, böngésző TTL 60 perc.`
+            ? `Szerververzió ${linksVersion || "-"}, böngésző TTL 60 perc.`
             : "A szerververzió most nem ismert. Böngésző TTL 60 perc.";
         if (promotedState === "nincs") {
             notices.push({
@@ -779,7 +779,7 @@
     /** @param {unknown} value */
     function suggestionValueText(value) {
         if (Array.isArray(value)) {
-            if (value.every((item) => typeof item === "string")) return value.join(", ") || "—";
+            if (value.every((item) => typeof item === "string")) return value.join(", ") || "-";
             return value
                 .map((item) => {
                     if (item && typeof item === "object") {
@@ -790,11 +790,11 @@
                     return String(item ?? "");
                 })
                 .filter(Boolean)
-                .join(", ") || "—";
+                .join(", ") || "-";
         }
         if (value && typeof value === "object") return JSON.stringify(value);
         const text = String(value ?? "").trim();
-        return text || "—";
+        return text || "-";
     }
 
     async function decideListingQueueSuggestion(id, action) {
@@ -896,7 +896,7 @@
         await auth.refresh();
     }
 
-    /** Cím + rövid köszöntő / leírás — minden admin-fülön egységes fejléc. */
+    /** Cím + rövid köszöntő / leírás - minden admin-fülön egységes fejléc. */
     const ADMIN_PAGE_COPY = {
         welcome: {
             title: "Dashboard",
@@ -1104,7 +1104,7 @@
     /** @param {unknown} slug */
     function settlementTypeLabel(slug) {
         const s = String(slug || "").trim();
-        if (!s) return "—";
+        if (!s) return "-";
         const t = settlementLocationTypes.find((x) => x.slug === s);
         return t ? t.label_hu : s;
     }
@@ -1112,7 +1112,7 @@
     /** @param {string} slug */
     function eventTypeLabelFromCatalog(slug) {
         const s = String(slug || "").trim();
-        if (!s) return "—";
+        if (!s) return "-";
         const t = catalogEventTypes.find((x) => x.slug === s);
         return t ? t.label_hu : s;
     }
@@ -1120,7 +1120,7 @@
     /** @param {number} typeId @param {string} subSlug */
     function eventSubtypeLabelFromCatalog(typeId, subSlug) {
         const ss = String(subSlug || "").trim();
-        if (!ss) return "—";
+        if (!ss) return "-";
         const s = catalogEventSubtypes.find(
             (x) =>
                 x.slug === ss &&
@@ -1492,6 +1492,9 @@
                 weather_provider_weatherapi_enabled: data.weather_provider_weatherapi_enabled ?? "true",
                 weather_provider_openweathermap_enabled: data.weather_provider_openweathermap_enabled ?? "true",
                 my_location_slug: data.my_location_slug ?? "csikszereda",
+                social_facebook_url: data.social_facebook_url ?? "",
+                social_twitter_url: data.social_twitter_url ?? "",
+                social_instagram_url: data.social_instagram_url ?? "",
                 ...data,
             };
             settingsLoaded = true;
@@ -2540,21 +2543,21 @@
     const ADMIN_TABLE_PREVIEW_MAX = 20;
 
     function contentPreview(text, maxLen = ADMIN_TABLE_PREVIEW_MAX) {
-        if (!text || !String(text).trim()) return "—";
+        if (!text || !String(text).trim()) return "-";
         const t = String(text).replace(/\s+/g, " ").trim();
         return t.length > maxLen ? t.slice(0, maxLen) + "…" : t;
     }
 
     /** URLs and long strings in table cells use the same max length as contentPreview. */
     function formatAdminTime(value) {
-        if (!value) return "—";
+        if (!value) return "-";
         const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return "—";
+        if (Number.isNaN(d.getTime())) return "-";
         return d.toLocaleString("hu-HU");
     }
 
     function urlPreview(url, maxLen = ADMIN_TABLE_PREVIEW_MAX) {
-        if (!url || !String(url).trim()) return "—";
+        if (!url || !String(url).trim()) return "-";
         const s = String(url).trim();
         return s.length > maxLen ? s.slice(0, maxLen) + "…" : s;
     }
@@ -2562,10 +2565,10 @@
     function formatLatLon(lat, lon) {
         const la = lat != null && lat !== "" ? Number(lat) : NaN;
         const lo = lon != null && lon !== "" ? Number(lon) : NaN;
-        if (!Number.isFinite(la) && !Number.isFinite(lo)) return "—";
-        if (la === 0 && lo === 0) return "—";
-        const a = Number.isFinite(la) ? la.toFixed(4) : "—";
-        const o = Number.isFinite(lo) ? lo.toFixed(4) : "—";
+        if (!Number.isFinite(la) && !Number.isFinite(lo)) return "-";
+        if (la === 0 && lo === 0) return "-";
+        const a = Number.isFinite(la) ? la.toFixed(4) : "-";
+        const o = Number.isFinite(lo) ? lo.toFixed(4) : "-";
         return `${a}, ${o}`;
     }
 
@@ -2587,7 +2590,7 @@
         const seat = locations.find(
             (l) => l.county === c.name && l.type !== "megye" && l.is_county_seat,
         );
-        return seat ? `${seat.name} (${seat.type})` : "—";
+        return seat ? `${seat.name} (${seat.type})` : "-";
     }
 
     function countyMatchesSearch(c, q) {
@@ -3393,7 +3396,7 @@
         return (arr || []).map((t) => "#" + t).join(" ");
     }
     function getLocationName(id) {
-        if (id == null || id === "") return "—";
+        if (id == null || id === "") return "-";
         const l = locations.find((loc) => loc.id === id);
         return l ? `${l.name}${l.county ? " (" + l.county + ")" : ""}` : id;
     }
@@ -3970,7 +3973,7 @@
                                             {#each listingQueueUnpublished as row}
                                                 <tr>
                                                     <td>{row.name}</td>
-                                                    <td>{row.owner_email || "—"}</td>
+                                                    <td>{row.owner_email || "-"}</td>
                                                     <td class="admin-table-col--action">
                                                         <button
                                                             type="button"
@@ -4301,7 +4304,7 @@
                                     <tr class:admin-row-today={isToday}>
                                         <td>{m.id}</td>
                                         <td>
-                                            {m.display_date ?? "—"}
+                                            {m.display_date ?? "-"}
                                             {#if isToday}
                                                 <span class="admin-date-today-badge"
                                                     >ma</span
@@ -4850,7 +4853,7 @@
                                         <td>{l.coordinates || "-"}</td>
                                         <td>{l.population || "-"}</td>
                                         <td>{l.area || "-"}</td>
-                                        <td class="admin-table-cell-preview" title={l.crest || ""}>{l.crest ? urlPreview(l.crest) : "—"}</td>
+                                        <td class="admin-table-cell-preview" title={l.crest || ""}>{l.crest ? urlPreview(l.crest) : "-"}</td>
                                         <td>
                                             {#if l.parent_id}
                                                 {getLocationName(l.parent_id)}
@@ -4921,7 +4924,7 @@
                                 id="slt-slug"
                                 type="text"
                                 bind:value={newSettlementLocationType.slug}
-                                placeholder="pl. varos — üresen automatikus"
+                                placeholder="pl. varos - üresen automatikus"
                             />
                             <label for="slt-label">Megnevezés (HU) *</label>
                             <input
@@ -5039,7 +5042,7 @@
                         <p class="admin-info">
                             Rendezvényhelyszínek (csarnokok, terek, pályák) településhez kötve. Előbb add meg az
                             <strong>új helyszínt</strong> (ha szükséges), alatta a <strong>helyszíntípusok</strong>
-                            katalógusa (slug a megnevezésből, sorrend), majd az összes helyszín listája — az
+                            katalógusa (slug a megnevezésből, sorrend), majd az összes helyszín listája - az
                             <strong>Események</strong> napi programjában itt választhatók.
                         </p>
                     {/if}
@@ -5386,9 +5389,9 @@
                                             >{v.settlement_name}, {v.county_name}</td
                                         >
                                         <td>{v.name}</td>
-                                        <td>{v.name_ro || "—"}</td>
-                                        <td>{v.name_de || "—"}</td>
-                                        <td><code>{v.slug || "—"}</code></td>
+                                        <td>{v.name_ro || "-"}</td>
+                                        <td>{v.name_de || "-"}</td>
+                                        <td><code>{v.slug || "-"}</code></td>
                                         <td
                                             >{v.kind_label || v.kind}</td
                                         >
@@ -5398,9 +5401,9 @@
                                                     v.latitude,
                                                 ).toFixed(4)}, {Number(
                                                     v.longitude,
-                                                ).toFixed(4)}{:else}—{/if}</td
+                                                ).toFixed(4)}{:else}-{/if}</td
                                         >
-                                        <td>{v.seating_capacity ?? "—"}</td>
+                                        <td>{v.seating_capacity ?? "-"}</td>
                                         <td class="admin-table-cell-preview" title={v.description || ""}>{contentPreview(v.description)}</td>
                                         <td class="admin-table-cell-preview" title={v.notes || ""}>{contentPreview(v.notes)}</td>
                                         <td>
@@ -5467,7 +5470,7 @@
                         <p class="admin-info">
                             Közösségi és sportesemények: település, opcionális kiválasztott helyszín, típus,
                             szervező, leírás. A kezdő és befejező <strong>dátum és időpont (óra:perc)</strong> mind
-                            kötelező — a mentés és a nyilvános időjelzések ettől függnek. Opcionálisan
+                            kötelező - a mentés és a nyilvános időjelzések ettől függnek. Opcionálisan
                             <strong>napi program</strong> (több nap, helyszínenkénti tételek) adható meg a szerkesztőben.
                         </p>
                     {/if}
@@ -5475,7 +5478,7 @@
                         <summary class="admin-create-summary"><span>Új esemény</span><AdminPlusIcon /></summary>
                         <p class="admin-form-hint">
                             A <strong>kezdő és befejező dátum</strong> és a hozzájuk tartozó
-                            <strong>időpontok (óra:perc)</strong> mind kötelezőek — a mentés nélkülük nem lehetséges.
+                            <strong>időpontok (óra:perc)</strong> mind kötelezőek - a mentés nélkülük nem lehetséges.
                         </p>
                     <form class="admin-form admin-create-form" on:submit={submitEvent}>
                         <label for="event_loc"
@@ -5505,7 +5508,7 @@
                             name="default_venue_id"
                             bind:value={newEvent.default_venue_id}
                         >
-                            <option value="">— nincs megadva —</option>
+                            <option value="">- nincs megadva -</option>
                             {#each venueOptionsNew as v}
                                 <option value={String(v.id)}>{v.name}</option>
                             {/each}
@@ -5513,7 +5516,7 @@
 
                         <label for="event_attraction">Látnivaló (opcionális)</label>
                         <select id="event_attraction" name="attraction_id" bind:value={newEvent.attraction_id}>
-                            <option value="">— nincs hozzárendelve —</option>
+                            <option value="">- nincs hozzárendelve -</option>
                             {#each attractions as att}
                                 <option value={String(att.id)}>{att.name} ({att.county_name || att.county_slug})</option>
                             {/each}
@@ -5656,7 +5659,7 @@
                             on:change={() => (newEvent.event_subtype_id = "")}
                             required
                         >
-                            <option value="">— válassz —</option>
+                            <option value="">- válassz -</option>
                             {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as t}
                                 <option value={String(t.id)}
                                     >{t.label_hu} ({t.slug})</option
@@ -5669,7 +5672,7 @@
                             id="event_subtype_id"
                             bind:value={newEvent.event_subtype_id}
                         >
-                            <option value="">— nincs —</option>
+                            <option value="">- nincs -</option>
                             {#each subtypesForNewEvent as s}
                                 <option value={String(s.id)}
                                     >{s.label_hu} ({s.slug})</option
@@ -5811,14 +5814,14 @@
                                                     alt=""
                                                 />
                                             {:else}
-                                                <span class="admin-thumb-empty">—</span>
+                                                <span class="admin-thumb-empty">-</span>
                                             {/if}
                                         </td>
                                         <td>
                                             {#if !eventDateTimeComplete(e)}
                                                 <span
                                                     class="admin-req"
-                                                    title="Hiányos dátum vagy időpont — szerkessze és töltse ki."
+                                                    title="Hiányos dátum vagy időpont - szerkessze és töltse ki."
                                                     >⚠</span
                                                 >
                                             {/if}
@@ -5847,8 +5850,8 @@
                                         <td>{accessTypeLabel(e.access_type)}</td>
                                         <td>{getLocationName(e.location_id)}</td>
                                         <td class="admin-table-cell-preview" title={e.default_venue_name || ""}>{contentPreview(e.default_venue_name || "")}</td>
-                                        <td>{e.organizer || "—"}</td>
-                                        <td>{e.entry_price && String(e.entry_price).trim() ? e.entry_price : "—"}</td>
+                                        <td>{e.organizer || "-"}</td>
+                                        <td>{e.entry_price && String(e.entry_price).trim() ? e.entry_price : "-"}</td>
                                         <td class="admin-table-cell-preview" title={e.description || ""}>{contentPreview(e.description)}</td>
                                         <td>
                                             <button
@@ -6070,7 +6073,7 @@
                                 bind:value={newCatalogEventSubtype.event_type_id}
                                 required
                             >
-                                <option value="">— válassz —</option>
+                                <option value="">- válassz -</option>
                                 {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as ct}
                                     <option value={String(ct.id)}
                                         >{ct.label_hu} ({ct.slug})</option
@@ -6429,10 +6432,10 @@
                                         <td>{site.status === "approved" ? "Jóváhagyott" : "Jóváhagyásra vár"}</td>
                                         <td>{site.claimed ? "Átvéve" : "Gazdátlan"}</td>
                                         <td class="admin-table-cell-preview" title={site.description || ""}>{contentPreview(site.description)}</td>
-                                        <td>{site.submitter || "—"}</td>
+                                        <td>{site.submitter || "-"}</td>
                                         <td>{formatAdminTime(site.submitted_at)}</td>
                                         <td>{formatAdminTime(site.approved_at)}</td>
-                                        <td>{site.approver || "—"}</td>
+                                        <td>{site.approver || "-"}</td>
                                     </tr>
                                 {:else}
                                     <tr><td colspan="9">Nincsenek weboldalak.</td></tr>
@@ -6685,12 +6688,12 @@
                                             ></td
                                         >
                                         <td>{s.verified ? "Ellenőrzött" : "Nem ellenőrzött"}</td>
-                                        <td>{canonicalDomain(String(s.url ?? "")) || "—"}</td>
+                                        <td>{canonicalDomain(String(s.url ?? "")) || "-"}</td>
                                         <td>{getLocationName(s.location_id)}</td
                                         >
                                         <td>{getCategoryName(s.category_id)}</td
                                         >
-                                        <td>{s.phone || "—"}</td>
+                                        <td>{s.phone || "-"}</td>
                                         <td class="admin-table-cell-preview" title={s.address || ""}>{contentPreview(s.address)}</td>
                                         <td class="admin-table-cell-preview" title={s.notes || ""}>{contentPreview(s.notes)}</td>
                                         <td>{(s.languages || []).join(", ")}</td
@@ -6702,7 +6705,7 @@
                                                         .map((t) => "#" + t)
                                                         .join(" ")}
                                                 </div>
-                                            {:else}—{/if}
+                                            {:else}-{/if}
                                         </td>
                                         <td>
                                             <button
@@ -6799,10 +6802,10 @@
                                 {#each pgUsers.rows as user (user.id)}
                                     <tr>
                                         <td>{user.email}</td>
-                                        <td>{[user.given_name, user.family_name].filter(Boolean).join(" ") || user.name || "—"}</td>
-                                        <td>{user.display_name || user.name || "—"}</td>
-                                        <td>{user.locale || "—"}</td>
-                                        <td>{user.settlement || "—"}</td>
+                                        <td>{[user.given_name, user.family_name].filter(Boolean).join(" ") || user.name || "-"}</td>
+                                        <td>{user.display_name || user.name || "-"}</td>
+                                        <td>{user.locale || "-"}</td>
+                                        <td>{user.settlement || "-"}</td>
                                         <td>{formatAdminTime(user.created_at)}</td>
                                         <td>{formatAdminTime(user.last_login_at)}</td>
                                         <td>{user.website_banned ? "Igen" : "Nem"}</td>
@@ -6838,10 +6841,31 @@
                         <p class="admin-info">
                             Oldalszintű beállítások: alapértelmezett település vendégeknek és azoknak, akik nem választottak saját települést (kezdőlap időjárás, eseményszűrés),
                             időjárás-szolgáltatók engedélyezése, ikon stílus, cache TTL és látogató-becslés.
-                            A <strong>cache törlése</strong> új verziószámot ad — a látogatók frissebb időjárást kapnak.
+                            A <strong>cache törlése</strong> új verziószámot ad - a látogatók frissebb időjárást kapnak.
                         </p>
                     {/if}
                     {@render adminNotice("settings")}
+                    <section class="admin-form-section">
+                        <h3>Közösségi oldalak</h3>
+                        <p class="admin-hint">Ezek a linkek a Lámsza, a Játszótér és a Szótár láblécében jelennek meg. Üres mező: az a link nem látszik. Teljes cím, https://-sel.</p>
+                        <div class="admin-form">
+                            <label for="social_facebook_url">Facebook</label>
+                            <input id="social_facebook_url" name="social_facebook_url" type="url" bind:value={siteSettings.social_facebook_url} placeholder="https://www.facebook.com/…" />
+
+                            <label for="social_twitter_url">Twitter</label>
+                            <input id="social_twitter_url" name="social_twitter_url" type="url" bind:value={siteSettings.social_twitter_url} placeholder="https://twitter.com/…" />
+
+                            <label for="social_instagram_url">Instagram</label>
+                            <input id="social_instagram_url" name="social_instagram_url" type="url" bind:value={siteSettings.social_instagram_url} placeholder="https://www.instagram.com/…" />
+
+                            <div class="flex gap-md mt-md">
+                                <button type="button" class="admin-submit-btn" on:click={saveSettings} disabled={settingsSaving}>
+                                    {settingsSaving ? 'Mentés…' : 'Mentés'}
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
                     <section class="admin-form-section">
                         <h3>Alapértelmezett település (MyLocation)</h3>
                         <p class="admin-hint">Ez a vendégek, és a saját település nélküli felhasználók alaphelye a kezdőlapon és az index közelségi rendezésénél. A saját települést mindenki a felhasználói beállításokban állítja; a kereső és az index szűrője csak a találatokat szűri.</p>
@@ -7118,10 +7142,10 @@
                                         <tr>
                                             <td><a href={pg.slug === 'home' ? '/' : '/' + pg.slug} target="_blank">{pg.slug === 'home' ? '/' : '/' + pg.slug}</a></td>
                                             <td>{pg.title}</td>
-                                            <td class="admin-table-cell-preview" title={pg.greeting || ''}>{pg.greeting ? contentPreview(pg.greeting) : '—'}</td>
+                                            <td class="admin-table-cell-preview" title={pg.greeting || ''}>{pg.greeting ? contentPreview(pg.greeting) : '-'}</td>
                                             <td>{pg.updated_at ? pg.updated_at.slice(0, 19) : ''}</td>
                                             <td class="admin-table-col--action"><button type="button" class="btn-update" on:click={() => startEditPage(pg)}>Szerk.</button></td>
-                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">-</td>
                                         </tr>
                                     {:else}
                                         <tr
@@ -7164,7 +7188,7 @@
                         {@render adminNotice("page_faq")}
                         <h3>GYIK / disclaimer: {editingPageFaq.label_hu || editingPageFaq.section_key}</h3>
                         <p class="admin-info">
-                            Kulcs: <code>{editingPageFaq.section_key}</code> — a nyilvános oldalon a
+                            Kulcs: <code>{editingPageFaq.section_key}</code> - a nyilvános oldalon a
                             <code>PageFaqDisclaimer</code> ugyanazt a HTML-struktúrát használja (<code>.faq</code>,
                             <code>details.faq-item</code>, <code>#disclaimer</code>, <code>.note.info</code>). Minden
                             blokk egy külön kérdés / válasz pár.
@@ -7212,7 +7236,7 @@
                                     </div>
                                 </details>
                             {:else}
-                                <p class="admin-info">Még nincs kérdés — kattints az „Új kérdés” gombra.</p>
+                                <p class="admin-info">Még nincs kérdés - kattints az „Új kérdés” gombra.</p>
                             {/each}
 
                             <label for="pfaq_disc">Disclaimer (Markdown)</label>
@@ -7283,7 +7307,7 @@
                                             <td>{(row.faq_items || []).length}</td>
                                             <td>{row.updated_at ? row.updated_at.slice(0, 19) : ''}</td>
                                             <td class="admin-table-col--action"><button type="button" class="btn-update" on:click={() => startEditPageFaq(row)}>Szerk.</button></td>
-                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">-</td>
                                         </tr>
                                     {:else}
                                         <tr
@@ -7323,7 +7347,7 @@
                     {:else}
                         <p class="admin-info">
                             Bejegyzés <strong>típusok</strong> (pl. entry, business): belső címkék a bejegyzések
-                            szerkezetéhez és szűréséhez — nem ugyanaz, mint a kategória.
+                            szerkezetéhez és szűréséhez - nem ugyanaz, mint a kategória.
                         </p>
                     {/if}
                     <details class="admin-create-panel">
@@ -7620,7 +7644,7 @@
                         <p class="admin-info">
                             <strong>Megyék:</strong> magyar / román / név név, URL-slug, bemutatkozó szöveg (Markdown),
                             és a <strong>megyeszékhely</strong> település kiválasztása a listából.
-                            <strong>Történelmi székek</strong> (pl. Csíkszék): külön név, slug és tartalom —
+                            <strong>Történelmi székek</strong> (pl. Csíkszék): külön név, slug és tartalom -
                             a <code>/szekek</code> oldalakon jelennek meg.
                         </p>
                     {/if}
@@ -7695,10 +7719,10 @@
                                                         <label class="admin-region-edit-span2" for="county_edit_seat_location_id">
                                                             Megyeszékhely
                                                             <select id="county_edit_seat_location_id" name="seat_location_id" bind:value={editingCounty.seat_location_id}>
-                                                                <option value="">— válassz települést —</option>
+                                                                <option value="">- válassz települést -</option>
                                                                 {#each settlementsForCountyName(c.name) as loc (loc.id)}
                                                                     <option value={String(loc.id)}
-                                                                        >{loc.name} ({loc.type}){loc.name_ro ? " — " + loc.name_ro : ""}</option
+                                                                        >{loc.name} ({loc.type}){loc.name_ro ? " - " + loc.name_ro : ""}</option
                                                                     >
                                                                 {/each}
                                                             </select>
@@ -7732,8 +7756,8 @@
                                     {:else}
                                         <tr>
                                             <td><strong>{c.name}</strong></td>
-                                            <td>{c.name_ro || "—"}</td>
-                                            <td>{c.name_de || "—"}</td>
+                                            <td>{c.name_ro || "-"}</td>
+                                            <td>{c.name_de || "-"}</td>
                                             <td><code>{c.slug}</code></td>
                                             <td>{countySeatDisplayName(c)}</td>
                                             <td class="admin-table-cell-preview" title={c.content || ""}
@@ -7746,7 +7770,7 @@
                                                     on:click={() => startEditCounty(c)}>Szerk.</button
                                                 >
                                             </td>
-                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">-</td>
                                         </tr>
                                     {/if}
                                 {:else}
@@ -7878,8 +7902,8 @@
                                     {:else}
                                         <tr>
                                             <td><strong>{h.name}</strong></td>
-                                            <td>{h.name_ro || "—"}</td>
-                                            <td>{h.name_de || "—"}</td>
+                                            <td>{h.name_ro || "-"}</td>
+                                            <td>{h.name_de || "-"}</td>
                                             <td><code>{h.slug}</code></td>
                                             <td class="admin-table-cell-preview" title={h.content || ""}
                                                 >{contentPreview(h.content)}</td
@@ -7891,7 +7915,7 @@
                                                     on:click={() => startEditHistoricalSeat(h)}>Szerk.</button
                                                 >
                                             </td>
-                                            <td class="admin-table-col--action admin-table-col--action--muted">—</td>
+                                            <td class="admin-table-col--action admin-table-col--action--muted">-</td>
                                         </tr>
                                     {/if}
                                 {:else}
@@ -8739,7 +8763,7 @@
                         name="default_venue_id"
                         bind:value={editingEvent.default_venue_id}
                     >
-                        <option value="">— nincs megadva —</option>
+                        <option value="">- nincs megadva -</option>
                         {#each venueOptionsEdit as v}
                             <option value={String(v.id)}>{v.name}</option>
                         {/each}
@@ -8747,7 +8771,7 @@
 
                     <label for="edit_ev_attraction">Látnivaló (opcionális)</label>
                     <select id="edit_ev_attraction" name="attraction_id" bind:value={editingEvent.attraction_id}>
-                        <option value="">— nincs hozzárendelve —</option>
+                        <option value="">- nincs hozzárendelve -</option>
                         {#each attractions as att}
                             <option value={String(att.id)}>{att.name} ({att.county_name || att.county_slug})</option>
                         {/each}
@@ -8902,7 +8926,7 @@
                         on:change={() => (editingEvent.event_subtype_id = "")}
                         required
                     >
-                        <option value="">— válassz —</option>
+                        <option value="">- válassz -</option>
                         {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as t}
                             <option value={String(t.id)}
                                 >{t.label_hu} ({t.slug})</option
@@ -8916,7 +8940,7 @@
                         name="event_subtype_id"
                         bind:value={editingEvent.event_subtype_id}
                     >
-                        <option value="">— nincs —</option>
+                        <option value="">- nincs -</option>
                         {#each subtypesForEditEvent as s}
                             <option value={String(s.id)}
                                 >{s.label_hu} ({s.slug})</option
@@ -9088,7 +9112,7 @@
                                                         bind:value={act.venue_id}
                                                     >
                                                         <option value=""
-                                                            >— alapértelmezett —</option
+                                                            >- alapértelmezett -</option
                                                         >
                                                         {#each venueOptionsEdit as v}
                                                             <option

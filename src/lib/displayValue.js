@@ -1,5 +1,5 @@
 /** Empty public-field placeholder (same glyph as admin tables). */
-export const EMPTY_PLACEHOLDER = "—";
+export const EMPTY_PLACEHOLDER = "-";
 
 /** @param {unknown} value */
 export function displayText(value) {

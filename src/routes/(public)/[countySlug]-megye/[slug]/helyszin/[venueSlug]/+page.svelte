@@ -99,7 +99,7 @@
 <svelte:head>
     <title
         >{venue
-            ? `${String(venue.name)} — ${String(venue.settlement_name || "")}`
+            ? `${String(venue.name)} - ${String(venue.settlement_name || "")}`
             : "Helyszín"} · Na Lámsza!</title
     >
 </svelte:head>
@@ -241,7 +241,7 @@
         >
             <h2 class="venue-section-title">További események a településen</h2>
             <p class="venue-events-hint">
-                Ugyanilyen helyszíntípus ({kindLabel(venue.kind, venue.kind_label)}) más helyszínen ebben a városban — nem
+                Ugyanilyen helyszíntípus ({kindLabel(venue.kind, venue.kind_label)}) más helyszínen ebben a városban - nem
                 közvetlenül ennél a címnél.
             </p>
             <ul class="venue-events-list">

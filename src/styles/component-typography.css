@@ -1,4 +1,4 @@
-/* Component typography — font sizes live here, not in Svelte <style> blocks */
+/* Component typography - font sizes live here, not in Svelte <style> blocks */
 
 /* Directory listing cards */
 .entry-listing__title {
@@ -301,7 +301,7 @@
   font-size: var(--text-2xs);
 }
 
-/* News widget (homepage / county — not list cards) */
+/* News widget (homepage / county - not list cards) */
 .news-widget .news-meta {
   font-size: var(--text-sm);
 }

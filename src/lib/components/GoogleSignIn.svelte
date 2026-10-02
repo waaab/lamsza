@@ -22,6 +22,7 @@
                         theme: "outline",
                         size: "large",
                         text: "signin_with",
+                        locale: "hu",
                         width: 280,
                     });
                 }
@@ -42,7 +43,7 @@
         }
         return new Promise((resolve, reject) => {
             const existing = document.querySelector(
-                'script[src="https://accounts.google.com/gsi/client"]',
+                'script[src="https://accounts.google.com/gsi/client?hl=hu"]',
             );
             if (existing) {
                 if (window.google?.accounts?.id) {
@@ -58,7 +59,7 @@
                 return;
             }
             const s = document.createElement("script");
-            s.src = "https://accounts.google.com/gsi/client";
+            s.src = "https://accounts.google.com/gsi/client?hl=hu";
             s.async = true;
             s.defer = true;
             s.onload = () => resolve();

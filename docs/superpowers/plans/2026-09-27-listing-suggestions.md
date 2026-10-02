@@ -135,8 +135,8 @@ git commit -m "Store one open listing suggestion per entry."
 - Test: `backend/entry_suggestions_test.go`
 
 **Interfaces:**
-- `GET /api/entry/suggestion-form?slug=` — 401 signed out, 403 owner or active member, 200 editable snapshot for an eligible user. The snapshot includes phone and social links even when public `GET /api/entry` hides them.
-- `POST /api/entry/suggestions` body `{ "entry_id", "fields", "note" }` — 401, 403, 409 `{"error":"suggestion_pending"}`, 400 `{"error":"empty_diff"}`, 200 `{ "id", "status": "open" }`.
+- `GET /api/entry/suggestion-form?slug=` - 401 signed out, 403 owner or active member, 200 editable snapshot for an eligible user. The snapshot includes phone and social links even when public `GET /api/entry` hides them.
+- `POST /api/entry/suggestions` body `{ "entry_id", "fields", "note" }` - 401, 403, 409 `{"error":"suggestion_pending"}`, 400 `{"error":"empty_diff"}`, 200 `{ "id", "status": "open" }`.
 - `POST /api/admin/listing-queue/suggestion` body `{ "id", "action": "accept" | "deny" }`. Accept writes the changed columns and does not change `slug`. Deny sets `status` to `denied`.
 - `GET /api/admin/listing-queue` adds `suggestions`: `{ "id", "entry_id", "entry_name", "email", "changes", "note" }` for open rows.
 - `GET /api/entry` adds `suggestion_pending: true` when an open row exists.

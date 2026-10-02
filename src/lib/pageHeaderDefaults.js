@@ -50,7 +50,7 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
     },
     iranyelvek: {
         title: "Irányelvek",
-        greeting: "Adatvédelem, sütik és felhasználási feltételek — összefoglaló.",
+        greeting: "Adatvédelem, sütik és felhasználási feltételek - összefoglaló.",
     },
     "iranyelvek/sutik": {
         title: "Sütik",

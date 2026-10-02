@@ -127,8 +127,8 @@ Skip unless the user asked to commit.
 **Interfaces:**
 - Consumes: `auth.UserFromRequest`, `auth.ApplyGoogleProfile` is not used here
 - Produces:
-  - `func HandlePreferences(w http.ResponseWriter, r *http.Request)` — `PUT /api/account/preferences` body `{ "theme": "light"|"dark"|"system", "quicklink_slots": 7..14 }`. Omit a key to leave it unchanged. Invalid theme or slot → 400.
-  - `func HandleImport(w http.ResponseWriter, r *http.Request)` — `POST /api/account/import` body `{ "theme": "", "quicklink_slots": null, "links": [], "history": [] }`. If `prefs_imported_at` is already set, return the current account and do not write. Otherwise copy only empty account values, set `prefs_imported_at = NOW()`, return `GET` me-shaped prefs.
+  - `func HandlePreferences(w http.ResponseWriter, r *http.Request)` - `PUT /api/account/preferences` body `{ "theme": "light"|"dark"|"system", "quicklink_slots": 7..14 }`. Omit a key to leave it unchanged. Invalid theme or slot → 400.
+  - `func HandleImport(w http.ResponseWriter, r *http.Request)` - `POST /api/account/import` body `{ "theme": "", "quicklink_slots": null, "links": [], "history": [] }`. If `prefs_imported_at` is already set, return the current account and do not write. Otherwise copy only empty account values, set `prefs_imported_at = NOW()`, return `GET` me-shaped prefs.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -210,7 +210,7 @@ Skip unless the user asked to commit.
   - `POST /api/account/links` body `{title,url,bg_color}` appends at max position + 1
   - `PUT /api/account/links` body `{links:[{id,title,url,bg_color}]}` replaces order for this user only
   - `DELETE /api/account/links?id=` deletes one row owned by the user
-  - `func NormalizeLink(title, url, color string) (title, url, color string, err error)` — title and url required after trim; empty color becomes `#e6f0ff`
+  - `func NormalizeLink(title, url, color string) (title, url, color string, err error)` - title and url required after trim; empty color becomes `#e6f0ff`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -273,7 +273,7 @@ Skip unless the user asked to commit.
   - `POST /api/account/history` body `{slug,name,category,location,photo}` upserts and moves `viewed_at` to now, then deletes rows beyond 12 for that user
   - `DELETE /api/account/history?slug=` removes one
   - `DELETE /api/account/history` with no slug clears the user
-  - `func NormalizeHistoryItem(slug, name, category, location, photo string) (item HistoryItem, err error)` — slug and name required
+  - `func NormalizeHistoryItem(slug, name, category, location, photo string) (item HistoryItem, err error)` - slug and name required
 
 - [ ] **Step 1: Write the failing test**
 
@@ -471,7 +471,7 @@ Skip unless the user asked to commit.
 **Interfaces:**
 - Consumes: `GET /api/account/links`, `GET /api/auth/me` `quicklink_slots`, `POST /api/account/history`, existing `recordHistoryVisit`
 - Produces:
-  - `export async function recordAccountHistory(item)` in `entryHistory.js` — if `auth` is logged in, `POST /api/account/history` and also call `recordHistoryVisit`; if logged out, only `recordHistoryVisit`
+  - `export async function recordAccountHistory(item)` in `entryHistory.js` - if `auth` is logged in, `POST /api/account/history` and also call `recordHistoryVisit`; if logged out, only `recordHistoryVisit`
   - Homepage, when `$auth.loggedIn`, loads links from the account and slot count from `quicklinkSlots` (fallback `readSlotCount()` when null)
 
 - [ ] **Step 1: Write the failing test**

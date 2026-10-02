@@ -89,7 +89,7 @@ export async function recordAccountHistory(raw, authState = {}) {
                 body: JSON.stringify(item),
             });
         } catch {
-            /* network / server — still keep browser copy */
+            /* network / server - still keep browser copy */
         }
     }
     return recordHistoryVisit(raw);

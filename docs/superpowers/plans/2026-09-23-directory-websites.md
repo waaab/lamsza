@@ -26,12 +26,12 @@
 
 ## File structure
 
-- `backend/internal/webdomain/domain.go` — canonical key and plain-text limits. No database.
-- `src/lib/websiteDomain.js` — the same key rules for the form, tested in Node.
-- `backend/internal/account/websites.go` — submit, public list, admin action, search hits, queue rows.
-- `backend/migrations/websites.sql` plus `account.MigrateWebsites()` — table, ban flag, listing-URL backfill.
-- `src/lib/components/AddWebsiteForm.svelte` — the three-field form.
-- `src/lib/components/WebsiteCard.svelte` — title, description, domain, direct link.
+- `backend/internal/webdomain/domain.go` - canonical key and plain-text limits. No database.
+- `src/lib/websiteDomain.js` - the same key rules for the form, tested in Node.
+- `backend/internal/account/websites.go` - submit, public list, admin action, search hits, queue rows.
+- `backend/migrations/websites.sql` plus `account.MigrateWebsites()` - table, ban flag, listing-URL backfill.
+- `src/lib/components/AddWebsiteForm.svelte` - the three-field form.
+- `src/lib/components/WebsiteCard.svelte` - title, description, domain, direct link.
 - Index, search, and admin pages only gain a section or message. `EntryCard.svelte` gains the existing owner mark.
 
 ---
@@ -47,8 +47,8 @@
 **Interfaces:**
 - Consumes: nothing
 - Produces:
-  - `func CanonicalDomain(raw string) (string, error)` — registrable domain, or an error when the input has no host
-  - `func Plain(raw string, maxRunes int) (string, error)` — HTML stripped, trimmed; error if empty or longer than `maxRunes`
+  - `func CanonicalDomain(raw string) (string, error)` - registrable domain, or an error when the input has no host
+  - `func Plain(raw string, maxRunes int) (string, error)` - HTML stripped, trimmed; error if empty or longer than `maxRunes`
   - `canonicalDomain(raw)` and `plainText(raw, max)` with the same results in `src/lib/websiteDomain.js`
 
 - [ ] **Step 1: Write the failing Go test**
@@ -325,7 +325,7 @@ If `MigrateWebsites` lives in a new file `backend/internal/account/websites_migr
 - Create: `backend/internal/account/websites.go`
 - Modify: `backend/internal/account/queue.go` (`QueueCount` adds pending websites)
 - Modify: `backend/internal/auth/auth.go` (add the pending-website count to the inline `admin_queue_count` query. Do not import `account` from `auth`; that import cycle is already closed the other way.)
-- Modify: `backend/main.go` and `backend/handlers_test.go` (route `POST/GET /api/websites` — GET is public, POST requires a session)
+- Modify: `backend/main.go` and `backend/handlers_test.go` (route `POST/GET /api/websites` - GET is public, POST requires a session)
 - Test: `backend/website_test.go`
 
 **Interfaces:**

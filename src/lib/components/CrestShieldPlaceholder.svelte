@@ -3,7 +3,7 @@
     export let label = "Címer helyőrző";
 </script>
 
-<!-- Same shield outline as admin “Megyék” icon — default when no crest URL is set -->
+<!-- Same shield outline as admin “Megyék” icon - default when no crest URL is set -->
 <div class="crest-placeholder-shield" role="img" aria-label={label}>
     <svg
         xmlns="http://www.w3.org/2000/svg"

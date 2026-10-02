@@ -10,9 +10,9 @@ A public listing (`/bejegyzes/[slug]`) ends after the profile and events. There 
 
 On each listing page, after the profile and events:
 
-1. **Közeli helyek** — other local businesses near this listing.
-2. **Kapcsolódó bejegyzések** — other listings in the same category (same county, no overlap with nearby).
-3. **Böngészési előzmények** — this browser’s recently opened listings (not other people’s views).
+1. **Közeli helyek** - other local businesses near this listing.
+2. **Kapcsolódó bejegyzések** - other listings in the same category (same county, no overlap with nearby).
+3. **Böngészési előzmények** - this browser’s recently opened listings (not other people’s views).
 
 Hungarian UI. Hide any block whose list is empty.
 
@@ -59,9 +59,9 @@ Hungarian UI. Hide any block whose list is empty.
 
 Three units:
 
-1. **`GET /api/entry/related?slug=`** (public) — returns `{ nearby, related }` arrays of compact listing objects. No history.
-2. **`src/lib/entryHistory.js`** — read/write/normalize `localStorage`. No UI, no fetch.
-3. **Listing page UI** — fetch related after the entry is known; record history; render the three blocks.
+1. **`GET /api/entry/related?slug=`** (public) - returns `{ nearby, related }` arrays of compact listing objects. No history.
+2. **`src/lib/entryHistory.js`** - read/write/normalize `localStorage`. No UI, no fetch.
+3. **Listing page UI** - fetch related after the entry is known; record history; render the three blocks.
 
 Compact listing object (nearby, related, and stored history):
 
@@ -96,8 +96,8 @@ Placement: below `EntryProfile` and `EventsWidget`.
 
 Desktop: two columns of text links.
 
-- Left: **Közeli helyek** — listing name → `/bejegyzes/{slug}`. County-padded rows may include settlement name.
-- Right: **Kapcsolódó bejegyzések** — listing name → `/bejegyzes/{slug}`.
+- Left: **Közeli helyek** - listing name → `/bejegyzes/{slug}`. County-padded rows may include settlement name.
+- Right: **Kapcsolódó bejegyzések** - listing name → `/bejegyzes/{slug}`.
 
 Below **992px**: stack, Nearby first.
 
@@ -111,7 +111,7 @@ Then **Böngészési előzmények**: horizontal strip of compact Index-style car
 
 ## Files (indicative)
 
-- `backend/internal/handlers/public.go` (or a sibling handler) — related endpoint; register in `main.go` and `handlers_test.go`
+- `backend/internal/handlers/public.go` (or a sibling handler) - related endpoint; register in `main.go` and `handlers_test.go`
 - `src/lib/entryHistory.js` + `tests/entryHistory.test.js`
-- `src/lib/components/` — small presentational blocks for the two link columns and the history strip
-- `src/routes/(public)/bejegyzes/[slug]/+page.svelte` — fetch, record, compose
+- `src/lib/components/` - small presentational blocks for the two link columns and the history strip
+- `src/routes/(public)/bejegyzes/[slug]/+page.svelte` - fetch, record, compose

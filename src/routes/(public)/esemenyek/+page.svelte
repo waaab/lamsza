@@ -16,10 +16,10 @@
 
     /** @param {string | null | undefined} iso */
     function calendarChipFromYMD(iso) {
-        if (!iso) return { month: "—", day: "—" };
+        if (!iso) return { month: "-", day: "-" };
         const part = String(iso).split("T")[0];
         const [y, m, d] = part.split("-").map((x) => parseInt(x, 10));
-        if (!y || !m || !d) return { month: "—", day: "—" };
+        if (!y || !m || !d) return { month: "-", day: "-" };
         const mo = formatMonthShortLikeCard(y, m).replace(/\./g, "").trim();
         const monthUpper = mo.toLocaleUpperCase("hu-HU");
         return { month: monthUpper.slice(0, 3), day: String(d) };
@@ -73,12 +73,12 @@
     let filterLocationSlug = null;
     /** @type {string | null} YYYY-MM from filter-options, drives date_from / date_to */
     let filterMonthKey = null;
-    /** @type {string | null} YYYY-MM-DD — single-day filter (takes precedence over filterMonthKey) */
+    /** @type {string | null} YYYY-MM-DD - single-day filter (takes precedence over filterMonthKey) */
     let filterDayKey = null;
 
     /** @type {'year' | 'month'} */
     let sidebarCalendarMode = "year";
-    /** @type {string | null} YYYY-MM — month open in sidebar day grid */
+    /** @type {string | null} YYYY-MM - month open in sidebar day grid */
     let drillMonthYM = null;
 
     let viewMode = "grid";
@@ -123,7 +123,7 @@
         });
     }
 
-    /** @param {string} ym YYYY-MM — short month only (same style as event card dates). */
+    /** @param {string} ym YYYY-MM - short month only (same style as event card dates). */
     function drillMonthTitleShort(ym) {
         const [y, m] = ym.split("-").map(Number);
         if (!y || !m) return ym;
@@ -144,7 +144,7 @@
         return out;
     })();
 
-    /** 12 short month labels (hu-HU) — static, never fetched. */
+    /** 12 short month labels (hu-HU) - static, never fetched. */
     const calendarMonthLabels = Array.from({ length: 12 }, (_, i) =>
         formatMonthShortLikeCard(2000, i + 1),
     );
@@ -1406,7 +1406,7 @@
                 <div
                     class="events-month-day-calendar"
                     role="grid"
-                    aria-label={"Napok — " +
+                    aria-label={"Napok - " +
                         drillMonthTitleShort(drillMonthYM) +
                         (drillYearMonth ? " " + drillYearMonth.y : "")}
                 >
@@ -1457,7 +1457,7 @@
                     class="events-year-calendar"
                     role="grid"
                     aria-busy={filtersLoading}
-                    aria-label="Hónapok — {calendarViewYear}"
+                    aria-label="Hónapok - {calendarViewYear}"
                 >
                     {#each calendarMonthLabels as mlabel, i (mlabel)}
                         {@const monthNum = i + 1}

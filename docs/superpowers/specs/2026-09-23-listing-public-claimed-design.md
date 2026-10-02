@@ -63,8 +63,8 @@ Public `GET /api/entry` (and list/search payloads used by cards):
 - If **not** claimed: `photos` is `[]`, `hours` and `delivery_hours` are empty objects, `ratings_enabled` is false, and `rating`, `review_count`, `reviews`, and `my_review` are omitted. The page keys off `claimed`, not leftover admin data.
 - If claimed: include stored photos and hours; include `ratings_enabled`. If ratings are on, include `rating` (average, one decimal, `0` if count is 0), `review_count`, `reviews` (newest first, cap **50**), and `my_review` when the request has a session. If ratings are off, omit `reviews` and `my_review`.
 
-`POST /api/entry/reviews` body `{ "slug" or "entry_id", "score", "text" }` — upsert the current user’s review.  
-`DELETE /api/entry/reviews?slug=` — delete the current user’s review.
+`POST /api/entry/reviews` body `{ "slug" or "entry_id", "score", "text" }` - upsert the current user’s review.  
+`DELETE /api/entry/reviews?slug=` - delete the current user’s review.
 
 Member `PATCH` of a listing accepts `ratings_enabled`. Non-members keep 403.
 

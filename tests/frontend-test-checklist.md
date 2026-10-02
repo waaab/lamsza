@@ -73,7 +73,7 @@ Run these tests against the live development server (`npm run dev` on port 5173)
 - [ ] Page lists all villages
 - [ ] Each village links to its detail page
 
-### 1.9 Settlement Detail (`/[county]-megye/[slug]`) — **NAVIGATION BUG FIX**
+### 1.9 Settlement Detail (`/[county]-megye/[slug]`) - **NAVIGATION BUG FIX**
 
 - [ ] Page loads with correct settlement data
 - [ ] Entries for the settlement are displayed
@@ -85,7 +85,7 @@ Run these tests against the live development server (`npm run dev` on port 5173)
 - [ ] Browser back button works correctly after parent-city navigation
 - [ ] Breadcrumbs update on navigation
 
-### 1.10 Entry Detail (`/bejegyzes/[slug]`) — **NAVIGATION BUG FIX**
+### 1.10 Entry Detail (`/bejegyzes/[slug]`) - **NAVIGATION BUG FIX**
 
 - [ ] Page loads with correct entry data (name, phone, address, etc.)
 - [ ] Breadcrumbs show correct path
@@ -182,8 +182,8 @@ Run these tests against the live development server (`npm run dev` on port 5173)
 
 - [ ] List loads all entries with name, location, category
 - [ ] Create new entry with all fields (name, location, phone, URL, etc.)
-- [ ] Edit existing entry — changes persist after reload
-- [ ] Delete entry — removed from list
+- [ ] Edit existing entry - changes persist after reload
+- [ ] Delete entry - removed from list
 
 ### 5.4 CRUD: Locations
 

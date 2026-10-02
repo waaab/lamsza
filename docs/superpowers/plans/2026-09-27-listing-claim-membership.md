@@ -140,7 +140,7 @@ git commit -m "Hold a listing claim until an admin accepts it."
 
 **Interfaces:**
 - `GET /api/account/listings/members?entry_id=` already exists and returns an array of active members. Extend that array to include pending member rows, each with `status`. Do not change it to an object. `fiok/+page.svelte` already treats the body as an array.
-- `POST /api/account/listings/members` body `{ "entry_id", "user_id", "action": "accept" | "deny" }` — active owner only. Accept sets that pending member to `active`. Deny deletes the pending member row. 403 if the target role is `owner`. The route is already registered in `main.go` and `handlers_test.go`. Add the POST case to `HandleListingMembers`. Keep the existing DELETE.
+- `POST /api/account/listings/members` body `{ "entry_id", "user_id", "action": "accept" | "deny" }` - active owner only. Accept sets that pending member to `active`. Deny deletes the pending member row. 403 if the target role is `owner`. The route is already registered in `main.go` and `handlers_test.go`. Add the POST case to `HandleListingMembers`. Keep the existing DELETE.
 - Public page: `showClaim` is false while `claim_pending` is true; the sidebar shows disabled **Átvételre vár** for every eligible logged-in user. `showJoin` stays true for eligible users who have no membership row. A user whose own row is `member` / `pending` sees disabled **Tagságkérés elküldve** instead.
 - **Bejegyzéseim** lists pending members for each owned listing with **Elfogad** and **Elutasít**.
 - Admin members queue keeps **Elfogad** and **Elutasít** and now lists only `role = 'member'`. Add a claims block bound to `data.claims`.

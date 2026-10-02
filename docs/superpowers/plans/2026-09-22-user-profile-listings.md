@@ -198,7 +198,7 @@ Skip unless the user asked to commit.
 - Produces:
   - `GET /api/admin/listing-queue` → `{ unpublished: [{id,name,slug,owner_email}], members: [{entry_id,entry_name,user_id,email}] }`
   - `POST /api/admin/listing-queue/publish` body `{ "entry_id" }` sets `published = true` and does not change `verified`
-  - `POST /api/admin/listing-queue/member` body `{ "entry_id", "user_id", "action": "approve"|"reject" }` — approve sets `status = active`; reject deletes the pending row
+  - `POST /api/admin/listing-queue/member` body `{ "entry_id", "user_id", "action": "approve"|"reject" }` - approve sets `status = active`; reject deletes the pending row
   - `HandleMe` field `admin_queue_count` (number) for admins, omitted otherwise
   - Header admin button shows the count when it is greater than 0
   - Admin section title **Bejegyzés-jóváhagyások**

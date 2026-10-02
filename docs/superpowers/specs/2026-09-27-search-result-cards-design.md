@@ -43,11 +43,11 @@ Text is trimmed. A joined meta line uses ` · `. If only one side exists, that s
 | Weboldalak | `title` | `domain` | `description` | `url`, new tab |
 | Szolgáltatások | `name` | `location` · category label | `notes` | `/bejegyzes/{slug}` |
 | Látnivalók | `name` | `county_name` | `description` | `/{county_slug}-megye/{slug}` |
-| Helyszínek | `name` | `settlement_name` · `kind_label` | — | `/{county_slug}-megye/{settlement_slug}/helyszin/{slug}` |
-| Események | `title` | short date · `location_name` | — | `/esemenyek/{id}` |
-| Települések | `name` | `county` | — | `/{county_slug}-megye/{slug}` |
-| Történelmi székek | `name` | — | — | `/szekek/{slug}` |
-| Hírek | `title` | `source` | — | `link`, new tab |
+| Helyszínek | `name` | `settlement_name` · `kind_label` | - | `/{county_slug}-megye/{settlement_slug}/helyszin/{slug}` |
+| Események | `title` | short date · `location_name` | - | `/esemenyek/{id}` |
+| Települések | `name` | `county` | - | `/{county_slug}-megye/{slug}` |
+| Történelmi székek | `name` | - | - | `/szekek/{slug}` |
+| Hírek | `title` | `source` | - | `link`, new tab |
 
 The service category label is `canonicalEntryCategory`. The event date is `formatDateShort` of `start_date`. If `start_date` is empty or does not parse, the date side is omitted. Settlements are no longer adapted into an `EntryCard` record.
 

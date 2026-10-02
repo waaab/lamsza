@@ -15,7 +15,7 @@ function isNonProdHost() {
     );
 }
 
-/** Demo gallery photos for Vite/local/staging only — never on production hosts. */
+/** Demo gallery photos for Vite/local/staging only - never on production hosts. */
 export function useDemoEntryPhotos() {
     return dev || isNonProdHost();
 }
@@ -44,8 +44,8 @@ export function demoGallerySlides(entry) {
             url: demo.src,
             src: demo.src,
             fallback: demo.fallback,
-            alt: `${label} — fotó ${i + 1}`,
-            title: `${label} — fotó ${i + 1}`,
+            alt: `${label} - fotó ${i + 1}`,
+            title: `${label} - fotó ${i + 1}`,
             description: "Példakép (csak fejlesztői és staging környezetben).",
             width: 800,
             height: 600,

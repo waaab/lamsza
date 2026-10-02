@@ -73,7 +73,7 @@
   --btn-update-bg: #0dcaf0;
   --btn-update-hover: #31d2f2;
 
-  /* Scrollbars — used by global * rules below */
+  /* Scrollbars - used by global * rules below */
   --scrollbar-track: var(--bg-body);
   --scrollbar-thumb: color-mix(in srgb, var(--text-muted) 42%, var(--border-color));
   --scrollbar-thumb-hover: color-mix(in srgb, var(--text-secondary) 38%, var(--border-color));
@@ -233,7 +233,7 @@ body {
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
 }
 
-/* WebKit / Chromium — match Firefox thin themed scrollbars app-wide */
+/* WebKit / Chromium - match Firefox thin themed scrollbars app-wide */
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -1873,10 +1873,20 @@ footer {
   flex-direction: column;
 }
 
-.footer-bottom{
+.footer-bottom {
   display: flex;
   gap: 1em;
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+.social-links,
+.policy-links {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 /* No local results message */

@@ -58,7 +58,7 @@ func normalizeYMD(s string) string {
 	return s
 }
 
-// HandlePublicMondasok GET /api/mondasok — quotes for a calendar day.
+// HandlePublicMondasok GET /api/mondasok - quotes for a calendar day.
 // Optional ?date=YYYY-MM-DD uses that day (browser should pass local calendar date, same as homepage #datetime).
 // If date is missing or invalid, falls back to “today” in Europe/Budapest.
 func HandlePublicMondasok(w http.ResponseWriter, r *http.Request) {

@@ -3,7 +3,7 @@
     import Markdown from "./Markdown.svelte";
     import { getApiBase } from "$lib/api.js";
 
-    /** Logical section key — must match `page_faq_sections.section_key` */
+    /** Logical section key - must match `page_faq_sections.section_key` */
     export let sectionKey = "home";
 
     let faqTitle = "";

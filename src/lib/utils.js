@@ -110,7 +110,7 @@ export function formatTime(date) {
     });
 }
 
-/** Hungarian long date with weekday — same options as the homepage `#datetime` widget. */
+/** Hungarian long date with weekday - same options as the homepage `#datetime` widget. */
 export function formatHuDateLong(d) {
     const x = d instanceof Date ? d : new Date(d);
     return x.toLocaleDateString("hu-HU", {

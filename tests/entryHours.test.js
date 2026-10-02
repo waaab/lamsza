@@ -23,7 +23,7 @@ test("hoursConfigured: open+close or closed counts", () => {
 test("formatDayHours: closed, range, placeholder", () => {
     assert.equal(formatDayHours({ closed: true }), "Zárva");
     assert.equal(formatDayHours({ open: "09:00", close: "17:00", closed: false }), "09:00–17:00");
-    assert.equal(formatDayHours({ open: "", close: "", closed: false }), "—");
+    assert.equal(formatDayHours({ open: "", close: "", closed: false }), "-");
 });
 
 test("openStatus: unknown when hours are not set", () => {

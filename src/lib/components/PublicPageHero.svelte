@@ -5,9 +5,9 @@
     export let title = "";
     /** Bevezető a cím alatt (mindig megjelenik; betöltéskor: „…”). */
     export let greeting = "";
-    /** Ha igaz, a `pages` meta (cím / bevezető) még töltődik — a bevezető helyén „…”. */
+    /** Ha igaz, a `pages` meta (cím / bevezető) még töltődik - a bevezető helyén „…”. */
     export let loading = false;
-    /** Pl. kezdőlap bejelentkezett üdv — felülírja a `title`-t megjelenítésben és a böngésző címben. */
+    /** Pl. kezdőlap bejelentkezett üdv - felülírja a `title`-t megjelenítésben és a böngésző címben. */
     export let titleOverride = /** @type {string | null} */ (null);
 
     export let showBreadcrumbs = true;

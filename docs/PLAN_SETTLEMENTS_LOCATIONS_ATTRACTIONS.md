@@ -47,9 +47,9 @@ Attraction (látnivaló)     e.g. Szent Anna-tó, Vár
 
 **Key distinction:**
 - **Settlement** = administrative/place entity (name, type, county, crest, etc.)
-- **Location** = geographic point (latitude, longitude, optional address) — used by settlements, attractions, and **default homepage weather**
+- **Location** = geographic point (latitude, longitude, optional address) - used by settlements, attractions, and **default homepage weather**
 
-**Weather:** Locations drive weather display. The default homepage weather uses a site setting (e.g. `my_location_slug` → settlement's location). **Attractions with coordinates can also have weather** — e.g. Szent Anna-tó (46.126, 25.888). Weather APIs (Open-Meteo, etc.) accept lat/lon directly, so we can show weather for any entity with a `location_id`.
+**Weather:** Locations drive weather display. The default homepage weather uses a site setting (e.g. `my_location_slug` → settlement's location). **Attractions with coordinates can also have weather** - e.g. Szent Anna-tó (46.126, 25.888). Weather APIs (Open-Meteo, etc.) accept lat/lon directly, so we can show weather for any entity with a `location_id`.
 
 ---
 
@@ -73,17 +73,17 @@ historical_seats
 
 counties
     id, name, name_ro, name_de, slug
-    location_id (FK) — county "center" for map, default weather
+    location_id (FK) - county "center" for map, default weather
     content
 
 county_historical_seats (junction, many-to-many)
     county_id, historical_seat_id
-    — Hargita → Csíkszék, Udvarhelyszék; Kovászna → Háromszék; Maros → Marosszék
+    - Hargita → Csíkszék, Udvarhelyszék; Kovászna → Háromszék; Maros → Marosszék
 
 settlements
     id, county_id (FK), name, name_ro, name_de, slug, type (város, falu, község, municípium)
-    location_id (FK) — settlement coordinates
-    parent_id (FK) — village → town
+    location_id (FK) - settlement coordinates
+    parent_id (FK) - village → town
     post_code, population, area, crest, is_county_seat
     content
 
@@ -91,17 +91,17 @@ locations (geographic)
     id, latitude, longitude, address, elevation
 
 attractions
-    id, county_id (FK) — attraction belongs to a county
+    id, county_id (FK) - attraction belongs to a county
     name, name_ro, name_de, slug, description (short)
-    location_id (FK) — coordinates for map + weather
+    location_id (FK) - coordinates for map + weather
     content (Markdown)
     featured_image (banner)
-    — gallery: attraction_images table (id, attraction_id, url, sort_order)
+    - gallery: attraction_images table (id, attraction_id, url, sort_order)
 
 attraction_settlements (junction, optional)
     attraction_id, settlement_id
-    — explicit "show this attraction on this settlement's page"
-    — alternative: derive "nearby" by county or radius
+    - explicit "show this attraction on this settlement's page"
+    - alternative: derive "nearby" by county or radius
 ```
 
 ### 2.3 Entries & Events
@@ -128,7 +128,7 @@ attraction_settlements (junction, optional)
 
 ---
 
-## 3.1 Historical Seats (Székek) — Mapping
+## 3.1 Historical Seats (Székek) - Mapping
 
 Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.org/wiki/Székelyföld_történelmi_székei):
 
@@ -148,7 +148,7 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 
 ### 4.1 Current
 
-- `pages` table: slug, title, content — for static pages (iranyelvek, sütik, feltetelek)
+- `pages` table: slug, title, content - for static pages (iranyelvek, sütik, feltetelek)
 - County/settlement pages: no editable body content; data comes from DB fields only
 
 ### 4.2 Proposed
@@ -192,7 +192,7 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 - **Sidebar:** Historical seats | Counties | Settlements | Attractions | Entries | Events | …
 - **List + detail:** Each section has list view and edit form
 - **Content editor:** Markdown for `content` fields
-- **Location picker:** For settlements and attractions — map or lat/lon input
+- **Location picker:** For settlements and attractions - map or lat/lon input
 
 ---
 
@@ -245,7 +245,7 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 | **County–szék mapping** | Many-to-many: `county_historical_seats` junction. Hargita → Csíkszék, Udvarhelyszék; Kovászna → Háromszék; Maros → Marosszék. |
 | **Attraction imagery** | `featured_image` (banner) + `attraction_images` gallery table. |
 | **Content format** | Markdown. |
-| **Attraction URLs** | `/{countySlug}-megye/{slug}` — same pattern as settlements, linked to county. |
+| **Attraction URLs** | `/{countySlug}-megye/{slug}` - same pattern as settlements, linked to county. |
 | **Breadcrumbs** | Respect hierarchy: Home › [Szék] › County › [Settlement/Attraction]. |
 
 ---
@@ -283,7 +283,7 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 | Concept | Before | After |
 |---------|--------|-------|
 | **Location** | Administrative entity (county, city, village) | Geographic point (lat, lon, address) |
-| **Settlement** | Mixed with "location" | City, town, village — belongs to county |
+| **Settlement** | Mixed with "location" | City, town, village - belongs to county |
 | **County** | Row in locations (type=megye) | First-class entity, belongs to historical seat |
 | **Historical seat** | – | New; above county |
 | **Attraction** | – | New; has location (weather!), county, featured_image + gallery |

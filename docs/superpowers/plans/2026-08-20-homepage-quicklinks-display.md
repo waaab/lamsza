@@ -6,14 +6,14 @@
 
 **Architecture:** A tiny `src/lib/quickLinksDisplay.js` helper owns min/max/default, clamp, and `localStorage`. The homepage sets `--quicklink-slots` and an expanded class. CSS caps widget width, wraps cards, packs the three widgets with `flex-start`, and uses `flex-basis: 100%` on Gyorslinkek only when `N > 7`. Promoted-link fetch/cache is unchanged.
 
-**Tech Stack:** Svelte 5 (keep this page in legacy `let` / `$: ` / `on:click` — do not migrate the file to runes), SvelteKit, `localStorage`, Node built-in test runner (`node --test`), existing `global.css`.
+**Tech Stack:** Svelte 5 (keep this page in legacy `let` / `$: ` / `on:click` - do not migrate the file to runes), SvelteKit, `localStorage`, Node built-in test runner (`node --test`), existing `global.css`.
 
 ## Global Constraints
 
 - Default / min slot count: **7** (includes the `+` / Új card). Max: **14**.
 - `localStorage` key: **`quick_links_display_count`**. Missing / non-numeric → 7; out of range → clamp to `[7, 14]`.
 - `N` is widget **width in cards**, not a hide limit. Order is always `+`, then personal (`user_quick_links`), then admin/promoted.
-- Compact (`N = 7`): three widgets one row, packed (`justify-content: flex-start`). Expanded (`N > 7`): Gyorslinkek `flex-basis: 100%` so date/time and weather wrap below, adjacent; card strip stays `N` slots wide, left-aligned — do not set `width: 100%` on `#gyorslinkek`.
+- Compact (`N = 7`): three widgets one row, packed (`justify-content: flex-start`). Expanded (`N > 7`): Gyorslinkek `flex-basis: 100%` so date/time and weather wrap below, adjacent; card strip stays `N` slots wide, left-aligned - do not set `width: 100%` on `#gyorslinkek`.
 - Slot width math: `calc(var(--quicklink-slots, 7) * (60px + 0.5rem))`.
 - Skeletons while `promotedLoading`: count = `max(0, 7 - 1 - userLinks.length)`.
 - No arrows, no drag-scroll. No admin UI or API changes. Visitors cannot edit/delete admin cards.
@@ -301,7 +301,7 @@ EOF
 
 Keep **legacy** Svelte syntax in this file (`let`, `$:`, `on:click`). Do not introduce runes.
 
-- [ ] **Step 1: Script — import, state, drop scroll helpers**
+- [ ] **Step 1: Script - import, state, drop scroll helpers**
 
 Add import:
 
@@ -348,7 +348,7 @@ slotCount = readSlotCount();
 
 `loadUserLinks` stays first so `skeletonCount` can use personal links on the first client render.
 
-- [ ] **Step 2: Markup — header stepper, wrap strip, skeletons**
+- [ ] **Step 2: Markup - header stepper, wrap strip, skeletons**
 
 Replace the Gyorslinkek widget (from `<div id="gyorslinkek"` through its closing `</div>` before `<DateTimeWidget />`) with:
 

@@ -240,7 +240,7 @@
     <dialog
         bind:this={lightbox}
         class="entry-gallery__lightbox"
-        aria-label={`${label} — nagyobb méret`}
+        aria-label={`${label} - nagyobb méret`}
         onclose={onDialogClose}
     >
         <button

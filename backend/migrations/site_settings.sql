@@ -14,5 +14,8 @@ INSERT INTO site_settings (key, value) VALUES
   ('weather_provider_default', 'open_meteo'),
   ('weather_provider_open_meteo_enabled', 'true'),
   ('weather_provider_weatherapi_enabled', 'true'),
-  ('weather_provider_openweathermap_enabled', 'true')
+  ('weather_provider_openweathermap_enabled', 'true'),
+  ('social_facebook_url', 'https://www.facebook.com/szekelygugel'),
+  ('social_twitter_url', ''),
+  ('social_instagram_url', '')
 ON CONFLICT (key) DO NOTHING;

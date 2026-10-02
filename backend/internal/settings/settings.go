@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 )
 
 // MigrateSiteSettings creates site_settings table and seeds default values if missing.
@@ -34,7 +36,10 @@ func MigrateSiteSettings() {
 		  ('weather_provider_open_meteo_enabled', 'true'),
 		  ('weather_provider_weatherapi_enabled', 'true'),
 		  ('weather_provider_openweathermap_enabled', 'true'),
-		  ('my_location_slug', 'csikszereda')
+		  ('my_location_slug', 'csikszereda'),
+		  ('social_facebook_url', 'https://www.facebook.com/szekelygugel'),
+		  ('social_twitter_url', ''),
+		  ('social_instagram_url', '')
 		ON CONFLICT (key) DO NOTHING
 	`)
 	if err != nil {
@@ -46,17 +51,24 @@ func MigrateSiteSettings() {
 
 // PublicConfig is returned by GET /api/config/public (no auth)
 type PublicConfig struct {
-	WeatherCacheTTLMinutes int    `json:"weather_cache_ttl_minutes"`
-	WeatherCacheVersion    string `json:"weather_cache_version"`
-	QuickLinksVersion      string `json:"quick_links_version"`
-	QuickLinksCount        int    `json:"quick_links_count"`
-	WeatherIconStyle       string `json:"weather_icon_style"`
-	MyLocationSlug         string `json:"my_location_slug"`
-	MyLocationName         string `json:"my_location_name"`
-	MyLocationCounty       string `json:"my_location_county"`
-	MyLocationCountySlug   string `json:"my_location_county_slug"`
-	MyLocationType         string `json:"my_location_type"`
-	GoogleClientID         string `json:"google_client_id"`
+	WeatherCacheTTLMinutes int          `json:"weather_cache_ttl_minutes"`
+	WeatherCacheVersion    string       `json:"weather_cache_version"`
+	QuickLinksVersion      string       `json:"quick_links_version"`
+	QuickLinksCount        int          `json:"quick_links_count"`
+	WeatherIconStyle       string       `json:"weather_icon_style"`
+	MyLocationSlug         string       `json:"my_location_slug"`
+	MyLocationName         string       `json:"my_location_name"`
+	MyLocationCounty       string       `json:"my_location_county"`
+	MyLocationCountySlug   string       `json:"my_location_county_slug"`
+	MyLocationType         string       `json:"my_location_type"`
+	GoogleClientID         string       `json:"google_client_id"`
+	SocialLinks            []SocialLink `json:"social_links"`
+}
+
+// SocialLink is one footer network link. Empty admin URLs are omitted.
+type SocialLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 // HandlePublicConfig returns weather cache config for frontend
@@ -93,7 +105,45 @@ func HandlePublicConfig(w http.ResponseWriter, r *http.Request) {
 		MyLocationCountySlug:   myLocCountySlug,
 		MyLocationType:         myLocType,
 		GoogleClientID:         config.AppConfig.GoogleClientID,
+		SocialLinks:            FooterSocialLinks(),
 	})
+}
+
+// FooterSocialLinks returns Facebook, Twitter, and Instagram in that order.
+// A network is included only when its stored value is an http(s) URL.
+func FooterSocialLinks() []SocialLink {
+	specs := []struct{ key, label string }{
+		{"social_facebook_url", "Facebook"},
+		{"social_twitter_url", "Twitter"},
+		{"social_instagram_url", "Instagram"},
+	}
+	out := []SocialLink{}
+	for _, spec := range specs {
+		raw, _ := getSetting(spec.key, "")
+		if link := normalizeSocialURL(raw); link != "" {
+			out = append(out, SocialLink{Label: spec.label, URL: link})
+		}
+	}
+	return out
+}
+
+// normalizeSocialURL accepts a full http(s) URL, or a host we can prefix with https://.
+func normalizeSocialURL(raw string) string {
+	u := strings.TrimSpace(raw)
+	if u == "" {
+		return ""
+	}
+	if !strings.Contains(u, "://") {
+		u = "https://" + u
+	}
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Host == "" {
+		return ""
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return ""
+	}
+	return u
 }
 
 // GetSetting returns a site_settings value or default if missing/error (e.g. table not yet migrated)

@@ -54,7 +54,7 @@ function endOfLocalDayMs(yyyyMmDd) {
 /**
  * Resolves start/end instants. If the event spans multiple days and the stored
  * end time is exactly midnight, treat that as “through that whole last day”
- * (end = 23:59:59.999 local on end_date) — otherwise March 28 00:00 reads as
+ * (end = 23:59:59.999 local on end_date) - otherwise March 28 00:00 reads as
  * the very start of March 28 and the event wrongly shows as ended by evening.
  *
  * @param {EventLike} ev

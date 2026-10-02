@@ -29,12 +29,12 @@ Hungarian UI. No public profile URL.
 
 Tabs:
 
-1. **Profil** — read-only Google data: photo, given name, family name, display name, email, locale, Google account id, last login, account created. Only non-empty fields are shown.
-2. **Beállítások** — theme (`light`, `dark`, `system`) and homepage slot count (existing range 7–14, default 7).
-3. **Bejegyzéseim** — listings you own, listings where you are a member, your unpublished listings, and your pending join requests. Create a listing here.
-4. **Linkjeim** — add, edit, delete, and reorder the homepage quick links (title, URL, color).
-5. **Előzmények** — listings you opened, newest first. Remove one, or clear all.
-6. **Kedvenc helyek** — four groups: Települések, Látnivalók, Bejegyzések, Események. Remove one here. Add them from the public pages.
+1. **Profil** - read-only Google data: photo, given name, family name, display name, email, locale, Google account id, last login, account created. Only non-empty fields are shown.
+2. **Beállítások** - theme (`light`, `dark`, `system`) and homepage slot count (existing range 7–14, default 7).
+3. **Bejegyzéseim** - listings you own, listings where you are a member, your unpublished listings, and your pending join requests. Create a listing here.
+4. **Linkjeim** - add, edit, delete, and reorder the homepage quick links (title, URL, color).
+5. **Előzmények** - listings you opened, newest first. Remove one, or clear all.
+6. **Kedvenc helyek** - four groups: Települések, Látnivalók, Bejegyzések, Események. Remove one here. Add them from the public pages.
 
 ## Google fields
 
@@ -83,10 +83,10 @@ On the user row: photo URL, given name, family name, locale, theme, homepage slo
 
 Separate tables:
 
-- **Links** — title, URL, color, order, per user.
-- **History** — the same item shape as today’s browser history (`slug`, `name`, `category`, `location`, `photo`), newest first, at most 12. The profile lists every stored row. The listing page still shows at most 8 and hides the listing that is open.
-- **Favorites** — user, entity type, entity id, `created_at`.
-- **Listing people** — listing, user, role (`owner` or `member`), status (`active` or `pending`).
+- **Links** - title, URL, color, order, per user.
+- **History** - the same item shape as today’s browser history (`slug`, `name`, `category`, `location`, `photo`), newest first, at most 12. The profile lists every stored row. The listing page still shows at most 8 and hides the listing that is open.
+- **Favorites** - user, entity type, entity id, `created_at`.
+- **Listing people** - listing, user, role (`owner` or `member`), status (`active` or `pending`).
 
 On the listing: `verified` (migrated from `claimed`) and `published` (true for rows that already exist).
 

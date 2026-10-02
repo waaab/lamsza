@@ -10,7 +10,7 @@
 export function getApiBase() {
     const env = import.meta.env.VITE_API_BASE_URL;
     if (env) return String(env).replace(/\/$/, "");
-    /** Same tab as the Svelte app — absolute origin so fetches always resolve (Vite proxy / reverse proxy). */
+    /** Same tab as the Svelte app - absolute origin so fetches always resolve (Vite proxy / reverse proxy). */
     if (typeof window !== "undefined" && window.location?.origin) {
         return window.location.origin;
     }

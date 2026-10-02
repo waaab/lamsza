@@ -9,15 +9,29 @@
     $: faqSectionKey = deriveFaqSectionKey($page.url.pathname);
     import { auth } from "$lib/stores/auth";
     import { apiFetch } from "$lib/api.js";
-    import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
+    import SignInDialog from "$lib/components/SignInDialog.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
     import { APP_VERSION } from "$lib/publicChangelog.js";
+
+    const NETWORK_LAUNCH_YEAR = 2009;
+    const year = new Date().getFullYear();
 
     let scrollY = 0;
     let loginDialogOpen = false;
     let googleClientId = "";
     let configLoaded = false;
+    let socialLinks = [];
+
+    function httpSocialLinks(raw) {
+        if (!Array.isArray(raw)) return [];
+        return raw.filter(
+            (link) =>
+                link &&
+                String(link.label || "").trim() &&
+                /^https?:\/\//i.test(String(link.url || "").trim()),
+        );
+    }
 
     onMount(async () => {
         const stopLoginListener = listenForOpenLogin(openLoginDialog);
@@ -25,6 +39,7 @@
         try {
             const cfg = await apiFetch("/api/config/public");
             googleClientId = cfg.google_client_id || "";
+            socialLinks = httpSocialLinks(cfg.social_links);
         } catch (e) {
             console.error(e);
         }
@@ -79,10 +94,11 @@
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                ><path
-                    d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-                /><polyline points="9 22 9 12 15 12 15 22" /></svg
+                aria-hidden="true"
             >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+            </svg>
             <span>Lámsza</span>
         </a>
         <a
@@ -372,23 +388,19 @@
 <footer>
     <div class="copyright">
         Sok ❤️-el Székelyföldről.
-        © {new Date().getFullYear()} &bull; Na lámsza &bull; Erdélyi magyar startlap
+        © {NETWORK_LAUNCH_YEAR} - {year} &bull; Na lámsza &bull; Erdélyi magyar startlap
         és kereső. Az internet székely kapuja.
     </div>
     <div class="footer-bottom">
-        <div class="brand-info">
-            <div class="social-links">
-                <a href="https://www.facebook.com/szekelygugel" target="_blank" rel="noopener" title="Facebook"
-                    >Facebook</a
-                >
-                <a href="/" target="_blank" rel="noopener" title="Twitter"
-                    >Twitter</a
-                >
-                <a href="/" target="_blank" rel="noopener" title="Instagram"
-                    >Instagram</a
-                >
+        {#if socialLinks.length}
+            <div class="brand-info">
+                <div class="social-links">
+                    {#each socialLinks as link (link.url)}
+                        <a href={link.url} target="_blank" rel="noopener" title={link.label}>{link.label}</a>
+                    {/each}
+                </div>
             </div>
-        </div>
+        {/if}
         <div class="policy-links">
             <a href="/iranyelvek" title="Irányelvek">Irányelvek</a>
             <a href="/iranyelvek/feltetelek" title="Feltételek">Feltételek</a>
@@ -401,34 +413,14 @@
     </div>
 </footer>
 
-{#if loginDialogOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-        class="link-dialog-overlay"
-        role="dialog"
-        aria-labelledby="login-dialog-title"
-        tabindex="-1"
-        on:click|self={closeLoginDialog}
-    >
-        <div class="link-dialog" on:click|stopPropagation>
-            <h3 id="login-dialog-title">Belépés</h3>
-            {#if googleClientId}
-                {#key googleClientId}
-                    <GoogleSignIn
-                        clientId={googleClientId}
-                        onSignedIn={onGoogleSignedIn}
-                    />
-                {/key}
-            {:else if configLoaded}
-                <p class="login-error">A Google belépés nincs beállítva.</p>
-            {/if}
-            <div class="link-dialog-actions">
-                <button type="button" class="link-dialog-cancel" on:click={closeLoginDialog}>Mégse</button>
-            </div>
-        </div>
-    </div>
-{/if}
+<SignInDialog
+    open={loginDialogOpen}
+    appName="Lámsza"
+    clientId={googleClientId}
+    configReady={configLoaded}
+    onClose={closeLoginDialog}
+    onSignedIn={onGoogleSignedIn}
+/>
 
 {#if scrollY > 500}
     <button

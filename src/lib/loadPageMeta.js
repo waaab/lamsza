@@ -12,7 +12,7 @@ function nonEmptyOrFallback(s, fallback) {
  * Instant defaults for the hero (same keys as `pages.slug` in admin).
  * Use as initial state so the title/greeting are not "…" before the API responds.
  *
- * @param {string} slug — `pages.slug` (e.g. `index`, `home`, `iranyelvek/sutik`)
+ * @param {string} slug - `pages.slug` (e.g. `index`, `home`, `iranyelvek/sutik`)
  * @returns {{ title: string, greeting: string }}
  */
 export function initialPageHeader(slug) {
@@ -24,7 +24,7 @@ export function initialPageHeader(slug) {
 }
 
 /**
- * @param {string} slug — `pages.slug` (pl. `szekek`, `home`, `iranyelvek/sutik`)
+ * @param {string} slug - `pages.slug` (pl. `szekek`, `home`, `iranyelvek/sutik`)
  * @returns {Promise<{ title: string, greeting: string, content?: string, slug?: string }>}
  */
 export async function loadPageMeta(slug) {

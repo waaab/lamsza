@@ -250,7 +250,7 @@
                 />
             {:else}
                 <CrestShieldPlaceholder
-                    label="{displayTown} címere — nincs feltöltött kép, helyőrző pajzs"
+                    label="{displayTown} címere - nincs feltöltött kép, helyőrző pajzs"
                 />
             {/if}
         </div>

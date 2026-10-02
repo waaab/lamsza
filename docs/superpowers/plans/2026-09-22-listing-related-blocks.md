@@ -219,13 +219,13 @@ Skip unless the user asked to commit.
 
 **Files:**
 - Create: `backend/internal/handlers/entry_related.go`
-- Modify: `backend/main.go` — register next to `/api/entry`
-- Modify: `backend/handlers_test.go` — register on `testMux`; add `TestEntryRelated`
+- Modify: `backend/main.go` - register next to `/api/entry`
+- Modify: `backend/handlers_test.go` - register on `testMux`; add `TestEntryRelated`
 
 **Interfaces:**
 - Consumes: `slug` query; tables `entries`, `settlements`, `counties`, `entry_categories`
 - Produces: JSON `{ "nearby": RelatedEntry[], "related": RelatedEntry[] }`
-- `RelatedEntry`: `id` (JSON number or string matching existing entry `id` encoding — use the same `models` id type as `Entry.ID` which is `string`), `name`, `slug`, `category`, `location`, `location_slug`, `county_slug`, `photos` (`json.RawMessage`, sanitized array)
+- `RelatedEntry`: `id` (JSON number or string matching existing entry `id` encoding - use the same `models` id type as `Entry.ID` which is `string`), `name`, `slug`, `category`, `location`, `location_slug`, `county_slug`, `photos` (`json.RawMessage`, sanitized array)
 - Constants: `relatedEntryLimit = 8`
 - 400 if `slug` empty; 404 if not found; GET only
 
@@ -578,7 +578,7 @@ On error/not-found, set `nearby = []`, `related = []`, `historyItems = []` and d
 
 Do not add extra skeleton for these blocks in v1 (they appear after the profile is already shown).
 
-- [ ] **Step 3: Autofixer on `+page.svelte` if the MCP reports issues** — fix real issues; ignore unrelated pre-existing ones.
+- [ ] **Step 3: Autofixer on `+page.svelte` if the MCP reports issues** - fix real issues; ignore unrelated pre-existing ones.
 
 - [ ] **Step 4: Commit**
 

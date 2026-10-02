@@ -142,8 +142,8 @@ Replace the non-functional heart in `src/routes/(public)/esemenyek/[id]/+page.sv
 
 Add the same button to:
 
-- `src/routes/(public)/[countySlug]-megye/[slug]/+page.svelte` — `settlement` when `settlementData` is set, `attraction` when `attractionData` is set
-- `src/routes/(public)/bejegyzes/[slug]/+page.svelte` — `entry`
+- `src/routes/(public)/[countySlug]-megye/[slug]/+page.svelte` - `settlement` when `settlementData` is set, `attraction` when `attractionData` is set
+- `src/routes/(public)/bejegyzes/[slug]/+page.svelte` - `entry`
 
 Load `GET /api/account/favorites` once when logged in and pass `active` from `isFavorite`.
 
