@@ -75,7 +75,7 @@ func TestWebshopListingWithoutTown(t *testing.T) {
 	user := mustLogin("website-submit@test.lamsza")
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
 		"website_id":  webID,
-		"category_id": 39,
+		"category_id": 0,
 		"type_id":     2,
 		"location_id": 0,
 		"name":        "Mobonline",
@@ -89,13 +89,20 @@ func TestWebshopListingWithoutTown(t *testing.T) {
 		t.Fatal(err)
 	}
 	entryID := int(listing["id"].(float64))
+	if int(listing["category_id"].(float64)) != 39 {
+		t.Fatalf("category_id = %v, want 39", listing["category_id"])
+	}
 
 	var locationID sql.NullInt64
-	if err := db.DB.QueryRow(`SELECT location_id FROM entries WHERE id = $1`, entryID).Scan(&locationID); err != nil {
+	var categoryID int
+	if err := db.DB.QueryRow(`SELECT location_id, category_id FROM entries WHERE id = $1`, entryID).Scan(&locationID, &categoryID); err != nil {
 		t.Fatal(err)
 	}
 	if locationID.Valid {
 		t.Fatalf("location_id = %d, want NULL", locationID.Int64)
+	}
+	if categoryID != 39 {
+		t.Fatalf("entries.category_id = %d, want 39", categoryID)
 	}
 }
 

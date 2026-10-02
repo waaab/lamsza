@@ -98,6 +98,7 @@ type createListingBody struct {
 	HoursEnabled    bool            `json:"hours_enabled"`
 	DeliveryEnabled bool            `json:"delivery_enabled"`
 	Photos          json.RawMessage `json:"photos"`
+	Tags            []string        `json:"tags"`
 }
 
 type updateListingBody struct {
@@ -1026,21 +1027,8 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if body.Name == "" || body.CategoryID <= 0 || body.TypeID <= 0 {
+	if body.Name == "" || body.TypeID <= 0 {
 		http.Error(w, "name, category_id, and type_id required", http.StatusBadRequest)
-		return
-	}
-	if err := validateLeafCategoryID(body.CategoryID); err != nil {
-		writeListingFieldError(w, "category_id")
-		return
-	}
-	if err := validateEntryTypeID(body.TypeID); err != nil {
-		writeListingFieldError(w, "type_id")
-		return
-	}
-	body.Languages = normalizeListingLanguages(body.Languages)
-	if !validListingURL(body.URL) {
-		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
 
@@ -1055,7 +1043,55 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			writeListingConflict(w, http.StatusForbidden, "website_banned")
 			return
 		}
-	} else if strings.TrimSpace(body.URL) != "" {
+		if body.CategoryID <= 0 {
+			var websiteCategoryID sql.NullInt64
+			var status string
+			err = db.DB.QueryRow(`SELECT category_id, status FROM websites WHERE id = $1`, body.WebsiteID).Scan(&websiteCategoryID, &status)
+			if err == sql.ErrNoRows {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if status != "approved" {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			if !websiteCategoryID.Valid || websiteCategoryID.Int64 <= 0 {
+				writeListingFieldError(w, "category_id")
+				return
+			}
+			body.CategoryID = int(websiteCategoryID.Int64)
+		}
+	}
+
+	if body.CategoryID <= 0 {
+		http.Error(w, "name, category_id, and type_id required", http.StatusBadRequest)
+		return
+	}
+	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
+	if err := validateEntryTypeID(body.TypeID); err != nil {
+		writeListingFieldError(w, "type_id")
+		return
+	}
+	if len(body.Tags) > 0 {
+		if err := validateListingTags(body.CategoryID, normalizeListingTags(body.Tags)); err != nil {
+			writeListingFieldError(w, "tags")
+			return
+		}
+	}
+	body.Languages = normalizeListingLanguages(body.Languages)
+	if !validListingURL(body.URL) {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+
+	if body.WebsiteID <= 0 && strings.TrimSpace(body.URL) != "" {
 		domainKey, err := webdomain.CanonicalDomain(body.URL)
 		if err == nil {
 			var exists bool
@@ -1103,10 +1139,9 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	if body.WebsiteID > 0 {
 		var domainKey, status string
 		var linkedEntryID sql.NullInt64
-		var websiteCategoryID sql.NullInt64
 		err = tx.QueryRow(`
-			SELECT domain_key, status, entry_id, category_id FROM websites WHERE id = $1 FOR UPDATE
-		`, body.WebsiteID).Scan(&domainKey, &status, &linkedEntryID, &websiteCategoryID)
+			SELECT domain_key, status, entry_id FROM websites WHERE id = $1 FOR UPDATE
+		`, body.WebsiteID).Scan(&domainKey, &status, &linkedEntryID)
 		if err == sql.ErrNoRows {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
@@ -1122,14 +1157,6 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		if linkedEntryID.Valid {
 			writeListingConflict(w, http.StatusConflict, "domain_taken")
 			return
-		}
-		if body.CategoryID <= 0 && websiteCategoryID.Valid {
-			body.CategoryID = int(websiteCategoryID.Int64)
-			err = tx.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 		}
 		listingURL = "https://" + domainKey
 	}
@@ -1194,6 +1221,13 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	if err := tx.Commit(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	if len(body.Tags) > 0 {
+		if err := replaceListingTags(entryID, normalizeListingTags(body.Tags)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	json.NewEncoder(w).Encode(map[string]interface{}{
