@@ -198,7 +198,11 @@
         delivery_enabled: false,
         photos: emptyPhotos(),
     };
-    let newEntryCategory = { name: "" };
+    let newEntryCategory = { name: "", parent_id: "" };
+    /** @type {{ id: number, message: string, moveTo: string } | null} */
+    let categoryDeleteMove = null;
+    /** @type {Record<number, string>} */
+    let websiteApproveCategory = {};
     let newEntryType = { name: "" };
     let newEvent = {
         location_id: "",
@@ -869,11 +873,15 @@
         await auth.refresh();
     }
 
-    async function reviewWebsite(websiteId, action) {
+    async function reviewWebsite(websiteId, action, categoryId = 0) {
+        const body = { id: websiteId, action };
+        if (action === "approve" && categoryId > 0) {
+            body.category_id = categoryId;
+        }
         const res = await apiCall("/api/admin/websites", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: websiteId, action }),
+            body: JSON.stringify(body),
         });
         if (!res.ok) {
             const detail = (await res.text()) || `HTTP ${res.status}`;
@@ -1210,10 +1218,16 @@
         ];
     });
     $: pgEvents = adminPageSlice(rfEvents, pageEvents);
+    $: entryCategoryParents = entryCategories.filter(
+        (cat) => cat.parent_id == null,
+    );
+    $: entryCategoryChildren = entryCategories.filter(
+        (cat) => cat.parent_id != null,
+    );
     $: rfEntryCategories = filterRows(
         entryCategories,
         searchEntryCategories,
-        (cat) => [cat.id, cat.name],
+        (cat) => [cat.id, cat.name, getEntryCategoryParentName(cat)],
     );
     $: pgEntryCategories = adminPageSlice(rfEntryCategories, pageEntryCategories);
     $: rfEntries = filterRows(entries, searchEntries, (s) => {
@@ -3031,15 +3045,93 @@
         cancelEditLocation();
     }
 
+    function getEntryCategoryParentName(cat) {
+        if (!cat?.parent_id) return "-";
+        const parent = entryCategories.find((row) => row.id === cat.parent_id);
+        return parent ? parent.name : "-";
+    }
+
+    function entryCategoryMoveTargets(cat) {
+        if (!cat?.parent_id) {
+            return entryCategoryParents.filter((row) => row.id !== cat.id);
+        }
+        return entryCategoryChildren.filter((row) => row.id !== cat.id);
+    }
+
     // --- Submit entry category ---
     function submitEntryCategory(e) {
         e.preventDefault();
+        const payload = { name: String(newEntryCategory.name ?? "").trim() };
+        if (newEntryCategory.parent_id) {
+            payload.parent_id = parseInt(newEntryCategory.parent_id, 10);
+        }
         createRecord(
             "entry_categories",
-            newEntryCategory,
+            payload,
             fetchEntryCategories,
-            () => (newEntryCategory = { name: "" }),
+            () => (newEntryCategory = { name: "", parent_id: "" }),
         );
+    }
+
+    async function deleteEntryCategory(cat) {
+        const table = "entry_categories";
+        const ok = await showConfirm("Biztosan törölni szeretnéd?");
+        if (!ok) return;
+        try {
+            const res = await apiCall(`/api/admin/entry_categories?id=${cat.id}`, {
+                method: "DELETE",
+            });
+            if (res.ok) {
+                categoryDeleteMove = null;
+                noteAdminAction(table, "A törlés sikerült.");
+                fetchEntryCategories();
+                return;
+            }
+            if (res.status === 409) {
+                const message = (await res.text()).trim();
+                const targets = entryCategoryMoveTargets(cat);
+                categoryDeleteMove = {
+                    id: cat.id,
+                    message,
+                    moveTo: targets.length ? String(targets[0].id) : "",
+                };
+                noteAdminAction(table, message, false);
+                return;
+            }
+            await noteAdminFailure(table, res);
+        } catch (e) {
+            console.error(e);
+            await noteAdminFailure(table, e && e.message ? e.message : String(e));
+        }
+    }
+
+    async function deleteEntryCategoryWithMove(cat) {
+        if (!categoryDeleteMove || categoryDeleteMove.id !== cat.id) return;
+        const moveTo = parseInt(categoryDeleteMove.moveTo, 10);
+        if (!moveTo) return;
+        const table = "entry_categories";
+        try {
+            const res = await apiCall(
+                `/api/admin/entry_categories?id=${cat.id}&move_to=${moveTo}`,
+                { method: "DELETE" },
+            );
+            if (res.ok) {
+                categoryDeleteMove = null;
+                noteAdminAction(table, "A törlés sikerült.");
+                fetchEntryCategories();
+                return;
+            }
+            if (res.status === 409) {
+                const message = (await res.text()).trim();
+                categoryDeleteMove = { ...categoryDeleteMove, message };
+                noteAdminAction(table, message, false);
+                return;
+            }
+            await noteAdminFailure(table, res);
+        } catch (e) {
+            console.error(e);
+            await noteAdminFailure(table, e && e.message ? e.message : String(e));
+        }
     }
 
     // --- Submit entry type ---
@@ -3949,7 +4041,48 @@
                                                 title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
                                             >Frissítés</button>
                                         {:else if msg.action === "website"}
-                                            <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "approve")}>Approve</button>
+                                            <label for="website_cat_{msg.websiteId}"
+                                                >Alkategória</label
+                                            >
+                                            <select
+                                                id="website_cat_{msg.websiteId}"
+                                                value={websiteApproveCategory[
+                                                    msg.websiteId
+                                                ] ?? ""}
+                                                on:change={(e) => {
+                                                    websiteApproveCategory = {
+                                                        ...websiteApproveCategory,
+                                                        [msg.websiteId]:
+                                                            e.currentTarget.value,
+                                                    };
+                                                }}
+                                            >
+                                                <option value="">Válassz alkategóriát</option>
+                                                {#each entryCategoryParents as parent}
+                                                    <optgroup label={parent.name}>
+                                                        {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
+                                                            <option value={child.id}
+                                                                >{child.name}</option
+                                                            >
+                                                        {/each}
+                                                    </optgroup>
+                                                {/each}
+                                            </select>
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm"
+                                                on:click={() =>
+                                                    reviewWebsite(
+                                                        msg.websiteId,
+                                                        "approve",
+                                                        parseInt(
+                                                            websiteApproveCategory[
+                                                                msg.websiteId
+                                                            ] || "0",
+                                                            10,
+                                                        ),
+                                                    )}>Approve</button
+                                            >
                                             <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "reject")}>Reject</button>
                                             <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "ban")}>Ban User</button>
                                         {/if}
@@ -6265,6 +6398,14 @@
                                 required
                             />
 
+                            <label for="cat_parent">Főkategória</label>
+                            <select id="cat_parent" bind:value={newEntryCategory.parent_id}>
+                                <option value="">Főkategória</option>
+                                {#each entryCategoryParents as parent}
+                                    <option value={parent.id}>{parent.name}</option>
+                                {/each}
+                            </select>
+
                             <button type="submit" class="admin-submit-btn"
                                 >Hozzáadás</button
                             >
@@ -6311,6 +6452,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Név</th>
+                                    <th>Főkategória</th>
                                     <th class="admin-table-col--action">Szerk.</th>
                                     <th class="admin-table-col--action">Törlés</th>
                                 </tr>
@@ -6320,6 +6462,7 @@
                                     <tr>
                                         <td>{cat.id}</td>
                                         <td>{cat.name}</td>
+                                        <td>{getEntryCategoryParentName(cat)}</td>
                                         <td>
                                             <button
                                                 class="btn-update"
@@ -6332,17 +6475,50 @@
                                             <button
                                                 class="btn-delete"
                                                 on:click={() =>
-                                                    deleteRecord(
-                                                        "entry_categories",
-                                                        cat.id,
-                                                        fetchEntryCategories,
-                                                    )}>Törlés</button
+                                                    deleteEntryCategory(cat)}
+                                                >Törlés</button
                                             >
                                         </td>
                                     </tr>
+                                    {#if categoryDeleteMove?.id === cat.id}
+                                        <tr>
+                                            <td colspan="5">
+                                                <p>{categoryDeleteMove.message}</p>
+                                                <label for="cat_move_{cat.id}"
+                                                    >Áthelyezés ide</label
+                                                >
+                                                <select
+                                                    id="cat_move_{cat.id}"
+                                                    bind:value={categoryDeleteMove.moveTo}
+                                                >
+                                                    {#each entryCategoryMoveTargets(cat) as target}
+                                                        <option value={target.id}
+                                                            >{target.name}</option
+                                                        >
+                                                    {/each}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    class="admin-submit-btn"
+                                                    on:click={() =>
+                                                        deleteEntryCategoryWithMove(
+                                                            cat,
+                                                        )}
+                                                    >Áthelyezés és törlés</button
+                                                >
+                                                <button
+                                                    type="button"
+                                                    class="btn"
+                                                    on:click={() =>
+                                                        (categoryDeleteMove = null)}
+                                                    >Mégse</button
+                                                >
+                                            </td>
+                                        </tr>
+                                    {/if}
                                 {:else}
                                     <tr
-                                        ><td colspan="4"
+                                        ><td colspan="5"
                                             >Nincsenek kategóriák.</td
                                         ></tr
                                     >
@@ -7350,24 +7526,6 @@
                             szerkezetéhez és szűréséhez - nem ugyanaz, mint a kategória.
                         </p>
                     {/if}
-                    <details class="admin-create-panel">
-                        <summary class="admin-create-summary"><span>Új típus</span><AdminPlusIcon /></summary>
-                        <form class="admin-form admin-create-form" on:submit={submitEntryType}>
-                            <label for="etype_name">Típus neve</label>
-                            <input
-                                id="etype_name"
-                                name="name"
-                                type="text"
-                                bind:value={newEntryType.name}
-                                required
-                                placeholder="pl. entry, business..."
-                            />
-                            <button type="submit" class="admin-submit-btn"
-                                >Hozzáadás</button
-                            >
-                        </form>
-                    </details>
-
                     {@render adminNotice("entry_types")}
                     <div class="admin-table-toolbar">
                         <label class="admin-search-label"
@@ -7403,8 +7561,6 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>Név</th>
-                                    <th class="admin-table-col--action">Szerk.</th>
-                                    <th class="admin-table-col--action">Törlés</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -7412,29 +7568,10 @@
                                     <tr>
                                         <td>{et.id}</td>
                                         <td>{et.name}</td>
-                                        <td>
-                                            <button
-                                                class="btn-update"
-                                                on:click={() =>
-                                                    startEditType(et)}
-                                                >Szerk.</button
-                                            >
-                                        </td>
-                                        <td>
-                                            <button
-                                                class="btn-delete"
-                                                on:click={() =>
-                                                    deleteRecord(
-                                                        "entry_types",
-                                                        et.id,
-                                                        fetchEntryTypes,
-                                                    )}>Törlés</button
-                                            >
-                                        </td>
                                     </tr>
                                 {:else}
                                     <tr
-                                        ><td colspan="4">Nincsenek típusok.</td
+                                        ><td colspan="2">Nincsenek típusok.</td
                                         ></tr
                                     >
                                 {/each}
