@@ -6,23 +6,10 @@ func TestCanonicalEntryCategory(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{"egeszsegugy", "Egészségügy"},
-		{"Egészségügy", "Egészségügy"},
-		{"  egészségügy  ", "Egészségügy"},
-		{"Orvosi rendelők", "Egészségügy"},
-		{"oktatas", "Oktatás"},
-		{"Oktatás", "Oktatás"},
-		{"mesteremberek", "Mesteremberek"},
-		{"Mesterember", "Mesteremberek"},
-		{"hivatalok", "Hivatalok"},
-		{"Hivatalok", "Hivatalok"},
-		{"városháza", "Hivatalok"},
+		{"Bútor", "Bútor"},
+		{"  Étterem  ", "Étterem"},
+		{"egeszsegugy", "egeszsegugy"},
 		{"Vendéglő", "Vendéglő"},
-		{"vendeglo", "Vendéglő"},
-		{"bolt", "Bolt"},
-		{"sportegyesület", "Sportegyesület"},
-		{"egyeb", "Egyéb"},
-		{"Egyéb", "Egyéb"},
 		{"", ""},
 		{"  ", ""},
 	}
@@ -31,5 +18,11 @@ func TestCanonicalEntryCategory(t *testing.T) {
 		if got != c.want {
 			t.Errorf("CanonicalEntryCategory(%q) = %q, want %q", c.in, got, c.want)
 		}
+	}
+}
+
+func TestSeedEntryCategoriesCount(t *testing.T) {
+	if len(SeedEntryCategories()) != 68 {
+		t.Fatalf("SeedEntryCategories len = %d, want 68", len(SeedEntryCategories()))
 	}
 }

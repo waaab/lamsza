@@ -23,8 +23,8 @@ func createEntry(t *testing.T, name string, locID interface{}) (interface{}, str
 	payload := map[string]interface{}{
 		"name":        name,
 		"location_id": locID,
-		"type":        "entry",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 	}
 	rr := doRequest(t, "POST", "/api/admin/entries", payload)
 	if rr.Code != http.StatusOK {
@@ -43,8 +43,8 @@ func TestUnclaimedPublicEntryHidesExtras(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":        "UnclaimedExtras A",
 		"location_id": mustLocID(t),
-		"type":        "entry",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 		"hours":       map[string]any{"mon": map[string]any{"open": "09:00", "close": "17:00", "closed": false}},
 	}
 	rr := doRequest(t, "POST", "/api/admin/entries", payload)

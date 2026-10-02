@@ -13,49 +13,24 @@ const (
 	EntryCategoryEgyeb          = "Egyéb"
 )
 
-// SeedEntryCategories is the short directory catalog (Index slugs + in-use sectors).
+// SeedEntryCategories returns every name in the v2 directory catalog.
 func SeedEntryCategories() []string {
-	return []string{
-		EntryCategoryEgeszsegugy,
-		EntryCategoryOktatas,
-		EntryCategoryMesteremberek,
-		EntryCategoryHivatalok,
-		EntryCategoryVendeglo,
-		EntryCategoryBolt,
-		EntryCategorySportegyesulet,
-		EntryCategoryEgyeb,
+	names := make([]string, 0, 68)
+	for _, node := range DirectoryParents() {
+		names = append(names, node.Name)
 	}
+	for _, node := range DirectoryChildren() {
+		names = append(names, node.Name)
+	}
+	return names
 }
 
-// CanonicalEntryCategory maps stored / legacy category strings onto catalog labels.
+// CanonicalEntryCategory returns the stored category name.
 func CanonicalEntryCategory(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	switch Slugify(trimmed) {
-	case "egeszsegugy", "orvosi-rendelok", "orvosi-rendelo":
-		return EntryCategoryEgeszsegugy
-	case "oktatas":
-		return EntryCategoryOktatas
-	case "mesteremberek", "mesterember":
-		return EntryCategoryMesteremberek
-	case "hivatalok", "varoshaza":
-		return EntryCategoryHivatalok
-	case "vendeglo", "vendeglatas":
-		return EntryCategoryVendeglo
-	case "bolt", "kereskedelem":
-		return EntryCategoryBolt
-	case "sportegyesulet", "sport":
-		return EntryCategorySportegyesulet
-	case "egyeb", "other":
-		return EntryCategoryEgyeb
-	default:
-		return trimmed
-	}
+	return strings.TrimSpace(raw)
 }
 
 // DefaultEntryCategory is used when an entry has no category.
 func DefaultEntryCategory() string {
-	return EntryCategoryEgyeb
+	return ""
 }

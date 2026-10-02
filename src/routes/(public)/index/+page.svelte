@@ -24,7 +24,6 @@
     import {
         canonicalEntryType,
         canonicalEntryTypeKey,
-        filterServiceEntries,
     } from "$lib/entryType.js";
     import {
         canonicalEntryCategory,
@@ -101,7 +100,7 @@
             : $page.url.pathname === "/index/szolgaltatasok"
               ? "services"
               : "all";
-    $: viewEntries = filterServiceEntries(entries);
+    $: viewEntries = entries;
     $: serviceTotal = viewEntries.length;
     $: serviceClaimed = viewEntries.filter((entry) => entry.claimed).length;
     $: websiteTotal = websites.length;

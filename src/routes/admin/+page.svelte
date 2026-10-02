@@ -11,7 +11,7 @@
     } from "$lib/scheduleActivityTypes.js";
     import { absoluteMediaUrl } from "$lib/eventImage.js";
     import { getApiBase, apiCall } from "$lib/api.js";
-    import { ENTRY_TYPE_SERVICE } from "$lib/entryType.js";
+    import { ENTRY_TYPE_VALLALKOZAS } from "$lib/entryType.js";
     import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
     import { offersDelivery } from "$lib/entryPublicExtras.js";
     import { emptyPhotos, normalizePhotos } from "$lib/entryPhotos.js";
@@ -188,7 +188,7 @@
         phone: "",
         address: "",
         notes: "",
-        type: ENTRY_TYPE_SERVICE,
+        type: ENTRY_TYPE_VALLALKOZAS,
         languages: ["HU"],
         tags: "",
         verified: false,
@@ -342,7 +342,7 @@
         phone: "",
         address: "",
         notes: "",
-        type: ENTRY_TYPE_SERVICE,
+        type: ENTRY_TYPE_VALLALKOZAS,
         languages: ["HU"],
         tags: "",
     };
@@ -3011,7 +3011,7 @@
                 phone: "",
                 address: "",
                 notes: "",
-                type: ENTRY_TYPE_SERVICE,
+                type: ENTRY_TYPE_VALLALKOZAS,
                 languages: ["HU"],
                 tags: "",
             };
@@ -3444,7 +3444,7 @@
                     phone: "",
                     address: "",
                     notes: "",
-                    type: ENTRY_TYPE_SERVICE,
+                    type: ENTRY_TYPE_VALLALKOZAS,
                     languages: ["HU"],
                     tags: "",
                     verified: false,

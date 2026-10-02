@@ -1,7 +1,7 @@
 /** Canonical `entry_types.name` values (admin catalog). */
-export const ENTRY_TYPE_SERVICE = "Szolgáltatás";
-export const ENTRY_TYPE_CEG = "Cég";
-export const ENTRY_TYPE_EGYEB = "Egyéb";
+export const ENTRY_TYPE_SZEMELY = "Személy";
+export const ENTRY_TYPE_VALLALKOZAS = "Vállalkozás";
+export const ENTRY_TYPE_INTEZMENY = "Intézmény";
 
 /** @param {unknown} raw */
 function foldType(raw) {
@@ -13,47 +13,27 @@ function foldType(raw) {
 }
 
 /**
- * Map stored / legacy `entries.type` strings onto catalog labels.
- * Unknown values are returned trimmed as-is.
+ * Map stored type strings onto catalog labels.
+ * Unknown values return an empty string.
  *
  * @param {unknown} raw
  * @returns {string}
  */
 export function canonicalEntryType(raw) {
-    const folded = foldType(raw);
-    if (!folded) return "";
-    if (folded === "service" || folded === "szolgaltatas") {
-        return ENTRY_TYPE_SERVICE;
-    }
-    if (folded === "ceg" || folded === "company") {
-        return ENTRY_TYPE_CEG;
-    }
-    if (folded === "entry" || folded === "egyeb" || folded === "other") {
-        return ENTRY_TYPE_EGYEB;
-    }
     const trimmed = String(raw ?? "").trim();
-    return trimmed;
+    if (!trimmed) return "";
+    if (
+        trimmed === ENTRY_TYPE_SZEMELY ||
+        trimmed === ENTRY_TYPE_VALLALKOZAS ||
+        trimmed === ENTRY_TYPE_INTEZMENY
+    ) {
+        return trimmed;
+    }
+    return "";
 }
 
 /** @param {unknown} raw */
 export function canonicalEntryTypeKey(raw) {
     const label = canonicalEntryType(raw);
     return label ? foldType(label) : "";
-}
-
-/**
- * @param {{ type?: string } | null | undefined} entry
- */
-export function isServiceEntry(entry) {
-    return canonicalEntryType(entry?.type) === ENTRY_TYPE_SERVICE;
-}
-
-/**
- * @template {{ type?: string }} T
- * @param {T[] | null | undefined} entries
- * @returns {T[]}
- */
-export function filterServiceEntries(entries) {
-    if (!Array.isArray(entries)) return [];
-    return entries.filter(isServiceEntry);
 }

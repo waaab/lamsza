@@ -69,3 +69,23 @@ func TestDirectoryCatalogSeedIds(t *testing.T) {
 		t.Fatalf("entries next id = %d, want 1 (last_value=%d is_called=%v)", nextID, lastValue, isCalled)
 	}
 }
+
+func TestLegacyCategoryMigrateDoesNotPruneTree(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+	handlers.MigrateEntryCategories()
+	handlers.MigrateEntryTypes()
+	var n int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 68 {
+		t.Fatalf("categories = %d, want 68", n)
+	}
+	var types int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&types); err != nil {
+		t.Fatal(err)
+	}
+	if types != 3 {
+		t.Fatalf("types = %d, want 3", types)
+	}
+}

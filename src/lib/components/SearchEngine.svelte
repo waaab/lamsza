@@ -5,7 +5,6 @@
     import { searchResultCardModel } from "$lib/searchResultCard.js";
     import { formatSearchElapsed } from "$lib/searchElapsed.js";
     import { locationMenuTowns, searchPreferredLocation, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
-    import { isServiceEntry } from "$lib/entryType.js";
     import {
         buildSettlementAnswer,
         pickSettlement,
@@ -69,13 +68,8 @@
     $: filteredAttractions = (searchResults?.attractions || []).filter((item) =>
         !selectedCounty || item.county_slug === selectedCounty,
     );
-    $: serviceEntries = orderedEntries.filter((entry) => isServiceEntry(entry));
     $: shownWebsites = resultFilter === "services" ? [] : (searchResults?.websites || []);
-    $: indexEntries = resultFilter === "services"
-        ? serviceEntries
-        : resultFilter === "websites"
-          ? []
-          : orderedEntries;
+    $: indexEntries = resultFilter === "websites" ? [] : orderedEntries;
     $: showBrowseSections = resultFilter === "index";
     $: hasResults = searchResults && (
         (showBrowseSections && filteredLocations.length > 0) ||

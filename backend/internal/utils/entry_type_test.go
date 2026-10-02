@@ -6,16 +6,16 @@ func TestCanonicalEntryType(t *testing.T) {
 	cases := []struct {
 		in, want string
 	}{
-		{"service", "Szolgáltatás"},
-		{"Service", "Szolgáltatás"},
-		{"Szolgáltatás", "Szolgáltatás"},
-		{"  szolgáltatás  ", "Szolgáltatás"},
-		{"Cég", "Cég"},
-		{"ceg", "Cég"},
-		{"company", "Cég"},
-		{"entry", "Egyéb"},
-		{"Egyéb", "Egyéb"},
-		{"other", "Egyéb"},
+		{EntryTypeSzemely, EntryTypeSzemely},
+		{"Személy", EntryTypeSzemely},
+		{EntryTypeVallalkozas, EntryTypeVallalkozas},
+		{"Vállalkozás", EntryTypeVallalkozas},
+		{EntryTypeIntezmeny, EntryTypeIntezmeny},
+		{"Intézmény", EntryTypeIntezmeny},
+		{"service", ""},
+		{"Szolgáltatás", ""},
+		{"Cég", ""},
+		{"Egyéb", ""},
 		{"", ""},
 		{"  ", ""},
 	}

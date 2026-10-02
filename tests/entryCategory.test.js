@@ -1,53 +1,46 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-    ENTRY_CATEGORY_BOLT,
-    ENTRY_CATEGORY_EGESZSEGUGY,
-    ENTRY_CATEGORY_EGYEB,
-    ENTRY_CATEGORY_HIVATALOK,
     canonicalEntryCategory,
     canonicalEntryCategoryKey,
     directoryCategoryTabs,
     entryMatchesCategory,
 } from "../src/lib/entryCategory.js";
 
-test("canonicalEntryCategory maps Index slugs and aliases", () => {
-    assert.equal(canonicalEntryCategory("egeszsegugy"), ENTRY_CATEGORY_EGESZSEGUGY);
-    assert.equal(canonicalEntryCategory("Egészségügy"), ENTRY_CATEGORY_EGESZSEGUGY);
-    assert.equal(canonicalEntryCategory("Orvosi rendelők"), ENTRY_CATEGORY_EGESZSEGUGY);
-    assert.equal(canonicalEntryCategory("hivatalok"), ENTRY_CATEGORY_HIVATALOK);
-    assert.equal(canonicalEntryCategory("városháza"), ENTRY_CATEGORY_HIVATALOK);
-    assert.equal(canonicalEntryCategory("bolt"), ENTRY_CATEGORY_BOLT);
-    assert.equal(canonicalEntryCategory("egyeb"), ENTRY_CATEGORY_EGYEB);
+test("canonicalEntryCategory returns the stored name", () => {
+    assert.equal(canonicalEntryCategory("Bútor"), "Bútor");
+    assert.equal(canonicalEntryCategory("  Étterem  "), "Étterem");
+    assert.equal(canonicalEntryCategory("egeszsegugy"), "egeszsegugy");
+    assert.equal(canonicalEntryCategory("Vendéglő"), "Vendéglő");
     assert.equal(canonicalEntryCategory(""), "");
 });
 
-test("entryMatchesCategory matches URL slug against catalog label", () => {
-    assert.equal(
-        entryMatchesCategory({ category: "Egészségügy" }, "egeszsegugy"),
-        true,
-    );
-    assert.equal(
-        entryMatchesCategory({ category: "egeszsegugy" }, "egeszsegugy"),
-        true,
-    );
+test("entryMatchesCategory matches child slug", () => {
+    assert.equal(entryMatchesCategory({ category: "Bútor" }, "butor"), true);
+    assert.equal(entryMatchesCategory({ category: "Étterem" }, "etterem"), true);
     assert.equal(entryMatchesCategory({ category: "Oktatás" }, "hivatalok"), false);
     assert.equal(entryMatchesCategory({ category: "Hivatalok" }, "osszes"), true);
 });
 
+test("entryMatchesCategory matches parent slug for a child category", () => {
+    assert.equal(entryMatchesCategory({ category: "Bútor" }, "vasarlas"), true);
+    assert.equal(entryMatchesCategory({ category: "Turbószerviz" }, "auto"), true);
+    assert.equal(entryMatchesCategory({ category: "Bútor" }, "auto"), false);
+});
+
 test("directoryCategoryTabs uses slugs in /index URLs", () => {
     const tabs = directoryCategoryTabs([
-        { category: "egeszsegugy" },
-        { category: "Egészségügy" },
-        { category: "hivatalok" },
+        { category: "Bútor" },
+        { category: "Bútor" },
+        { category: "Bank" },
         { category: "" },
     ]);
     assert.equal(tabs[0].id, "osszes");
     const ids = tabs.map((t) => t.id);
-    assert.ok(ids.includes("egeszsegugy"));
-    assert.ok(ids.includes("hivatalok"));
-    assert.equal(tabs.filter((t) => t.id === "egeszsegugy").length, 1);
-    const health = tabs.find((t) => t.id === "egeszsegugy");
-    assert.equal(health.label, ENTRY_CATEGORY_EGESZSEGUGY);
-    assert.equal(health.url, "/index/egeszsegugy");
+    assert.ok(ids.includes("butor"));
+    assert.ok(ids.includes("bank"));
+    assert.equal(tabs.filter((t) => t.id === "butor").length, 1);
+    const furniture = tabs.find((t) => t.id === "butor");
+    assert.equal(furniture.label, "Bútor");
+    assert.equal(furniture.url, "/index/butor");
 });

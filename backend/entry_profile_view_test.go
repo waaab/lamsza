@@ -106,8 +106,8 @@ func TestAdminEntriesStoreHoursAndDeliverySwitches(t *testing.T) {
 		"id":               id,
 		"name":             "Admin Switch Entry",
 		"location_id":      locID,
-		"type":             "entry",
-		"category":         "Egyéb",
+		"type":             "Vállalkozás",
+		"category":         "Bútor",
 		"hours_enabled":    true,
 		"delivery_enabled": true,
 	}
@@ -201,8 +201,8 @@ func TestPublicHoursSwitch(t *testing.T) {
 		"id":            id,
 		"name":          "Public Hours Switch",
 		"location_id":   locID,
-		"type":          "entry",
-		"category":      "Egyéb",
+		"type":          "Vállalkozás",
+		"category":      "Bútor",
 		"hours_enabled": true,
 		"hours":         map[string]interface{}{},
 	}

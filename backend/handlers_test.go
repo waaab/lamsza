@@ -725,8 +725,8 @@ func TestPublicEntryVerifiedSeparateFromClaimed(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":        "Verified Separate Test",
 		"location_id": locID,
-		"type":        "service",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 		"verified":    true,
 	}
 
@@ -771,8 +771,8 @@ func TestAdminEntriesCRUD(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":        "IntegTest Entry",
 		"location_id": locID,
-		"type":        "entry",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 		"phone":       "0700-000-000",
 		"address":     "Test Address 1",
 		"notes":       "Integration test entry",
@@ -1071,8 +1071,8 @@ func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":        "Claim Test Entry",
 		"location_id": locID,
-		"type":        "entry",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 	}
 	rr = doRequest(t, "POST", "/api/admin/entries", payload)
 	if rr.Code != http.StatusOK {
@@ -1167,8 +1167,8 @@ func TestMemberCanPatchListing(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":        "Patch Test Entry",
 		"location_id": locID,
-		"type":        "entry",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 		"verified":    true,
 	}
 	rr = doRequest(t, "POST", "/api/admin/entries", payload)
@@ -1284,8 +1284,8 @@ func TestMemberCannotDeleteListing(t *testing.T) {
 	payload := map[string]interface{}{
 		"name":        "Delete Test Entry",
 		"location_id": locID,
-		"type":        "entry",
-		"category":    "Egyéb",
+		"type":        "Vállalkozás",
+		"category":    "Bútor",
 	}
 	rr = doRequest(t, "POST", "/api/admin/entries", payload)
 	if rr.Code != http.StatusOK {
