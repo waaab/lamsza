@@ -4,6 +4,7 @@
     import { page } from "$app/stores";
     import { onMount } from "svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
+    import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
     import {
@@ -21,9 +22,10 @@
         directoryCategoryTabs,
         directoryChildTabs,
         entryMatchesCategory,
+        parentCategoryTabActive,
     } from "$lib/entryCategory.js";
     import { apiFetch } from "$lib/api.js";
-    import { listingAnchor, sortDirectoryEntries } from "$lib/directoryListingOrder.js";
+    import { listingAnchor, sortDirectoryEntries, sortWebsites } from "$lib/directoryListingOrder.js";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { auth } from "$lib/stores/auth";
 
@@ -33,6 +35,8 @@
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
     let childCategories = [];
     let entries = [];
+    /** @type {Array<{ id: number, title: string, description: string, domain: string, url: string, category?: string, entry_id?: number }>} */
+    let shelfWebsites = [];
     let loading = true;
     let error = null;
 
@@ -113,8 +117,13 @@
         location: locationOrderOn ? listingLocation : null,
         locations,
     });
-    $: totalCount = sortedEntries.length;
+    $: sortedWebsites = sortWebsites(shelfWebsites, sortMode);
+    $: totalCount = sortedEntries.length + sortedWebsites.length;
     $: displayItems = sortedEntries.slice(0, visibleCount);
+    $: displayWebsites = sortedWebsites.slice(
+        0,
+        Math.max(0, visibleCount - sortedEntries.length),
+    );
 
     function loadMore() {
         visibleCount += 12;
@@ -184,6 +193,9 @@
             entries = (allEntries || []).filter((e) =>
                 entryMatchesCategory(e, categoryId),
             );
+            shelfWebsites = websites.filter(
+                (site) => !site.entry_id && entryMatchesCategory(site, categoryId),
+            );
         } catch (err) {
             console.error(err);
             error = "Hiba történt az adatok betöltésekor.";
@@ -210,8 +222,7 @@
     {:else}
         {#each dynamicCategories as cat}
             <button
-                class="btn btn-md {cat.id === currentCategory ||
-                cat.id.toLowerCase() === currentCategory.toLowerCase()
+                class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, DIRECTORY_CATALOG)
                     ? 'active'
                     : ''}"
                 on:click={() => goto(cat.url)}>{cat.label}</button
@@ -256,7 +267,7 @@
                     on:click={clearAllFilters}>Szűrő törlése</button
                 >
             </p>
-            <p>({displayItems.length}/{totalCount})</p>
+            <p>({displayItems.length + displayWebsites.length}/{totalCount})</p>
         </span>
 
         <div class="view-mode-toggle">
@@ -411,11 +422,11 @@
             <span class="info-box error">
                 <p>{error}</p>
             </span>
-        {:else if entries.length === 0}
+        {:else if entries.length === 0 && shelfWebsites.length === 0}
             <span class="info-box info">
                 <p>Nincs megjeleníthető bejegyzés ebben a kategóriában.</p>
             </span>
-        {:else if displayItems.length === 0}
+        {:else if displayItems.length === 0 && displayWebsites.length === 0}
             <span class="info-box info"
                 ><p>Nincs a szűrőknek megfelelő bejegyzés.</p></span
             >
@@ -423,6 +434,9 @@
             <div class="list {viewMode === 'grid' ? 'grid' : 'flex'}">
                 {#each displayItems as entry}
                     <EntryCard {entry} layout={viewMode === "grid" ? "grid" : "list"} />
+                {/each}
+                {#each displayWebsites as website (website.id)}
+                    <WebsiteCard {website} />
                 {/each}
             </div>
             {#if visibleCount < totalCount}

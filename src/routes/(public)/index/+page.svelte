@@ -32,6 +32,7 @@
         directoryChildTabs,
         entryHasTown,
         entryMatchesCategory,
+        parentCategoryTabActive,
     } from "$lib/entryCategory.js";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { apiFetch } from "$lib/api.js";
@@ -256,8 +257,11 @@
                 entryMatchesCategory(e, currentCategory)) &&
             matchesClaim(e, websiteClaimFilter),
     );
-    $: filteredWebsites = unlinkedWebsites.filter((site) =>
-        matchesClaim(site, websiteClaimFilter),
+    $: filteredWebsites = unlinkedWebsites.filter(
+        (site) =>
+            (currentCategory === "osszes" ||
+                entryMatchesCategory(site, currentCategory)) &&
+            matchesClaim(site, websiteClaimFilter),
     );
     $: sortedWebsiteEntries = sortDirectoryEntries(filteredWebsiteEntries, {
         sortMode: websiteSortMode,
@@ -669,7 +673,7 @@
             <div class="header-tabs-filters-row">
                 {#each dynamicCategories as cat}
                     <button
-                        class="btn btn-md {cat.id === currentCategory ? 'active' : ''}"
+                        class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, DIRECTORY_CATALOG) ? 'active' : ''}"
                         on:click={() => (currentCategory = cat.id)}>{cat.label}</button
                     >
                 {/each}

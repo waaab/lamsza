@@ -6,7 +6,9 @@ import {
     DIRECTORY_CATALOG,
     directoryCategoryTabs,
     directoryChildTabs,
+    directoryParentSlug,
     entryMatchesCategory,
+    parentCategoryTabActive,
 } from "../src/lib/entryCategory.js";
 
 test("canonicalEntryCategory returns the stored name", () => {
@@ -57,4 +59,27 @@ test("directoryChildTabs hides empty child shelves", () => {
         children.map((row) => row.id),
         ["butor"],
     );
+});
+
+test("directoryChildTabs resolves a child slug to its parent row", () => {
+    const children = directoryChildTabs(
+        "butor",
+        DIRECTORY_CATALOG,
+        [{ category: "Bútor" }],
+        [{ category: "Bútor", entry_id: 0 }],
+    );
+    assert.deepEqual(
+        children.map((row) => row.id),
+        ["butor"],
+    );
+});
+
+test("directoryParentSlug maps child slugs to their parent", () => {
+    assert.equal(directoryParentSlug("butor", DIRECTORY_CATALOG), "vasarlas");
+    assert.equal(directoryParentSlug("vasarlas", DIRECTORY_CATALOG), "vasarlas");
+});
+
+test("parentCategoryTabActive keeps the parent tab lit for a child slug", () => {
+    assert.equal(parentCategoryTabActive("vasarlas", "butor", DIRECTORY_CATALOG), true);
+    assert.equal(parentCategoryTabActive("auto", "butor", DIRECTORY_CATALOG), false);
 });
