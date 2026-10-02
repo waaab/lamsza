@@ -3,6 +3,9 @@ package main
 import (
 	"backend/internal/db"
 	"backend/internal/handlers"
+	"encoding/json"
+	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -88,4 +91,45 @@ func TestLegacyCategoryMigrateDoesNotPruneTree(t *testing.T) {
 	if types != 3 {
 		t.Fatalf("types = %d, want 3", types)
 	}
+}
+
+func TestDeleteCategoryRequiresMove(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+	// Étterem is 11. Attach nothing. Delete succeeds.
+	rr := doRequest(t, "DELETE", "/api/admin/entry_categories?id=11", nil)
+	if rr.Code != 200 {
+		t.Fatalf("empty delete: %d %s", rr.Code, rr.Body.String())
+	}
+	// Recreate Étterem under Étkezés (1) so later tests still have a leaf.
+	rr = doRequest(t, "POST", "/api/admin/entry_categories", strings.NewReader(`{"name":"Étterem","parent_id":1}`))
+	if rr.Code != 200 {
+		t.Fatalf("recreate: %d %s", rr.Code, rr.Body.String())
+	}
+	var created struct {
+		ID int `json:"id"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.DB.Exec(`
+		INSERT INTO entries (name, category_id, type_id, languages)
+		VALUES ('Próba étterem', $1, 2, '{HU}')`, created.ID); err != nil {
+		t.Fatal(err)
+	}
+	rr = doRequest(t, "DELETE", "/api/admin/entry_categories?id="+strconv.Itoa(created.ID), nil)
+	if rr.Code != 409 {
+		t.Fatalf("blocked delete: %d", rr.Code)
+	}
+	rr = doRequest(t, "DELETE", "/api/admin/entry_categories?id="+strconv.Itoa(created.ID)+"&move_to=12", nil)
+	if rr.Code != 200 {
+		t.Fatalf("move delete: %d %s", rr.Code, rr.Body.String())
+	}
+	var cat int
+	if err := db.DB.QueryRow(`SELECT category_id FROM entries WHERE name = 'Próba étterem'`).Scan(&cat); err != nil {
+		t.Fatal(err)
+	}
+	if cat != 12 {
+		t.Fatalf("moved category = %d, want 12 Kávézó", cat)
+	}
+	_, _ = db.DB.Exec(`DELETE FROM entries WHERE name = 'Próba étterem'`)
 }

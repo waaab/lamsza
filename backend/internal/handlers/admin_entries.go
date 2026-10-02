@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -188,10 +189,52 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func scanEntryCategory(row interface {
+	Scan(dest ...interface{}) error
+}) (models.EntryCategory, error) {
+	var sc models.EntryCategory
+	var parentID sql.NullInt64
+	if err := row.Scan(&sc.ID, &sc.Name, &sc.Slug, &parentID, &sc.SortOrder); err != nil {
+		return sc, err
+	}
+	if parentID.Valid {
+		v := int(parentID.Int64)
+		sc.ParentID = &v
+	}
+	return sc, nil
+}
+
+func validateCategoryParent(parentID *int) error {
+	if parentID == nil {
+		return nil
+	}
+	var grandparent sql.NullInt64
+	err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, *parentID).Scan(&grandparent)
+	if err == sql.ErrNoRows {
+		return fmt.Errorf("parent not found")
+	}
+	if err != nil {
+		return err
+	}
+	if grandparent.Valid {
+		return fmt.Errorf("third level not allowed")
+	}
+	return nil
+}
+
+func siblingSortOrder(parentID *int) (int, error) {
+	var sortOrder int
+	err := db.DB.QueryRow(`
+		SELECT COALESCE(MAX(sort_order), 0) + 1 FROM entry_categories
+		WHERE (($1::int IS NULL AND parent_id IS NULL) OR parent_id = $1)`,
+		parentID).Scan(&sortOrder)
+	return sortOrder, err
+}
+
 func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		rows, err := db.DB.Query("SELECT id, name FROM entry_categories ORDER BY name ASC")
+		rows, err := db.DB.Query(`SELECT id, name, slug, parent_id, sort_order FROM entry_categories ORDER BY COALESCE(parent_id, id), sort_order, id`)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -199,8 +242,8 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		var res []models.EntryCategory
 		for rows.Next() {
-			var sc models.EntryCategory
-			if err := rows.Scan(&sc.ID, &sc.Name); err == nil {
+			sc, err := scanEntryCategory(rows)
+			if err == nil {
 				res = append(res, sc)
 			}
 		}
@@ -215,8 +258,33 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		slug := utils.Slugify(sc.Name)
-		err := db.DB.QueryRow("INSERT INTO entry_categories (name, slug) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET slug=EXCLUDED.slug RETURNING id", sc.Name, slug).Scan(&sc.ID)
+		sc.Name = strings.TrimSpace(sc.Name)
+		if sc.Name == "" {
+			http.Error(w, "name required", http.StatusBadRequest)
+			return
+		}
+		if err := validateCategoryParent(sc.ParentID); err != nil {
+			if err.Error() == "parent not found" {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if err.Error() == "third level not allowed" {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		sortOrder, err := siblingSortOrder(sc.ParentID)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		sc.Slug = utils.Slugify(sc.Name)
+		err = db.DB.QueryRow(
+			`INSERT INTO entry_categories (name, slug, parent_id, sort_order) VALUES ($1, $2, $3, $4) RETURNING id, sort_order`,
+			sc.Name, sc.Slug, sc.ParentID, sortOrder,
+		).Scan(&sc.ID, &sc.SortOrder)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -229,31 +297,157 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 400)
 			return
 		}
-		slug := utils.Slugify(sc.Name)
-		_, err := db.DB.Exec("UPDATE entry_categories SET name=$1, slug=$2 WHERE id=$3", sc.Name, slug, sc.ID)
+		sc.Name = strings.TrimSpace(sc.Name)
+		if sc.Name == "" {
+			http.Error(w, "name required", http.StatusBadRequest)
+			return
+		}
+		if err := validateCategoryParent(sc.ParentID); err != nil {
+			if err.Error() == "parent not found" || err.Error() == "third level not allowed" {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if sc.ParentID != nil {
+			var children int
+			if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories WHERE parent_id = $1`, sc.ID).Scan(&children); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			if children > 0 {
+				http.Error(w, "parent with children cannot be moved", http.StatusBadRequest)
+				return
+			}
+		}
+		sc.Slug = utils.Slugify(sc.Name)
+		_, err := db.DB.Exec(
+			`UPDATE entry_categories SET name=$1, slug=$2, parent_id=$3 WHERE id=$4`,
+			sc.Name, sc.Slug, sc.ParentID, sc.ID,
+		)
 		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if _, err := db.DB.Exec(`UPDATE entries SET cat_name = $1 WHERE category_id = $2`, sc.Name, sc.ID); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 
 	case "DELETE":
-		id := r.URL.Query().Get("id")
-		if id == "" {
+		idStr := r.URL.Query().Get("id")
+		if idStr == "" {
 			http.Error(w, "missing id", http.StatusBadRequest)
 			return
 		}
-		var n int
-		err := db.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE category_id = $1`, id).Scan(&n)
+		id, err := strconv.Atoi(idStr)
 		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
+		}
+		moveToStr := r.URL.Query().Get("move_to")
+		if moveToStr != "" {
+			moveTo, err := strconv.Atoi(moveToStr)
+			if err != nil {
+				http.Error(w, "invalid move_to", http.StatusBadRequest)
+				return
+			}
+			if moveTo == id {
+				http.Error(w, "move_to cannot equal id", http.StatusBadRequest)
+				return
+			}
+			var parentID sql.NullInt64
+			if err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, id).Scan(&parentID); err == sql.ErrNoRows {
+				http.Error(w, "category not found", http.StatusNotFound)
+				return
+			} else if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			if !parentID.Valid {
+				var moveParent sql.NullInt64
+				if err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, moveTo).Scan(&moveParent); err == sql.ErrNoRows {
+					http.Error(w, "move_to not found", http.StatusBadRequest)
+					return
+				} else if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				if moveParent.Valid {
+					http.Error(w, "move_to must be a parent", http.StatusBadRequest)
+					return
+				}
+				if _, err := db.DB.Exec(`UPDATE entry_categories SET parent_id = $1 WHERE parent_id = $2`, moveTo, id); err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+			} else {
+				var moveParent sql.NullInt64
+				if err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, moveTo).Scan(&moveParent); err == sql.ErrNoRows {
+					http.Error(w, "move_to not found", http.StatusBadRequest)
+					return
+				} else if err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				if !moveParent.Valid {
+					http.Error(w, "move_to must be a child", http.StatusBadRequest)
+					return
+				}
+				if _, err := db.DB.Exec(`
+					UPDATE entries SET category_id = $1, cat_name = (SELECT name FROM entry_categories WHERE id = $1)
+					WHERE category_id = $2`, moveTo, id); err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				if _, err := db.DB.Exec(`UPDATE websites SET category_id = $1 WHERE category_id = $2`, moveTo, id); err != nil {
+					http.Error(w, err.Error(), 500)
+					return
+				}
+			}
+			if _, err := db.DB.Exec(`DELETE FROM entry_categories WHERE id = $1`, id); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		var parentID sql.NullInt64
+		if err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, id).Scan(&parentID); err == sql.ErrNoRows {
+			http.Error(w, "category not found", http.StatusNotFound)
+			return
+		} else if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if n > 0 {
-			http.Error(w, fmt.Sprintf("Nem törölhető: %d bejegyzés használja ezt a kategóriát.", n), http.StatusConflict)
+		if !parentID.Valid {
+			var children int
+			if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories WHERE parent_id = $1`, id).Scan(&children); err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			if children > 0 {
+				http.Error(w, "Előbb helyezd át vagy töröld az alkategóriákat.", http.StatusConflict)
+				return
+			}
+		}
+		var entries int
+		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE category_id = $1`, id).Scan(&entries); err != nil {
+			http.Error(w, err.Error(), 500)
 			return
 		}
-		if _, err := db.DB.Exec("DELETE FROM entry_categories WHERE id = $1", id); err != nil {
+		var websites int
+		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM websites WHERE category_id = $1`, id).Scan(&websites); err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		if entries > 0 || websites > 0 {
+			http.Error(w, "Előbb helyezd át a bejegyzéseket.", http.StatusConflict)
+			return
+		}
+		if _, err := db.DB.Exec(`DELETE FROM entry_categories WHERE id = $1`, id); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}

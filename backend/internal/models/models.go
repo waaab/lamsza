@@ -255,8 +255,11 @@ type AdminEntry struct {
 }
 
 type EntryCategory struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Slug      string `json:"slug"`
+	ParentID  *int   `json:"parent_id"`
+	SortOrder int    `json:"sort_order"`
 }
 
 type EntryType struct {
