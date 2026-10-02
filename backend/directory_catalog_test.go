@@ -163,9 +163,22 @@ func TestEntryTypesStayClosed(t *testing.T) {
 	if rr.Code != 403 {
 		t.Fatalf("create type: %d", rr.Code)
 	}
+	if !strings.Contains(rr.Body.String(), "A típuslista zárt.") {
+		t.Fatalf("create type body: %s", rr.Body.String())
+	}
+	rr = doRequest(t, "PUT", "/api/admin/entry_types", strings.NewReader(`{"id":1,"name":"Más"}`))
+	if rr.Code != 403 {
+		t.Fatalf("update type: %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "A típuslista zárt.") {
+		t.Fatalf("update type body: %s", rr.Body.String())
+	}
 	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id=1", nil)
 	if rr.Code != 403 {
 		t.Fatalf("delete type: %d", rr.Code)
+	}
+	if !strings.Contains(rr.Body.String(), "A típuslista zárt.") {
+		t.Fatalf("delete type body: %s", rr.Body.String())
 	}
 	var n int
 	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&n); err != nil {

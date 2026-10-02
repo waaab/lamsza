@@ -454,29 +454,59 @@ func TestAdminEntryCategoriesCRUD(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestAdminEntryTypesCRUD(t *testing.T) {
-	payload := map[string]string{"name": "TestType_IntegTest"}
+	const closedMsg = "A típuslista zárt."
 
-	rr := doRequest(t, "POST", "/api/admin/entry_types", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entry_types: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	rr := doRequest(t, "POST", "/api/admin/entry_types", map[string]string{"name": "TestType_IntegTest"})
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("POST entry_types: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
 	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
+	if !strings.Contains(rr.Body.String(), closedMsg) {
+		t.Fatalf("POST entry_types: expected %q in body, got %s", closedMsg, rr.Body.String())
+	}
 
 	rr = doRequest(t, "GET", "/api/admin/entry_types", nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET entry_types: expected 200, got %d", rr.Code)
 	}
-
-	rr = doRequest(t, "PUT", "/api/admin/entry_types", map[string]interface{}{"id": id, "name": "TestType_Updated"})
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT entry_types: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+	var types []map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &types); err != nil {
+		t.Fatal(err)
+	}
+	if len(types) != 3 {
+		t.Fatalf("GET entry_types: expected 3 types, got %d", len(types))
+	}
+	wantNames := []string{"Személy", "Vállalkozás", "Intézmény"}
+	gotNames := make([]string, len(types))
+	for i, tp := range types {
+		gotNames[i], _ = tp["name"].(string)
+	}
+	for _, want := range wantNames {
+		found := false
+		for _, got := range gotNames {
+			if got == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("GET entry_types: missing %q in %#v", want, gotNames)
+		}
 	}
 
-	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE entry_types: expected 200, got %d", rr.Code)
+	rr = doRequest(t, "PUT", "/api/admin/entry_types", map[string]interface{}{"id": 1, "name": "TestType_Updated"})
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("PUT entry_types: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), closedMsg) {
+		t.Fatalf("PUT entry_types: expected %q in body, got %s", closedMsg, rr.Body.String())
+	}
+
+	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id=1", nil)
+	if rr.Code != http.StatusForbidden {
+		t.Fatalf("DELETE entry_types: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), closedMsg) {
+		t.Fatalf("DELETE entry_types: expected %q in body, got %s", closedMsg, rr.Body.String())
 	}
 }
 
