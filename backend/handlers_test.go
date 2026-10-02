@@ -985,7 +985,7 @@ func TestAdminPublishDoesNotVerify(t *testing.T) {
 	locID := locs[0]["id"]
 
 	var categoryID, typeID int
-	if err := db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
+	if err := db.DB.QueryRow(`SELECT id FROM entry_categories WHERE parent_id IS NOT NULL ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
 		t.Skip("No entry categories in DB; cannot test admin publish queue")
 	}
 	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {
@@ -1393,7 +1393,7 @@ func TestListingRejectsInvalidURL(t *testing.T) {
 	locID := locs[0]["id"]
 
 	var categoryID, typeID int
-	if err := db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
+	if err := db.DB.QueryRow(`SELECT id FROM entry_categories WHERE parent_id IS NOT NULL ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
 		t.Skip("No entry categories in DB; cannot test listing url validation")
 	}
 	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {

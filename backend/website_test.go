@@ -295,7 +295,7 @@ func cleanupClaimTestDomains(t *testing.T) {
 			t.Errorf("cleanup website %s: %v", d, err)
 		}
 	}
-	for _, name := range []string{"Manifesto", "Second", "Banned claim"} {
+	for _, name := range []string{"Claimmanifestoqx", "Second", "Banned claim"} {
 		if _, err := db.DB.Exec(`DELETE FROM entries WHERE name = $1`, name); err != nil {
 			t.Errorf("cleanup entry name %s: %v", name, err)
 		}
@@ -317,10 +317,10 @@ func TestClaimWebsiteCreatesUnpublishedListing(t *testing.T) {
 
 	locID := mustLocID(t)
 	var catID, typeID int
-	db.DB.QueryRow(`SELECT id FROM entry_categories ORDER BY id ASC LIMIT 1`).Scan(&catID)
+	db.DB.QueryRow(`SELECT id FROM entry_categories WHERE parent_id IS NOT NULL ORDER BY id ASC LIMIT 1`).Scan(&catID)
 	db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID)
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
-		"website_id": webID, "name": "Manifesto", "location_id": locID,
+		"website_id": webID, "name": "Claimmanifestoqx", "location_id": locID,
 		"category_id": catID, "type_id": typeID, "url": "https://evil.example",
 	}, owner)
 	if rr.Code != 200 {
@@ -351,7 +351,7 @@ func TestClaimWebsiteCreatesUnpublishedListing(t *testing.T) {
 	if after["websites"].([]interface{})[0].(map[string]interface{})["url"] != "https://claim-example.com" {
 		t.Fatal("website hit missing")
 	}
-	byName := searchJSON(t, "Manifesto")
+	byName := searchJSON(t, "Claimmanifestoqx")
 	if byName["website_query"] == true || len(byName["websites"].([]interface{})) != 0 {
 		t.Fatalf("name query leaked website %#v", byName["websites"])
 	}
