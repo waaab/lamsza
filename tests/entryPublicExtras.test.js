@@ -25,12 +25,12 @@ test('showListingHours follows hours_enabled even when gazdátlan or the week is
 test('showListingDeliveryHours requires the switch and a delivery category', () => {
 	assert.equal(showListingDeliveryHours({
 		delivery_enabled: true,
-		category: 'Vendéglő',
+		category: 'Étterem',
 		name: 'Példa'
 	}), true);
 	assert.equal(showListingDeliveryHours({
 		delivery_enabled: true,
-		category: 'Vendéglő',
+		category: 'Étterem',
 		name: 'Lámsza.com'
 	}), false);
 	assert.equal(showListingDeliveryHours({

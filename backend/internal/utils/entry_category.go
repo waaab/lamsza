@@ -8,6 +8,7 @@ const (
 	EntryCategoryMesteremberek  = "Mesteremberek"
 	EntryCategoryHivatalok      = "Hivatalok"
 	EntryCategoryVendeglo       = "Vendéglő"
+	EntryCategoryEtterem        = "Étterem"
 	EntryCategoryBolt           = "Bolt"
 	EntryCategorySportegyesulet = "Sportegyesület"
 	EntryCategoryEgyeb          = "Egyéb"

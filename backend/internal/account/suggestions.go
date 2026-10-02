@@ -3,6 +3,7 @@ package account
 import (
 	"backend/internal/auth"
 	"backend/internal/db"
+	"backend/internal/utils"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -419,7 +420,7 @@ func suggestionOffersDelivery(entry suggestionEntry) bool {
 	if strings.TrimSpace(entry.Name) == "Lámsza.com" {
 		return false
 	}
-	return entry.DeliveryEnabled && strings.TrimSpace(entry.Category) == "Vendéglő"
+	return entry.DeliveryEnabled && strings.TrimSpace(entry.Category) == utils.EntryCategoryEtterem
 }
 
 func normalizeSuggestionFields(raw map[string]json.RawMessage, entry suggestionEntry) (map[string]any, error) {

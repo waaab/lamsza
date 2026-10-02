@@ -90,6 +90,29 @@ const CATEGORY_PARENT_SLUG = new Map(
 );
 
 /**
+ * Turn the public category API into the slug-parent rows the shelves use.
+ *
+ * @param {Array<{ id: number, name: string, slug?: string, parent_id?: number | null, sort_order?: number }>} rows
+ */
+export function directoryCatalogFromApi(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const slugById = new Map(
+        list.map((row) => [Number(row.id), String(row.slug || foldCategory(row.name))]),
+    );
+    return list.map((row, index) => {
+        const parentID =
+            row.parent_id == null || row.parent_id === "" ? null : Number(row.parent_id);
+        return {
+            id: String(row.id),
+            name: String(row.name ?? ""),
+            slug: String(row.slug || foldCategory(row.name)),
+            parent_id: parentID ? slugById.get(parentID) || null : null,
+            sort_order: Number(row.sort_order ?? index + 1),
+        };
+    });
+}
+
+/**
  * Return the stored category name.
  *
  * @param {unknown} raw
@@ -109,11 +132,18 @@ export function canonicalEntryCategoryKey(raw) {
  * @param {{ category?: string } | null | undefined} entry
  * @param {string} slug
  */
-export function entryMatchesCategory(entry, slug) {
+export function entryMatchesCategory(entry, slug, catalog = DIRECTORY_CATALOG) {
     if (!slug || slug === "osszes") return true;
     const catKey = canonicalEntryCategoryKey(entry?.category);
     const filterKey = foldCategory(slug);
     if (catKey === filterKey) return true;
+    const rows = catalog || DIRECTORY_CATALOG;
+    const row = rows.find(
+        (item) => item.slug === catKey || foldCategory(item.name) === catKey,
+    );
+    if (row?.parent_id) {
+        return row.parent_id === filterKey;
+    }
     return CATEGORY_PARENT_SLUG.get(catKey) === filterKey;
 }
 

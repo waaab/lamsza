@@ -68,6 +68,7 @@ func main() {
 	// Core Module (Always Enabled)
 	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	mux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
+	mux.HandleFunc("/api/entry-categories", middleware.ApplyCORS(handlers.HandlePublicEntryCategories))
 	mux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	mux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
 	mux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))

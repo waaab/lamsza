@@ -6675,8 +6675,12 @@
                         <label for="serv_cat">Kategória</label>
                         <select id="serv_cat" bind:value={newEntry.category_id}>
                             <option value={null}>-</option>
-                            {#each entryCategories as cat}
-                                <option value={cat.id}>{cat.name}</option>
+                            {#each entryCategoryParents as parent}
+                                <optgroup label={parent.name}>
+                                    {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
+                                        <option value={child.id}>{child.name}</option>
+                                    {/each}
+                                </optgroup>
                             {/each}
                         </select>
 
@@ -8292,8 +8296,12 @@
                     <label for="edit_cat">Kategória</label>
                     <select id="edit_cat" bind:value={editingEntry.category_id}>
                         <option value={null}>-</option>
-                        {#each entryCategories as cat}
-                            <option value={cat.id}>{cat.name}</option>
+                        {#each entryCategoryParents as parent}
+                            <optgroup label={parent.name}>
+                                {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
+                                    <option value={child.id}>{child.name}</option>
+                                {/each}
+                            </optgroup>
                         {/each}
                     </select>
 
@@ -9365,8 +9373,12 @@
                         bind:value={newOrganizerEntry.category_id}
                     >
                         <option value={null}>-</option>
-                        {#each entryCategories as cat}
-                            <option value={cat.id}>{cat.name}</option>
+                        {#each entryCategoryParents as parent}
+                            <optgroup label={parent.name}>
+                                {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
+                                    <option value={child.id}>{child.name}</option>
+                                {/each}
+                            </optgroup>
                         {/each}
                     </select>
 

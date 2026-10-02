@@ -4,8 +4,10 @@ import (
 	"backend/internal/db"
 	"backend/internal/utils"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"strings"
 )
 
@@ -26,26 +28,46 @@ func MigrateEntryCategories() {
 func resolveEntryCategoryID(id *int, name string) (int, string, error) {
 	if id != nil && *id > 0 {
 		var n string
-		err := db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, *id).Scan(&n)
+		var parentID sql.NullInt64
+		err := db.DB.QueryRow(`SELECT name, parent_id FROM entry_categories WHERE id = $1`, *id).Scan(&n, &parentID)
 		if err == nil {
-			return *id, n, nil
+			return leafCategory(*id, n, parentID)
 		}
 	}
 	canon := utils.CanonicalEntryCategory(name)
 	if canon != "" {
 		var cid int
-		err := db.DB.QueryRow(`SELECT id FROM entry_categories WHERE name = $1`, canon).Scan(&cid)
+		var parentID sql.NullInt64
+		err := db.DB.QueryRow(`SELECT id, parent_id FROM entry_categories WHERE name = $1`, canon).Scan(&cid, &parentID)
 		if err == nil {
-			return cid, canon, nil
+			return leafCategory(cid, canon, parentID)
 		}
 	}
 	trimmed := strings.TrimSpace(name)
 	if trimmed != "" {
 		var cid int
-		err := db.DB.QueryRow(`SELECT id FROM entry_categories WHERE name = $1`, trimmed).Scan(&cid)
+		var parentID sql.NullInt64
+		err := db.DB.QueryRow(`SELECT id, parent_id FROM entry_categories WHERE name = $1`, trimmed).Scan(&cid, &parentID)
 		if err == nil {
-			return cid, trimmed, nil
+			return leafCategory(cid, trimmed, parentID)
 		}
 	}
 	return 0, "", fmt.Errorf("unknown entry category: %s", strings.TrimSpace(name))
+}
+
+var errCategoryNotLeaf = errors.New("category must be a subcategory")
+
+func leafCategory(id int, name string, parentID sql.NullInt64) (int, string, error) {
+	if !parentID.Valid {
+		return 0, "", errCategoryNotLeaf
+	}
+	return id, name, nil
+}
+
+func writeCategoryResolveError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errCategoryNotLeaf) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	http.Error(w, err.Error(), http.StatusInternalServerError)
 }

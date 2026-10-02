@@ -28,6 +28,7 @@
     import {
         canonicalEntryCategory,
         DIRECTORY_CATALOG,
+        directoryCatalogFromApi,
         directoryCategoryTabs,
         directoryChildTabs,
         entryHasTown,
@@ -45,6 +46,7 @@
     let pageHeaderLoading = false;
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
+    let catalog = DIRECTORY_CATALOG;
     let childCategories = [];
     let entries = [];
     /** @type {Array<{ id: number, title: string, description: string, domain: string, url: string, claimed?: boolean }>} */
@@ -202,20 +204,20 @@
     $: filteredEntries = viewEntries.filter(
         (e) =>
             (currentCategory === "osszes" ||
-                entryMatchesCategory(e, currentCategory)) &&
+                entryMatchesCategory(e, currentCategory, catalog)) &&
             entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey) &&
             matchesPlace(e, selectedPlace) &&
             matchesClaim(e, serviceClaimFilter),
     );
     $: serviceClaimCounts = {
         claimed: viewEntries.filter((e) =>
-            (currentCategory === "osszes" || entryMatchesCategory(e, currentCategory)) &&
+            (currentCategory === "osszes" || entryMatchesCategory(e, currentCategory, catalog)) &&
             entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey) &&
             matchesPlace(e, selectedPlace) &&
             e.claimed,
         ).length,
         unclaimed: viewEntries.filter((e) =>
-            (currentCategory === "osszes" || entryMatchesCategory(e, currentCategory)) &&
+            (currentCategory === "osszes" || entryMatchesCategory(e, currentCategory, catalog)) &&
             entryMatchesAsideFilters(e, selectedTypeKey, selectedTagKey) &&
             matchesPlace(e, selectedPlace) &&
             !e.claimed,
@@ -226,7 +228,7 @@
         currentCategory === "osszes"
             ? null
             : dynamicCategories.find((c) => c.id === currentCategory)?.label ||
-              DIRECTORY_CATALOG.find((row) => row.slug === currentCategory)?.name ||
+              catalog.find((row) => row.slug === currentCategory)?.name ||
               canonicalEntryCategory(currentCategory);
 
     $: typeFilterLabel =
@@ -254,13 +256,13 @@
     $: filteredWebsiteEntries = websiteEntries.filter(
         (e) =>
             (currentCategory === "osszes" ||
-                entryMatchesCategory(e, currentCategory)) &&
+                entryMatchesCategory(e, currentCategory, catalog)) &&
             matchesClaim(e, websiteClaimFilter),
     );
     $: filteredWebsites = unlinkedWebsites.filter(
         (site) =>
             (currentCategory === "osszes" ||
-                entryMatchesCategory(site, currentCategory)) &&
+                entryMatchesCategory(site, currentCategory, catalog)) &&
             matchesClaim(site, websiteClaimFilter),
     );
     $: sortedWebsiteEntries = sortDirectoryEntries(filteredWebsiteEntries, {
@@ -301,10 +303,11 @@
 
     $: childCategories = directoryChildTabs(
         currentCategory,
-        DIRECTORY_CATALOG,
+        catalog,
         entries,
         websites,
     );
+    $: dynamicCategories = directoryCategoryTabs(catalog, entries, websites);
 
     $: activeHeader =
         indexView === "services"
@@ -326,24 +329,17 @@
         });
         (async () => {
             try {
-                const [directory, locs, websitesData] = await Promise.all([
+                const [directory, locs, websitesData, categoryRows] = await Promise.all([
                     apiFetch("/api/directory"),
                     apiFetch("/api/locations"),
                     apiFetch("/api/websites"),
+                    apiFetch("/api/entry-categories"),
                 ]);
                 entries = directory || [];
                 websites = websitesData?.websites || [];
-                dynamicCategories = directoryCategoryTabs(
-                    DIRECTORY_CATALOG,
-                    entries,
-                    websites,
-                );
-                childCategories = directoryChildTabs(
-                    currentCategory,
-                    DIRECTORY_CATALOG,
-                    entries,
-                    websites,
-                );
+                if (Array.isArray(categoryRows) && categoryRows.length) {
+                    catalog = directoryCatalogFromApi(categoryRows);
+                }
                 locations = Array.isArray(locs) ? locs : [];
             } catch (err) {
                 console.error(err);
@@ -673,7 +669,7 @@
             <div class="header-tabs-filters-row">
                 {#each dynamicCategories as cat}
                     <button
-                        class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, DIRECTORY_CATALOG) ? 'active' : ''}"
+                        class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, catalog) ? 'active' : ''}"
                         on:click={() => (currentCategory = cat.id)}>{cat.label}</button
                     >
                 {/each}

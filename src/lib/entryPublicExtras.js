@@ -2,7 +2,7 @@ import { hoursConfigured } from "./entryHours.js";
 
 export function offersDelivery(entry) {
 	if (String(entry?.name ?? "").trim() === "Lámsza.com") return false;
-	return String(entry?.category ?? "").trim() === "Vendéglő";
+	return String(entry?.category ?? "").trim() === "Étterem";
 }
 
 export function showListingPhotos(entry) {

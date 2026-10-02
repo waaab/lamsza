@@ -194,7 +194,7 @@ func listingDeliveryEnabled(catName, name string, requested bool) bool {
 	if strings.TrimSpace(name) == "Lámsza.com" {
 		return false
 	}
-	return strings.TrimSpace(catName) == utils.EntryCategoryVendeglo
+	return strings.TrimSpace(catName) == utils.EntryCategoryEtterem
 }
 
 func sanitizeSocialLinks(raw json.RawMessage) json.RawMessage {

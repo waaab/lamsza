@@ -70,6 +70,7 @@ func init() {
 	testMux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
 	testMux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
 	testMux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
+	testMux.HandleFunc("/api/entry-categories", middleware.ApplyCORS(handlers.HandlePublicEntryCategories))
 	testMux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
 	testMux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
 	testMux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))

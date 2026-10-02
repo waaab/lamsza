@@ -9,6 +9,7 @@ import {
     directoryParentSlug,
     entryMatchesCategory,
     parentCategoryTabActive,
+    directoryCatalogFromApi,
 } from "../src/lib/entryCategory.js";
 
 test("canonicalEntryCategory returns the stored name", () => {
@@ -82,4 +83,14 @@ test("directoryParentSlug maps child slugs to their parent", () => {
 test("parentCategoryTabActive keeps the parent tab lit for a child slug", () => {
     assert.equal(parentCategoryTabActive("vasarlas", "butor", DIRECTORY_CATALOG), true);
     assert.equal(parentCategoryTabActive("auto", "butor", DIRECTORY_CATALOG), false);
+});
+
+test("directoryCatalogFromApi keeps an admin-added child on its parent shelf", () => {
+    const catalog = directoryCatalogFromApi([
+        { id: 1, name: "Étkezés", slug: "etkezes", parent_id: null, sort_order: 1 },
+        { id: 99, name: "Reggeli bár", slug: "reggeli-bar", parent_id: 1, sort_order: 9 },
+    ]);
+    assert.equal(entryMatchesCategory({ category: "Reggeli bár" }, "etkezes", catalog), true);
+    const tabs = directoryCategoryTabs(catalog, [{ category: "Reggeli bár" }], []);
+    assert.equal(tabs.some((tab) => tab.id === "etkezes"), true);
 });

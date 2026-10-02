@@ -22,7 +22,7 @@ func adminDeliveryEnabled(catName, name string, requested bool) bool {
 	if strings.TrimSpace(name) == "Lámsza.com" {
 		return false
 	}
-	return strings.TrimSpace(catName) == utils.EntryCategoryVendeglo
+	return strings.TrimSpace(catName) == utils.EntryCategoryEtterem
 }
 
 func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +94,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.Type = typeName
 		catID, catName, catErr := resolveEntryCategoryID(s.CategoryID, s.Category)
 		if catErr != nil {
-			http.Error(w, catErr.Error(), 500)
+			writeCategoryResolveError(w, catErr)
 			return
 		}
 		s.CategoryID = &catID
@@ -143,7 +143,7 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.Type = typeName
 		catID, catName, catErr := resolveEntryCategoryID(s.CategoryID, s.Category)
 		if catErr != nil {
-			http.Error(w, catErr.Error(), 500)
+			writeCategoryResolveError(w, catErr)
 			return
 		}
 		s.CategoryID = &catID

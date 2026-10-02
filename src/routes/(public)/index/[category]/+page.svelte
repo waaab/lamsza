@@ -19,6 +19,7 @@
     import {
         canonicalEntryCategory,
         DIRECTORY_CATALOG,
+        directoryCatalogFromApi,
         directoryCategoryTabs,
         directoryChildTabs,
         entryMatchesCategory,
@@ -33,6 +34,7 @@
     let pageHeaderLoading = false;
 
     let dynamicCategories = [{ id: "osszes", label: "Összes", url: "/index" }];
+    let catalog = DIRECTORY_CATALOG;
     let childCategories = [];
     let entries = [];
     /** @type {Array<{ id: number, title: string, description: string, domain: string, url: string, category?: string, entry_id?: number }>} */
@@ -89,7 +91,7 @@
     );
 
     $: categoryFilterLabel =
-        DIRECTORY_CATALOG.find((row) => row.slug === currentCategory)?.name ||
+        catalog.find((row) => row.slug === currentCategory)?.name ||
         canonicalEntryCategory(currentCategory) ||
         currentCategory;
 
@@ -174,27 +176,31 @@
         loading = true;
         error = null;
         try {
-            const [allEntries, websitesData] = await Promise.all([
+            const [allEntries, websitesData, categoryRows] = await Promise.all([
                 apiFetch("/api/directory"),
                 apiFetch("/api/websites"),
+                apiFetch("/api/entry-categories"),
             ]);
             const websites = websitesData?.websites || [];
+            if (Array.isArray(categoryRows) && categoryRows.length) {
+                catalog = directoryCatalogFromApi(categoryRows);
+            }
             dynamicCategories = directoryCategoryTabs(
-                DIRECTORY_CATALOG,
+                catalog,
                 allEntries || [],
                 websites,
             );
             childCategories = directoryChildTabs(
                 categoryId,
-                DIRECTORY_CATALOG,
+                catalog,
                 allEntries || [],
                 websites,
             );
             entries = (allEntries || []).filter((e) =>
-                entryMatchesCategory(e, categoryId),
+                entryMatchesCategory(e, categoryId, catalog),
             );
             shelfWebsites = websites.filter(
-                (site) => !site.entry_id && entryMatchesCategory(site, categoryId),
+                (site) => !site.entry_id && entryMatchesCategory(site, categoryId, catalog),
             );
         } catch (err) {
             console.error(err);
@@ -222,7 +228,7 @@
     {:else}
         {#each dynamicCategories as cat}
             <button
-                class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, DIRECTORY_CATALOG)
+                class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, catalog)
                     ? 'active'
                     : ''}"
                 on:click={() => goto(cat.url)}>{cat.label}</button

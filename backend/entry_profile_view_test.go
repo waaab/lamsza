@@ -136,7 +136,7 @@ func TestAdminEntriesStoreHoursAndDeliverySwitches(t *testing.T) {
 		t.Fatalf("hours_enabled: expected true on gazdátlan listing, got %v", found["hours_enabled"])
 	}
 	if found["delivery_enabled"] != false {
-		t.Fatalf("delivery_enabled: expected false for non-Vendéglő, got %v", found["delivery_enabled"])
+		t.Fatalf("delivery_enabled: expected false for non-Étterem, got %v", found["delivery_enabled"])
 	}
 
 	rr = doRequest(t, "GET", "/api/admin/entry_categories", nil)
@@ -145,23 +145,23 @@ func TestAdminEntriesStoreHoursAndDeliverySwitches(t *testing.T) {
 	}
 	var categories []map[string]interface{}
 	json.Unmarshal(rr.Body.Bytes(), &categories)
-	var vendegloID interface{}
+	var etteremID interface{}
 	for _, cat := range categories {
-		if cat["name"] == "Vendéglő" {
-			vendegloID = cat["id"]
+		if cat["name"] == "Étterem" {
+			etteremID = cat["id"]
 			break
 		}
 	}
-	if vendegloID == nil {
-		t.Skip("Vendéglő category missing; cannot test delivery_enabled")
+	if etteremID == nil {
+		t.Fatal("Étterem category missing; cannot test delivery_enabled")
 	}
 
-	payload["category_id"] = vendegloID
-	payload["category"] = "Vendéglő"
+	payload["category_id"] = etteremID
+	payload["category"] = "Étterem"
 	payload["delivery_enabled"] = true
 	rr = doRequest(t, "PUT", "/api/admin/entries", payload)
 	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT vendéglő entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
+		t.Fatalf("PUT étterem entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
 
 	rr = doRequest(t, "GET", "/api/admin/entries", nil)
@@ -174,10 +174,10 @@ func TestAdminEntriesStoreHoursAndDeliverySwitches(t *testing.T) {
 		}
 	}
 	if found == nil {
-		t.Fatalf("entry %v not found after vendéglő update", id)
+		t.Fatalf("entry %v not found after étterem update", id)
 	}
 	if found["delivery_enabled"] != true {
-		t.Fatalf("delivery_enabled: expected true for Vendéglő, got %v", found["delivery_enabled"])
+		t.Fatalf("delivery_enabled: expected true for Étterem, got %v", found["delivery_enabled"])
 	}
 }
 

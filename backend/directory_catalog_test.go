@@ -390,3 +390,37 @@ func TestEntryTypesStayClosed(t *testing.T) {
 		t.Fatalf("types = %d", n)
 	}
 }
+
+func TestPublicEntryCategories(t *testing.T) {
+	rr := doAnonRequest(t, "GET", "/api/entry-categories", nil)
+	if rr.Code != 200 {
+		t.Fatalf("public categories: %d %s", rr.Code, rr.Body.String())
+	}
+	var rows []struct {
+		ID       int    `json:"id"`
+		Name     string `json:"name"`
+		Slug     string `json:"slug"`
+		ParentID *int   `json:"parent_id"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &rows); err != nil {
+		t.Fatal(err)
+	}
+	var butor, vasarlas bool
+	for _, row := range rows {
+		if row.Name == "Bútor" && row.Slug == "butor" && row.ParentID != nil && *row.ParentID == 4 {
+			butor = true
+		}
+		if row.Name == "Vásárlás" && row.ParentID == nil {
+			vasarlas = true
+		}
+	}
+	if !butor || !vasarlas {
+		t.Fatalf("catalog missing Bútor or Vásárlás: %d rows", len(rows))
+	}
+	rr = doRequest(t, "POST", "/api/admin/entries", map[string]interface{}{
+		"name": "Parent Shelf Entry", "category_id": 1, "type": "Vállalkozás",
+	})
+	if rr.Code != 400 {
+		t.Fatalf("parent category on entry: %d %s", rr.Code, rr.Body.String())
+	}
+}
