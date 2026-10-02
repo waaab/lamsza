@@ -1,5 +1,6 @@
 <script>
-    import { apiCall } from "$lib/api.js";
+    import { onMount } from "svelte";
+    import { apiCall, apiFetch } from "$lib/api.js";
     import { WEBSITE_CREATE_NOTE, WEBSITE_CREATE_TITLE } from "$lib/indexCreateCopy.js";
     import { openLogin } from "$lib/openLogin.js";
     import { auth } from "$lib/stores/auth.js";
@@ -11,20 +12,56 @@
     let domain = $state("");
     let title = $state("");
     let description = $state("");
+    let categoryId = $state(0);
+    let catalogLoading = $state(false);
+    /** @type {Array<{ id: number, name: string, parent_id?: number | null }>} */
+    let catalogCategories = $state([]);
     let error = $state("");
     let pending = $state(false);
     let submitted = $state(false);
+
+    let categoryParents = $derived(
+        catalogCategories.filter((row) => row.parent_id == null || row.parent_id === 0),
+    );
+    let categoryChildren = $derived(
+        catalogCategories.filter((row) => row.parent_id != null && row.parent_id > 0),
+    );
+
     let websiteReady = $derived(
         canonicalDomain(domain) !== "" &&
             plainText(title, 120) !== "" &&
-            plainText(description, 300) !== "",
+            plainText(description, 300) !== "" &&
+            Number(categoryId) > 0,
     );
 
     function fieldError(field) {
         if (field === "domain") return "A webcím nem érvényes.";
         if (field === "title") return "A cím kötelező, legfeljebb 120 karakter.";
         if (field === "description") return "A rövid leírás kötelező, legfeljebb 300 karakter.";
+        if (field === "category_id") return "Válassz alkategóriát.";
         return "Ellenőrizd a mezőket.";
+    }
+
+    async function loadWebsiteCatalog() {
+        if (!$auth.loggedIn) return;
+        catalogLoading = true;
+        try {
+            const catalog = await apiFetch("/api/account/listings/catalog");
+            catalogCategories = (Array.isArray(catalog?.categories) ? catalog.categories : [])
+                .map((row) => ({
+                    id: Number(row.id),
+                    name: String(row.name ?? "").trim(),
+                    parent_id:
+                        row.parent_id == null || row.parent_id === ""
+                            ? null
+                            : Number(row.parent_id),
+                }))
+                .filter((row) => row.id > 0 && row.name);
+        } catch {
+            catalogCategories = [];
+        } finally {
+            catalogLoading = false;
+        }
     }
 
     async function handleSubmit(event) {
@@ -40,7 +77,12 @@
             const res = await apiCall("/api/websites", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ domain, title, description }),
+                body: JSON.stringify({
+                    domain,
+                    title,
+                    description,
+                    category_id: Number(categoryId),
+                }),
             });
 
             if (res.status === 201) {
@@ -73,6 +115,10 @@
             pending = false;
         }
     }
+
+    onMount(() => {
+        void loadWebsiteCatalog();
+    });
 </script>
 
 <div
@@ -98,6 +144,9 @@
             </div>
         {:else}
             <form class="link-dialog-form add-website-form__fields" onsubmit={handleSubmit}>
+                {#if catalogLoading}
+                    <p>Kategóriák betöltése…</p>
+                {/if}
                 <label for="website-domain">Webcím <span class="field-required" aria-hidden="true">*</span></label>
                 <input
                     id="website-domain"
@@ -127,6 +176,18 @@
                     rows="4"
                     required
                 ></textarea>
+
+                <label for="website-category">Alkategória <span class="field-required" aria-hidden="true">*</span></label>
+                <select id="website-category" name="category_id" bind:value={categoryId} required>
+                    <option value={0} disabled>Válassz alkategóriát</option>
+                    {#each categoryParents as parent (parent.id)}
+                        <optgroup label={parent.name}>
+                            {#each categoryChildren.filter((row) => row.parent_id === parent.id) as child (child.id)}
+                                <option value={child.id}>{child.name}</option>
+                            {/each}
+                        </optgroup>
+                    {/each}
+                </select>
 
                 {#if error}
                     <p class="add-website-form__error">{error}</p>

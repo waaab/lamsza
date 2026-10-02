@@ -3,11 +3,101 @@ package main
 import (
 	"backend/internal/db"
 	"backend/internal/handlers"
+	"database/sql"
 	"encoding/json"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+func postWebsite(t *testing.T, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	cookie := mustLogin("website-submit@test.lamsza")
+	return doRequestWithCookie(t, "POST", "/api/websites", strings.NewReader(body), cookie)
+}
+
+func TestWebsiteRequiresLeafCategory(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+	defer func() {
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, "mobonline.ro"); err != nil {
+			t.Errorf("cleanup mobonline.ro: %v", err)
+		}
+	}()
+
+	// category 4 is Vásárlás, a parent. category 39 is Bútor.
+	rr := postWebsite(t, `{"domain":"mobonline.ro","title":"Mobonline","description":"Bútor webshop","category_id":4}`)
+	if rr.Code != 400 {
+		t.Fatalf("parent category: %d %s", rr.Code, rr.Body.String())
+	}
+	rr = postWebsite(t, `{"domain":"mobonline.ro","title":"Mobonline","description":"Bútor webshop","category_id":39}`)
+	if rr.Code != 201 {
+		t.Fatalf("leaf category: %d %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestWebshopListingWithoutTown(t *testing.T) {
+	const domain = "mobonline.ro"
+	cleanup := func() {
+		if _, err := db.DB.Exec(`
+			DELETE FROM entries WHERE id IN (
+				SELECT entry_id FROM websites WHERE domain_key = $1 AND entry_id IS NOT NULL
+			)`, domain); err != nil {
+			t.Errorf("cleanup entries: %v", err)
+		}
+		if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, domain); err != nil {
+			t.Errorf("cleanup website: %v", err)
+		}
+	}
+	cleanup()
+	defer cleanup()
+
+	handlers.MigrateDirectoryCatalog()
+
+	rr := postWebsite(t, `{"domain":"mobonline.ro","title":"Mobonline","description":"Bútor webshop","category_id":39}`)
+	if rr.Code != 201 {
+		t.Fatalf("submit: %d %s", rr.Code, rr.Body.String())
+	}
+	var submitted map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &submitted); err != nil {
+		t.Fatal(err)
+	}
+	webID := int(submitted["id"].(float64))
+
+	admin := mustLogin("admin@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{
+		"id": webID, "action": "approve",
+	}, admin)
+	if rr.Code != 200 {
+		t.Fatalf("approve: %d %s", rr.Code, rr.Body.String())
+	}
+
+	user := mustLogin("website-submit@test.lamsza")
+	rr = doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
+		"website_id":  webID,
+		"category_id": 39,
+		"type_id":     2,
+		"location_id": 0,
+		"name":        "Mobonline",
+		"url":         "https://mobonline.ro",
+	}, user)
+	if rr.Code != 200 {
+		t.Fatalf("create listing: %d %s", rr.Code, rr.Body.String())
+	}
+	var listing map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &listing); err != nil {
+		t.Fatal(err)
+	}
+	entryID := int(listing["id"].(float64))
+
+	var locationID sql.NullInt64
+	if err := db.DB.QueryRow(`SELECT location_id FROM entries WHERE id = $1`, entryID).Scan(&locationID); err != nil {
+		t.Fatal(err)
+	}
+	if locationID.Valid {
+		t.Fatalf("location_id = %d, want NULL", locationID.Int64)
+	}
+}
 
 func TestDirectoryCatalogSeedIds(t *testing.T) {
 	handlers.MigrateDirectoryCatalog()

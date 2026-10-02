@@ -30,6 +30,8 @@ type websiteListItem struct {
 	Domain      string `json:"domain"`
 	URL         string `json:"url"`
 	Claimed     bool   `json:"claimed"`
+	CategoryID  int    `json:"category_id"`
+	Category    string `json:"category"`
 }
 
 type websitesListResponse struct {
@@ -40,6 +42,7 @@ type submitWebsiteBody struct {
 	Domain      string `json:"domain"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	CategoryID  int    `json:"category_id"`
 }
 
 type submitWebsiteResponse struct {
@@ -253,14 +256,15 @@ func HandleWebsites(w http.ResponseWriter, r *http.Request) {
 func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	resp := websitesListResponse{Websites: []websiteListItem{}}
 	rows, err := db.DB.Query(`
-		SELECT id, title, description, domain_key,
+		SELECT w.id, w.title, w.description, w.domain_key, COALESCE(w.category_id, 0), COALESCE(c.name, ''),
 			EXISTS (
 				SELECT 1 FROM entry_members m
-				WHERE m.entry_id = websites.entry_id AND m.role = 'owner' AND m.status = 'active'
+				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
 			)
-		FROM websites
-		WHERE status = 'approved'
-		ORDER BY title ASC, id ASC
+		FROM websites w
+		LEFT JOIN entry_categories c ON c.id = w.category_id
+		WHERE w.status = 'approved'
+		ORDER BY w.title ASC, w.id ASC
 	`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -269,7 +273,7 @@ func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	for rows.Next() {
 		var item websiteListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.Claimed); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.CategoryID, &item.Category, &item.Claimed); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -321,6 +325,10 @@ func handleWebsiteSubmit(w http.ResponseWriter, r *http.Request) {
 		writeWebsiteFieldError(w, "description")
 		return
 	}
+	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+		writeWebsiteFieldError(w, "category_id")
+		return
+	}
 	submittedHost, err := submittedHost(body.Domain)
 	if err != nil {
 		writeWebsiteFieldError(w, "domain")
@@ -341,10 +349,10 @@ func handleWebsiteSubmit(w http.ResponseWriter, r *http.Request) {
 
 	var id int
 	err = db.DB.QueryRow(`
-		INSERT INTO websites (domain_key, submitted_host, title, description, status, user_id)
-		VALUES ($1, $2, $3, $4, 'pending', $5)
+		INSERT INTO websites (domain_key, submitted_host, title, description, status, user_id, category_id)
+		VALUES ($1, $2, $3, $4, 'pending', $5, $6)
 		RETURNING id
-	`, domainKey, submittedHost, title, description, u.ID).Scan(&id)
+	`, domainKey, submittedHost, title, description, u.ID, body.CategoryID).Scan(&id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -430,8 +438,9 @@ func checkWebsiteDomainConflict(domainKey string) (map[string]interface{}, error
 }
 
 type adminWebsiteBody struct {
-	ID     int    `json:"id"`
-	Action string `json:"action"`
+	ID         int    `json:"id"`
+	Action     string `json:"action"`
+	CategoryID int    `json:"category_id"`
 }
 
 func HandleAdminWebsite(w http.ResponseWriter, r *http.Request) {
@@ -522,19 +531,40 @@ func handleAdminWebsiteAction(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		res, err := db.DB.Exec(`
-			UPDATE websites
-			SET status = 'approved', approved_at = NOW(), approved_by = $2
-			WHERE id = $1 AND status = 'pending'
-		`, body.ID, adminUser.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		n, _ := res.RowsAffected()
-		if n == 0 {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
+		if body.CategoryID > 0 {
+			if err := validateLeafCategoryID(body.CategoryID); err != nil {
+				writeWebsiteFieldError(w, "category_id")
+				return
+			}
+			res, err := db.DB.Exec(`
+				UPDATE websites
+				SET status = 'approved', approved_at = NOW(), approved_by = $2, category_id = $3
+				WHERE id = $1 AND status = 'pending'
+			`, body.ID, adminUser.ID, body.CategoryID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			n, _ := res.RowsAffected()
+			if n == 0 {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+		} else {
+			res, err := db.DB.Exec(`
+				UPDATE websites
+				SET status = 'approved', approved_at = NOW(), approved_by = $2
+				WHERE id = $1 AND status = 'pending'
+			`, body.ID, adminUser.ID)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			n, _ := res.RowsAffected()
+			if n == 0 {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
 		}
 	case "reject":
 		res, err := db.DB.Exec(`

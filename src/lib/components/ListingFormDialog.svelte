@@ -93,13 +93,19 @@
     let listingCatalogLoading = $state(false);
     /** @type {Array<{ id: number, name: string }>} */
     let listingLocations = $state([]);
-    /** @type {Array<{ id: number, name: string }>} */
+    /** @type {Array<{ id: number, name: string, parent_id?: number | null }>} */
     let listingCategories = $state([]);
     /** @type {Array<{ id: number, name: string }>} */
     let listingTypes = $state([]);
     let listingForm = $state(emptyListingForm());
     let hoursEnabled = $state(false);
     let deliveryEnabled = $state(false);
+    let listingCategoryParents = $derived(
+        listingCategories.filter((row) => row.parent_id == null || row.parent_id === 0),
+    );
+    let listingCategoryChildren = $derived(
+        listingCategories.filter((row) => row.parent_id != null && row.parent_id > 0),
+    );
     let listingOffersDelivery = $derived(
         offersDelivery({
             name: listingForm.name,
@@ -117,7 +123,6 @@
     let listingPhotoLimit = $derived(mode === "create" ? 1 : MAX_ENTRY_PHOTOS);
     let listingFormReady = $derived(
         String(listingForm.name ?? "").trim() !== "" &&
-            Number(listingForm.location_id) > 0 &&
             Number(listingForm.category_id) > 0 &&
             Number(listingForm.type_id) > 0 &&
             listingUrlOk(listingForm.url),
@@ -144,6 +149,10 @@
                 .map((row) => ({
                     id: Number(row.id),
                     name: String(row.name ?? "").trim(),
+                    parent_id:
+                        row.parent_id == null || row.parent_id === ""
+                            ? null
+                            : Number(row.parent_id),
                 }))
                 .filter((row) => row.id > 0 && row.name);
             listingTypes = (Array.isArray(catalog?.types) ? catalog.types : [])
@@ -381,7 +390,7 @@
         const languages = listingLanguages(form.languages);
         return {
             name: String(form.name ?? "").trim(),
-            location_id: Number(form.location_id),
+            location_id: Number(form.location_id) > 0 ? Number(form.location_id) : 0,
             category_id: Number(form.category_id),
             type_id: Number(form.type_id),
             url: String(form.url ?? "").trim(),
@@ -529,19 +538,23 @@
                 <label for="profile_listing_name">Név <span class="field-required" aria-hidden="true">*</span></label>
                 <input id="profile_listing_name" type="text" bind:value={listingForm.name} required />
 
-                <label for="profile_listing_location">Település <span class="field-required" aria-hidden="true">*</span></label>
-                <select id="profile_listing_location" bind:value={listingForm.location_id} required>
-                    <option value={0} disabled>Válassz települést</option>
+                <label for="profile_listing_location">Település</label>
+                <select id="profile_listing_location" bind:value={listingForm.location_id}>
+                    <option value={0}>Nincs település</option>
                     {#each listingLocations as loc (loc.id)}
                         <option value={loc.id}>{loc.name}</option>
                     {/each}
                 </select>
 
-                <label for="profile_listing_category">Kategória <span class="field-required" aria-hidden="true">*</span></label>
+                <label for="profile_listing_category">Alkategória <span class="field-required" aria-hidden="true">*</span></label>
                 <select id="profile_listing_category" bind:value={listingForm.category_id} required>
-                    <option value={0} disabled>Válassz kategóriát</option>
-                    {#each listingCategories as cat (cat.id)}
-                        <option value={cat.id}>{cat.name}</option>
+                    <option value={0} disabled>Válassz alkategóriát</option>
+                    {#each listingCategoryParents as parent (parent.id)}
+                        <optgroup label={parent.name}>
+                            {#each listingCategoryChildren.filter((row) => row.parent_id === parent.id) as child (child.id)}
+                                <option value={child.id}>{child.name}</option>
+                            {/each}
+                        </optgroup>
                     {/each}
                 </select>
 

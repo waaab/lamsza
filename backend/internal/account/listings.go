@@ -532,8 +532,9 @@ func HandleListings(w http.ResponseWriter, r *http.Request) {
 }
 
 type catalogItem struct {
-	ID   int    `json:"id"`
-	Name string `json:"name"`
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	ParentID *int   `json:"parent_id,omitempty"`
 }
 
 type listingCatalogResponse struct {
@@ -557,17 +558,22 @@ func HandleListingCatalog(w http.ResponseWriter, r *http.Request) {
 		Types:      []catalogItem{},
 	}
 
-	rows, err := db.DB.Query(`SELECT id, name FROM entry_categories ORDER BY name ASC, id ASC`)
+	rows, err := db.DB.Query(`SELECT id, name, parent_id FROM entry_categories ORDER BY COALESCE(parent_id, id), sort_order, id`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	for rows.Next() {
 		var item catalogItem
-		if err := rows.Scan(&item.ID, &item.Name); err != nil {
+		var parentID sql.NullInt64
+		if err := rows.Scan(&item.ID, &item.Name, &parentID); err != nil {
 			rows.Close()
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+		if parentID.Valid {
+			pid := int(parentID.Int64)
+			item.ParentID = &pid
 		}
 		resp.Categories = append(resp.Categories, item)
 	}
@@ -908,6 +914,76 @@ func writeListingConflict(w http.ResponseWriter, code int, errorCode string) {
 	json.NewEncoder(w).Encode(map[string]string{"error": errorCode})
 }
 
+func writeListingFieldError(w http.ResponseWriter, field string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]string{"error": "invalid", "field": field})
+}
+
+func validateLeafCategoryID(categoryID int) error {
+	if categoryID <= 0 {
+		return sql.ErrNoRows
+	}
+	var parentID sql.NullInt64
+	err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, categoryID).Scan(&parentID)
+	if err != nil {
+		return err
+	}
+	if !parentID.Valid {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func validateEntryTypeID(typeID int) error {
+	if typeID <= 0 {
+		return sql.ErrNoRows
+	}
+	var exists bool
+	err := db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM entry_types WHERE id = $1)`, typeID).Scan(&exists)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func validateListingTags(categoryID int, tags []string) error {
+	var catSlug string
+	var parentSlug sql.NullString
+	err := db.DB.QueryRow(`
+		SELECT c.slug, p.slug
+		FROM entry_categories c
+		LEFT JOIN entry_categories p ON p.id = c.parent_id
+		WHERE c.id = $1
+	`, categoryID).Scan(&catSlug, &parentSlug)
+	if err != nil {
+		return err
+	}
+	for _, tag := range tags {
+		tagSlug := utils.Slugify(tag)
+		if tagSlug == "" {
+			continue
+		}
+		if tagSlug == catSlug {
+			return fmt.Errorf("tag matches category slug")
+		}
+		if parentSlug.Valid && tagSlug == parentSlug.String {
+			return fmt.Errorf("tag matches parent slug")
+		}
+	}
+	return nil
+}
+
+func listingLocationValue(locationID int) any {
+	if locationID <= 0 {
+		return nil
+	}
+	return locationID
+}
+
 func listingURLDomainConflict(entryID int, newURL string) (bool, error) {
 	newURL = strings.TrimSpace(newURL)
 	var newKey string
@@ -950,8 +1026,16 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, "invalid json", http.StatusBadRequest)
 		return
 	}
-	if body.Name == "" || body.LocationID <= 0 || body.CategoryID <= 0 || body.TypeID <= 0 {
-		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
+	if body.Name == "" || body.CategoryID <= 0 || body.TypeID <= 0 {
+		http.Error(w, "name, category_id, and type_id required", http.StatusBadRequest)
+		return
+	}
+	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
+	if err := validateEntryTypeID(body.TypeID); err != nil {
+		writeListingFieldError(w, "type_id")
 		return
 	}
 	body.Languages = normalizeListingLanguages(body.Languages)
@@ -990,7 +1074,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	var catName string
 	err := db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "invalid category_id", http.StatusBadRequest)
+		writeListingFieldError(w, "category_id")
 		return
 	}
 	if err != nil {
@@ -1019,9 +1103,10 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	if body.WebsiteID > 0 {
 		var domainKey, status string
 		var linkedEntryID sql.NullInt64
+		var websiteCategoryID sql.NullInt64
 		err = tx.QueryRow(`
-			SELECT domain_key, status, entry_id FROM websites WHERE id = $1 FOR UPDATE
-		`, body.WebsiteID).Scan(&domainKey, &status, &linkedEntryID)
+			SELECT domain_key, status, entry_id, category_id FROM websites WHERE id = $1 FOR UPDATE
+		`, body.WebsiteID).Scan(&domainKey, &status, &linkedEntryID, &websiteCategoryID)
 		if err == sql.ErrNoRows {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
@@ -1038,6 +1123,14 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			writeListingConflict(w, http.StatusConflict, "domain_taken")
 			return
 		}
+		if body.CategoryID <= 0 && websiteCategoryID.Valid {
+			body.CategoryID = int(websiteCategoryID.Int64)
+			err = tx.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 		listingURL = "https://" + domainKey
 	}
 
@@ -1052,7 +1145,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, published, hours, hours_enabled, delivery_hours, delivery_enabled, photos, ratings_enabled)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, false, false, $12::jsonb, $13, $14::jsonb, $15, $16::jsonb, false)
 		RETURNING id
-	`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, body.HoursEnabled, delivery, deliveryEnabled, photos).Scan(&entryID)
+	`, body.TypeID, listingLocationValue(body.LocationID), body.CategoryID, catName, body.Name, slug, listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages), hours, body.HoursEnabled, delivery, deliveryEnabled, photos).Scan(&entryID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1088,9 +1181,9 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 				submittedHostValue = host
 			}
 			_, err = tx.Exec(`
-				INSERT INTO websites (domain_key, submitted_host, title, description, status, user_id, entry_id)
-				VALUES ($1, $2, $3, $4, 'approved', $5, $6)
-			`, domainKey, submittedHostValue, websiteTitle(body.Name), websiteDescription(body.Notes), userID, entryID)
+				INSERT INTO websites (domain_key, submitted_host, title, description, status, user_id, entry_id, category_id)
+				VALUES ($1, $2, $3, $4, 'approved', $5, $6, $7)
+			`, domainKey, submittedHostValue, websiteTitle(body.Name), websiteDescription(body.Notes), userID, entryID, body.CategoryID)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -1151,8 +1244,16 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 	_, hasSocialLinks := rawFields["social_links"]
 	_, hasTags := rawFields["tags"]
-	if body.Name == "" || body.LocationID <= 0 || body.CategoryID <= 0 || body.TypeID <= 0 {
-		http.Error(w, "name, location_id, category_id, and type_id required", http.StatusBadRequest)
+	if body.Name == "" || body.CategoryID <= 0 || body.TypeID <= 0 {
+		http.Error(w, "name, category_id, and type_id required", http.StatusBadRequest)
+		return
+	}
+	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
+	if err := validateEntryTypeID(body.TypeID); err != nil {
+		writeListingFieldError(w, "type_id")
 		return
 	}
 	body.Languages = normalizeListingLanguages(body.Languages)
@@ -1164,7 +1265,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	var catName string
 	err = db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
 	if err == sql.ErrNoRows {
-		http.Error(w, "invalid category_id", http.StatusBadRequest)
+		writeListingFieldError(w, "category_id")
 		return
 	}
 	if err != nil {
@@ -1199,6 +1300,14 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		return
 	}
 
+	if hasTags {
+		if err := validateListingTags(body.CategoryID, normalizeListingTags(body.Tags)); err != nil {
+			writeListingFieldError(w, "tags")
+			return
+		}
+	}
+
+	locationValue := listingLocationValue(body.LocationID)
 	if hasSocialLinks {
 		socialLinks := string(sanitizeSocialLinks(body.SocialLinks))
 		_, err = db.DB.Exec(`
@@ -1208,7 +1317,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 				hours = $11::jsonb, hours_enabled = $12, delivery_hours = $13::jsonb, delivery_enabled = $14,
 				social_links = $15::jsonb, photos = $16::jsonb, ratings_enabled = $17
 			WHERE id = $18
-		`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
+		`, body.TypeID, locationValue, body.CategoryID, catName, body.Name,
 			listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
 			hours, body.HoursEnabled, delivery, body.DeliveryEnabled, socialLinks, photos, body.RatingsEnabled, entryID)
 	} else {
@@ -1219,7 +1328,7 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 				hours = $11::jsonb, hours_enabled = $12, delivery_hours = $13::jsonb, delivery_enabled = $14,
 				photos = $15::jsonb, ratings_enabled = $16
 			WHERE id = $17
-		`, body.TypeID, body.LocationID, body.CategoryID, catName, body.Name,
+		`, body.TypeID, locationValue, body.CategoryID, catName, body.Name,
 			listingURL, body.Phone, body.Address, body.Notes, pq.Array(body.Languages),
 			hours, body.HoursEnabled, delivery, body.DeliveryEnabled, photos, body.RatingsEnabled, entryID)
 	}
