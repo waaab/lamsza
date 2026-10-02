@@ -379,10 +379,6 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "move_to must be a parent", http.StatusBadRequest)
 					return
 				}
-				if _, err := db.DB.Exec(`UPDATE entry_categories SET parent_id = $1 WHERE parent_id = $2`, moveTo, id); err != nil {
-					http.Error(w, err.Error(), 500)
-					return
-				}
 			} else {
 				var moveParent sql.NullInt64
 				if err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, moveTo).Scan(&moveParent); err == sql.ErrNoRows {
@@ -396,18 +392,55 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, "move_to must be a child", http.StatusBadRequest)
 					return
 				}
-				if _, err := db.DB.Exec(`
-					UPDATE entries SET category_id = $1, cat_name = (SELECT name FROM entry_categories WHERE id = $1)
-					WHERE category_id = $2`, moveTo, id); err != nil {
+			}
+			tx, err := db.DB.Begin()
+			if err != nil {
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			if !parentID.Valid {
+				if _, err := tx.Exec(`UPDATE entry_categories SET parent_id = $1 WHERE parent_id = $2`, moveTo, id); err != nil {
+					tx.Rollback()
 					http.Error(w, err.Error(), 500)
 					return
 				}
-				if _, err := db.DB.Exec(`UPDATE websites SET category_id = $1 WHERE category_id = $2`, moveTo, id); err != nil {
+				var entries int
+				if err := tx.QueryRow(`SELECT COUNT(*) FROM entries WHERE category_id = $1`, id).Scan(&entries); err != nil {
+					tx.Rollback()
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				var websites int
+				if err := tx.QueryRow(`SELECT COUNT(*) FROM websites WHERE category_id = $1`, id).Scan(&websites); err != nil {
+					tx.Rollback()
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				if entries > 0 || websites > 0 {
+					tx.Rollback()
+					http.Error(w, "Előbb helyezd át a bejegyzéseket.", http.StatusConflict)
+					return
+				}
+			} else {
+				if _, err := tx.Exec(`
+					UPDATE entries SET category_id = $1, cat_name = (SELECT name FROM entry_categories WHERE id = $1)
+					WHERE category_id = $2`, moveTo, id); err != nil {
+					tx.Rollback()
+					http.Error(w, err.Error(), 500)
+					return
+				}
+				if _, err := tx.Exec(`UPDATE websites SET category_id = $1 WHERE category_id = $2`, moveTo, id); err != nil {
+					tx.Rollback()
 					http.Error(w, err.Error(), 500)
 					return
 				}
 			}
-			if _, err := db.DB.Exec(`DELETE FROM entry_categories WHERE id = $1`, id); err != nil {
+			if _, err := tx.Exec(`DELETE FROM entry_categories WHERE id = $1`, id); err != nil {
+				tx.Rollback()
+				http.Error(w, err.Error(), 500)
+				return
+			}
+			if err := tx.Commit(); err != nil {
 				http.Error(w, err.Error(), 500)
 				return
 			}
