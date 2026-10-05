@@ -2,20 +2,20 @@ const APPS = {
 	lamsza: {
 		envKey: 'VITE_LAMSZA_ORIGIN',
 		local: 'https://lamsza.test',
-		/** Vite strictPort when apps run on localhost (Lámsza 5173). */
-		localVite: 'http://localhost:5173',
+		/** Vite strictPort: Admin 5173, Lámsza 5174, Szótár 5175, Játszótér 5176. */
+		localVite: 'http://localhost:5174',
 		prod: 'https://lamsza.com'
 	},
 	szotar: {
 		envKey: 'VITE_SZOTAR_ORIGIN',
 		local: 'https://szotar.lamsza.test',
-		localVite: 'http://localhost:5174',
+		localVite: 'http://localhost:5175',
 		prod: 'https://szotar.lamsza.com'
 	},
 	jatszoter: {
 		envKey: 'VITE_JATSZOTER_ORIGIN',
 		local: 'https://jatszoter.lamsza.test',
-		localVite: 'http://localhost:5175',
+		localVite: 'http://localhost:5176',
 		prod: 'https://jatszoter.lamsza.com'
 	}
 };

@@ -1,7 +1,6 @@
 <script>
     import { onMount } from "svelte";
     import { fade } from "svelte/transition";
-    import { goto } from "$app/navigation";
     import { page } from "$app/stores";
     import PageFaqDisclaimer from "$lib/components/PageFaqDisclaimer.svelte";
     import { deriveFaqSectionKey } from "$lib/pageFaqSection.js";
@@ -296,20 +295,6 @@
                 <AppIcon name="profile" size={16} />
                 <span class="sr-only">Fiók</span>
             </a>
-            {#if $auth.isAdmin}
-            <button
-                type="button"
-                class="btn nav-btn nav-btn--admin {$page.url.pathname.startsWith('/admin') ? 'active' : ''}"
-                title="Dashboard"
-                on:click={() => goto('/admin')}
-            >
-                {#if $auth.adminQueueCount > 0}
-                    <span class="nav-admin-badge" aria-label="{$auth.adminQueueCount} jóváhagyásra vár">{$auth.adminQueueCount}</span>
-                {/if}
-                <span class="sr-only">Dashboard</span>
-                <AppIcon name="dashboard" size={16} />
-            </button>
-            {/if}
             <button
                 type="button"
                 class="btn nav-btn"

@@ -40,7 +40,7 @@ func Load() {
 	}
 
 	AppConfig.DatabaseURL = getEnv("DATABASE_URL", "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable")
-	AppConfig.Port = getEnv("PORT", "3000")
+	AppConfig.Port = getEnv("PORT", "3001")
 	AppConfig.WeatherAPIKey = getEnv("WEATHER_API_KEY", "")
 	AppConfig.WeatherAPIComKey = getEnv("WEATHER_API_COM_KEY", "")
 

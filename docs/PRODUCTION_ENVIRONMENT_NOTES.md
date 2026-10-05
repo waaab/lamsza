@@ -16,6 +16,7 @@
 - `szotar.lamsza.com` → Points to `146.190.204.232`.
 - `jatszoter.lamsza.com` → Points to `146.190.204.232`.
 - `admin.lamsza.com` → Points to `146.190.204.232`.
+  - **Phase 2:** DNS/Nginx/TLS/`admin.service` placeholder exist. The independent `lamsza-admin` app runs locally first (`http://localhost:5173` / API `:3000`). Production cutover (static to `/var/www/admin/public`, Go on `:8083`) is deferred. Szótár/Játszótér `/admin` stay in their own apps for now.
 - **Decommissioned & Purged**: Legacy droplet `46.101.116.17` deleted; unused DNS records (`api.lamsza.com`, `accounts.lamsza.com`, and all `*-staging` domains) purged.
 
 ## 2. SECURITY & OS HARDENING

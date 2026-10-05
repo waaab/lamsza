@@ -17,7 +17,7 @@ This document is the single handoff checklist for production server setup and co
 | `szotar.lamsza.com` | Székely dictionary | **Yes** | `szotar` |
 | `jatszoter.lamsza.com` | Word games | **Yes** | `jatszoter` |
 | `www.lamsza.com` | Optional alias → redirect to apex | Optional | — |
-| `admin.lamsza.com` | Network admin dashboard | No (not started) | — |
+| `admin.lamsza.com` | Main Lámsza admin app (`lamsza-admin`) | **Phase 2** (DNS/Nginx exist; app deploy later) | `lamsza-admin` |
 | `api.lamsza.com` | Shared API gateway | No (TBD) | — |
 | `account.lamsza.com` | Central accounts | No (TBD) | — |
 | `mink.lamsza.com` | Private social | No (planned) | — |
@@ -295,9 +295,10 @@ Useful when comparing to local docker-compose; **not** for public exposure.
 
 | App | Frontend (Vite) | Backend | Postgres |
 |-----|-----------------|---------|----------|
-| lamsza | 5173 | 3000 | 5433 |
-| szotar | 5174 | 3010 | 5435 |
-| jatszoter | 5175 | 3001 | 5434 |
+| admin (`lamsza-admin`) | 5173 | 3000 | shared with lamsza (:5433) |
+| lamsza | 5174 | 3001 | 5433 |
+| szotar | 5175 | 3002 | 5435 |
+| jatszoter | 5176 | 3003 | 5434 |
 
 ---
 
