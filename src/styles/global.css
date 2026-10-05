@@ -1279,8 +1279,9 @@ section.page-section{
   border-radius: 12px;
   padding: 2rem;
   box-sizing: border-box;
-  width: min(42rem, calc(100vw - 2rem));
-  min-width: min(42rem, calc(100vw - 2rem));
+  width: min(70vw, calc(100vw - 2rem));
+  max-width: min(70vw, calc(100vw - 2rem));
+  min-width: 0;
   max-height: calc(100dvh - 2rem);
   overflow-x: hidden;
   overflow-y: auto;
