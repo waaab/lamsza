@@ -293,7 +293,9 @@
 
 <style>
     .suggestion-dialog {
-        width: min(40rem, calc(100vw - 2rem));
+        width: min(70vw, calc(100vw - 2rem));
+        max-width: min(70vw, calc(100vw - 2rem));
+        min-width: 0;
         max-height: calc(100vh - 2rem);
         overflow: auto;
     }

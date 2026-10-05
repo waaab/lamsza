@@ -17,7 +17,7 @@
     onclick={(e) => e.target === e.currentTarget && onClose()}
     onkeydown={(e) => e.key === "Escape" && onClose()}
 >
-    <div class="link-dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
+    <div class="link-dialog notice-dialog" role="presentation" onclick={(e) => e.stopPropagation()}>
         <h3 id="notice-dialog-title">{title}</h3>
         <p class="create-form-note">{message}</p>
         <div class="link-dialog-actions">
@@ -25,3 +25,11 @@
         </div>
     </div>
 </div>
+
+<style>
+    .notice-dialog {
+        width: min(28rem, calc(100vw - 2rem));
+        max-width: min(28rem, calc(100vw - 2rem));
+        min-width: 0;
+    }
+</style>
