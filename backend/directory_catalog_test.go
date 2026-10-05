@@ -178,8 +178,15 @@ func TestLegacyCategoryMigrateDoesNotPruneTree(t *testing.T) {
 	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories`).Scan(&n); err != nil {
 		t.Fatal(err)
 	}
-	if n != 68 {
-		t.Fatalf("categories = %d, want 68", n)
+	if n != 94 {
+		t.Fatalf("categories = %d, want 94", n)
+	}
+	var sportpalya int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories WHERE name = 'Sportpálya'`).Scan(&sportpalya); err != nil {
+		t.Fatal(err)
+	}
+	if sportpalya != 0 {
+		t.Fatal("Sportpálya must stay a venue, not a directory category")
 	}
 	var types int
 	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&types); err != nil {
@@ -388,6 +395,41 @@ func TestEntryTypesStayClosed(t *testing.T) {
 	}
 	if n != 3 {
 		t.Fatalf("types = %d", n)
+	}
+}
+
+func TestAdminTags(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+	const name = "admin-tag-probe"
+	t.Cleanup(func() {
+		db.DB.Exec(`DELETE FROM tags WHERE name = $1 OR name = $2`, name, name+"-2")
+	})
+	rr := doRequest(t, "POST", "/api/admin/tags", map[string]string{"name": "Bútor"})
+	if rr.Code != 400 {
+		t.Fatalf("category-shaped tag: %d %s", rr.Code, rr.Body.String())
+	}
+	rr = doRequest(t, "POST", "/api/admin/tags", map[string]string{"name": name})
+	if rr.Code != 201 {
+		t.Fatalf("create tag: %d %s", rr.Code, rr.Body.String())
+	}
+	var created struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	rr = doRequest(t, "POST", "/api/admin/tags", map[string]string{"name": name})
+	if rr.Code != 409 {
+		t.Fatalf("duplicate tag: %d %s", rr.Code, rr.Body.String())
+	}
+	rr = doRequest(t, "PUT", "/api/admin/tags", map[string]interface{}{"id": created.ID, "name": name + "-2"})
+	if rr.Code != 200 {
+		t.Fatalf("rename tag: %d %s", rr.Code, rr.Body.String())
+	}
+	rr = doRequest(t, "DELETE", "/api/admin/tags?id="+strconv.Itoa(created.ID), nil)
+	if rr.Code != 200 {
+		t.Fatalf("delete tag: %d %s", rr.Code, rr.Body.String())
 	}
 }
 

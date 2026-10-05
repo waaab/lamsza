@@ -29,6 +29,7 @@
     import EntryStars from "$lib/components/EntryStars.svelte";
     import EntryPhotoGallery from "$lib/components/EntryPhotoGallery.svelte";
     import EntryReviews from "$lib/components/EntryReviews.svelte";
+    import { displayTagLabel } from "$lib/directoryTagCloud.js";
 
     /** @type {{
      *   entry?: Record<string, any> | null,
@@ -68,13 +69,34 @@
     } = $props();
 
     let typeLabel = $derived(displayText(canonicalEntryType(entry?.type)));
-    let categoryLabel = $derived(displayText(entry?.category));
+    let categoryLabels = $derived.by(() => {
+        const many = Array.isArray(entry?.categories)
+            ? entry.categories.map((c) => String(c).trim()).filter(Boolean)
+            : [];
+        if (many.length) {
+            return many
+                .map((c) => displayText(c))
+                .filter((c) => c !== EMPTY_PLACEHOLDER);
+        }
+        const one = displayText(entry?.category);
+        return one !== EMPTY_PLACEHOLDER ? [one] : [];
+    });
+    let categoryLabel = $derived(categoryLabels[0] ?? EMPTY_PLACEHOLDER);
     let locationName = $derived(displayText(entry?.location));
+    let countyName = $derived(displayText(entry?.location_county));
+    let countySlug = $derived(String(entry?.county_slug ?? "").trim());
+    let settlementSlug = $derived(String(entry?.location_slug ?? "").trim());
+    let countyHref = $derived(countySlug ? `/${countySlug}-megye` : "");
     let locationHref = $derived.by(() => {
-        const countySlug = String(entry?.county_slug ?? "").trim();
-        const settlementSlug = String(entry?.location_slug ?? "").trim();
         if (!countySlug || !settlementSlug) return "";
         return `/${countySlug}-megye/${settlementSlug}`;
+    });
+    let showPlaceLinks = $derived.by(() => {
+        const countyOk =
+            Boolean(countyHref) && countyName !== EMPTY_PLACEHOLDER;
+        const settlementOk =
+            Boolean(locationHref) && locationName !== EMPTY_PLACEHOLDER;
+        return countyOk || settlementOk;
     });
     let url = $derived(String(entry?.url ?? "").trim());
     let phone = $derived(String(entry?.phone ?? "").trim());
@@ -86,6 +108,38 @@
             ? entry.tags.map((t) => String(t).trim()).filter(Boolean)
             : [],
     );
+    let tagLabels = $derived(tags.map((t) => displayTagLabel(t)));
+    let jsonLd = $derived.by(() => {
+        if (placeholder || !entry?.name) return null;
+        /** @type {Record<string, unknown>} */
+        const data = {
+            "@context": "https://schema.org",
+            "@type": "LocalBusiness",
+            name: String(entry.name),
+        };
+        if (url) data.url = url;
+        if (showListingPhone(entry) && phone) data.telephone = phone;
+        /** @type {Record<string, string>} */
+        const postal = { "@type": "PostalAddress" };
+        if (address !== EMPTY_PLACEHOLDER) postal.streetAddress = address;
+        if (locationName !== EMPTY_PLACEHOLDER) {
+            postal.addressLocality = locationName;
+        }
+        if (countyName !== EMPTY_PLACEHOLDER) {
+            postal.addressRegion = countyName;
+        }
+        if (Object.keys(postal).length > 1) data.address = postal;
+        if (categoryLabels.length) data.knowsAbout = [...categoryLabels];
+        if (locationName !== EMPTY_PLACEHOLDER) {
+            data.areaServed = locationName;
+        }
+        return data;
+    });
+    let jsonLdScript = $derived.by(() => {
+        if (!jsonLd) return "";
+        const payload = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+        return "<script type=\"application/ld+json\">" + payload + "</" + "script>";
+    });
     let languages = $derived(displayText(entry?.languages));
     let initials = $derived(displayInitials(entry?.name));
     let rating = $derived.by(() => {
@@ -150,6 +204,20 @@
     let todayKey = $derived(todayWeekdayKey());
     let status = $derived(openStatus(hours));
     let slides = $derived(gallerySlides(entry));
+    let hasContactBlock = $derived(
+        showListingWebsite(entry) ||
+            showListingPhone(entry) ||
+            socialLinks.length > 0 ||
+            Boolean(showMapsPin && mapsHref) ||
+            showListingLanguages(entry) ||
+            showClaim ||
+            showClaimWaiting ||
+            showJoin ||
+            showJoinWaiting ||
+            showOwnerEdit ||
+            suggestionState === "open" ||
+            suggestionState === "waiting",
+    );
 </script>
 
 {#snippet suggestEdit()}
@@ -180,6 +248,12 @@
     {/if}
 {/snippet}
 
+<svelte:head>
+    {#if jsonLdScript}
+        {@html jsonLdScript}
+    {/if}
+</svelte:head>
+
 {#if placeholder}
     <article
         class="entry-profile entry-profile--placeholder"
@@ -207,6 +281,10 @@
                 </section>
                 <section class="entry-profile__section">
                     <div class="skeleton skeleton-text entry-profile__skel-heading"></div>
+                    <div class="skeleton skeleton-text entry-profile__skel-line entry-profile__skel-line--mid"></div>
+                </section>
+                <section class="entry-profile__section">
+                    <div class="skeleton skeleton-text entry-profile__skel-heading"></div>
                     <div class="skeleton skeleton-text entry-profile__skel-line"></div>
                     <div class="skeleton skeleton-text entry-profile__skel-line entry-profile__skel-line--mid"></div>
                     <div class="skeleton skeleton-text entry-profile__skel-line entry-profile__skel-line--short"></div>
@@ -224,13 +302,15 @@
                 </section>
             </div>
             <aside class="entry-profile__aside" aria-hidden="true">
-                <div class="entry-profile__contact">
-                    {#each { length: 4 }}
-                        <div class="entry-profile__contact-row">
-                            <span class="skeleton entry-profile__skel-icon"></span>
-                            <span class="skeleton skeleton-text entry-profile__skel-contact"></span>
-                        </div>
-                    {/each}
+                <div class="sidebar-box">
+                    <div class="entry-profile__contact">
+                        {#each { length: 4 }}
+                            <div class="entry-profile__contact-row">
+                                <span class="skeleton entry-profile__skel-icon"></span>
+                                <span class="skeleton skeleton-text entry-profile__skel-contact"></span>
+                            </div>
+                        {/each}
+                    </div>
                 </div>
             </aside>
         </div>
@@ -256,12 +336,12 @@
             {#if typeLabel !== EMPTY_PLACEHOLDER}
                 <span>{typeLabel}</span>
             {/if}
-            {#if typeLabel !== EMPTY_PLACEHOLDER && categoryLabel !== EMPTY_PLACEHOLDER}
-                <span class="entry-profile__dot" aria-hidden="true">·</span>
-            {/if}
-            {#if categoryLabel !== EMPTY_PLACEHOLDER}
-                <span>{categoryLabel}</span>
-            {/if}
+            {#each categoryLabels as label, i (label)}
+                {#if typeLabel !== EMPTY_PLACEHOLDER || i > 0}
+                    <span class="entry-profile__dot" aria-hidden="true">·</span>
+                {/if}
+                <span>{label}</span>
+            {/each}
         </p>
         <p class="entry-profile__status-row">
             <span
@@ -322,15 +402,10 @@
                 <h2 id="entry-services-title" class="entry-profile__section-title">
                     Szolgáltatások
                 </h2>
-                {#if tags.length}
-                    <ul
-                        class={[
-                            "entry-profile__services",
-                            !textExpanded && "entry-profile__services--clamp",
-                        ]}
-                    >
-                        {#each tags as tag (tag)}
-                            <li>{tag.startsWith("#") ? tag.slice(1) : tag}</li>
+                {#if categoryLabels.length}
+                    <ul class="entry-profile__services">
+                        {#each categoryLabels as label (label)}
+                            <li>{label}</li>
                         {/each}
                     </ul>
                 {:else}
@@ -417,19 +492,6 @@
                 </section>
             {/if}
 
-            <section class="entry-profile__section" aria-labelledby="entry-tags-title">
-                <h2 id="entry-tags-title" class="entry-profile__section-title">Címkék</h2>
-                {#if tags.length}
-                    <ul class="entry-profile__tags">
-                        {#each tags as tag (tag)}
-                            <li>#{tag.replace(/^#/, "")}</li>
-                        {/each}
-                    </ul>
-                {:else}
-                    <p class="entry-profile__empty">{EMPTY_PLACEHOLDER}</p>
-                {/if}
-            </section>
-
             {#if socialLinks.length}
                 <section class="entry-profile__section" aria-labelledby="entry-social-title">
                     <h2 id="entry-social-title" class="entry-profile__section-title">Közösségi oldalak</h2>
@@ -444,131 +506,177 @@
             {/if}
         </div>
 
-        <aside class="entry-profile__aside" aria-label="Elérhetőség">
-            <div class="entry-profile__contact">
-                {#if showListingWebsite(entry)}
-                    <a
-                        class="entry-profile__contact-row"
-                        href={url}
-                        target="_blank"
-                        rel="nofollow noopener"
-                    >
-                        <span class="entry-profile__contact-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
-                            </svg>
-                        </span>
-                        <span>{hostLabel}</span>
-                    </a>
+        <aside
+            class="entry-profile__aside"
+            aria-label="Elérhetőség, helyszín és címkék"
+        >
+            <div class="sidebar-box">
+                {#if hasContactBlock}
+                    <div class="entry-profile__contact">
+                        {#if showListingWebsite(entry)}
+                            <a
+                                class="entry-profile__contact-row"
+                                href={url}
+                                target="_blank"
+                                rel="nofollow noopener"
+                            >
+                                <span class="entry-profile__contact-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                        <polyline points="15 3 21 3 21 9" />
+                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                    </svg>
+                                </span>
+                                <span>{hostLabel}</span>
+                            </a>
+                        {/if}
+                        {#if showListingPhone(entry)}
+                            <a class="entry-profile__contact-row" href={`tel:${phoneHref}`}>
+                                <span class="entry-profile__contact-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+                                    </svg>
+                                </span>
+                                <span>{phone}</span>
+                            </a>
+                        {/if}
+                        {#each socialLinks as link (link.url)}
+                            <a
+                                class="entry-profile__contact-row"
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                <span class="entry-profile__contact-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                        <polyline points="15 3 21 3 21 9" />
+                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                    </svg>
+                                </span>
+                                <span>{link.label || link.url}</span>
+                            </a>
+                        {/each}
+                        {#if showMapsPin && mapsHref}
+                            <a
+                                class="entry-profile__contact-row"
+                                href={mapsHref}
+                                target="_blank"
+                                rel="nofollow noopener"
+                            >
+                                <span class="entry-profile__contact-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                                        <circle cx="12" cy="10" r="3" />
+                                    </svg>
+                                </span>
+                                <span class="entry-profile__contact-stack">
+                                    <span>Útvonal</span>
+                                    {#if address !== EMPTY_PLACEHOLDER}
+                                        <span class="entry-profile__contact-sub">{address}</span>
+                                    {/if}
+                                    {#if locationName !== EMPTY_PLACEHOLDER}
+                                        <span class="entry-profile__contact-sub">{locationName}</span>
+                                    {/if}
+                                </span>
+                            </a>
+                        {/if}
+                        {#if showListingLanguages(entry)}
+                            <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                                <span class="entry-profile__contact-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="2" y1="12" x2="22" y2="12" />
+                                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                                    </svg>
+                                </span>
+                                <span>{languages}</span>
+                            </div>
+                        {/if}
+                        {#if showClaim}
+                            <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                                <button
+                                    type="button"
+                                    class="entry-profile__action"
+                                    disabled={claimBusy}
+                                    onclick={() => onClaim()}
+                                >
+                                    Sajátnak jelölöm
+                                </button>
+                            </div>
+                        {/if}
+                        {#if showClaimWaiting}
+                            <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                                <button type="button" class="entry-profile__action" disabled>
+                                    Átvételre vár
+                                </button>
+                            </div>
+                        {/if}
+                        {#if showJoin}
+                            <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                                <button
+                                    type="button"
+                                    class="entry-profile__action"
+                                    disabled={claimBusy}
+                                    onclick={() => onJoin()}
+                                >
+                                    Tagság kérése
+                                </button>
+                            </div>
+                        {/if}
+                        {#if showJoinWaiting}
+                            <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                                <button type="button" class="entry-profile__action" disabled>
+                                    Tagságkérés elküldve
+                                </button>
+                            </div>
+                        {/if}
+                        {#if showOwnerEdit || suggestionState === "open" || suggestionState === "waiting"}
+                            <div class="entry-profile__contact-row entry-profile__contact-row--static">
+                                {@render suggestEdit()}
+                            </div>
+                        {/if}
+                    </div>
                 {/if}
-                {#if showListingPhone(entry)}
-                    <a class="entry-profile__contact-row" href={`tel:${phoneHref}`}>
-                        <span class="entry-profile__contact-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
-                            </svg>
-                        </span>
-                        <span>{phone}</span>
-                    </a>
-                {/if}
-                {#each socialLinks as link (link.url)}
-                    <a
-                        class="entry-profile__contact-row"
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        <span class="entry-profile__contact-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
-                            </svg>
-                        </span>
-                        <span>{link.label || link.url}</span>
-                    </a>
-                {/each}
-                {#if showMapsPin && mapsHref}
-                    <a
-                        class="entry-profile__contact-row"
-                        href={mapsHref}
-                        target="_blank"
-                        rel="nofollow noopener"
-                    >
-                        <span class="entry-profile__contact-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                                <circle cx="12" cy="10" r="3" />
-                            </svg>
-                        </span>
-                        <span class="entry-profile__contact-stack">
-                            <span>Útvonal</span>
-                            {#if address !== EMPTY_PLACEHOLDER}
-                                <span class="entry-profile__contact-sub">{address}</span>
+
+                {#if showPlaceLinks}
+                    <div class="index-tags-aside__section">
+                        <h5 class="index-tags-aside__heading">Helyszín</h5>
+                        <ul class="index-tag-cloud">
+                            {#if countyHref && countyName !== EMPTY_PLACEHOLDER}
+                                <li class="index-tag-cloud__li">
+                                    <a class="btn btn-md" href={countyHref}>
+                                        <span class="btn-label">{countyName}</span>
+                                    </a>
+                                </li>
                             {/if}
-                            {#if locationName !== EMPTY_PLACEHOLDER}
-                                <span class="entry-profile__contact-sub">{locationName}</span>
+                            {#if locationHref && locationName !== EMPTY_PLACEHOLDER}
+                                <li class="index-tag-cloud__li">
+                                    <a class="btn btn-md" href={locationHref}>
+                                        <span class="btn-label">{locationName}</span>
+                                    </a>
+                                </li>
                             {/if}
-                        </span>
-                    </a>
-                {/if}
-                {#if showListingLanguages(entry)}
-                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                        <span class="entry-profile__contact-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="2" y1="12" x2="22" y2="12" />
-                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                            </svg>
-                        </span>
-                        <span>{languages}</span>
+                        </ul>
                     </div>
                 {/if}
-                {#if showClaim}
-                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                        <button
-                            type="button"
-                            class="entry-profile__action"
-                            disabled={claimBusy}
-                            onclick={() => onClaim()}
-                        >
-                            Sajátnak jelölöm
-                        </button>
-                    </div>
-                {/if}
-                {#if showClaimWaiting}
-                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                        <button type="button" class="entry-profile__action" disabled>
-                            Átvételre vár
-                        </button>
-                    </div>
-                {/if}
-                {#if showJoin}
-                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                        <button
-                            type="button"
-                            class="entry-profile__action"
-                            disabled={claimBusy}
-                            onclick={() => onJoin()}
-                        >
-                            Tagság kérése
-                        </button>
-                    </div>
-                {/if}
-                {#if showJoinWaiting}
-                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                        <button type="button" class="entry-profile__action" disabled>
-                            Tagságkérés elküldve
-                        </button>
-                    </div>
-                {/if}
-                {#if showOwnerEdit || suggestionState === "open" || suggestionState === "waiting"}
-                    <div class="entry-profile__contact-row entry-profile__contact-row--static">
-                        {@render suggestEdit()}
-                    </div>
-                {/if}
+
+                <div class="index-tags-aside__section">
+                    <h5 class="index-tags-aside__heading">Címkék</h5>
+                    {#if tagLabels.length}
+                        <ul class="index-tag-cloud">
+                            {#each tagLabels as label (label)}
+                                <li class="index-tag-cloud__li">
+                                    <span class="btn btn-md">
+                                        <span class="btn-label">{label}</span>
+                                    </span>
+                                </li>
+                            {/each}
+                        </ul>
+                    {:else}
+                        <p class="index-tags-aside__empty">Nincs megjeleníthető címke.</p>
+                    {/if}
+                </div>
             </div>
         </aside>
     </div>
@@ -728,27 +836,6 @@
         border-radius: 8px;
         flex: 0 0 auto;
     }
-    .entry-profile__services {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-    }
-    .entry-profile__services li {
-        padding: 0.65rem 0;
-        border-top: 1px solid var(--border-color);
-    }
-    .entry-profile__services li:first-child {
-        border-top: none;
-        padding-top: 0;
-    }
-    .entry-profile__services--clamp {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
     .entry-profile__about--clamp {
         display: -webkit-box;
         -webkit-line-clamp: 4;
@@ -833,7 +920,7 @@
         color: var(--szekely-blue);
         font-weight: 700;
     }
-    .entry-profile__tags,
+    .entry-profile__services,
     .entry-profile__social {
         display: flex;
         flex-wrap: wrap;
@@ -842,11 +929,12 @@
         margin: 0;
         padding: 0;
     }
-    .entry-profile__tags li {
+    .entry-profile__services li {
         padding: 0.2rem 0.55rem;
         border: 1px solid var(--border-color);
         border-radius: 999px;
         color: var(--text-secondary);
+        background: var(--card-bg);
     }
     .entry-profile__social a {
         color: var(--szekely-blue);
@@ -886,26 +974,36 @@
     .entry-profile__aside {
         min-width: 0;
     }
+    .entry-profile__aside :global(.sidebar-box) {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
     .entry-profile__contact {
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        background: var(--card-bg);
+        margin: -0.25rem -0.35rem 0.85rem;
         overflow: hidden;
+    }
+    .entry-profile__contact:last-child {
+        margin-bottom: 0;
     }
     .entry-profile__contact-row {
         display: flex;
         align-items: flex-start;
         gap: 0.75rem;
-        padding: 0.9rem 1rem;
+        padding: 0.75rem 0.5rem;
         border-top: 1px solid var(--border-color);
         color: inherit;
         text-decoration: none;
+        border-radius: 0.5rem;
     }
     .entry-profile__contact-row:first-child {
         border-top: none;
     }
     a.entry-profile__contact-row:hover {
         background: color-mix(in srgb, var(--szekely-blue) 6%, var(--card-bg));
+    }
+    .entry-profile__aside :global(.index-tags-aside__section) {
+        margin-top: 0.15rem;
     }
     .entry-profile__contact-icon {
         color: var(--szekely-green);
@@ -965,9 +1063,6 @@
         width: 70%;
         height: 0.85rem;
         margin: 0.15rem 0;
-    }
-    .entry-profile--placeholder .entry-profile__photo {
-        border: none;
     }
 
     @media (min-width: 900px) {

@@ -200,7 +200,7 @@
     function formatScheduleTimePart(a) {
         const s = a.starts_at ? String(a.starts_at).slice(0, 5) : "";
         const e = a.ends_at ? String(a.ends_at).slice(0, 5) : "";
-        if (s && e) return `${s}–${e}`;
+        if (s && e) return `${s} - ${e}`;
         if (s) return s;
         if (e) return e;
         return "";

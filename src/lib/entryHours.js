@@ -26,6 +26,27 @@ export function emptyWeekHours() {
     return Object.fromEntries(WEEKDAYS.map(({ key }) => [key, emptyDayHours()]));
 }
 
+export function defaultDayHours() {
+    return { open: "08:00", close: "20:00", closed: false };
+}
+
+export function defaultWeekHours() {
+    return Object.fromEntries(WEEKDAYS.map(({ key }) => [key, defaultDayHours()]));
+}
+
+export function weekHoursAreEmpty(raw) {
+    const hours = normalizeHours(raw);
+    return WEEKDAYS.every(({ key }) => {
+        const slot = hours[key];
+        return !slot.closed && slot.open === "" && slot.close === "";
+    });
+}
+
+export function withDefaultWeekHours(raw) {
+    if (weekHoursAreEmpty(raw)) return defaultWeekHours();
+    return normalizeHours(raw);
+}
+
 export function normalizeHours(raw) {
     const out = emptyWeekHours();
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return out;
@@ -52,7 +73,7 @@ export function hoursConfigured(raw) {
 export function formatDayHours(slot, placeholder = "-") {
     if (!slot) return placeholder;
     if (slot.closed) return "Zárva";
-    if (slot.open && slot.close) return `${slot.open}–${slot.close}`;
+    if (slot.open && slot.close) return `${slot.open} - ${slot.close}`;
     return placeholder;
 }
 
@@ -119,6 +140,6 @@ export function openStatus(hours, now = new Date(), timeZone = "Europe/Bucharest
     return {
         state: isOpen ? "open" : "closed",
         label: isOpen ? "Nyitva" : "Zárva",
-        detail: `${slot.open}–${slot.close}`,
+        detail: `${slot.open} - ${slot.close}`,
     };
 }

@@ -106,7 +106,8 @@ export function formatMonthShortLikeCard(year, month1to12) {
 export function formatTime(date) {
     return new Date(date).toLocaleTimeString("hu-HU", {
         hour: "2-digit",
-        minute: "2-digit"
+        minute: "2-digit",
+        hourCycle: "h23",
     });
 }
 

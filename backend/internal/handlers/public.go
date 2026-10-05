@@ -3,12 +3,14 @@ package handlers
 import (
 	"backend/internal/auth"
 	"backend/internal/db"
+	"backend/internal/directory"
 	"backend/internal/models"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"backend/internal/utils"
@@ -93,7 +95,7 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if category != "" {
-		sqlQuery += " AND (pg_slugify(ec.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR pg_slugify(ec_parent.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR unaccent(ec.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + "))"
+		sqlQuery += " AND (pg_slugify(ec.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR pg_slugify(ec_parent.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR unaccent(ec.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + ") OR EXISTS (SELECT 1 FROM entry_category_links l JOIN entry_categories lc ON lc.id = l.category_id LEFT JOIN entry_categories lp ON lp.id = lc.parent_id WHERE l.entry_id = e.id AND (pg_slugify(lc.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR pg_slugify(lp.slug) = pg_slugify($" + fmt.Sprintf("%d", paramIdx) + ") OR unaccent(lc.name) ILIKE unaccent($" + fmt.Sprintf("%d", paramIdx) + "))))"
 		params = append(params, category)
 		paramIdx++
 	}
@@ -165,11 +167,29 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	if user, err := auth.UserFromRequest(r); err == nil && user != nil {
 		viewerUserID = user.ID
 	}
+	entryIDs := make([]int, 0, len(entries))
 	for i := range entries {
 		if entries[i].Tags == nil {
 			entries[i].Tags = []string{}
 		}
+		entries[i].Categories = []string{}
+		if id, err := strconv.Atoi(entries[i].ID); err == nil {
+			entryIDs = append(entryIDs, id)
+		}
 		ApplyPublicEntryExtrasMode(&entries[i], viewerUserID, true)
+	}
+	if names, err := directory.NamesForEntries(db.DB, entryIDs); err == nil {
+		for i := range entries {
+			id, convErr := strconv.Atoi(entries[i].ID)
+			if convErr != nil {
+				continue
+			}
+			got := names[id]
+			if len(got) == 0 && entries[i].Category != "" {
+				got = []string{entries[i].Category}
+			}
+			entries[i].Categories = got
+		}
 	}
 	json.NewEncoder(w).Encode(entries)
 	log.Printf("EntriesHandler found %d entries", len(entries))
@@ -217,6 +237,16 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 	e.DeliveryHours = jsonObjectOrEmpty(delivery)
 	e.SocialLinks = jsonArrayOrEmpty(socialLinks)
 	e.Photos = sanitizePhotos(photos)
+	e.Categories = []string{}
+	if id, convErr := strconv.Atoi(e.ID); convErr == nil {
+		if names, nameErr := directory.NamesForEntries(db.DB, []int{id}); nameErr == nil {
+			if got := names[id]; len(got) > 0 {
+				e.Categories = got
+			} else if e.Category != "" {
+				e.Categories = []string{e.Category}
+			}
+		}
+	}
 
 	rows, _ := db.DB.Query("SELECT t.name FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = $1", e.ID)
 	defer rows.Close()

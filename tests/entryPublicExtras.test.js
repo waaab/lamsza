@@ -35,6 +35,11 @@ test('showListingDeliveryHours requires the switch and a delivery category', () 
 	}), false);
 	assert.equal(showListingDeliveryHours({
 		delivery_enabled: true,
+		category: 'Kávézó',
+		name: 'Példa'
+	}), true);
+	assert.equal(showListingDeliveryHours({
+		delivery_enabled: true,
 		category: 'Bolt',
 		name: 'Példa'
 	}), false);

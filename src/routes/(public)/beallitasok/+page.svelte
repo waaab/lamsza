@@ -369,6 +369,7 @@
                     bind:value={preferredSettlementId}
                     onchange={noteLocationChoice}
                 >
+<option value="">Válassz...</option>
                     <option value="">Nincs kiválasztva</option>
                     {#each locationChoices as loc (loc.id)}
                         <option value={String(loc.id)}>

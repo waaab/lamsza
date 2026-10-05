@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"backend/internal/db"
+	"backend/internal/directory"
 	"backend/internal/utils"
 	"database/sql"
 	"errors"
@@ -65,7 +66,7 @@ func leafCategory(id int, name string, parentID sql.NullInt64) (int, string, err
 }
 
 func writeCategoryResolveError(w http.ResponseWriter, err error) {
-	if errors.Is(err, errCategoryNotLeaf) {
+	if errors.Is(err, errCategoryNotLeaf) || errors.Is(err, directory.ErrCategorySet) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

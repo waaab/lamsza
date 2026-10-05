@@ -1,0 +1,28 @@
+---
+description: Dialogs and form overlays must use Lámsza theme tokens in light and dark mode
+globs: src/lib/components/**/*Dialog*.svelte,src/lib/components/**/*Form*.svelte,src/lib/components/CategoryMultiSelect.svelte,src/styles/global.css
+alwaysApply: false
+---
+
+# Dialog and form theme
+
+Dialogs, overlays, and form controls inside them follow the same `data-theme` tokens as the rest of Lámsza. Do not invent a second palette.
+
+- Surfaces: `var(--card-bg)`, `var(--bg-body)`, `var(--border-color)`
+- Text: `var(--text-primary)`, `var(--text-secondary)`, `var(--text-muted)`, `var(--text-faint)`
+- Accents: existing brand tokens (`--szekely-red`, `--szekely-blue`, …)
+- Inputs in `.link-dialog-form` already set background/color from tokens - nested widgets must too
+
+```css
+/* ❌ hard-coded light surface - unreadable in dark mode */
+.item { background: #fff; color: #111; }
+
+/* ✅ theme tokens */
+.item {
+  background: var(--bg-body);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+}
+```
+
+Before finishing a dialog UI change, check both light and dark (`data-theme`). Selected chips, summary rows, helper text, and buttons must stay readable.

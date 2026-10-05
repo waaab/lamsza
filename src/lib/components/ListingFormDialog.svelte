@@ -1,10 +1,11 @@
 <script>
     import { onMount } from "svelte";
+    import CategoryMultiSelect from "$lib/components/CategoryMultiSelect.svelte";
     import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import { canonicalDomain } from "$lib/websiteDomain.js";
-    import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import { emptyWeekHours, normalizeHours, withDefaultWeekHours } from "$lib/entryHours.js";
     import { offersDelivery } from "$lib/entryPublicExtras.js";
     import {
         DEFAULT_PHOTO_HEIGHT,
@@ -48,8 +49,9 @@
         return {
             id: 0,
             name: "",
-            location_id: 0,
+            location_id: -1,
             category_id: 0,
+            category_extra: [],
             type_id: 0,
             url: "",
             phone: "",
@@ -388,29 +390,40 @@
     /** @param {Record<string, unknown>} form */
     function listingRequestBody(form) {
         const languages = listingLanguages(form.languages);
+        /** @type {number[]} */
+        const categoryIds = [];
+        const seen = new Set();
+        for (const raw of [
+            form.category_id,
+            ...(Array.isArray(form.category_extra) ? form.category_extra : []),
+        ]) {
+            const id = Number(raw);
+            if (id <= 0 || seen.has(id)) continue;
+            seen.add(id);
+            categoryIds.push(id);
+        }
         return {
             name: String(form.name ?? "").trim(),
             location_id: Number(form.location_id) > 0 ? Number(form.location_id) : 0,
-            category_id: Number(form.category_id),
-            type_id: Number(form.type_id),
+            category_id: categoryIds[0] || 0,
+            category_ids: categoryIds,
+            type_id: Number(form.type_id) || 0,
             url: String(form.url ?? "").trim(),
             phone: String(form.phone ?? "").trim(),
             address: String(form.address ?? "").trim(),
             notes: String(form.notes ?? "").trim(),
-            languages: languages.length ? languages : ["HU"],
+            languages: languages.length ? [...languages] : ["HU"],
             hours: normalizeHours(form.hours),
-            hours_enabled: hoursEnabled,
+            hours_enabled: Boolean(hoursEnabled),
             delivery_hours: normalizeHours(form.delivery_hours),
-            delivery_enabled: listingOffersDelivery ? deliveryEnabled : false,
+            delivery_enabled: listingOffersDelivery ? Boolean(deliveryEnabled) : false,
             photos: normalizePhotos(form.photos).slice(0, listingPhotoLimit),
             ratings_enabled: mode === "edit" ? Boolean(form.ratings_enabled) : false,
-            ...(mode === "edit"
-                ? {
-                      tags: tagsFromField(form.tags),
-                      social_links: socialList(form.social_links),
-                  }
+            tags: tagsFromField(form.tags),
+            ...(mode === "edit" ? { social_links: socialList(form.social_links) } : {}),
+            ...(mode === "create" && listingWebsiteId > 0
+                ? { website_id: Number(listingWebsiteId) }
                 : {}),
-            ...(mode === "create" && listingWebsiteId > 0 ? { website_id: listingWebsiteId } : {}),
         };
     }
 
@@ -456,9 +469,56 @@
             await onSaved();
             onNotice("A mentés sikerült.");
             onClose();
-        } catch {
-            listingsError = "A mentés nem sikerült";
+        } catch (err) {
+            listingsError = listingSaveErrorMessage(err);
         }
+    }
+
+    /** @param {unknown} err */
+    function listingSaveErrorMessage(err) {
+        const text = String(
+            err && typeof err === "object" && "message" in err ? err.message : err ?? "",
+        ).trim();
+        try {
+            const data = JSON.parse(text);
+            if (data?.error === "domain_taken") {
+                return "Ez a domain már másik bejegyzéshez tartozik.";
+            }
+            if (data?.field === "category_id") {
+                return "A kategória érvénytelen. Válassz újra a listából.";
+            }
+            if (data?.field === "type_id") {
+                return "A típus érvénytelen.";
+            }
+            if (data?.field === "tags") {
+                return "A címke nem lehet megegyező egy kategória nevével.";
+            }
+            if (data?.error === "invalid") {
+                return "A mentés nem sikerült: érvénytelen mező.";
+            }
+        } catch {
+            /* plain text body */
+        }
+        if (text.includes("entries_unique_entry") || text.includes("duplicate key")) {
+            return "Ezzel a névvel már van bejegyzés ezen a településen.";
+        }
+        if (text.includes("name, category_id, and type_id required")) {
+            return "A név, a kategória és a típus kötelező.";
+        }
+        if (text.includes("invalid url")) {
+            return "A weboldal URL érvénytelen.";
+        }
+        if (text.includes("invalid json")) {
+            return "A mentés nem sikerült: hibás adat a űrlapon.";
+        }
+        if (text.includes("forbidden") || text.includes("unauthorized")) {
+            return "Nincs jogosultságod a mentéshez. Jelentkezz be újra.";
+        }
+        if (text && text !== "A mentés nem sikerült") {
+            const short = text.length > 180 ? `${text.slice(0, 180)}...` : text;
+            return `A mentés nem sikerült: ${short}`;
+        }
+        return "A mentés nem sikerült";
     }
 
     async function loadEntry(id) {
@@ -466,11 +526,16 @@
             const detail = await apiFetch(
                 `/api/account/listings?id=${encodeURIComponent(String(id))}`,
             );
+            const categoryIDs = (Array.isArray(detail.category_ids) ? detail.category_ids : [])
+                .map((id) => Number(id))
+                .filter((id) => id > 0);
+            const categoryID = Number(detail.category_id) || categoryIDs[0] || 0;
             listingForm = {
                 id: Number(detail.id),
                 name: String(detail.name ?? ""),
-                location_id: Number(detail.location_id),
-                category_id: Number(detail.category_id),
+                location_id: Number(detail.location_id) > 0 ? Number(detail.location_id) : 0, // 0 = Nincs település
+                category_id: categoryID,
+                category_extra: categoryIDs.filter((id) => id !== categoryID),
                 type_id: Number(detail.type_id),
                 url: String(detail.url ?? ""),
                 phone: String(detail.phone ?? ""),
@@ -540,27 +605,24 @@
 
                 <label for="profile_listing_location">Település</label>
                 <select id="profile_listing_location" bind:value={listingForm.location_id}>
+                    <option value={-1}>Válassz...</option>
                     <option value={0}>Nincs település</option>
                     {#each listingLocations as loc (loc.id)}
                         <option value={loc.id}>{loc.name}</option>
                     {/each}
                 </select>
 
-                <label for="profile_listing_category">Alkategória <span class="field-required" aria-hidden="true">*</span></label>
-                <select id="profile_listing_category" bind:value={listingForm.category_id} required>
-                    <option value={0} disabled>Válassz alkategóriát</option>
-                    {#each listingCategoryParents as parent (parent.id)}
-                        <optgroup label={parent.name}>
-                            {#each listingCategoryChildren.filter((row) => row.parent_id === parent.id) as child (child.id)}
-                                <option value={child.id}>{child.name}</option>
-                            {/each}
-                        </optgroup>
-                    {/each}
-                </select>
+                <CategoryMultiSelect
+                    parents={listingCategoryParents}
+                    children={listingCategoryChildren}
+                    bind:primary={listingForm.category_id}
+                    bind:extra={listingForm.category_extra}
+                    primaryInputId="profile_listing_category"
+                />
 
                 <label for="profile_listing_type">Típus <span class="field-required" aria-hidden="true">*</span></label>
                 <select id="profile_listing_type" bind:value={listingForm.type_id} required>
-                    <option value={0} disabled>Válassz típust</option>
+                    <option value={0}>Válassz...</option>
                     {#each listingTypes as typ (typ.id)}
                         <option value={typ.id}>{typ.name}</option>
                     {/each}
@@ -596,9 +658,6 @@
                         {/if}
                     </div>
                 {/if}
-                {#if listingsError}
-                    <p class="profile-error">{listingsError}</p>
-                {/if}
                 {#if formNotice}
                     <p class="profile-ok">{formNotice}</p>
                 {/if}
@@ -609,13 +668,13 @@
                 <label for="profile_listing_address">Cím</label>
                 <input id="profile_listing_address" type="text" bind:value={listingForm.address} />
 
-                <label for="profile_listing_notes">Megjegyzés</label>
+                <label for="profile_listing_notes">Bemutatkozás</label>
                 <textarea id="profile_listing_notes" bind:value={listingForm.notes} rows="3"></textarea>
 
-                {#if mode === "edit"}
-                    <label for="profile_listing_tags">Címkék (#cimke1 #cimke2)</label>
-                    <input id="profile_listing_tags" type="text" bind:value={listingForm.tags} />
+                <label for="profile_listing_tags">Címkék (#cimke1 #cimke2)</label>
+                <input id="profile_listing_tags" type="text" bind:value={listingForm.tags} />
 
+                {#if mode === "edit"}
                     <fieldset class="link-dialog-choices">
                         <legend>Közösségi oldalak</legend>
                         {#each listingForm.social_links as link, index (index)}
@@ -647,16 +706,32 @@
                 </fieldset>
 
                 <label class="link-dialog-check">
-                    <input type="checkbox" name="hours_enabled" bind:checked={hoursEnabled} />
+                    <input
+                        type="checkbox"
+                        name="hours_enabled"
+                        bind:checked={hoursEnabled}
+                        onchange={() => {
+                            if (hoursEnabled) listingForm.hours = withDefaultWeekHours(listingForm.hours);
+                        }}
+                    />
                     Nyitvatartás / Program
                 </label>
                 {#if hoursEnabled}
                     <EntryHoursEditor bind:hours={listingForm.hours} />
                 {/if}
 
-                {#if mode === "edit" && listingOffersDelivery}
+                {#if listingOffersDelivery}
                     <label class="link-dialog-check">
-                        <input type="checkbox" name="delivery_enabled" bind:checked={deliveryEnabled} />
+                        <input
+                            type="checkbox"
+                            name="delivery_enabled"
+                            bind:checked={deliveryEnabled}
+                            onchange={() => {
+                                if (deliveryEnabled) {
+                                    listingForm.delivery_hours = withDefaultWeekHours(listingForm.delivery_hours);
+                                }
+                            }}
+                        />
                         Kiszállítási idő
                     </label>
                     {#if deliveryEnabled}
@@ -740,6 +815,10 @@
                         <input type="checkbox" name="ratings_enabled" bind:checked={listingForm.ratings_enabled} />
                         Értékelések
                     </label>
+                {/if}
+
+                {#if listingsError}
+                    <p class="profile-error" role="alert">{listingsError}</p>
                 {/if}
 
                 <div class="link-dialog-actions">

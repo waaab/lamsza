@@ -3,6 +3,7 @@ package account
 import (
 	"backend/internal/auth"
 	"backend/internal/db"
+	"backend/internal/directory"
 	"backend/internal/webdomain"
 	"database/sql"
 	"encoding/json"
@@ -24,15 +25,17 @@ type WebsiteHit struct {
 }
 
 type websiteListItem struct {
-	ID          int    `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Domain      string `json:"domain"`
-	URL         string `json:"url"`
-	Claimed     bool   `json:"claimed"`
-	CategoryID  int    `json:"category_id"`
-	Category    string `json:"category"`
-	EntryID     int    `json:"entry_id"`
+	ID          int      `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Domain      string   `json:"domain"`
+	URL         string   `json:"url"`
+	Claimed     bool     `json:"claimed"`
+	CategoryID  int      `json:"category_id"`
+	Category    string   `json:"category"`
+	Categories  []string `json:"categories"`
+	EntryID     int      `json:"entry_id"`
+	EntrySlug   string   `json:"entry_slug,omitempty"`
 }
 
 type websitesListResponse struct {
@@ -44,6 +47,7 @@ type submitWebsiteBody struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	CategoryID  int    `json:"category_id"`
+	CategoryIDs []int  `json:"category_ids"`
 }
 
 type submitWebsiteResponse struct {
@@ -258,13 +262,14 @@ func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	resp := websitesListResponse{Websites: []websiteListItem{}}
 	rows, err := db.DB.Query(`
 		SELECT w.id, w.title, w.description, w.domain_key, COALESCE(w.category_id, 0), COALESCE(c.name, ''),
-			COALESCE(w.entry_id, 0),
+			COALESCE(w.entry_id, 0), COALESCE(e.slug, ''),
 			EXISTS (
 				SELECT 1 FROM entry_members m
 				WHERE m.entry_id = w.entry_id AND m.role = 'owner' AND m.status = 'active'
 			)
 		FROM websites w
 		LEFT JOIN entry_categories c ON c.id = w.category_id
+		LEFT JOIN entries e ON e.id = w.entry_id AND e.published = true
 		WHERE w.status = 'approved'
 		ORDER BY w.title ASC, w.id ASC
 	`)
@@ -275,12 +280,33 @@ func handleWebsitesList(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	for rows.Next() {
 		var item websiteListItem
-		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.CategoryID, &item.Category, &item.EntryID, &item.Claimed); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.Domain, &item.CategoryID, &item.Category, &item.EntryID, &item.EntrySlug, &item.Claimed); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		item.URL = "https://" + item.Domain
+		item.Categories = []string{}
 		resp.Websites = append(resp.Websites, item)
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ids := make([]int, 0, len(resp.Websites))
+	for _, item := range resp.Websites {
+		ids = append(ids, item.ID)
+	}
+	names, err := directory.NamesForWebsites(db.DB, ids)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	for i := range resp.Websites {
+		got := names[resp.Websites[i].ID]
+		if len(got) == 0 && resp.Websites[i].Category != "" {
+			got = []string{resp.Websites[i].Category}
+		}
+		resp.Websites[i].Categories = got
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
@@ -327,7 +353,12 @@ func handleWebsiteSubmit(w http.ResponseWriter, r *http.Request) {
 		writeWebsiteFieldError(w, "description")
 		return
 	}
-	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+	categoryIDs, err := directory.NormalizeCategoryIDs(body.CategoryID, body.CategoryIDs)
+	if err != nil {
+		writeWebsiteFieldError(w, "category_id")
+		return
+	}
+	if _, err = directory.ValidateLeaves(db.DB, categoryIDs); err != nil {
 		writeWebsiteFieldError(w, "category_id")
 		return
 	}
@@ -357,6 +388,10 @@ func handleWebsiteSubmit(w http.ResponseWriter, r *http.Request) {
 	`, domainKey, submittedHost, title, description, u.ID, body.CategoryID).Scan(&id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err = directory.ReplaceWebsiteCategories(db.DB, id, categoryIDs); err != nil {
+		writeWebsiteFieldError(w, "category_id")
 		return
 	}
 
@@ -440,9 +475,10 @@ func checkWebsiteDomainConflict(domainKey string) (map[string]interface{}, error
 }
 
 type adminWebsiteBody struct {
-	ID         int    `json:"id"`
-	Action     string `json:"action"`
-	CategoryID int    `json:"category_id"`
+	ID          int    `json:"id"`
+	Action      string `json:"action"`
+	CategoryID  int    `json:"category_id"`
+	CategoryIDs []int  `json:"category_ids"`
 }
 
 func HandleAdminWebsite(w http.ResponseWriter, r *http.Request) {
@@ -534,7 +570,12 @@ func handleAdminWebsiteAction(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if body.CategoryID > 0 {
-			if err := validateLeafCategoryID(body.CategoryID); err != nil {
+			categoryIDs, err := directory.NormalizeCategoryIDs(body.CategoryID, body.CategoryIDs)
+			if err != nil {
+				writeWebsiteFieldError(w, "category_id")
+				return
+			}
+			if _, err = directory.ValidateLeaves(db.DB, categoryIDs); err != nil {
 				writeWebsiteFieldError(w, "category_id")
 				return
 			}
@@ -550,6 +591,10 @@ func handleAdminWebsiteAction(w http.ResponseWriter, r *http.Request) {
 			n, _ := res.RowsAffected()
 			if n == 0 {
 				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			if err = directory.ReplaceWebsiteCategories(db.DB, body.ID, categoryIDs); err != nil {
+				writeWebsiteFieldError(w, "category_id")
 				return
 			}
 		} else {

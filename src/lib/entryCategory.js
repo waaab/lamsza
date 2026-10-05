@@ -54,12 +54,51 @@ const DIRECTORY_TREE = [
     ],
     [
         "Mesteremberek",
-        ["Villanyszerelő", "Vízvezeték-szerelő", "Asztalos", "Takarítás", "Építkezés"],
+        [
+            "Villanyszerelő",
+            "Vízvezeték-szerelő",
+            "Asztalos",
+            "Takarítás",
+            "Építkezés",
+            "Szabó",
+            "Építész",
+            "Lakberendezés",
+        ],
     ],
     ["Oktatás", ["Óvoda", "Iskola", "Egyetem"]],
     ["Hivatalok", ["Polgármesteri hivatal", "Megyei intézmény", "Posta"]],
-    ["Sport és szabadidő", ["Sportegyesület", "Sportpálya"]],
-    ["Pénzügy", ["Bank", "Biztosító"]],
+    ["Sport és szabadidő", ["Sportegyesület"]],
+    ["Pénzügy", ["Bank", "Biztosító", "Könyvelő", "Pénzügyi tanácsadó"]],
+    [
+        "Informatika és távközlés",
+        [
+            "Webfejlesztés",
+            "Webdizájn",
+            "Keresőoptimalizálás",
+            "Szoftver",
+            "Hálózat",
+            "Számítógép szerviz",
+            "Tárhely",
+            "Internet",
+            "Távközlés",
+            "E-kereskedelem",
+        ],
+    ],
+    [
+        "Szakmai szolgáltatások",
+        [
+            "Ügyvéd",
+            "Közjegyző",
+            "Fordítóiroda",
+            "Tanácsadás",
+            "Marketing",
+            "Grafika",
+            "Toborzás",
+            "Nyomda",
+            "Ingatlanközvetítő",
+            "Fotós",
+        ],
+    ],
 ];
 
 /** @type {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} */
@@ -81,6 +120,43 @@ export const DIRECTORY_CATALOG = DIRECTORY_TREE.flatMap(([parentName, children],
     }));
     return [parent, ...childRows];
 });
+
+/**
+ * Parents in catalog order, each with its subcategories.
+ *
+ * @param {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} [catalog]
+ */
+export function directoryGroups(catalog = DIRECTORY_CATALOG) {
+    const rows = catalog?.length ? catalog : DIRECTORY_CATALOG;
+    return rows
+        .filter((row) => !row.parent_id)
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "hu"))
+        .map((parent) => ({
+            ...parent,
+            children: rows
+                .filter((row) => row.parent_id === parent.slug)
+                .slice()
+                .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "hu")),
+        }));
+}
+
+/**
+ * Same groups, but a subcategory is listed only when an entry is filed there.
+ *
+ * @param {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} [catalog]
+ * @param {Array<{ category?: string }>} [entries]
+ */
+export function directoryGroupsForEntries(catalog = DIRECTORY_CATALOG, entries = []) {
+    const rows = catalog?.length ? catalog : DIRECTORY_CATALOG;
+    const list = Array.isArray(entries) ? entries : [];
+    return directoryGroups(rows).map((parent) => ({
+        ...parent,
+        children: parent.children.filter((child) =>
+            list.some((entry) => entryMatchesCategory(entry, child.slug, rows)),
+        ),
+    }));
+}
 
 /** @type {Map<string, string>} child slug -> parent slug */
 const CATEGORY_PARENT_SLUG = new Map(
@@ -132,19 +208,38 @@ export function canonicalEntryCategoryKey(raw) {
  * @param {{ category?: string } | null | undefined} entry
  * @param {string} slug
  */
-export function entryMatchesCategory(entry, slug, catalog = DIRECTORY_CATALOG) {
-    if (!slug || slug === "osszes") return true;
-    const catKey = canonicalEntryCategoryKey(entry?.category);
+/**
+ * @param {{ category?: string, categories?: string[] } | null | undefined} entry
+ */
+function entryCategoryNames(entry) {
+    const many = Array.isArray(entry?.categories) ? entry.categories : [];
+    const names = many.map((name) => canonicalEntryCategory(name)).filter(Boolean);
+    const one = canonicalEntryCategory(entry?.category);
+    if (one && !names.includes(one)) names.push(one);
+    return names;
+}
+
+/**
+ * @param {string} name
+ * @param {string} slug
+ * @param {Array<{ slug: string, name: string, parent_id: string | null }>} rows
+ */
+function nameMatchesCategory(name, slug, rows) {
+    const catKey = canonicalEntryCategoryKey(name);
     const filterKey = foldCategory(slug);
+    if (!catKey || !filterKey) return false;
     if (catKey === filterKey) return true;
-    const rows = catalog || DIRECTORY_CATALOG;
     const row = rows.find(
         (item) => item.slug === catKey || foldCategory(item.name) === catKey,
     );
-    if (row?.parent_id) {
-        return row.parent_id === filterKey;
-    }
+    if (row?.parent_id) return row.parent_id === filterKey;
     return CATEGORY_PARENT_SLUG.get(catKey) === filterKey;
+}
+
+export function entryMatchesCategory(entry, slug, catalog = DIRECTORY_CATALOG) {
+    if (!slug || slug === "osszes") return true;
+    const rows = catalog || DIRECTORY_CATALOG;
+    return entryCategoryNames(entry).some((name) => nameMatchesCategory(name, slug, rows));
 }
 
 /** @param {Array<{ category?: string, category_id?: number }>} rows */
@@ -152,36 +247,33 @@ function visibleChildSlugs(rows) {
     /** @type {Set<string>} */
     const visible = new Set();
     for (const row of rows || []) {
-        const slug = canonicalEntryCategoryKey(row?.category);
-        if (slug) visible.add(slug);
+        for (const name of entryCategoryNames(row)) {
+            const slug = canonicalEntryCategoryKey(name);
+            if (slug) visible.add(slug);
+        }
     }
     return visible;
 }
 
 /**
+ * Main category tabs. Every parent is listed, including empty shelves.
+ * Subcategories stay on directoryChildTabs and appear only when they have an entry.
+ *
  * @param {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} catalog
- * @param {Array<{ category?: string }>} entries
- * @param {Array<{ category?: string, category_id?: number, entry_id?: number }>} [websites]
+ * @param {Array<{ category?: string }>} [_entries]
+ * @param {Array<{ category?: string, category_id?: number, entry_id?: number }>} [_websites]
  */
-export function directoryCategoryTabs(catalog, entries, websites = []) {
-    const visible = visibleChildSlugs([
-        ...(entries || []),
-        ...(websites || []).filter((site) => !site?.entry_id),
-    ]);
-    const parents = (catalog || DIRECTORY_CATALOG).filter((row) => !row.parent_id);
-    const tabs = parents
-        .filter((parent) => {
-            const children = (catalog || DIRECTORY_CATALOG).filter(
-                (row) => row.parent_id === parent.slug,
-            );
-            return children.some((child) => visible.has(child.slug));
-        })
+export function directoryCategoryTabs(catalog, _entries, _websites = []) {
+    const rows = catalog?.length ? catalog : DIRECTORY_CATALOG;
+    const tabs = rows
+        .filter((row) => !row.parent_id)
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name, "hu"))
         .map((parent) => ({
             id: parent.slug,
             label: parent.name,
             url: `/index/${parent.slug}`,
-        }))
-        .sort((a, b) => a.label.localeCompare(b.label, "hu"));
+        }));
     return [{ id: "osszes", label: "Összes", url: "/index" }, ...tabs];
 }
 

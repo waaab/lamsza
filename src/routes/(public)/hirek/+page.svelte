@@ -1,5 +1,6 @@
 <script>
     import { onMount } from "svelte";
+    import ChipScrollRow from "$lib/components/ChipScrollRow.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { apiFetch } from "$lib/api.js";
@@ -277,84 +278,6 @@
             loading = false;
         }
     });
-    let canScrollLeft = false;
-    let canScrollRight = false;
-    let chipsContainer;
-
-    function checkScroll(node) {
-        if (!node) return;
-        canScrollLeft = node.scrollLeft > 5;
-        canScrollRight =
-            node.scrollLeft < node.scrollWidth - node.clientWidth - 5;
-    }
-
-    // Drag to scroll logic for chips
-    function dragScroll(node) {
-        let isDown = false;
-        let startX;
-        let scrollLeft;
-
-        const onMouseDown = (e) => {
-            isDown = true;
-            node.classList.add("active");
-            startX = e.pageX - node.offsetLeft;
-            scrollLeft = node.scrollLeft;
-        };
-
-        const onMouseLeave = () => {
-            isDown = false;
-            node.classList.remove("active");
-        };
-
-        const onMouseUp = () => {
-            isDown = false;
-            node.classList.remove("active");
-        };
-
-        const onMouseMove = (e) => {
-            if (!isDown) return;
-            e.preventDefault();
-            const x = e.pageX - node.offsetLeft;
-            const walk = (x - startX) * 2; // Scroll-fast factor
-            node.scrollLeft = scrollLeft - walk;
-            checkScroll(node);
-        };
-
-        const onScroll = () => {
-            checkScroll(node);
-        };
-
-        const onResize = () => {
-            checkScroll(node);
-        };
-
-        node.addEventListener("mousedown", onMouseDown);
-        node.addEventListener("mouseleave", onMouseLeave);
-        node.addEventListener("mouseup", onMouseUp);
-        node.addEventListener("mousemove", onMouseMove);
-        node.addEventListener("scroll", onScroll);
-        window.addEventListener("resize", onResize);
-
-        // Initial check after a short delay for layout
-        setTimeout(() => checkScroll(node), 100);
-
-        return {
-            destroy() {
-                node.removeEventListener("mousedown", onMouseDown);
-                node.removeEventListener("mouseleave", onMouseLeave);
-                node.removeEventListener("mouseup", onMouseUp);
-                node.removeEventListener("mousemove", onMouseMove);
-                node.removeEventListener("scroll", onScroll);
-                window.removeEventListener("resize", onResize);
-            },
-        };
-    }
-
-    function scrollChips(amount) {
-        if (chipsContainer) {
-            chipsContainer.scrollBy({ left: amount, behavior: "smooth" });
-        }
-    }
 </script>
 
 <svelte:head>
@@ -374,44 +297,27 @@
     documentTitleSuffix=" - Lámsza"
 />
 
-<div class="header-tabs chips">
-    <span class="header-tabs-label" aria-label="Leggyakoribb témák">Leggyakoribb témák:</span>
-    {#if loading}
+{#if loading}
+    <div class="header-tabs chips">
+        <span class="header-tabs-label" aria-label="Leggyakoribb témák">Leggyakoribb témák:</span>
         <span class="btn btn--loading">Szűrők betöltése…</span>
-    {:else if allNewsItems.length > 0}
-        <div class="header-tabs-filters-row"
-            class:can-left={canScrollLeft}
-            class:can-right={canScrollRight}
-        >
+    </div>
+{:else if allNewsItems.length > 0}
+    <ChipScrollRow label="Leggyakoribb témák:">
+        {#each topWords as [word, count]}
             <button
-                class="btn btn-xs scroll-arrow left"
-                aria-label="Görgetés balra"
-                on:click={() => scrollChips(-200)}>‹</button
+                class="btn btn-md {selectedWord === word ? 'active' : ''}"
+                on:click={() => {
+                    selectedWord = selectedWord === word ? null : word;
+                    scrollToTop();
+                }}
             >
-            <div class="chips-list" use:dragScroll bind:this={chipsContainer}>
-                {#each topWords as [word, count]}
-                    <button
-                        class="btn btn-md {selectedWord === word
-                            ? 'active'
-                            : ''}"
-                        on:click={() => {
-                            selectedWord = selectedWord === word ? null : word;
-                            scrollToTop();
-                        }}
-                    >
-                    <span class="btn-label">{word}</span>
-                    <span class="btn-label-count">{count}</span>
-                    </button>
-                {/each}
-            </div>
-            <button
-                class="btn btn-xs scroll-arrow right"
-                aria-label="Görgetés jobbra"
-                on:click={() => scrollChips(200)}>›</button
-            >
-        </div>
-    {/if}
-</div>
+                <span class="btn-label">{word}</span>
+                <span class="btn-label-count">{count}</span>
+            </button>
+        {/each}
+    </ChipScrollRow>
+{/if}
 {#if selectedSource || selectedWord}
     <div class="filter-actions">
         <span class="info-box">

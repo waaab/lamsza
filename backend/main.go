@@ -85,6 +85,7 @@ func main() {
 	mux.HandleFunc("/api/admin/entries", admin(handlers.HandleAdminEntries))
 	mux.HandleFunc("/api/admin/entry_categories", admin(handlers.HandleAdminEntryCategories))
 	mux.HandleFunc("/api/admin/entry_types", admin(handlers.HandleAdminEntryTypes))
+	mux.HandleFunc("/api/admin/tags", admin(handlers.HandleAdminTags))
 	mux.HandleFunc("/api/admin/locations", admin(handlers.HandleAdminLocations))
 	mux.HandleFunc("/api/admin/settlement_location_types", admin(handlers.HandleAdminSettlementLocationTypes))
 	mux.HandleFunc("/api/admin/county_seat", admin(handlers.HandleSetCountySeat))

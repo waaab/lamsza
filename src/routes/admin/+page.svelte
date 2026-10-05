@@ -12,10 +12,13 @@
     import { absoluteMediaUrl } from "$lib/eventImage.js";
     import { getApiBase, apiCall } from "$lib/api.js";
     import { ENTRY_TYPE_VALLALKOZAS } from "$lib/entryType.js";
-    import { emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import { emptyWeekHours, normalizeHours, withDefaultWeekHours } from "$lib/entryHours.js";
     import { offersDelivery } from "$lib/entryPublicExtras.js";
     import { emptyPhotos, normalizePhotos } from "$lib/entryPhotos.js";
+    import CategoryMultiSelect from "$lib/components/CategoryMultiSelect.svelte";
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
+    import HuDateInput from "$lib/components/HuDateInput.svelte";
+    import HuTimeInput from "$lib/components/HuTimeInput.svelte";
     import EntryPhotosEditor from "$lib/components/EntryPhotosEditor.svelte";
     import GoogleSignIn from "$lib/components/GoogleSignIn.svelte";
     import { canonicalDomain } from "$lib/websiteDomain.js";
@@ -44,6 +47,7 @@
         { id: "entries", title: "Index" },
         { id: "entry_categories", title: "Bejegyzés Kategóriák" },
         { id: "entry_types", title: "Bejegyzés típusok" },
+        { id: "tags", title: "Címkék" },
         { id: "locations", title: "Települések" },
         { id: "counties", title: "Megyék" },
         { id: "venues", title: "Helyszínek" },
@@ -156,6 +160,7 @@
     let entries = [];
     let entryCategories = [];
     let entryTypes = [];
+    let tags = [];
     let events = [];
 
     // Per-feed loading state
@@ -182,13 +187,14 @@
     let newEntry = {
         location_id: "",
         category_id: "",
+        category_extra: [],
         name: "",
         slug: "",
         url: "",
         phone: "",
         address: "",
         notes: "",
-        type: ENTRY_TYPE_VALLALKOZAS,
+        type: "",
         languages: ["HU"],
         tags: "",
         verified: false,
@@ -203,7 +209,10 @@
     let categoryDeleteMove = null;
     /** @type {Record<number, string>} */
     let websiteApproveCategory = {};
+    /** @type {Record<number, number[]>} */
+    let websiteApproveExtra = {};
     let newEntryType = { name: "" };
+    let newTag = { name: "" };
     let newEvent = {
         location_id: "",
         default_venue_id: "",
@@ -276,6 +285,7 @@
     let searchEntries = "";
     let searchAdminWebsites = "";
     let searchEntryTypes = "";
+    let searchTags = "";
     let searchAttractions = "";
     let searchCounties = "";
     let searchHistoricalSeats = "";
@@ -302,6 +312,7 @@
     /** @type {Array<{ id: number, email: string, name: string, given_name: string, family_name: string, display_name: string, locale: string, settlement: string, created_at: string, last_login_at: string, website_banned: boolean, is_admin: boolean }>} */
     let adminUsers = [];
     let pageEntryTypes = 1;
+    let pageTags = 1;
     let pageAttractions = 1;
     let pageCounties = 1;
     let pageHistoricalSeats = 1;
@@ -340,13 +351,14 @@
     let newOrganizerEntry = {
         location_id: "",
         category_id: "",
+        category_extra: [],
         name: "",
         slug: "",
         url: "",
         phone: "",
         address: "",
         notes: "",
-        type: ENTRY_TYPE_VALLALKOZAS,
+        type: "",
         languages: ["HU"],
         tags: "",
     };
@@ -357,6 +369,7 @@
     let editingLocation = null;
     let editingCategory = null;
     let editingType = null;
+    let editingTag = null;
     let editingMondas = null;
     let editingLink = null;
     let editingNews = null;
@@ -421,6 +434,7 @@
         entries: "Index",
         entry_categories: "Bejegyzés kategóriák",
         entry_types: "Bejegyzés típusok",
+        tags: "Címkék",
         events: "Események",
         catalog_event_types: "Eseménytípusok",
         catalog_event_subtypes: "Esemény-altípusok",
@@ -762,7 +776,7 @@
 
     const SUGGESTION_FIELD_LABELS = {
         name: "Név",
-        tags: "Szolgáltatások",
+        tags: "Címkék",
         notes: "Bemutatkozás",
         location_id: "Település",
         address: "Cím",
@@ -873,10 +887,13 @@
         await auth.refresh();
     }
 
-    async function reviewWebsite(websiteId, action, categoryId = 0) {
+    async function reviewWebsite(websiteId, action, categoryId = 0, categoryIds = []) {
         const body = { id: websiteId, action };
         if (action === "approve" && categoryId > 0) {
             body.category_id = categoryId;
+            body.category_ids = (Array.isArray(categoryIds) ? categoryIds : [])
+                .map((id) => Number(id))
+                .filter((id) => id > 0);
         }
         const res = await apiCall("/api/admin/websites", {
             method: "POST",
@@ -962,6 +979,10 @@
         entry_types: {
             title: "Bejegyzés típusok",
             greeting: "A címtárban használható bejegyzés-típusok kezelése.",
+        },
+        tags: {
+            title: "Címkék",
+            greeting: "Keresztszavak a bejegyzésekhez. A címke nem ismétli a kategória nevét.",
         },
         pages: {
             title: "Oldalak",
@@ -1297,6 +1318,8 @@
         et.name,
     ]);
     $: pgEntryTypes = adminPageSlice(rfEntryTypes, pageEntryTypes);
+    $: rfTags = filterRows(tags, searchTags, (tag) => [tag.id, tag.name, tag.usage]);
+    $: pgTags = adminPageSlice(rfTags, pageTags);
     $: rfAttractions = filterRows(attractions, searchAttractions, (att) => [
         att.name,
         att.slug,
@@ -1416,6 +1439,7 @@
         fetchAdminWebsites();
         fetchEntryCategories();
         fetchEntryTypes();
+        fetchTags();
         fetchEvents();
         fetchVenuesCatalog();
         fetchVenueTypes();
@@ -1831,6 +1855,35 @@
     }
     function fetchEntryTypes() {
         loadData("entry_types", (d) => (entryTypes = d));
+    }
+    function fetchTags() {
+        loadData("tags", (d) => (tags = d));
+    }
+
+    function submitTag(e) {
+        e.preventDefault();
+        createRecord(
+            "tags",
+            { name: String(newTag.name ?? "").trim() },
+            fetchTags,
+            () => (newTag = { name: "" }),
+        );
+    }
+
+    async function startEditTag(tag) {
+        const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
+        if (!ok) return;
+        editingTag = { ...tag };
+    }
+    function cancelEditTag() {
+        editingTag = null;
+    }
+    async function saveEditTag() {
+        if (!editingTag) return;
+        const ok = await showConfirm("Biztosan menteni szeretné a módosítást?");
+        if (!ok) return;
+        await updateRecord("tags", { id: editingTag.id, name: editingTag.name }, fetchTags);
+        editingTag = null;
     }
     async function fetchEvents() {
         await Promise.all([
@@ -3010,6 +3063,10 @@
             category_id: newOrganizerEntry.category_id
                 ? parseInt(newOrganizerEntry.category_id)
                 : null,
+            category_ids: [
+                parseInt(newOrganizerEntry.category_id),
+                ...(newOrganizerEntry.category_extra || []),
+            ].filter((id) => id > 0),
             tags: tagsFromStr(newOrganizerEntry.tags),
         };
         createRecord("entries", payload, fetchEntries, () => {
@@ -3019,13 +3076,14 @@
             newOrganizerEntry = {
                 location_id: "",
                 category_id: "",
+                category_extra: [],
                 name: "",
                 slug: "",
                 url: "",
                 phone: "",
                 address: "",
                 notes: "",
-                type: ENTRY_TYPE_VALLALKOZAS,
+                type: "",
                 languages: ["HU"],
                 tags: "",
             };
@@ -3513,6 +3571,10 @@
             category_id: newEntry.category_id
                 ? parseInt(newEntry.category_id)
                 : null,
+            category_ids: [
+                parseInt(newEntry.category_id),
+                ...(newEntry.category_extra || []),
+            ].filter((id) => id > 0),
             tags: tagsFromStr(newEntry.tags),
             verified: Boolean(newEntry.verified),
             hours: normalizeHours(newEntry.hours),
@@ -3530,13 +3592,14 @@
             () =>
                 (newEntry = {
                     location_id: "",
-                    category_id: null,
+                    category_id: "",
+                    category_extra: [],
                     name: "",
                     url: "",
                     phone: "",
                     address: "",
                     notes: "",
-                    type: ENTRY_TYPE_VALLALKOZAS,
+                    type: "",
                     languages: ["HU"],
                     tags: "",
                     verified: false,
@@ -3553,8 +3616,14 @@
     async function openEdit(entry) {
         const ok = await showConfirm("Biztosan szerkeszteni szeretné?");
         if (!ok) return;
+        const categoryIDs = (Array.isArray(entry.category_ids) ? entry.category_ids : [])
+            .map((id) => Number(id))
+            .filter((id) => id > 0);
+        const categoryID = Number(entry.category_id) || categoryIDs[0] || "";
         editingEntry = {
             ...entry,
+            category_id: categoryID,
+            category_extra: categoryIDs.filter((id) => id !== Number(categoryID)),
             languages: entry.languages ? [...entry.languages] : ["HU"],
             verified: Boolean(entry.verified),
             hours: normalizeHours(entry.hours),
@@ -3579,6 +3648,10 @@
             category_id: editingEntry.category_id
                 ? parseInt(editingEntry.category_id)
                 : null,
+            category_ids: [
+                parseInt(editingEntry.category_id),
+                ...(editingEntry.category_extra || []),
+            ].filter((id) => id > 0),
             tags: tagsFromStr(editTagsStr),
             verified: Boolean(editingEntry.verified),
             hours: normalizeHours(editingEntry.hours),
@@ -3891,6 +3964,14 @@
                 <AdminNavIcon name="entry_types" />
             </button>
 
+            <button
+                class="admin-sidebar-btn {activeTab === 'tags' ? 'active' : ''}"
+                on:click={() => goToAdminTab("tags")}
+                title="Címkék"
+            >
+                <AdminNavIcon name="tags" />
+            </button>
+
             <hr class="admin-sidebar-sep" aria-hidden="true" />
 
             <button
@@ -4041,33 +4122,13 @@
                                                 title="A böngésző-mentés törlése és újratöltése később lesz bekötve."
                                             >Frissítés</button>
                                         {:else if msg.action === "website"}
-                                            <label for="website_cat_{msg.websiteId}"
-                                                >Alkategória</label
-                                            >
-                                            <select
-                                                id="website_cat_{msg.websiteId}"
-                                                value={websiteApproveCategory[
-                                                    msg.websiteId
-                                                ] ?? ""}
-                                                on:change={(e) => {
-                                                    websiteApproveCategory = {
-                                                        ...websiteApproveCategory,
-                                                        [msg.websiteId]:
-                                                            e.currentTarget.value,
-                                                    };
-                                                }}
-                                            >
-                                                <option value="">Válassz alkategóriát</option>
-                                                {#each entryCategoryParents as parent}
-                                                    <optgroup label={parent.name}>
-                                                        {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
-                                                            <option value={child.id}
-                                                                >{child.name}</option
-                                                            >
-                                                        {/each}
-                                                    </optgroup>
-                                                {/each}
-                                            </select>
+                                            <CategoryMultiSelect
+                                                parents={entryCategoryParents}
+                                                children={entryCategoryChildren}
+                                                bind:primary={websiteApproveCategory[msg.websiteId]}
+                                                bind:extra={websiteApproveExtra[msg.websiteId]}
+                                                primaryInputId={"website_cat_" + msg.websiteId}
+                                            />
                                             <button
                                                 type="button"
                                                 class="btn btn-sm"
@@ -4081,6 +4142,7 @@
                                                             ] || "0",
                                                             10,
                                                         ),
+                                                        websiteApproveExtra[msg.websiteId] || [],
                                                     )}>Approve</button
                                             >
                                             <button type="button" class="btn btn-sm" on:click={() => reviewWebsite(msg.websiteId, "reject")}>Reject</button>
@@ -4368,10 +4430,9 @@
                             ></textarea>
                             <label for="mondas_day">Megjelenés napja</label>
                             <div class="admin-date-field">
-                                <input
+                                <HuDateInput
                                     id="mondas_day"
                                     name="display_date"
-                                    type="date"
                                     bind:value={newMondas.display_date}
                                     required
                                 />
@@ -4904,6 +4965,7 @@
                             id="loc_parent"
                             bind:value={newLocation.parent_id}
                         >
+<option value="">Válassz...</option>
                             <option value={null}
                                 >Nincs (Önálló város/község)</option
                             >
@@ -5258,6 +5320,7 @@
                             <label class="flex-1" style="min-width:10rem"
                                 >Típus
                                 <select id="new-venue-kind" name="kind" bind:value={newVenue.kind}>
+<option value="">Válassz...</option>
                                     {#each venueTypesList as vt}
                                         <option value={vt.slug}
                                             >{vt.label_hu}</option
@@ -5641,6 +5704,7 @@
                             name="default_venue_id"
                             bind:value={newEvent.default_venue_id}
                         >
+<option value="">Válassz...</option>
                             <option value="">- nincs megadva -</option>
                             {#each venueOptionsNew as v}
                                 <option value={String(v.id)}>{v.name}</option>
@@ -5649,6 +5713,7 @@
 
                         <label for="event_attraction">Látnivaló (opcionális)</label>
                         <select id="event_attraction" name="attraction_id" bind:value={newEvent.attraction_id}>
+<option value="">Válassz...</option>
                             <option value="">- nincs hozzárendelve -</option>
                             {#each attractions as att}
                                 <option value={String(att.id)}>{att.name} ({att.county_name || att.county_slug})</option>
@@ -5730,9 +5795,8 @@
                                         >*</span
                                     ></label
                                 >
-                                <input
+                                <HuDateInput
                                     id="event_start_date"
-                                    type="date"
                                     bind:value={newEvent.start_date}
                                     required
                                 />
@@ -5744,9 +5808,8 @@
                                         title="Kötelező">*</span
                                     ></label
                                 >
-                                <input
+                                <HuTimeInput
                                     id="event_start_time"
-                                    type="time"
                                     bind:value={newEvent.start_time}
                                     required
                                 />
@@ -5760,9 +5823,8 @@
                                         >*</span
                                     ></label
                                 >
-                                <input
+                                <HuDateInput
                                     id="event_end_date"
-                                    type="date"
                                     bind:value={newEvent.end_date}
                                     required
                                 />
@@ -5774,9 +5836,8 @@
                                         title="Kötelező">*</span
                                     ></label
                                 >
-                                <input
+                                <HuTimeInput
                                     id="event_end_time"
-                                    type="time"
                                     bind:value={newEvent.end_time}
                                     required
                                 />
@@ -5792,7 +5853,7 @@
                             on:change={() => (newEvent.event_subtype_id = "")}
                             required
                         >
-                            <option value="">- válassz -</option>
+                            <option value="">Válassz...</option>
                             {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as t}
                                 <option value={String(t.id)}
                                     >{t.label_hu} ({t.slug})</option
@@ -5805,6 +5866,7 @@
                             id="event_subtype_id"
                             bind:value={newEvent.event_subtype_id}
                         >
+<option value="">Válassz...</option>
                             <option value="">- nincs -</option>
                             {#each subtypesForNewEvent as s}
                                 <option value={String(s.id)}
@@ -5818,6 +5880,7 @@
                             id="event_access_type"
                             bind:value={newEvent.access_type}
                         >
+<option value="">Válassz...</option>
                             <option value="public">{ACCESS_TYPE_LABELS.public}</option>
                             <option value="members_only">{ACCESS_TYPE_LABELS.members_only}</option>
                             <option value="invitation_only">{ACCESS_TYPE_LABELS.invitation_only}</option>
@@ -6206,7 +6269,7 @@
                                 bind:value={newCatalogEventSubtype.event_type_id}
                                 required
                             >
-                                <option value="">- válassz -</option>
+<option value="">Válassz...</option>
                                 {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as ct}
                                     <option value={String(ct.id)}
                                         >{ct.label_hu} ({ct.slug})</option
@@ -6400,6 +6463,7 @@
 
                             <label for="cat_parent">Főkategória</label>
                             <select id="cat_parent" bind:value={newEntryCategory.parent_id}>
+<option value="">Válassz...</option>
                                 <option value="">Főkategória</option>
                                 {#each entryCategoryParents as parent}
                                     <option value={parent.id}>{parent.name}</option>
@@ -6491,6 +6555,7 @@
                                                     id="cat_move_{cat.id}"
                                                     bind:value={categoryDeleteMove.moveTo}
                                                 >
+<option value="">Válassz...</option>
                                                     {#each entryCategoryMoveTargets(cat) as target}
                                                         <option value={target.id}
                                                             >{target.name}</option
@@ -6653,6 +6718,7 @@
                     <form class="admin-form admin-create-form" on:submit={submitEntry}>
                         <label for="serv_type">Típus</label>
                         <select id="serv_type" bind:value={newEntry.type}>
+<option value="">Válassz...</option>
                             {#each entryTypes as t}<option value={t.name}
                                     >{t.name}</option
                                 >{/each}
@@ -6672,17 +6738,13 @@
                             {/each}
                         </select>
 
-                        <label for="serv_cat">Kategória</label>
-                        <select id="serv_cat" bind:value={newEntry.category_id}>
-                            <option value={null}>-</option>
-                            {#each entryCategoryParents as parent}
-                                <optgroup label={parent.name}>
-                                    {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
-                                        <option value={child.id}>{child.name}</option>
-                                    {/each}
-                                </optgroup>
-                            {/each}
-                        </select>
+                        <CategoryMultiSelect
+                            parents={entryCategoryParents}
+                            children={entryCategoryChildren}
+                            bind:primary={newEntry.category_id}
+                            bind:extra={newEntry.category_extra}
+                            primaryInputId="serv_cat"
+                        />
 
                         <label for="serv_name">Név</label>
                         <input
@@ -6713,7 +6775,7 @@
                             bind:value={newEntry.address}
                         />
 
-                        <label for="serv_notes">Megjegyzések</label>
+                        <label for="serv_notes">Bemutatkozás</label>
                         <textarea id="serv_notes" bind:value={newEntry.notes}
                         ></textarea>
 
@@ -6764,9 +6826,9 @@
                                 bind:checked={newEntry.verified}
                                 class="w-auto"
                             />
-                            Igényelt
+                            Ellenőrzött
                         </label>
-                        <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény).</p>
+                        <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény). A jelvény csak adminnal kapcsolható be.</p>
 
                         <label class="flex items-center gap-xs font-normal">
                             <input
@@ -6775,6 +6837,11 @@
                                 type="checkbox"
                                 bind:checked={newEntry.hours_enabled}
                                 class="w-auto"
+                                on:change={() => {
+                                    if (newEntry.hours_enabled) {
+                                        newEntry.hours = withDefaultWeekHours(newEntry.hours);
+                                    }
+                                }}
                             />
                             Nyitvatartás / Program
                         </label>
@@ -6790,6 +6857,13 @@
                                     type="checkbox"
                                     bind:checked={newEntry.delivery_enabled}
                                     class="w-auto"
+                                    on:change={() => {
+                                        if (newEntry.delivery_enabled) {
+                                            newEntry.delivery_hours = withDefaultWeekHours(
+                                                newEntry.delivery_hours,
+                                            );
+                                        }
+                                    }}
                                 />
                                 Kiszállítási idő
                             </label>
@@ -6845,13 +6919,13 @@
                                 <tr>
                                     <th>Név</th>
                                     <th>Típus</th>
-                                    <th>Igényelt</th>
+                                    <th>Ellenőrzött</th>
                                     <th>Domain</th>
                                     <th>Település</th>
                                     <th>Kategória</th>
                                     <th>Telefon</th>
                                     <th>Cím</th>
-                                    <th>Megjegyzés</th>
+                                    <th>Bemutatkozás</th>
                                     <th>Nyelvek</th>
                                     <th>Címkék</th>
                                     <th class="admin-table-col--action">Szerk.</th>
@@ -7052,6 +7126,7 @@
                         <div class="admin-form">
                             <label for="my_location_slug">Település</label>
                             <select id="my_location_slug" name="my_location_slug" bind:value={siteSettings.my_location_slug}>
+<option value="">Válassz...</option>
                                 {#each settlementsForSelect as loc}
                                     <option value={loc.slug}>{loc.name}{loc.county ? ` (${loc.county})` : ''}{loc.type ? ` – ${loc.type}` : ''}</option>
                                 {/each}
@@ -7069,6 +7144,7 @@
                         <div class="admin-form">
                             <label for="weather_provider_default">Alapértelmezett szolgáltató</label>
                             <select id="weather_provider_default" name="weather_provider_default" bind:value={siteSettings.weather_provider_default}>
+<option value="">Válassz...</option>
                                 <option value="open_meteo">Open-Meteo</option>
                                 <option value="weatherapi_com">WeatherAPI.com</option>
                                 <option value="openweathermap">OpenWeatherMap</option>
@@ -7092,6 +7168,7 @@
 
                             <label for="weather_icon_style">Időjárás ikon stílus</label>
                             <select id="weather_icon_style" name="weather_icon_style" bind:value={siteSettings.weather_icon_style}>
+<option value="">Válassz...</option>
                                 <option value="emoji">Emoji</option>
                                 <option value="svg">SVG (saját ikonok)</option>
                             </select>
@@ -7135,6 +7212,7 @@
                                 <input id="wet_src" name="source_text" type="text" bind:value={editingWeatherTrans.source_text} required />
                                 <label for="wet_lang">Nyelv</label>
                                 <select id="wet_lang" name="lang" bind:value={editingWeatherTrans.lang}>
+<option value="">Válassz...</option>
                                     {#each WEATHER_TRANS_LANGS as opt}
                                         <option value={opt.value}>{opt.label}</option>
                                     {/each}
@@ -7155,6 +7233,7 @@
                             <input id="wt_src" name="source_text" type="text" bind:value={newWeatherTrans.source_text} required placeholder="pl. overcast" />
                             <label for="wt_lang">Nyelv</label>
                             <select id="wt_lang" name="lang" bind:value={newWeatherTrans.lang}>
+<option value="">Válassz...</option>
                                 {#each WEATHER_TRANS_LANGS as opt}
                                     <option value={opt.value}>{opt.label}</option>
                                 {/each}
@@ -7598,6 +7677,96 @@
                     />
                 {/if}
 
+                <!-- Tags Tab -->
+                {#if activeTab === "tags"}
+                    {#if adminTabError && activeTab === adminTabError.tab}
+                        <div class="info-box error" role="alert">
+                            <p>{adminTabError.message}</p>
+                        </div>
+                    {:else}
+                        <p class="admin-info">
+                            Címkék a bejegyzéseken, a listaszűrőben és a keresésben. A törlés leveszi a címkét a bejegyzésekről. A bejegyzés megmarad.
+                        </p>
+                    {/if}
+                    <details class="admin-create-panel">
+                        <summary class="admin-create-summary"><span>Új címke</span><AdminPlusIcon /></summary>
+                        <form class="admin-form admin-create-form" on:submit={submitTag}>
+                            <label for="tag_name">Címke neve</label>
+                            <input
+                                id="tag_name"
+                                name="name"
+                                type="text"
+                                bind:value={newTag.name}
+                                required
+                            />
+                            <button type="submit" class="admin-submit-btn">Hozzáadás</button>
+                        </form>
+                    </details>
+                    {@render adminNotice("tags")}
+                    <div class="admin-table-toolbar">
+                        <label class="admin-search-label">
+                            <span class="admin-search-heading">Keresés</span>
+                            <input
+                                id="search_tags"
+                                name="search_tags"
+                                type="search"
+                                class="admin-search-input"
+                                bind:value={searchTags}
+                                on:input={() => (pageTags = 1)}
+                                placeholder="Név, ID…"
+                            />
+                        </label>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgTags.total}
+                        page={pgTags.page}
+                        totalPages={pgTags.totalPages}
+                        from={pgTags.from}
+                        to={pgTags.to}
+                        on:prev={() => (pageTags = Math.max(1, pageTags - 1))}
+                        on:next={() => (pageTags = Math.min(pgTags.totalPages, pageTags + 1))}
+                    />
+                    <div class="admin-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Név</th>
+                                    <th>Használat</th>
+                                    <th class="admin-table-col--action">Szerk.</th>
+                                    <th class="admin-table-col--action">Törlés</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {#each pgTags.rows as tag}
+                                    <tr>
+                                        <td>{tag.id}</td>
+                                        <td>{tag.name}</td>
+                                        <td>{tag.usage}</td>
+                                        <td>
+                                            <button class="btn-update" on:click={() => startEditTag(tag)}>Szerk.</button>
+                                        </td>
+                                        <td>
+                                            <button class="btn-delete" on:click={() => deleteRecord("tags", tag.id, fetchTags)}>Törlés</button>
+                                        </td>
+                                    </tr>
+                                {:else}
+                                    <tr><td colspan="5">Nincsenek címkék.</td></tr>
+                                {/each}
+                            </tbody>
+                        </table>
+                    </div>
+                    <AdminPaginationBar
+                        total={pgTags.total}
+                        page={pgTags.page}
+                        totalPages={pgTags.totalPages}
+                        from={pgTags.from}
+                        to={pgTags.to}
+                        on:prev={() => (pageTags = Math.max(1, pageTags - 1))}
+                        on:next={() => (pageTags = Math.min(pgTags.totalPages, pageTags + 1))}
+                    />
+                {/if}
+
                 <!-- Attractions Tab -->
                 {#if activeTab === "attractions"}
                     {#if adminTabError && activeTab === adminTabError.tab}
@@ -7641,6 +7810,7 @@
                         <div class="form-row">
                             <label for="att_county">Megye</label>
                             <select id="att_county" name="county_slug" bind:value={newAttraction.county_slug}>
+<option value="">Válassz...</option>
                                 <option value="hargita">Hargita</option>
                                 <option value="kovaszna">Kovászna</option>
                                 <option value="maros">Maros</option>
@@ -7860,7 +8030,7 @@
                                                         <label class="admin-region-edit-span2" for="county_edit_seat_location_id">
                                                             Megyeszékhely
                                                             <select id="county_edit_seat_location_id" name="seat_location_id" bind:value={editingCounty.seat_location_id}>
-                                                                <option value="">- válassz települést -</option>
+<option value="">Válassz...</option>
                                                                 {#each settlementsForCountyName(c.name) as loc (loc.id)}
                                                                     <option value={String(loc.id)}
                                                                         >{loc.name} ({loc.type}){loc.name_ro ? " - " + loc.name_ro : ""}</option
@@ -8120,10 +8290,9 @@
                     ></textarea>
                     <label for="emondas_day_edit">Megjelenés napja</label>
                     <div class="admin-date-field">
-                        <input
+                        <HuDateInput
                             id="emondas_day_edit"
                             name="display_date"
-                            type="date"
                             bind:value={editingMondas.display_date}
                             required
                             class="w-full"
@@ -8275,6 +8444,7 @@
                 <form class="admin-form" on:submit|preventDefault={saveEdit}>
                     <label for="edit_type">Típus</label>
                     <select id="edit_type" bind:value={editingEntry.type}>
+<option value="">Válassz...</option>
                         {#each entryTypes as t}<option value={t.name}
                                 >{t.name}</option
                             >{/each}
@@ -8286,6 +8456,7 @@
                         bind:value={editingEntry.location_id}
                         required
                     >
+                        <option value="">Válassz...</option>
                         {#each settlementsForSelect as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
@@ -8293,17 +8464,13 @@
                         {/each}
                     </select>
 
-                    <label for="edit_cat">Kategória</label>
-                    <select id="edit_cat" bind:value={editingEntry.category_id}>
-                        <option value={null}>-</option>
-                        {#each entryCategoryParents as parent}
-                            <optgroup label={parent.name}>
-                                {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
-                                    <option value={child.id}>{child.name}</option>
-                                {/each}
-                            </optgroup>
-                        {/each}
-                    </select>
+                    <CategoryMultiSelect
+                        parents={entryCategoryParents}
+                        children={entryCategoryChildren}
+                        bind:primary={editingEntry.category_id}
+                        bind:extra={editingEntry.category_extra}
+                        primaryInputId="edit_cat"
+                    />
 
                     <label for="edit_name">Név</label>
                     <input
@@ -8341,7 +8508,7 @@
                         bind:value={editingEntry.address}
                     />
 
-                    <label for="edit_notes">Megjegyzések</label>
+                    <label for="edit_notes">Bemutatkozás</label>
                     <textarea id="edit_notes" bind:value={editingEntry.notes}
                     ></textarea>
 
@@ -8390,9 +8557,9 @@
                             bind:checked={editingEntry.verified}
                             class="w-auto"
                         />
-                        Igényelt
+                        Ellenőrzött
                     </label>
-                    <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény).</p>
+                    <p class="admin-form-hint">Alapértelmezett: Nem ellenőrzött (szürke jelvény). A jelvény csak adminnal kapcsolható be.</p>
 
                     <label class="flex items-center gap-xs font-normal">
                         <input
@@ -8401,6 +8568,11 @@
                             type="checkbox"
                             bind:checked={editingEntry.hours_enabled}
                             class="w-auto"
+                            on:change={() => {
+                                if (editingEntry.hours_enabled) {
+                                    editingEntry.hours = withDefaultWeekHours(editingEntry.hours);
+                                }
+                            }}
                         />
                         Nyitvatartás / Program
                     </label>
@@ -8416,6 +8588,13 @@
                                 type="checkbox"
                                 bind:checked={editingEntry.delivery_enabled}
                                 class="w-auto"
+                                on:change={() => {
+                                    if (editingEntry.delivery_enabled) {
+                                        editingEntry.delivery_hours = withDefaultWeekHours(
+                                            editingEntry.delivery_hours,
+                                        );
+                                    }
+                                }}
                             />
                             Kiszállítási idő
                         </label>
@@ -8489,6 +8668,7 @@
                         id="eloc_county"
                         bind:value={editingLocation.county}
                     >
+<option value="">Válassz...</option>
                         <option value="">-</option>
                         {#each COUNTIES as c}<option value={c}>{c}</option
                             >{/each}
@@ -8496,6 +8676,7 @@
 
                     <label for="eloc_type">Típus</label>
                     <select id="eloc_type" bind:value={editingLocation.type}>
+<option value="">Válassz...</option>
                         <option value="">-</option>
                         {#each settlementLocationTypes as t}<option value={t.slug}
                                 >{t.label_hu}</option
@@ -8544,6 +8725,7 @@
                         id="eloc_parent"
                         bind:value={editingLocation.parent_id}
                     >
+<option value="">Válassz...</option>
                         <option value={null}>Nincs (Önálló város/község)</option
                         >
                         {#each settlementsForSelect.filter((l) => l.id !== editingLocation.id) as loc}
@@ -8590,6 +8772,7 @@
                         bind:value={editingVenue.settlement_id}
                         required
                     >
+<option value="">Válassz...</option>
                         {#each settlementsForSelect as loc}
                             <option value={String(loc.id)}
                                 >{loc.name} ({loc.county})</option
@@ -8632,6 +8815,7 @@
                         <label class="flex-1" style="min-width:10rem"
                             >Típus
                             <select id="ev-venue-kind" name="kind" bind:value={editingVenue.kind}>
+<option value="">Válassz...</option>
                                 {#each venueTypesList as vt}
                                     <option value={vt.slug}>{vt.label_hu}</option>
                                 {/each}
@@ -8783,6 +8967,30 @@
         </div>
     {/if}
 
+    <!-- Edit Tag Modal -->
+    {#if editingTag}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
+        <div
+            class="admin-modal-overlay"
+            role="dialog"
+            tabindex="-1"
+            on:click|self={cancelEditTag}
+            on:keydown={(e) => e.key === "Escape" && cancelEditTag()}
+        >
+            <div class="admin-modal">
+                <h3>Címke szerkesztése</h3>
+                <form class="admin-form" on:submit|preventDefault={saveEditTag}>
+                    <label for="etag_name">Címke neve</label>
+                    <input id="etag_name" type="text" bind:value={editingTag.name} required />
+                    <div class="modal-actions">
+                        <button type="submit" class="admin-submit-btn">Mentés</button>
+                        <button type="button" class="btn-delete" on:click={cancelEditTag}>Mégse</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {/if}
+
     <!-- Edit Attraction Modal -->
     {#if editingAttraction}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
@@ -8801,6 +9009,7 @@
                 >
                     <label for="eatt_county">Megye</label>
                     <select id="eatt_county" name="county_slug" bind:value={editingAttraction.county_slug}>
+<option value="">Válassz...</option>
                         <option value="hargita">Hargita</option>
                         <option value="kovaszna">Kovászna</option>
                         <option value="maros">Maros</option>
@@ -8893,6 +9102,7 @@
                             loadVenuesForEditSettlement(editingEvent.location_id);
                         }}
                     >
+                        <option value="">Válassz...</option>
                         {#each settlementsForSelect as loc}
                             <option value={loc.id}
                                 >{loc.name} ({loc.county})</option
@@ -8908,6 +9118,7 @@
                         name="default_venue_id"
                         bind:value={editingEvent.default_venue_id}
                     >
+<option value="">Válassz...</option>
                         <option value="">- nincs megadva -</option>
                         {#each venueOptionsEdit as v}
                             <option value={String(v.id)}>{v.name}</option>
@@ -8916,6 +9127,7 @@
 
                     <label for="edit_ev_attraction">Látnivaló (opcionális)</label>
                     <select id="edit_ev_attraction" name="attraction_id" bind:value={editingEvent.attraction_id}>
+<option value="">Válassz...</option>
                         <option value="">- nincs hozzárendelve -</option>
                         {#each attractions as att}
                             <option value={String(att.id)}>{att.name} ({att.county_name || att.county_slug})</option>
@@ -8997,15 +9209,10 @@
                                     >*</span
                                 ></label
                             >
-                            <input
+                            <HuDateInput
                                 id="edit_ev_start_date"
                                 name="start_date"
-                                type="date"
-                                value={editingEvent.start_date
-                                    ? editingEvent.start_date.split("T")[0]
-                                    : ""}
-                                on:change={(e) =>
-                                    (editingEvent.start_date = e.target.value)}
+                                bind:value={editingEvent.start_date}
                                 required
                             />
                         </div>
@@ -9016,10 +9223,9 @@
                                     title="Kötelező">*</span
                                 ></label
                             >
-                            <input
+                            <HuTimeInput
                                 id="edit_ev_start_time"
                                 name="start_time"
-                                type="time"
                                 bind:value={editingEvent.start_time}
                                 required
                             />
@@ -9032,15 +9238,10 @@
                                     >*</span
                                 ></label
                             >
-                            <input
+                            <HuDateInput
                                 id="edit_ev_end_date"
                                 name="end_date"
-                                type="date"
-                                value={editingEvent.end_date
-                                    ? editingEvent.end_date.split("T")[0]
-                                    : ""}
-                                on:change={(e) =>
-                                    (editingEvent.end_date = e.target.value)}
+                                bind:value={editingEvent.end_date}
                                 required
                             />
                         </div>
@@ -9051,10 +9252,9 @@
                                     title="Kötelező">*</span
                                 ></label
                             >
-                            <input
+                            <HuTimeInput
                                 id="edit_ev_end_time"
                                 name="end_time"
-                                type="time"
                                 bind:value={editingEvent.end_time}
                                 required
                             />
@@ -9071,7 +9271,7 @@
                         on:change={() => (editingEvent.event_subtype_id = "")}
                         required
                     >
-                        <option value="">- válassz -</option>
+                        <option value="">Válassz...</option>
                         {#each [...catalogEventTypes].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || String(a.label_hu).localeCompare(String(b.label_hu), "hu")) as t}
                             <option value={String(t.id)}
                                 >{t.label_hu} ({t.slug})</option
@@ -9085,6 +9285,7 @@
                         name="event_subtype_id"
                         bind:value={editingEvent.event_subtype_id}
                     >
+<option value="">Válassz...</option>
                         <option value="">- nincs -</option>
                         {#each subtypesForEditEvent as s}
                             <option value={String(s.id)}
@@ -9099,6 +9300,7 @@
                         name="access_type"
                         bind:value={editingEvent.access_type}
                     >
+<option value="">Válassz...</option>
                         <option value="public">{ACCESS_TYPE_LABELS.public}</option>
                         <option value="members_only">{ACCESS_TYPE_LABELS.members_only}</option>
                         <option value="invitation_only">{ACCESS_TYPE_LABELS.invitation_only}</option>
@@ -9185,10 +9387,9 @@
                                 <div class="schedule-day-head">
                                     <label class="schedule-inline"
                                         >Dátum
-                                        <input
+                                        <HuDateInput
                                             id={`schedule-day-${di}-date`}
                                             name={`schedule_day_${di}_date`}
-                                            type="date"
                                             bind:value={day.schedule_date}
                                         /></label
                                     >
@@ -9226,6 +9427,7 @@
                                                         class="schedule-act-type"
                                                         bind:value={act.activity_type}
                                                     >
+<option value="">Válassz...</option>
                                                         {#each SCHEDULE_ACTIVITY_TYPES as t}
                                                             <option value={t}
                                                                 >{SCHEDULE_ACTIVITY_TYPE_LABELS[
@@ -9236,17 +9438,15 @@
                                                     </select>
                                                 </td>
                                                 <td
-                                                    ><input
+                                                    ><HuTimeInput
                                                         id={`schedule-${di}-act-${ai}-start`}
                                                         name={`schedule_${di}_act_${ai}_starts_at`}
-                                                        type="time"
                                                         bind:value={act.starts_at}
                                                 /></td>
                                                 <td
-                                                    ><input
+                                                    ><HuTimeInput
                                                         id={`schedule-${di}-act-${ai}-end`}
                                                         name={`schedule_${di}_act_${ai}_ends_at`}
-                                                        type="time"
                                                         bind:value={act.ends_at}
                                                 /></td>
                                                 <td>
@@ -9256,6 +9456,7 @@
                                                         class="schedule-act-venue"
                                                         bind:value={act.venue_id}
                                                     >
+<option value="">Válassz...</option>
                                                         <option value=""
                                                             >- alapértelmezett -</option
                                                         >
@@ -9367,20 +9568,13 @@
                         required
                     />
 
-                    <label for="org_cat">Kategória</label>
-                    <select
-                        id="org_cat"
-                        bind:value={newOrganizerEntry.category_id}
-                    >
-                        <option value={null}>-</option>
-                        {#each entryCategoryParents as parent}
-                            <optgroup label={parent.name}>
-                                {#each entryCategoryChildren.filter((row) => row.parent_id === parent.id) as child}
-                                    <option value={child.id}>{child.name}</option>
-                                {/each}
-                            </optgroup>
-                        {/each}
-                    </select>
+                    <CategoryMultiSelect
+                        parents={entryCategoryParents}
+                        children={entryCategoryChildren}
+                        bind:primary={newOrganizerEntry.category_id}
+                        bind:extra={newOrganizerEntry.category_extra}
+                        primaryInputId="org_cat"
+                    />
 
                     <label for="org_phone">Telefon</label>
                     <input
@@ -9534,7 +9728,7 @@
         gap: 0.5rem;
         flex-wrap: wrap;
     }
-    .admin-date-field input[type="date"] {
+    .admin-date-field :global(input) {
         min-width: 12rem;
     }
     .admin-date-today-badge {

@@ -157,7 +157,7 @@
     flex: 1;
     min-width: 0;
     min-height: 0;
-    padding: 3rem;
+    padding: 1rem;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
 }
@@ -583,7 +583,6 @@
 }
 
 .schedule-act-table input[type="text"],
-.schedule-act-table input[type="time"],
 .schedule-act-table select.schedule-act-type {
     width: 100%;
     min-width: 0;

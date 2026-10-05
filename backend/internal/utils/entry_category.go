@@ -9,6 +9,10 @@ const (
 	EntryCategoryHivatalok      = "Hivatalok"
 	EntryCategoryVendeglo       = "Vendéglő"
 	EntryCategoryEtterem        = "Étterem"
+	EntryCategoryKavezo         = "Kávézó"
+	EntryCategoryCukraszda      = "Cukrászda"
+	EntryCategoryPekseg         = "Pékség"
+	EntryCategorySorozo         = "Söröző"
 	EntryCategoryBolt           = "Bolt"
 	EntryCategorySportegyesulet = "Sportegyesület"
 	EntryCategoryEgyeb          = "Egyéb"
@@ -16,7 +20,7 @@ const (
 
 // SeedEntryCategories returns every name in the v2 directory catalog.
 func SeedEntryCategories() []string {
-	names := make([]string, 0, 68)
+	names := make([]string, 0, 94)
 	for _, node := range DirectoryParents() {
 		names = append(names, node.Name)
 	}
@@ -24,6 +28,16 @@ func SeedEntryCategories() []string {
 		names = append(names, node.Name)
 	}
 	return names
+}
+
+// CategoryOffersDelivery is true for the Étkezés subcategories that take orders out.
+func CategoryOffersDelivery(name string) bool {
+	switch strings.TrimSpace(name) {
+	case EntryCategoryEtterem, EntryCategoryKavezo, EntryCategoryCukraszda, EntryCategoryPekseg, EntryCategorySorozo:
+		return true
+	default:
+		return false
+	}
 }
 
 // CanonicalEntryCategory returns the stored category name.

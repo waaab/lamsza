@@ -8,7 +8,7 @@ type DirectoryNode struct {
 	SortOrder int
 }
 
-// DirectoryParents returns the ten main categories (ids 1-10).
+// DirectoryParents returns the main categories. Ids 1-10 are the original shelves.
 func DirectoryParents() []DirectoryNode {
 	return []DirectoryNode{
 		{ID: 1, Name: "Étkezés", SortOrder: 1},
@@ -21,10 +21,12 @@ func DirectoryParents() []DirectoryNode {
 		{ID: 8, Name: "Hivatalok", SortOrder: 8},
 		{ID: 9, Name: "Sport és szabadidő", SortOrder: 9},
 		{ID: 10, Name: "Pénzügy", SortOrder: 10},
+		{ID: 69, Name: "Informatika és távközlés", SortOrder: 11},
+		{ID: 70, Name: "Szakmai szolgáltatások", SortOrder: 12},
 	}
 }
 
-// DirectoryChildren returns subcategories (ids 11-68).
+// DirectoryChildren returns subcategories. Sportpálya is a venue type, not a category.
 func DirectoryChildren() []DirectoryNode {
 	p := func(id int) *int { return &id }
 	return []DirectoryNode{
@@ -76,6 +78,9 @@ func DirectoryChildren() []DirectoryNode {
 		{ID: 56, ParentID: p(6), Name: "Asztalos", SortOrder: 3},
 		{ID: 57, ParentID: p(6), Name: "Takarítás", SortOrder: 4},
 		{ID: 58, ParentID: p(6), Name: "Építkezés", SortOrder: 5},
+		{ID: 82, ParentID: p(6), Name: "Szabó", SortOrder: 6},
+		{ID: 83, ParentID: p(6), Name: "Építész", SortOrder: 7},
+		{ID: 84, ParentID: p(6), Name: "Lakberendezés", SortOrder: 8},
 		{ID: 59, ParentID: p(7), Name: "Óvoda", SortOrder: 1},
 		{ID: 60, ParentID: p(7), Name: "Iskola", SortOrder: 2},
 		{ID: 61, ParentID: p(7), Name: "Egyetem", SortOrder: 3},
@@ -83,9 +88,30 @@ func DirectoryChildren() []DirectoryNode {
 		{ID: 63, ParentID: p(8), Name: "Megyei intézmény", SortOrder: 2},
 		{ID: 64, ParentID: p(8), Name: "Posta", SortOrder: 3},
 		{ID: 65, ParentID: p(9), Name: "Sportegyesület", SortOrder: 1},
-		{ID: 66, ParentID: p(9), Name: "Sportpálya", SortOrder: 2},
 		{ID: 67, ParentID: p(10), Name: "Bank", SortOrder: 1},
 		{ID: 68, ParentID: p(10), Name: "Biztosító", SortOrder: 2},
+		{ID: 80, ParentID: p(10), Name: "Könyvelő", SortOrder: 3},
+		{ID: 81, ParentID: p(10), Name: "Pénzügyi tanácsadó", SortOrder: 4},
+		{ID: 71, ParentID: p(69), Name: "Webfejlesztés", SortOrder: 1},
+		{ID: 72, ParentID: p(69), Name: "Webdizájn", SortOrder: 2},
+		{ID: 73, ParentID: p(69), Name: "Keresőoptimalizálás", SortOrder: 3},
+		{ID: 74, ParentID: p(69), Name: "Szoftver", SortOrder: 4},
+		{ID: 75, ParentID: p(69), Name: "Hálózat", SortOrder: 5},
+		{ID: 76, ParentID: p(69), Name: "Számítógép szerviz", SortOrder: 6},
+		{ID: 77, ParentID: p(69), Name: "Tárhely", SortOrder: 7},
+		{ID: 78, ParentID: p(69), Name: "Internet", SortOrder: 8},
+		{ID: 79, ParentID: p(69), Name: "Távközlés", SortOrder: 9},
+		{ID: 95, ParentID: p(69), Name: "E-kereskedelem", SortOrder: 10},
+		{ID: 85, ParentID: p(70), Name: "Ügyvéd", SortOrder: 1},
+		{ID: 86, ParentID: p(70), Name: "Közjegyző", SortOrder: 2},
+		{ID: 87, ParentID: p(70), Name: "Fordítóiroda", SortOrder: 3},
+		{ID: 88, ParentID: p(70), Name: "Tanácsadás", SortOrder: 4},
+		{ID: 89, ParentID: p(70), Name: "Marketing", SortOrder: 5},
+		{ID: 90, ParentID: p(70), Name: "Grafika", SortOrder: 6},
+		{ID: 91, ParentID: p(70), Name: "Toborzás", SortOrder: 7},
+		{ID: 92, ParentID: p(70), Name: "Nyomda", SortOrder: 8},
+		{ID: 93, ParentID: p(70), Name: "Ingatlanközvetítő", SortOrder: 9},
+		{ID: 94, ParentID: p(70), Name: "Fotós", SortOrder: 10},
 	}
 }
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"backend/internal/db"
+	"backend/internal/directory"
 	"backend/internal/models"
 	"backend/internal/utils"
 	"database/sql"
@@ -22,7 +23,7 @@ func adminDeliveryEnabled(catName, name string, requested bool) bool {
 	if strings.TrimSpace(name) == "Lámsza.com" {
 		return false
 	}
-	return strings.TrimSpace(catName) == utils.EntryCategoryEtterem
+	return utils.CategoryOffersDelivery(catName)
 }
 
 func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
@@ -78,6 +79,18 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		if res == nil {
 			res = []models.AdminEntry{}
 		}
+		for i := range res {
+			got, loadErr := directory.LoadEntryCategoryIDs(db.DB, res[i].ID)
+			if loadErr != nil || len(got) == 0 {
+				if res[i].CategoryID != nil {
+					res[i].CategoryIDs = []int{*res[i].CategoryID}
+				} else {
+					res[i].CategoryIDs = []int{}
+				}
+				continue
+			}
+			res[i].CategoryIDs = got
+		}
 		json.NewEncoder(w).Encode(res)
 
 	case "POST":
@@ -108,12 +121,22 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.DeliveryHours = jsonObjectOrEmpty(s.DeliveryHours)
 		s.DeliveryEnabled = adminDeliveryEnabled(catName, s.Name, s.DeliveryEnabled)
 		s.Photos = sanitizePhotos(s.Photos)
+		categoryIDs, catSetErr := directory.NormalizeCategoryIDs(catID, s.CategoryIDs)
+		if catSetErr != nil {
+			writeCategoryResolveError(w, catSetErr)
+			return
+		}
 		err = db.DB.QueryRow("INSERT INTO entries (type_id, location_id, category_id, cat_name, name, slug, url, phone, address, notes, languages, verified, hours, hours_enabled, delivery_hours, delivery_enabled, photos) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15::jsonb, $16, $17::jsonb) RETURNING id",
 			typeID, s.LocationID, catID, catName, s.Name, s.Slug, s.URL, s.Phone, s.Address, s.Notes, pq.Array(s.Languages), s.Verified, string(s.Hours), s.HoursEnabled, string(s.DeliveryHours), s.DeliveryEnabled, string(s.Photos)).Scan(&s.ID)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		if err = directory.ReplaceEntryCategories(db.DB, s.ID, categoryIDs); err != nil {
+			writeCategoryResolveError(w, err)
+			return
+		}
+		s.CategoryIDs = categoryIDs
 
 		for _, tagName := range s.Tags {
 			tagName = strings.TrimSpace(tagName)
@@ -154,6 +177,11 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 		s.DeliveryHours = jsonObjectOrEmpty(s.DeliveryHours)
 		s.DeliveryEnabled = adminDeliveryEnabled(catName, s.Name, s.DeliveryEnabled)
 		s.Photos = sanitizePhotos(s.Photos)
+		categoryIDs, catSetErr := directory.NormalizeCategoryIDs(catID, s.CategoryIDs)
+		if catSetErr != nil {
+			writeCategoryResolveError(w, catSetErr)
+			return
+		}
 		_, err = db.DB.Exec(`UPDATE entries SET 
             type_id=$1, location_id=$2, category_id=$3, cat_name=$4, name=$5, slug=$6, url=$7, 
             phone=$8, address=$9, notes=$10, languages=$11, verified=$12, hours=$13::jsonb, hours_enabled=$14, delivery_hours=$15::jsonb, delivery_enabled=$16, photos=$17::jsonb 
@@ -163,6 +191,11 @@ func HandleAdminEntries(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		if err = directory.ReplaceEntryCategories(db.DB, s.ID, categoryIDs); err != nil {
+			writeCategoryResolveError(w, err)
+			return
+		}
+		s.CategoryIDs = categoryIDs
 
 		db.DB.Exec("DELETE FROM entry_tags WHERE entry_id = $1", s.ID)
 		for _, tagName := range s.Tags {
@@ -405,13 +438,13 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				var entries int
-				if err := tx.QueryRow(`SELECT COUNT(*) FROM entries WHERE category_id = $1`, id).Scan(&entries); err != nil {
+				if err := tx.QueryRow(`SELECT COUNT(*) FROM entry_category_links WHERE category_id = $1`, id).Scan(&entries); err != nil {
 					tx.Rollback()
 					http.Error(w, err.Error(), 500)
 					return
 				}
 				var websites int
-				if err := tx.QueryRow(`SELECT COUNT(*) FROM websites WHERE category_id = $1`, id).Scan(&websites); err != nil {
+				if err := tx.QueryRow(`SELECT COUNT(*) FROM website_category_links WHERE category_id = $1`, id).Scan(&websites); err != nil {
 					tx.Rollback()
 					http.Error(w, err.Error(), 500)
 					return
@@ -422,6 +455,11 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			} else {
+				if err := directory.MoveCategoryLinks(tx, id, moveTo); err != nil {
+					tx.Rollback()
+					http.Error(w, err.Error(), 500)
+					return
+				}
 				if _, err := tx.Exec(`
 					UPDATE entries SET category_id = $1, cat_name = (SELECT name FROM entry_categories WHERE id = $1)
 					WHERE category_id = $2`, moveTo, id); err != nil {
@@ -467,12 +505,12 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		var entries int
-		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE category_id = $1`, id).Scan(&entries); err != nil {
+		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_category_links WHERE category_id = $1`, id).Scan(&entries); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		var websites int
-		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM websites WHERE category_id = $1`, id).Scan(&websites); err != nil {
+		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM website_category_links WHERE category_id = $1`, id).Scan(&websites); err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}

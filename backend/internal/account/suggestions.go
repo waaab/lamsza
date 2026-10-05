@@ -420,7 +420,7 @@ func suggestionOffersDelivery(entry suggestionEntry) bool {
 	if strings.TrimSpace(entry.Name) == "Lámsza.com" {
 		return false
 	}
-	return entry.DeliveryEnabled && strings.TrimSpace(entry.Category) == utils.EntryCategoryEtterem
+	return entry.DeliveryEnabled && utils.CategoryOffersDelivery(entry.Category)
 }
 
 func normalizeSuggestionFields(raw map[string]json.RawMessage, entry suggestionEntry) (map[string]any, error) {

@@ -21,8 +21,24 @@ func TestCanonicalEntryCategory(t *testing.T) {
 	}
 }
 
+func TestCategoryOffersDelivery(t *testing.T) {
+	for _, name := range []string{"Étterem", "Kávézó", "Cukrászda", "Pékség", "Söröző"} {
+		if !CategoryOffersDelivery(name) {
+			t.Fatalf("CategoryOffersDelivery(%q) = false", name)
+		}
+	}
+	if CategoryOffersDelivery("Bútor") || CategoryOffersDelivery("Étkezés") {
+		t.Fatal("delivery is limited to the Étkezés subcategories that take orders out")
+	}
+}
+
 func TestSeedEntryCategoriesCount(t *testing.T) {
-	if len(SeedEntryCategories()) != 68 {
-		t.Fatalf("SeedEntryCategories len = %d, want 68", len(SeedEntryCategories()))
+	if len(SeedEntryCategories()) != 94 {
+		t.Fatalf("SeedEntryCategories len = %d, want 94", len(SeedEntryCategories()))
+	}
+	for _, name := range SeedEntryCategories() {
+		if name == "Sportpálya" {
+			t.Fatal("Sportpálya is a venue, not a directory category")
+		}
 	}
 }

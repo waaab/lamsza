@@ -342,11 +342,10 @@
 {:else if entry}
     <Breadcrumbs
         label={entry.name}
-        countySlug={entry.county_slug}
-        countyName={entry.location_county || entry.county}
-        settlementSlug={entry.location_slug}
-        settlementName={entry.location}
-        settlementType={entry.location_type}
+        parentLabel="Index"
+        parentUrl="/index"
+        extraLabel={entry.location_slug ? "Szolgáltatások" : "Weboldalak"}
+        extraUrl={entry.location_slug ? "/index/szolgaltatasok" : "/index/weboldalak"}
     />
 
     <article class="profile-detail">

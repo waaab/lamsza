@@ -10,6 +10,7 @@
     } from "$lib/indexCreateCopy.js";
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
+    import ChipScrollRow from "$lib/components/ChipScrollRow.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import ClaimStatusFilter from "$lib/components/ClaimStatusFilter.svelte";
@@ -22,8 +23,7 @@
         displayTagLabel,
     } from "$lib/directoryTagCloud.js";
     import {
-        canonicalEntryType,
-        canonicalEntryTypeKey,
+        entryTypeLabelFromKey,
     } from "$lib/entryType.js";
     import {
         canonicalEntryCategory,
@@ -108,15 +108,22 @@
               ? "services"
               : "all";
     $: serviceEntries = entries.filter((entry) => entryHasTown(entry));
-    $: websiteEntries = entries.filter((entry) => !entryHasTown(entry));
-    $: unlinkedWebsites = websites.filter((site) => !site.entry_id);
+    /** Town-less listings that are not already represented by a website row. */
+    $: linkedWebsiteEntryIds = new Set(
+        websites.map((site) => Number(site?.entry_id)).filter((id) => id > 0),
+    );
+    $: websiteEntries = entries.filter(
+        (entry) => !entryHasTown(entry) && !linkedWebsiteEntryIds.has(Number(entry.id)),
+    );
+    /** Every approved website stays on Weboldalak, claimed or not. */
+    $: indexWebsites = websites;
     $: viewEntries = indexView === "websites" ? websiteEntries : serviceEntries;
     $: serviceTotal = serviceEntries.length;
     $: serviceClaimed = serviceEntries.filter((entry) => entry.claimed).length;
-    $: websiteTotal = websiteEntries.length + unlinkedWebsites.length;
+    $: websiteTotal = websiteEntries.length + indexWebsites.length;
     $: websiteClaimed =
         websiteEntries.filter((entry) => entry.claimed).length +
-        unlinkedWebsites.filter((site) => site.claimed).length;
+        indexWebsites.filter((site) => site.claimed).length;
 
     /**
      * @param {"services" | "websites"} kind
@@ -190,14 +197,23 @@
         serviceClaimFilter != null ||
         selectedPlace != null;
 
+    /** @param {string} id */
+    function pickServiceCategory(id) {
+        currentCategory = currentCategory === id ? "osszes" : id;
+    }
+
     function clearAllFilters() {
         currentCategory = "osszes";
         selectedTypeKey = null;
         selectedTagKey = null;
         serviceClaimFilter = null;
-        websiteClaimFilter = null;
         selectedPlace = null;
         locationMenuKey = null;
+        scrollToTop();
+    }
+
+    function clearWebsiteFilters() {
+        websiteClaimFilter = null;
         scrollToTop();
     }
 
@@ -224,20 +240,21 @@
         ).length,
     };
 
-    $: categoryFilterLabel =
-        currentCategory === "osszes"
-            ? null
-            : dynamicCategories.find((c) => c.id === currentCategory)?.label ||
-              catalog.find((row) => row.slug === currentCategory)?.name ||
-              canonicalEntryCategory(currentCategory);
-
-    $: typeFilterLabel =
-        selectedTypeKey &&
-        canonicalEntryType(
-            entries.find(
-                (e) => canonicalEntryTypeKey(e.type) === selectedTypeKey,
-            )?.type,
+    /**
+     * @param {string} slug
+     */
+    function categoryLabel(slug) {
+        if (slug === "osszes") return null;
+        return (
+            dynamicCategories.find((c) => c.id === slug)?.label ||
+            catalog.find((row) => row.slug === slug)?.name ||
+            canonicalEntryCategory(slug)
         );
+    }
+
+    $: categoryFilterLabel = categoryLabel(currentCategory);
+
+    $: typeFilterLabel = entryTypeLabelFromKey(selectedTypeKey) || null;
 
     $: tagFilterLabel = (() => {
         if (!selectedTagKey) return null;
@@ -253,17 +270,11 @@
     $: sortedEntries = sortDirectoryEntries(filteredEntries, { sortMode: serviceSortMode });
     $: totalCount = sortedEntries.length;
     $: displayItems = sortedEntries.slice(0, visibleServiceCount);
-    $: filteredWebsiteEntries = websiteEntries.filter(
-        (e) =>
-            (currentCategory === "osszes" ||
-                entryMatchesCategory(e, currentCategory, catalog)) &&
-            matchesClaim(e, websiteClaimFilter),
+    $: filteredWebsiteEntries = websiteEntries.filter((e) =>
+        matchesClaim(e, websiteClaimFilter),
     );
-    $: filteredWebsites = unlinkedWebsites.filter(
-        (site) =>
-            (currentCategory === "osszes" ||
-                entryMatchesCategory(site, currentCategory, catalog)) &&
-            matchesClaim(site, websiteClaimFilter),
+    $: filteredWebsites = indexWebsites.filter((site) =>
+        matchesClaim(site, websiteClaimFilter),
     );
     $: sortedWebsiteEntries = sortDirectoryEntries(filteredWebsiteEntries, {
         sortMode: websiteSortMode,
@@ -272,10 +283,10 @@
     $: websiteClaimCounts = {
         claimed:
             websiteEntries.filter((entry) => entry.claimed).length +
-            unlinkedWebsites.filter((site) => site.claimed).length,
+            indexWebsites.filter((site) => site.claimed).length,
         unclaimed:
             websiteEntries.filter((entry) => !entry.claimed).length +
-            unlinkedWebsites.filter((site) => !site.claimed).length,
+            indexWebsites.filter((site) => !site.claimed).length,
     };
     $: displayWebsiteEntries = sortedWebsiteEntries.slice(0, visibleWebsiteCount);
     $: displayWebsites = sortedWebsites.slice(0, visibleWebsiteCount);
@@ -294,18 +305,20 @@
         selectedTypeKey;
         selectedTagKey;
         serviceClaimFilter;
-        websiteClaimFilter;
         selectedPlace;
-        indexView;
         visibleServiceCount = 12;
+    }
+
+    $: {
+        websiteClaimFilter;
         visibleWebsiteCount = 12;
     }
 
-    $: childCategories = directoryChildTabs(
+    $: serviceChildCategories = directoryChildTabs(
         currentCategory,
         catalog,
-        entries,
-        websites,
+        serviceEntries,
+        [],
     );
     $: dynamicCategories = directoryCategoryTabs(catalog, entries, websites);
 
@@ -438,7 +451,7 @@
                         class="clear-filters btn btn-xs"
                         aria-label="Szűrők törlése"
                         title="Szűrők törlése"
-                        on:click={() => (websiteClaimFilter = null)}>Szűrő törlése</button
+                        on:click={clearWebsiteFilters}>Szűrő törlése</button
                     >
                 {:else if !hasActiveFilters}
                     💡 Leszűrve: <span class="active">Összes</span>
@@ -659,33 +672,33 @@
 {#snippet directoryBlock(kind)}
 <section class="index-directory" aria-label={kind === "websites" ? websitesHeader.title : servicesHeader.title}>
     <h2 class="index-directory__title">{kind === "websites" ? websitesHeader.title : servicesHeader.title}</h2>
-    <div class="header-tabs">
-        <span class="header-tabs-label" aria-label="Kiemelt Kategóriák">Kiemelt Kategóriák:</span>
-        {#if kind === "websites"}
-            <div class="header-tabs-filters-row"></div>
-        {:else if loading}
-            <span class="btn btn--loading">Szűrők betöltése…</span>
+    {#if kind !== "websites"}
+        {#if loading}
+            <div class="header-tabs chips">
+                <span class="header-tabs-label" aria-label="Kiemelt kategóriák">Kiemelt kategóriák:</span>
+                <span class="btn btn--loading">Szűrők betöltése…</span>
+            </div>
         {:else}
-            <div class="header-tabs-filters-row">
+            <ChipScrollRow label="Kiemelt kategóriák:">
                 {#each dynamicCategories as cat}
                     <button
                         class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, catalog) ? 'active' : ''}"
-                        on:click={() => (currentCategory = cat.id)}>{cat.label}</button
+                        on:click={() => pickServiceCategory(cat.id)}>{cat.label}</button
                     >
                 {/each}
-            </div>
-            {#if kind !== "websites" && childCategories.length > 0}
-                <div class="header-tabs-filters-row header-tabs-filters-row--children">
-                    {#each childCategories as cat}
+            </ChipScrollRow>
+            {#if serviceChildCategories.length > 0}
+                <ChipScrollRow>
+                    {#each serviceChildCategories as cat}
                         <button
                             class="btn btn-sm {cat.id === currentCategory ? 'active' : ''}"
-                            on:click={() => (currentCategory = cat.id)}>{cat.label}</button
+                            on:click={() => pickServiceCategory(cat.id)}>{cat.label}</button
                         >
                     {/each}
-                </div>
+                </ChipScrollRow>
             {/if}
         {/if}
-    </div>
+    {/if}
     {@render indexFilterBar(kind, "start")}
     <div class="list-page-layout">
         <section class="list">
@@ -748,24 +761,22 @@
                         bind:value={websiteClaimFilter}
                         claimedCount={websiteClaimCounts.claimed}
                         unclaimedCount={websiteClaimCounts.unclaimed}
+                        {loading}
                     />
-                {:else if loading}
-                    <div class="index-tags-aside-skeleton" aria-busy="true" aria-label="Címkék betöltése">
-                        <div class="index-tags-aside-skeleton__row">
-                            {#each Array(8) as _}
-                                <span class="skeleton index-tags-aside-skeleton__chip"></span>
-                            {/each}
-                        </div>
-                        <div class="index-tags-aside-skeleton__row">
-                            {#each Array(6) as _}
-                                <span class="skeleton index-tags-aside-skeleton__chip"></span>
-                            {/each}
-                        </div>
-                    </div>
                 {:else if error}
+                    <IndexTagAside
+                        loading={false}
+                        bind:selectedTypeKey
+                        bind:selectedTagKey
+                        bind:claimFilter={serviceClaimFilter}
+                        claimedCount={serviceClaimCounts.claimed}
+                        unclaimedCount={serviceClaimCounts.unclaimed}
+                        entries={viewEntries}
+                    />
                     <p class="index-tags-aside__empty">Nem sikerült betölteni a címkéket.</p>
                 {:else}
                     <IndexTagAside
+                        {loading}
                         bind:selectedTypeKey
                         bind:selectedTagKey
                         bind:claimFilter={serviceClaimFilter}

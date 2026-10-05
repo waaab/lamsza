@@ -6,6 +6,7 @@ type Entry struct {
 	ID                  string          `json:"id"`
 	Type                string          `json:"type"`
 	Category            string          `json:"category"`
+	Categories          []string        `json:"categories"`
 	Name                string          `json:"name"`
 	Slug                string          `json:"slug"`
 	Location            string          `json:"location"`
@@ -237,6 +238,7 @@ type AdminEntry struct {
 	Type            string          `json:"type"`
 	LocationID      *int            `json:"location_id"`
 	CategoryID      *int            `json:"category_id"`
+	CategoryIDs     []int           `json:"category_ids"`
 	Category        string          `json:"category"`
 	Name            string          `json:"name"`
 	Slug            string          `json:"slug"`

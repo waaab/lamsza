@@ -1488,6 +1488,16 @@ section {
   overflow: visible;
 }
 
+.header-tabs.chips .header-tabs-filters-row {
+  flex-wrap: nowrap;
+}
+
+.header-tabs.chips .chips-list {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
 .header-tabs-label {
   font-size: var(--text-xs);
   font-weight: 700;
@@ -2843,6 +2853,10 @@ svg {
   align-items: center;
   margin: 1rem 0;
   gap: 1rem;
+}
+
+.filter-actions:has(.index-location-menu) {
+  z-index: 40;
 }
 
 .filter-actions .btn {

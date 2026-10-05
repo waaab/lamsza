@@ -1,8 +1,10 @@
 import { hoursConfigured } from "./entryHours.js";
 
+const DELIVERY_CATEGORIES = new Set(["Étterem", "Kávézó", "Cukrászda", "Pékség", "Söröző"]);
+
 export function offersDelivery(entry) {
 	if (String(entry?.name ?? "").trim() === "Lámsza.com") return false;
-	return String(entry?.category ?? "").trim() === "Étterem";
+	return DELIVERY_CATEGORIES.has(String(entry?.category ?? "").trim());
 }
 
 export function showListingPhotos(entry) {

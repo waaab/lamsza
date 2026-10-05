@@ -21,7 +21,7 @@
     let name = $state("");
     let services = $state("");
     let notes = $state("");
-    let locationId = $state(0);
+    let locationId = $state("");
     let address = $state("");
     let url = $state("");
     let phone = $state("");
@@ -109,7 +109,7 @@
                 name = String(form.name ?? "");
                 services = tagText(form.tags);
                 notes = String(form.notes ?? "");
-                locationId = Number(form.location_id) || 0;
+                locationId = Number(form.location_id) || "";
                 address = String(form.address ?? "");
                 url = String(form.url ?? "");
                 phone = String(form.phone ?? "");
@@ -212,7 +212,7 @@
                 <label for="suggestion-name">Név</label>
                 <input id="suggestion-name" type="text" bind:value={name} />
 
-                <label for="suggestion-services">Szolgáltatások</label>
+                <label for="suggestion-services">Címkék</label>
                 <textarea id="suggestion-services" rows="3" bind:value={services}></textarea>
 
                 <label for="suggestion-notes">Bemutatkozás</label>
@@ -220,6 +220,7 @@
 
                 <label for="suggestion-location">Település</label>
                 <select id="suggestion-location" bind:value={locationId}>
+<option value="">Válassz...</option>
                     {#each locations as loc (loc.id)}
                         <option value={loc.id}>{loc.name}</option>
                     {/each}

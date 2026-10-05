@@ -1,4 +1,5 @@
 <script>
+    import CategoryMultiSelect from "$lib/components/CategoryMultiSelect.svelte";
     import { onMount } from "svelte";
     import { apiCall, apiFetch } from "$lib/api.js";
     import { WEBSITE_CREATE_NOTE, WEBSITE_CREATE_TITLE } from "$lib/indexCreateCopy.js";
@@ -13,6 +14,8 @@
     let title = $state("");
     let description = $state("");
     let categoryId = $state(0);
+    /** @type {number[]} */
+    let categoryExtra = $state([]);
     let catalogLoading = $state(false);
     /** @type {Array<{ id: number, name: string, parent_id?: number | null }>} */
     let catalogCategories = $state([]);
@@ -82,6 +85,9 @@
                     title,
                     description,
                     category_id: Number(categoryId),
+                    category_ids: [Number(categoryId), ...categoryExtra]
+                        .map((id) => Number(id))
+                        .filter((id) => id > 0),
                 }),
             });
 
@@ -177,17 +183,13 @@
                     required
                 ></textarea>
 
-                <label for="website-category">Alkategória <span class="field-required" aria-hidden="true">*</span></label>
-                <select id="website-category" name="category_id" bind:value={categoryId} required>
-                    <option value={0} disabled>Válassz alkategóriát</option>
-                    {#each categoryParents as parent (parent.id)}
-                        <optgroup label={parent.name}>
-                            {#each categoryChildren.filter((row) => row.parent_id === parent.id) as child (child.id)}
-                                <option value={child.id}>{child.name}</option>
-                            {/each}
-                        </optgroup>
-                    {/each}
-                </select>
+                <CategoryMultiSelect
+                    parents={categoryParents}
+                    children={categoryChildren}
+                    bind:primary={categoryId}
+                    bind:extra={categoryExtra}
+                    primaryInputId="website-category"
+                />
 
                 {#if error}
                     <p class="add-website-form__error">{error}</p>

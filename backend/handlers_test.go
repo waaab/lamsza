@@ -87,6 +87,7 @@ func init() {
 	testMux.HandleFunc("/api/admin/entries", admin(handlers.HandleAdminEntries))
 	testMux.HandleFunc("/api/admin/entry_categories", admin(handlers.HandleAdminEntryCategories))
 	testMux.HandleFunc("/api/admin/entry_types", admin(handlers.HandleAdminEntryTypes))
+	testMux.HandleFunc("/api/admin/tags", admin(handlers.HandleAdminTags))
 	testMux.HandleFunc("/api/admin/locations", admin(handlers.HandleAdminLocations))
 	testMux.HandleFunc("/api/admin/settlement_location_types", admin(handlers.HandleAdminSettlementLocationTypes))
 	testMux.HandleFunc("/api/admin/county_seat", admin(handlers.HandleSetCountySeat))

@@ -37,3 +37,23 @@ export function canonicalEntryTypeKey(raw) {
     const label = canonicalEntryType(raw);
     return label ? foldType(label) : "";
 }
+
+const ENTRY_TYPE_ORDER = [
+    ENTRY_TYPE_SZEMELY,
+    ENTRY_TYPE_VALLALKOZAS,
+    ENTRY_TYPE_INTEZMENY,
+];
+
+/** Closed type list, in catalog order, for the services sidebar. */
+export function entryTypeChoices() {
+    return ENTRY_TYPE_ORDER.map((label) => ({
+        key: canonicalEntryTypeKey(label),
+        label,
+    }));
+}
+
+/** @param {unknown} key */
+export function entryTypeLabelFromKey(key) {
+    const wanted = String(key ?? "");
+    return entryTypeChoices().find((row) => row.key === wanted)?.label || "";
+}

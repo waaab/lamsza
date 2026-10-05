@@ -8,6 +8,7 @@
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
     import DateTimeWidget from "$lib/components/DateTimeWidget.svelte";
     import NewsWidget from "$lib/components/NewsWidget.svelte";
+    import DirectoryCategories from "$lib/components/DirectoryCategories.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
@@ -434,6 +435,8 @@
 <section id="hirek">
     <NewsWidget limit={10} />
 </section>
+
+<DirectoryCategories />
 
 <!-- Quick Link Add/Edit Dialog -->
 {#if linkDialogOpen}

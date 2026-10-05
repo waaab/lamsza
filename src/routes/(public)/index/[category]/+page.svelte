@@ -5,6 +5,7 @@
     import { onMount } from "svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
+    import ChipScrollRow from "$lib/components/ChipScrollRow.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
     import {
@@ -13,8 +14,7 @@
         displayTagLabel,
     } from "$lib/directoryTagCloud.js";
     import {
-        canonicalEntryType,
-        canonicalEntryTypeKey,
+        entryTypeLabelFromKey,
     } from "$lib/entryType.js";
     import {
         canonicalEntryCategory,
@@ -73,6 +73,15 @@
         }
     }
 
+    /** @param {{ id: string, url: string }} cat */
+    function openCategory(cat) {
+        if (cat.id === currentCategory) {
+            goto("/index");
+            return;
+        }
+        goto(cat.url);
+    }
+
     function clearAllFilters() {
         selectedTypeKey = null;
         selectedTagKey = null;
@@ -95,13 +104,7 @@
         canonicalEntryCategory(currentCategory) ||
         currentCategory;
 
-    $: typeFilterLabel =
-        selectedTypeKey &&
-        canonicalEntryType(
-            entries.find(
-                (e) => canonicalEntryTypeKey(e.type) === selectedTypeKey,
-            )?.type,
-        );
+    $: typeFilterLabel = entryTypeLabelFromKey(selectedTypeKey) || null;
 
     $: tagFilterLabel = (() => {
         if (!selectedTagKey) return null;
@@ -221,31 +224,33 @@
     documentTitleSuffix=" - Székely Gugel"
 />
 
-<div class="header-tabs">
-    <span class="header-tabs-label">Kiemelt Kategóriák:</span>
-    {#if loading}
-        <span class="btn btn-md" style="opacity:0.5">adat betöltés...</span>
-    {:else}
+{#if loading}
+    <div class="header-tabs chips">
+        <span class="header-tabs-label" aria-label="Kiemelt kategóriák">Kiemelt kategóriák:</span>
+        <span class="btn btn--loading">Szűrők betöltése…</span>
+    </div>
+{:else}
+    <ChipScrollRow label="Kiemelt kategóriák:">
         {#each dynamicCategories as cat}
             <button
                 class="btn btn-md {parentCategoryTabActive(cat.id, currentCategory, catalog)
                     ? 'active'
                     : ''}"
-                on:click={() => goto(cat.url)}>{cat.label}</button
+                on:click={() => openCategory(cat)}>{cat.label}</button
             >
         {/each}
-        {#if childCategories.length > 0}
-            <div class="header-tabs-filters-row header-tabs-filters-row--children">
-                {#each childCategories as cat}
-                    <button
-                        class="btn btn-sm {cat.id === currentCategory ? 'active' : ''}"
-                        on:click={() => goto(cat.url)}>{cat.label}</button
-                    >
-                {/each}
-            </div>
-        {/if}
+    </ChipScrollRow>
+    {#if childCategories.length > 0}
+        <ChipScrollRow>
+            {#each childCategories as cat}
+                <button
+                    class="btn btn-sm {cat.id === currentCategory ? 'active' : ''}"
+                    on:click={() => openCategory(cat)}>{cat.label}</button
+                >
+            {/each}
+        </ChipScrollRow>
     {/if}
-</div>
+{/if}
 
 {#snippet categoryFilterBar()}
     <div class="filter-actions">
@@ -458,34 +463,17 @@
     <aside class="sidebar index-tags-sidebar" aria-label="Címkék">
         <div class="sidebar-box">
             <div class="sidebar-header">
-                <h4 class="sidebar-heading">Címkék</h4>
+                <h4 class="sidebar-heading">Szolgáltatások</h4>
             </div>
-            {#if loading}
-                <div
-                    class="index-tags-aside-skeleton"
-                    aria-busy="true"
-                    aria-label="Címkék betöltése"
-                >
-                    <div class="index-tags-aside-skeleton__row">
-                        {#each Array(8) as _}
-                            <span class="skeleton index-tags-aside-skeleton__chip"></span>
-                        {/each}
-                    </div>
-                    <div class="index-tags-aside-skeleton__row">
-                        {#each Array(6) as _}
-                            <span class="skeleton index-tags-aside-skeleton__chip"></span>
-                        {/each}
-                    </div>
-                </div>
-            {:else if error}
+            {#if error}
                 <p class="index-tags-aside__empty">Nem sikerült betölteni a címkéket.</p>
-            {:else}
-                <IndexTagAside
-                    bind:selectedTypeKey
-                    bind:selectedTagKey
-                    {entries}
-                />
             {/if}
+            <IndexTagAside
+                {loading}
+                bind:selectedTypeKey
+                bind:selectedTagKey
+                {entries}
+            />
         </div>
     </aside>
 </div>

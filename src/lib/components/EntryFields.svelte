@@ -6,7 +6,13 @@
     let { entry } = $props();
 
     let typeLabel = $derived(displayText(canonicalEntryType(entry?.type)));
-    let categoryLabel = $derived(displayText(entry?.category));
+    let categoryLabel = $derived(
+        displayText(
+            Array.isArray(entry?.categories) && entry.categories.length
+                ? entry.categories.join(", ")
+                : entry?.category,
+        ),
+    );
     let locationName = $derived(displayText(entry?.location));
     let locationHref = $derived.by(() => {
         const countySlug = String(entry?.county_slug ?? "").trim();
@@ -82,7 +88,7 @@
         </dd>
     </div>
     <div class="entry-fields__row entry-fields__row--block">
-        <dt>Megjegyzések</dt>
+        <dt>Bemutatkozás</dt>
         <dd
             class={[
                 "entry-fields__notes",

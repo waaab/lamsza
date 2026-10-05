@@ -10,6 +10,8 @@ import {
     entryMatchesCategory,
     parentCategoryTabActive,
     directoryCatalogFromApi,
+    directoryGroups,
+    directoryGroupsForEntries,
 } from "../src/lib/entryCategory.js";
 
 test("canonicalEntryCategory returns the stored name", () => {
@@ -27,19 +29,35 @@ test("entryMatchesCategory matches child slug", () => {
     assert.equal(entryMatchesCategory({ category: "Hivatalok" }, "osszes"), true);
 });
 
+test("entryMatchesCategory matches every shelf on the listing", () => {
+    const entry = {
+        category: "Webfejlesztés",
+        categories: ["Webfejlesztés", "Webdizájn", "E-kereskedelem", "Tanácsadás"],
+    };
+    assert.equal(entryMatchesCategory(entry, "webfejlesztes"), true);
+    assert.equal(entryMatchesCategory(entry, "webdizajn"), true);
+    assert.equal(entryMatchesCategory(entry, "e-kereskedelem"), true);
+    assert.equal(entryMatchesCategory(entry, "tanacsadas"), true);
+    assert.equal(entryMatchesCategory(entry, "informatika-es-tavkozles"), true);
+    assert.equal(entryMatchesCategory(entry, "szakmai-szolgaltatasok"), true);
+    assert.equal(entryMatchesCategory(entry, "auto"), false);
+});
+
 test("entryMatchesCategory matches parent slug for a child category", () => {
     assert.equal(entryMatchesCategory({ category: "Bútor" }, "vasarlas"), true);
     assert.equal(entryMatchesCategory({ category: "Turbószerviz" }, "auto"), true);
     assert.equal(entryMatchesCategory({ category: "Bútor" }, "auto"), false);
 });
 
-test("directoryCategoryTabs shows parent shelves with visible children", () => {
+test("directoryCategoryTabs lists every main category", () => {
     const tabs = directoryCategoryTabs(
         DIRECTORY_CATALOG,
         [{ category: "Bútor" }],
         [{ category: "Bank", entry_id: 0 }],
     );
     assert.equal(tabs[0].id, "osszes");
+    assert.equal(tabs.length, 13);
+    assert.equal(tabs[1].id, "etkezes");
     const ids = tabs.map((t) => t.id);
     assert.ok(ids.includes("vasarlas"));
     assert.ok(ids.includes("penzugy"));
@@ -83,6 +101,26 @@ test("directoryParentSlug maps child slugs to their parent", () => {
 test("parentCategoryTabActive keeps the parent tab lit for a child slug", () => {
     assert.equal(parentCategoryTabActive("vasarlas", "butor", DIRECTORY_CATALOG), true);
     assert.equal(parentCategoryTabActive("auto", "butor", DIRECTORY_CATALOG), false);
+});
+
+test("directoryGroupsForEntries hides subcategories with no entry", () => {
+    const groups = directoryGroupsForEntries(DIRECTORY_CATALOG, [{ category: "Bútor" }]);
+    const shopping = groups.find((group) => group.slug === "vasarlas");
+    const food = groups.find((group) => group.slug === "etkezes");
+    assert.deepEqual(shopping.children.map((child) => child.name), ["Bútor"]);
+    assert.equal(food.children.length, 0);
+    assert.equal(groups.length, 12);
+});
+
+test("directoryGroups lists every parent with its subcategories", () => {
+    const groups = directoryGroups(DIRECTORY_CATALOG);
+    assert.equal(groups.length, 12);
+    const food = groups.find((group) => group.slug === "etkezes");
+    assert.deepEqual(
+        food.children.map((child) => child.name),
+        ["Étterem", "Kávézó", "Cukrászda", "Pékség", "Söröző"],
+    );
+    assert.equal(groups.some((group) => group.name === "Sportpálya"), false);
 });
 
 test("directoryCatalogFromApi keeps an admin-added child on its parent shelf", () => {

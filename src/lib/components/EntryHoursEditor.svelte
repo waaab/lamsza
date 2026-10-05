@@ -1,5 +1,6 @@
 <script>
     import { WEEKDAYS, emptyWeekHours, normalizeHours } from "$lib/entryHours.js";
+    import HuTimeInput from "$lib/components/HuTimeInput.svelte";
 
     /** @type {{ hours?: Record<string, { open: string, close: string, closed: boolean }> }} */
     let { hours = $bindable(emptyWeekHours()) } = $props();
@@ -34,21 +35,21 @@
                 </label>
             </div>
             <div class="entry-hours-editor__times">
-                <input
-                    type="time"
+                <HuTimeInput
                     name={`hours-${row.key}-open`}
-                    aria-label="{row.label} nyitás"
+                    ariaLabel="{row.label} nyitás"
+                    placeholder="08:00"
                     value={row.slot.open}
                     disabled={row.slot.closed}
-                    oninput={(event) => patchDay(row.key, { open: event.currentTarget.value })}
+                    onchange={(next) => patchDay(row.key, { open: next })}
                 />
-                <input
-                    type="time"
+                <HuTimeInput
                     name={`hours-${row.key}-close`}
-                    aria-label="{row.label} zárás"
+                    ariaLabel="{row.label} zárás"
+                    placeholder="20:00"
                     value={row.slot.close}
                     disabled={row.slot.closed}
-                    oninput={(event) => patchDay(row.key, { close: event.currentTarget.value })}
+                    onchange={(next) => patchDay(row.key, { close: next })}
                 />
             </div>
         </li>
@@ -86,7 +87,7 @@
         gap: 0.4rem;
         min-width: 0;
     }
-    .entry-hours-editor input[type="time"] {
+    .entry-hours-editor__times :global(input) {
         width: 100%;
         min-width: 0;
         box-sizing: border-box;

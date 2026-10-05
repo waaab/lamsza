@@ -304,7 +304,7 @@
         </div>
         <div class="weather-footer">
             {#if weatherUpdatedAt}
-                <small class="weather-source">Utoljára frissítve: {weatherUpdatedAt.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit" })}</small>
+                <small class="weather-source">Utoljára frissítve: {weatherUpdatedAt.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</small>
             {/if}
             <small class="weather-source" title="Forrás: OpenWeatherMap">OpenWeatherMap</small>
         </div>

@@ -3,6 +3,7 @@ package account
 import (
 	"backend/internal/auth"
 	"backend/internal/db"
+	"backend/internal/directory"
 	"backend/internal/utils"
 	"backend/internal/webdomain"
 	"bytes"
@@ -87,6 +88,7 @@ type createListingBody struct {
 	Name            string          `json:"name"`
 	LocationID      int             `json:"location_id"`
 	CategoryID      int             `json:"category_id"`
+	CategoryIDs     []int           `json:"category_ids"`
 	TypeID          int             `json:"type_id"`
 	URL             string          `json:"url"`
 	Phone           string          `json:"phone"`
@@ -105,6 +107,7 @@ type updateListingBody struct {
 	Name            string          `json:"name"`
 	LocationID      int             `json:"location_id"`
 	CategoryID      int             `json:"category_id"`
+	CategoryIDs     []int           `json:"category_ids"`
 	TypeID          int             `json:"type_id"`
 	URL             string          `json:"url"`
 	Phone           string          `json:"phone"`
@@ -194,7 +197,7 @@ func listingDeliveryEnabled(catName, name string, requested bool) bool {
 	if strings.TrimSpace(name) == "Lámsza.com" {
 		return false
 	}
-	return strings.TrimSpace(catName) == utils.EntryCategoryEtterem
+	return utils.CategoryOffersDelivery(catName)
 }
 
 func sanitizeSocialLinks(raw json.RawMessage) json.RawMessage {
@@ -605,6 +608,7 @@ type listingDetailResponse struct {
 	Slug            string          `json:"slug"`
 	LocationID      int             `json:"location_id"`
 	CategoryID      int             `json:"category_id"`
+	CategoryIDs     []int           `json:"category_ids"`
 	TypeID          int             `json:"type_id"`
 	URL             string          `json:"url"`
 	Phone           string          `json:"phone"`
@@ -679,6 +683,14 @@ func handleGetListingDetail(w http.ResponseWriter, r *http.Request, userID int, 
 	}
 	if detail.Tags == nil {
 		detail.Tags = []string{}
+	}
+	detail.CategoryIDs, err = directory.LoadEntryCategoryIDs(db.DB, entryID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if len(detail.CategoryIDs) == 0 && detail.CategoryID > 0 {
+		detail.CategoryIDs = []int{detail.CategoryID}
 	}
 	json.NewEncoder(w).Encode(detail)
 }
@@ -952,27 +964,18 @@ func validateEntryTypeID(typeID int) error {
 }
 
 func validateListingTags(categoryID int, tags []string) error {
-	var catSlug string
-	var parentSlug sql.NullString
-	err := db.DB.QueryRow(`
-		SELECT c.slug, p.slug
-		FROM entry_categories c
-		LEFT JOIN entry_categories p ON p.id = c.parent_id
-		WHERE c.id = $1
-	`, categoryID).Scan(&catSlug, &parentSlug)
-	if err != nil {
-		return err
-	}
 	for _, tag := range tags {
 		tagSlug := utils.Slugify(tag)
 		if tagSlug == "" {
 			continue
 		}
-		if tagSlug == catSlug {
-			return fmt.Errorf("tag matches category slug")
+		var exists bool
+		err := db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM entry_categories WHERE slug = $1)`, tagSlug).Scan(&exists)
+		if err != nil {
+			return err
 		}
-		if parentSlug.Valid && tagSlug == parentSlug.String {
-			return fmt.Errorf("tag matches parent slug")
+		if exists {
+			return fmt.Errorf("tag matches category slug")
 		}
 	}
 	return nil
@@ -991,6 +994,7 @@ func listingURLDomainConflict(entryID int, newURL string) (bool, error) {
 	if newURL != "" {
 		key, err := webdomain.CanonicalDomain(newURL)
 		if err != nil {
+			// Keep the linked website URL; do not treat a parse miss as a takeover.
 			return false, nil
 		}
 		newKey = key
@@ -998,12 +1002,21 @@ func listingURLDomainConflict(entryID int, newURL string) (bool, error) {
 
 	var linkedKey sql.NullString
 	err := db.DB.QueryRow(`SELECT domain_key FROM websites WHERE entry_id = $1`, entryID).Scan(&linkedKey)
-	if err == nil && linkedKey.Valid {
-		if newURL == "" || linkedKey.String != newKey {
+	if err == sql.ErrNoRows {
+		err = nil
+	} else if err != nil {
+		return false, err
+	}
+	if linkedKey.Valid {
+		if newURL == "" {
 			return true, nil
 		}
+		if linkedKey.String == newKey {
+			return false, nil
+		}
+		return true, nil
 	}
-	if newURL == "" {
+	if newURL == "" || newKey == "" {
 		return false, nil
 	}
 
@@ -1071,7 +1084,12 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, "name, category_id, and type_id required", http.StatusBadRequest)
 		return
 	}
-	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+	categoryIDs, err := directory.NormalizeCategoryIDs(body.CategoryID, body.CategoryIDs)
+	if err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
+	if _, err = directory.ValidateLeaves(db.DB, categoryIDs); err != nil {
 		writeListingFieldError(w, "category_id")
 		return
 	}
@@ -1108,7 +1126,7 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 
 	var catName string
-	err := db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
+	err = db.DB.QueryRow(`SELECT name FROM entry_categories WHERE id = $1`, body.CategoryID).Scan(&catName)
 	if err == sql.ErrNoRows {
 		writeListingFieldError(w, "category_id")
 		return
@@ -1177,6 +1195,10 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if err = directory.ReplaceEntryCategories(tx, entryID, categoryIDs); err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
 
 	_, err = tx.Exec(`
 		INSERT INTO entry_members (entry_id, user_id, role, status)
@@ -1200,6 +1222,10 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			writeListingConflict(w, http.StatusConflict, "domain_taken")
 			return
 		}
+		if err = directory.ReplaceWebsiteCategories(tx, body.WebsiteID, categoryIDs); err != nil {
+			writeListingFieldError(w, "category_id")
+			return
+		}
 	} else if listingURL != "" {
 		domainKey, err := webdomain.CanonicalDomain(listingURL)
 		if err == nil {
@@ -1207,12 +1233,18 @@ func handleCreateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			if host, err := submittedHost(listingURL); err == nil {
 				submittedHostValue = host
 			}
-			_, err = tx.Exec(`
+			var websiteID int
+			err = tx.QueryRow(`
 				INSERT INTO websites (domain_key, submitted_host, title, description, status, user_id, entry_id, category_id)
 				VALUES ($1, $2, $3, $4, 'approved', $5, $6, $7)
-			`, domainKey, submittedHostValue, websiteTitle(body.Name), websiteDescription(body.Notes), userID, entryID, body.CategoryID)
+				RETURNING id
+			`, domainKey, submittedHostValue, websiteTitle(body.Name), websiteDescription(body.Notes), userID, entryID, body.CategoryID).Scan(&websiteID)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if err = directory.ReplaceWebsiteCategories(tx, websiteID, categoryIDs); err != nil {
+				writeListingFieldError(w, "category_id")
 				return
 			}
 		}
@@ -1282,7 +1314,12 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 		http.Error(w, "name, category_id, and type_id required", http.StatusBadRequest)
 		return
 	}
-	if err := validateLeafCategoryID(body.CategoryID); err != nil {
+	categoryIDs, err := directory.NormalizeCategoryIDs(body.CategoryID, body.CategoryIDs)
+	if err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
+	if _, err = directory.ValidateLeaves(db.DB, categoryIDs); err != nil {
 		writeListingFieldError(w, "category_id")
 		return
 	}
@@ -1367,6 +1404,21 @@ func handleUpdateListing(w http.ResponseWriter, r *http.Request, userID int) {
 			hours, body.HoursEnabled, delivery, body.DeliveryEnabled, photos, body.RatingsEnabled, entryID)
 	}
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err = directory.ReplaceEntryCategories(db.DB, entryID, categoryIDs); err != nil {
+		writeListingFieldError(w, "category_id")
+		return
+	}
+	var linkedWebsiteID int
+	err = db.DB.QueryRow(`SELECT id FROM websites WHERE entry_id = $1`, entryID).Scan(&linkedWebsiteID)
+	if err == nil {
+		if err = directory.ReplaceWebsiteCategories(db.DB, linkedWebsiteID, categoryIDs); err != nil {
+			writeListingFieldError(w, "category_id")
+			return
+		}
+	} else if err != sql.ErrNoRows {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
