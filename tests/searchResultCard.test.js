@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { szotarUrl } from "../src/lib/networkOrigins.js";
 import { searchResultCardModel } from "../src/lib/searchResultCard.js";
 import { formatDateShort } from "../src/lib/utils.js";
 
@@ -180,6 +181,42 @@ test("news: title and source, new tab", () => {
     assert.equal(card.external, true);
     assert.equal(card.claimed, null);
     assert.equal(card.accent, "none");
+});
+
+test("word: headword, speech types, definition, szotar link, new tab", () => {
+    const card = searchResultCardModel("word", {
+        id: 42,
+        headword: "  gagya  ",
+        definition_hu: "ügyetlen",
+        speech_types: ["melléknév", "főnév"],
+    });
+    assert.deepEqual(card, {
+        href: szotarUrl("/szo/42"),
+        title: "gagya",
+        meta: "melléknév, főnév",
+        description: "ügyetlen",
+        accent: "none",
+        external: true,
+        claimed: null,
+    });
+});
+
+test("word: no speech types omits meta", () => {
+    const card = searchResultCardModel("word", {
+        id: 7,
+        headword: "csángó",
+        definition_hu: "",
+        speech_types: [],
+    });
+    assert.equal(card.meta, "");
+    assert.equal(card.description, "");
+    assert.equal(card.href, szotarUrl("/szo/7"));
+});
+
+test("word: missing id or empty headword is skipped", () => {
+    assert.equal(searchResultCardModel("word", { id: 0, headword: "x" }), null);
+    assert.equal(searchResultCardModel("word", { id: 1, headword: "  " }), null);
+    assert.equal(searchResultCardModel("word", { headword: "x" }), null);
 });
 
 test("missing link or empty title is skipped", () => {

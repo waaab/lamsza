@@ -1,4 +1,5 @@
 import { canonicalEntryCategory } from "./entryCategory.js";
+import { szotarUrl } from "./networkOrigins.js";
 import { formatDateShort } from "./utils.js";
 
 function text(value) {
@@ -33,7 +34,7 @@ function card(fields) {
 }
 
 /**
- * @param {"website"|"service"|"attraction"|"venue"|"event"|"settlement"|"seat"|"news"} kind
+ * @param {"website"|"service"|"attraction"|"venue"|"event"|"settlement"|"seat"|"news"|"word"} kind
  * @param {Record<string, unknown>} row
  */
 export function searchResultCardModel(kind, row) {
@@ -133,6 +134,22 @@ export function searchResultCardModel(kind, row) {
             title: item.title,
             meta: item.source,
             description: "",
+            accent: "none",
+            external: true,
+            claimed: null,
+        });
+    }
+    if (kind === "word") {
+        const id = Number(item.id);
+        if (!Number.isFinite(id) || id <= 0) return null;
+        const types = Array.isArray(item.speech_types)
+            ? item.speech_types.map(text).filter(Boolean)
+            : [];
+        return card({
+            href: szotarUrl(`/szo/${id}`),
+            title: item.headword,
+            meta: types.join(", "),
+            description: item.definition_hu,
             accent: "none",
             external: true,
             claimed: null,
