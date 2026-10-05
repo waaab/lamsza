@@ -13,6 +13,7 @@ type Config struct {
 	WeatherAPIComKey  string
 	GoogleClientID    string
 	AdminGoogleEmails []string
+	SzotarOrigin      string
 	// DataAPI serves mondások, events, news, and the other content routes.
 	// Auth and /api/config/public stay up when this is false.
 	DataAPI  bool
@@ -45,6 +46,7 @@ func Load() {
 
 	AppConfig.GoogleClientID = getEnv("GOOGLE_CLIENT_ID", "")
 	AppConfig.AdminGoogleEmails = parseEmailList(getEnv("ADMIN_GOOGLE_EMAILS", "attila.bogozi@gmail.com"))
+	AppConfig.SzotarOrigin = strings.TrimRight(getEnv("SZOTAR_ORIGIN", ""), "/")
 
 	AppConfig.DataAPI = getBoolEnv("DATA_API", true)
 
