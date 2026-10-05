@@ -155,6 +155,7 @@ Each app needs its own `.env` on the server (never commit these).
 | `FEATURE_QUICKLINKS` | Optional | Default `true` |
 | `FEATURE_SEARCH` | Optional | Default `true` |
 | `DATA_API` | Optional | Default `true` |
+| `SZOTAR_ORIGIN` | Optional | Base URL for Szótár API, no trailing slash. Local `https://szotar.lamsza.test`, prod `https://szotar.lamsza.com`. Unset skips dictionary hits in `/api/search`. |
 
 ### 6.2 szotar.lamsza.com
 

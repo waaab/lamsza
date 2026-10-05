@@ -7,11 +7,13 @@ import (
 	"backend/internal/models"
 	"backend/internal/news"
 	"backend/internal/utils"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/lib/pq"
 )
@@ -56,6 +58,7 @@ type UnifiedSearchResult struct {
 	HistoricalSeats []HistoricalSeatSearchHit `json:"historical_seats"`
 	Websites        []account.WebsiteHit      `json:"websites"`
 	WebsiteQuery    bool                      `json:"website_query"`
+	Words           []WordSearchHit           `json:"words"`
 }
 
 type newsSearchItem struct {
@@ -80,6 +83,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 			HistoricalSeats: []HistoricalSeatSearchHit{},
 			Websites:        []account.WebsiteHit{},
 			WebsiteQuery:    false,
+			Words:           []WordSearchHit{},
 		})
 		return
 	}
@@ -96,6 +100,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	var attractionHits []AttractionSearchHit
 	var venueHits []VenueSearchHit
 	var seatHits []HistoricalSeatSearchHit
+	var wordHits []WordSearchHit
 
 	// Search locations (ILIKE on name, name_ro, name_de, county)
 	wg.Add(1)
@@ -385,6 +390,14 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		}()
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		wordHits = fetchSzotarWords(ctx, config.AppConfig.SzotarOrigin, q, nil)
+	}()
+
 	wg.Wait()
 
 	if locations == nil {
@@ -411,6 +424,9 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 	if websiteHits == nil {
 		websiteHits = []account.WebsiteHit{}
 	}
+	if wordHits == nil {
+		wordHits = []WordSearchHit{}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(UnifiedSearchResult{
@@ -423,5 +439,6 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 		HistoricalSeats: seatHits,
 		Websites:        websiteHits,
 		WebsiteQuery:    domainQuery,
+		Words:           wordHits,
 	})
 }
