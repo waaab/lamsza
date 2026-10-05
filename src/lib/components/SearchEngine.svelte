@@ -19,7 +19,7 @@
     let showDiscover = false;
 
     let searchInputValue = "";
-    let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats, websites, website_query }
+    let searchResults = null; // { locations, entries, events, news, attractions, venues, historical_seats, websites, words, website_query }
     let loading = false;
     /** @type {number | null} */
     let searchElapsedMs = null;
@@ -36,7 +36,7 @@
     let locationFieldEl;
     /** @type {Array<Record<string, any>>} */
     let locations = [];
-    /** @type {"index" | "services" | "websites"} */
+    /** @type {"index" | "services" | "websites" | "szotar"} */
     let resultFilter = "index";
     let searchGen = 0;
     // Results belong to the last submitted query. Clearing the box drops them
@@ -68,8 +68,18 @@
     $: filteredAttractions = (searchResults?.attractions || []).filter((item) =>
         !selectedCounty || item.county_slug === selectedCounty,
     );
-    $: shownWebsites = resultFilter === "services" ? [] : (searchResults?.websites || []);
-    $: indexEntries = resultFilter === "websites" ? [] : orderedEntries;
+    $: shownWords =
+        resultFilter === "services" || resultFilter === "websites"
+            ? []
+            : (searchResults?.words || []);
+    $: shownWebsites =
+        resultFilter === "services" || resultFilter === "szotar"
+            ? []
+            : (searchResults?.websites || []);
+    $: indexEntries =
+        resultFilter === "websites" || resultFilter === "szotar"
+            ? []
+            : orderedEntries;
     $: showBrowseSections = resultFilter === "index";
     $: hasResults = searchResults && (
         (showBrowseSections && filteredLocations.length > 0) ||
@@ -79,7 +89,8 @@
         (showBrowseSections && filteredAttractions.length > 0) ||
         (showBrowseSections && filteredVenues.length > 0) ||
         (showBrowseSections && (searchResults.historical_seats?.length || 0) > 0) ||
-        shownWebsites.length > 0
+        shownWebsites.length > 0 ||
+        shownWords.length > 0
     );
     $: totalCount = searchResults
         ? (showBrowseSections ? filteredLocations.length : 0) +
@@ -89,7 +100,8 @@
           (showBrowseSections ? filteredAttractions.length : 0) +
           (showBrowseSections ? filteredVenues.length : 0) +
           (showBrowseSections ? (searchResults.historical_seats?.length || 0) : 0) +
-          shownWebsites.length
+          shownWebsites.length +
+          shownWords.length
         : 0;
 
     function placeMatches(slug, selected) {
@@ -127,9 +139,11 @@
         ? "szolgáltatásokban:"
         : resultFilter === "websites"
           ? "weboldalakban:"
-          : selectedLocation?.name
-            ? `${selectedLocation.name} és környéke:`
-            : "mindenhol:";
+          : resultFilter === "szotar"
+            ? "szótárban:"
+            : selectedLocation?.name
+              ? `${selectedLocation.name} és környéke:`
+              : "mindenhol:";
 
     function stopAnswerTyping() {
         if (answerTimer) clearInterval(answerTimer);
@@ -582,6 +596,23 @@
                             </div>
                         </div>
                     {/if}
+
+                    {#if shownWords.length > 0}
+                        <div class="discover-section">
+                            <h4 class="discover-section-title">
+                                <AppIcon name="szotar" size={18} />
+                                Székely Szótár
+                            </h4>
+                            <div class="discover-result-list">
+                                {#each shownWords as word (word.id)}
+                                    {@const card = searchResultCardModel("word", word)}
+                                    {#if card}
+                                        <SearchResultCard {...card} />
+                                    {/if}
+                                {/each}
+                            </div>
+                        </div>
+                    {/if}
                 </div>
             {/if}
 
@@ -621,6 +652,15 @@
                             on:click={() => selectResultFilter("websites")}
                         >
                             Weboldalak
+                        </button>
+                        <button
+                            type="button"
+                            class="btn btn-md nav-btn"
+                            class:active={resultFilter === "szotar"}
+                            aria-pressed={resultFilter === "szotar"}
+                            on:click={() => selectResultFilter("szotar")}
+                        >
+                            Székely Szótár
                         </button>
                     </div>
                     {/if}
