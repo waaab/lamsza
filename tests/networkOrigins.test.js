@@ -27,7 +27,22 @@ test('hostname sniff selects .test hosts', () => {
 	);
 });
 
-test('production default when hostname is not .test', () => {
+test('localhost uses Vite strictPort origins', () => {
+	assert.equal(
+		resolveNetworkOrigin('lamsza', { envOrigin: '', hostname: 'localhost' }),
+		'http://localhost:5173'
+	);
+	assert.equal(
+		resolveNetworkOrigin('szotar', { envOrigin: '', hostname: '127.0.0.1' }),
+		'http://localhost:5174'
+	);
+	assert.equal(
+		resolveNetworkOrigin('jatszoter', { envOrigin: '', hostname: 'localhost' }),
+		'http://localhost:5175'
+	);
+});
+
+test('production default when hostname is not local', () => {
 	assert.equal(
 		resolveNetworkOrigin('lamsza', { envOrigin: '', hostname: 'szotar.lamsza.com' }),
 		'https://lamsza.com'
@@ -35,10 +50,6 @@ test('production default when hostname is not .test', () => {
 	assert.equal(
 		resolveNetworkOrigin('szotar', { envOrigin: '', hostname: '' }),
 		'https://szotar.lamsza.com'
-	);
-	assert.equal(
-		resolveNetworkOrigin('jatszoter', { envOrigin: '', hostname: 'localhost' }),
-		'https://jatszoter.lamsza.com'
 	);
 });
 

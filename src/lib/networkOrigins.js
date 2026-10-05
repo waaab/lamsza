@@ -2,24 +2,34 @@ const APPS = {
 	lamsza: {
 		envKey: 'VITE_LAMSZA_ORIGIN',
 		local: 'https://lamsza.test',
+		/** Vite strictPort when apps run on localhost (Lámsza 5173). */
+		localVite: 'http://localhost:5173',
 		prod: 'https://lamsza.com'
 	},
 	szotar: {
 		envKey: 'VITE_SZOTAR_ORIGIN',
 		local: 'https://szotar.lamsza.test',
+		localVite: 'http://localhost:5174',
 		prod: 'https://szotar.lamsza.com'
 	},
 	jatszoter: {
 		envKey: 'VITE_JATSZOTER_ORIGIN',
 		local: 'https://jatszoter.lamsza.test',
+		localVite: 'http://localhost:5175',
 		prod: 'https://jatszoter.lamsza.com'
 	}
 };
 
 /** @param {string} hostname */
+function isLocalhost(hostname) {
+	const host = String(hostname || '');
+	return host === 'localhost' || host === '127.0.0.1';
+}
+
+/** @param {string} hostname */
 function isLocalNetworkHost(hostname) {
 	const host = String(hostname || '');
-	return host === 'lamsza.test' || host.endsWith('.lamsza.test');
+	return isLocalhost(host) || host === 'lamsza.test' || host.endsWith('.lamsza.test');
 }
 
 /**
@@ -33,7 +43,9 @@ export function resolveNetworkOrigin(app, opts = {}) {
 		.trim()
 		.replace(/\/$/, '');
 	if (env) return env;
-	if (isLocalNetworkHost(opts.hostname)) return cfg.local;
+	const host = String(opts.hostname || '');
+	if (isLocalhost(host)) return cfg.localVite || cfg.local;
+	if (isLocalNetworkHost(host)) return cfg.local;
 	return cfg.prod;
 }
 
