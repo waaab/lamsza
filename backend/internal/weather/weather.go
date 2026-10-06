@@ -21,6 +21,29 @@ const (
 	providerOpenWeatherMap = "openweathermap"
 )
 
+// maxWeatherFanOut caps how many cities /api/weather/county fetches at the
+// same time. A county can hold many settlements, and with no cap each one
+// opens its own socket to the provider at once.
+const maxWeatherFanOut = 12
+
+// weatherFanOutBudget stops cities that have not started yet. The cap above
+// makes the route run in waves, so without a budget the last wave could finish
+// after the server WriteTimeout. Budget plus the worst case for one city
+// (three providers, weatherClientTimeout each) stays under that timeout.
+const weatherFanOutBudget = 15 * time.Second
+
+// weatherClientTimeout: http.DefaultClient has no timeout, so a provider that
+// accepts the connection and never answers held a goroutine and a socket for
+// the life of the process. The route tries up to three providers in turn, so
+// keep this short.
+const weatherClientTimeout = 4 * time.Second
+
+var weatherClient = &http.Client{Timeout: weatherClientTimeout}
+
+func weatherHTTPGet(url string) (*http.Response, error) {
+	return weatherClient.Get(url)
+}
+
 // fallbackDescHU: if an API returns English, we show Hungarian (admin can extend via site_settings later)
 var fallbackDescHU = map[string]string{
 	"overcast": "borult", "partly cloudy": "részben felhős", "clear": "tiszta ég",
@@ -289,7 +312,7 @@ func fetchOpenMeteoByCoords(lat, lon float64) (*UnifiedWeatherResponse, error) {
 	forecastURL := "https://api.open-meteo.com/v1/forecast?latitude=" + strconv.FormatFloat(lat, 'f', -1, 64) +
 		"&longitude=" + strconv.FormatFloat(lon, 'f', -1, 64) +
 		"&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,precipitation"
-	resp, err := http.Get(forecastURL)
+	resp, err := weatherHTTPGet(forecastURL)
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +386,7 @@ func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
 
 func fetchOpenMeteoByName(city string) (*UnifiedWeatherResponse, error) {
 	geoURL := "https://geocoding-api.open-meteo.com/v1/search?name=" + url.QueryEscape(city) + "&count=1"
-	resp, err := http.Get(geoURL)
+	resp, err := weatherHTTPGet(geoURL)
 	if err != nil {
 		return nil, err
 	}
@@ -450,7 +473,7 @@ func fetchWeatherAPICom(city, apiKey string) (*UnifiedWeatherResponse, error) {
 		return nil, nil
 	}
 	u := "https://api.weatherapi.com/v1/current.json?key=" + url.QueryEscape(apiKey) + "&q=" + url.QueryEscape(city) + "&lang=hu"
-	resp, err := http.Get(u)
+	resp, err := weatherHTTPGet(u)
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +491,7 @@ func fetchWeatherAPIComByCoords(lat, lon float64, apiKey string) (*UnifiedWeathe
 	}
 	q := strconv.FormatFloat(lat, 'f', -1, 64) + "," + strconv.FormatFloat(lon, 'f', -1, 64)
 	u := "https://api.weatherapi.com/v1/current.json?key=" + url.QueryEscape(apiKey) + "&q=" + url.QueryEscape(q) + "&lang=hu"
-	resp, err := http.Get(u)
+	resp, err := weatherHTTPGet(u)
 	if err != nil {
 		return nil, err
 	}
@@ -542,7 +565,7 @@ func fetchOpenWeatherMap(city, apiKey string) (*UnifiedWeatherResponse, error) {
 	}
 	weatherURL := "https://api.openweathermap.org/data/2.5/weather?q=" +
 		url.QueryEscape(city) + ",RO&appid=" + apiKey + "&units=metric&lang=hu"
-	resp, err := http.Get(weatherURL)
+	resp, err := weatherHTTPGet(weatherURL)
 	if err != nil {
 		return nil, err
 	}
@@ -561,7 +584,7 @@ func fetchOpenWeatherMapByCoords(lat, lon float64, apiKey string) (*UnifiedWeath
 	weatherURL := "https://api.openweathermap.org/data/2.5/weather?lat=" +
 		strconv.FormatFloat(lat, 'f', -1, 64) + "&lon=" + strconv.FormatFloat(lon, 'f', -1, 64) +
 		"&appid=" + url.QueryEscape(apiKey) + "&units=metric&lang=hu"
-	resp, err := http.Get(weatherURL)
+	resp, err := weatherHTTPGet(weatherURL)
 	if err != nil {
 		return nil, err
 	}
@@ -667,11 +690,18 @@ func HandleCountyWeather(w http.ResponseWriter, r *http.Request) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var results []cityWeather
+	slots := make(chan struct{}, maxWeatherFanOut)
+	deadline := time.Now().Add(weatherFanOutBudget)
 
 	for _, city := range cities {
 		wg.Add(1)
 		go func(c locInfo) {
 			defer wg.Done()
+			slots <- struct{}{}
+			defer func() { <-slots }()
+			if time.Now().After(deadline) {
+				return
+			}
 			searchName := c.name
 			if c.nameRo != "" {
 				searchName = c.nameRo

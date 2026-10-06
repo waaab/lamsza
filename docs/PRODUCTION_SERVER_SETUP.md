@@ -159,6 +159,8 @@ Each app needs its own `.env` on the server (never commit these).
 | `FEATURE_SEARCH` | Optional | Default `true` |
 | `DATA_API` | Optional | Default `true` |
 | `SZOTAR_ORIGIN` | Optional | Base URL for Szótár API, no trailing slash. Local `https://szotar.lamsza.test`, prod `https://szotar.lamsza.com`. Unset skips dictionary hits in `/api/search`. |
+| `DB_MAX_OPEN_CONNS` | Optional | Default `25`. Pool cap. The `lamsza` database is shared with admin and Postgres allows 100 connections in total, so keep lamsza plus admin under that. |
+| `DB_MAX_IDLE_CONNS` | Optional | Default `10`. Must not be above `DB_MAX_OPEN_CONNS`; the code lowers it if it is. |
 
 ### 6.2 szotar.lamsza.com
 

@@ -3,11 +3,14 @@ package config
 import (
 	"bufio"
 	"os"
+	"strconv"
 	"strings"
 )
 
 type Config struct {
 	DatabaseURL       string
+	DBMaxOpenConns    int
+	DBMaxIdleConns    int
 	Port              string
 	WeatherAPIKey     string
 	WeatherAPIComKey  string
@@ -47,6 +50,12 @@ func Load() {
 	}
 
 	AppConfig.DatabaseURL = getEnv("DATABASE_URL", "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable")
+	// Pool size. The `lamsza` database is shared with the admin app and
+	// Postgres defaults to max_connections=100, so this app must not try to
+	// take all of them. /api/search alone opens several connections per
+	// request, so an uncapped pool exhausts the server under load.
+	AppConfig.DBMaxOpenConns = getIntEnv("DB_MAX_OPEN_CONNS", 25)
+	AppConfig.DBMaxIdleConns = getIntEnv("DB_MAX_IDLE_CONNS", 10)
 	AppConfig.Port = getEnv("PORT", "3001")
 	AppConfig.WeatherAPIKey = getEnv("WEATHER_API_KEY", "")
 	AppConfig.WeatherAPIComKey = getEnv("WEATHER_API_COM_KEY", "")
@@ -153,6 +162,15 @@ func parseEmailList(raw string) []string {
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
+	}
+	return fallback
+}
+
+func getIntEnv(key string, fallback int) int {
+	if value, ok := os.LookupEnv(key); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(value)); err == nil && n > 0 {
+			return n
+		}
 	}
 	return fallback
 }

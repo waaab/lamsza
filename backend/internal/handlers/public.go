@@ -248,12 +248,18 @@ func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, _ := db.DB.Query("SELECT t.name FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = $1", e.ID)
-	defer rows.Close()
-	for rows.Next() {
-		var tag string
-		if err := rows.Scan(&tag); err == nil {
-			e.Tags = append(e.Tags, tag)
+	// Tags are optional extra data. On a query error (a full connection pool,
+	// for one) rows is nil, so the old `rows, _ :=` panicked on rows.Close().
+	// Log it and serve the entry without tags.
+	if rows, tagErr := db.DB.Query("SELECT t.name FROM tags t JOIN entry_tags et ON t.id = et.tag_id WHERE et.entry_id = $1", e.ID); tagErr != nil {
+		log.Printf("public entry %s tags: %v", e.ID, tagErr)
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			var tag string
+			if err := rows.Scan(&tag); err == nil {
+				e.Tags = append(e.Tags, tag)
+			}
 		}
 	}
 

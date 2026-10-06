@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"backend/internal/account"
 	"backend/internal/auth"
@@ -138,9 +139,31 @@ func main() {
 		log.Println("Data API stopped. Google sign-in and /api/config/public stay up.")
 		handler = dataAPIGate(mux)
 	}
+	srv := newServer(":"+port, middleware.LimitBody(handler))
 	log.Printf("Backend API active on port %s\n", port)
-	if err := http.ListenAndServe(":"+port, handler); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// newServer builds the API server with its timeouts.
+//
+// A bare http.ListenAndServe has no timeouts at all, so a half-open or slow
+// connection is never dropped and a few hundred of them hold the server
+// forever (slowloris).
+//
+// WriteTimeout starts when the request headers are read, so it has to be
+// longer than the slowest handler. The slowest are /api/proxy (15s client
+// timeout) and /api/weather/county (fan-out budget plus one city).
+func newServer(addr string, handler http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 }
 

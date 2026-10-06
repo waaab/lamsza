@@ -4,6 +4,7 @@ import (
 	"backend/internal/config"
 	"database/sql"
 	"log"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -22,11 +23,28 @@ func InitDB() {
 		log.Fatal(err)
 	}
 
+	// Pool limits. database/sql defaults to unlimited open connections, so a
+	// burst of /api/search requests (several connections each) can ask for
+	// more than Postgres allows and every query then fails at once.
+	// SetMaxOpenConns makes the extra requests wait for a connection instead.
+	maxOpen := config.AppConfig.DBMaxOpenConns
+	if maxOpen <= 0 {
+		maxOpen = 25
+	}
+	maxIdle := config.AppConfig.DBMaxIdleConns
+	if maxIdle <= 0 || maxIdle > maxOpen {
+		maxIdle = maxOpen
+	}
+	DB.SetMaxOpenConns(maxOpen)
+	DB.SetMaxIdleConns(maxIdle)
+	DB.SetConnMaxLifetime(30 * time.Minute)
+	DB.SetConnMaxIdleTime(5 * time.Minute)
+
 	if err = DB.Ping(); err != nil {
 		log.Fatal(err)
 	}
 
-	log.Println("Database connection established")
+	log.Printf("Database connection established (max open %d, max idle %d)", maxOpen, maxIdle)
 	dropLocationsLegacy()
 }
 
