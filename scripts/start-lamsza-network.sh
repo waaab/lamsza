@@ -23,7 +23,7 @@ find_projects_root() {
 	local dir="$1" app ok
 	while :; do
 		ok=1
-		for app in lamsza lamsza-admin szotar jatszoter; do
+		for app in lamsza lamsza-admin lamsza-szotar lamsza-jatszoter; do
 			[ -d "$dir/$app" ] || ok=0
 		done
 		[ "$ok" = 1 ] && { echo "$dir"; return 0; }
@@ -35,7 +35,7 @@ find_projects_root() {
 PROJECTS_ROOT="${LAMSZA_PROJECTS_ROOT:-$(find_projects_root "$(dirname "$SCRIPT_PATH")" || true)}"
 if [ -z "$PROJECTS_ROOT" ]; then
 	echo "$(basename "$0"): cannot find the projects root above $SCRIPT_PATH." >&2
-	echo "Expected a directory containing lamsza, lamsza-admin, szotar and jatszoter." >&2
+	echo "Expected a directory containing lamsza, lamsza-admin, lamsza-szotar and lamsza-jatszoter." >&2
 	echo "Set LAMSZA_PROJECTS_ROOT to point at it." >&2
 	exit 1
 fi
@@ -61,8 +61,8 @@ mkdir -p "$STATE_DIR"
 APPS=(
 	"admin|lamsza-admin|frontend|3000|5173"
 	"lamsza|lamsza|.|3001|5174"
-	"szotar|szotar|frontend|3002|5175"
-	"jatszoter|jatszoter|frontend|3003|5176"
+	"szotar|lamsza-szotar|frontend|3002|5175"
+	"jatszoter|lamsza-jatszoter|frontend|3003|5176"
 )
 
 cmd="${1:-start}"
@@ -106,8 +106,8 @@ stop_all() {
 	done
 	pkill -f "$PROJECTS_ROOT/lamsza-admin/backend" 2>/dev/null || true
 	pkill -f "$PROJECTS_ROOT/lamsza/backend" 2>/dev/null || true
-	pkill -f "$PROJECTS_ROOT/szotar/backend" 2>/dev/null || true
-	pkill -f "$PROJECTS_ROOT/jatszoter/backend" 2>/dev/null || true
+	pkill -f "$PROJECTS_ROOT/lamsza-szotar/backend" 2>/dev/null || true
+	pkill -f "$PROJECTS_ROOT/lamsza-jatszoter/backend" 2>/dev/null || true
 
 	# Wait for the ports to actually close, not just for the signals to be
 	# sent. start_apps now skips anything still listening (BOG-56), so a

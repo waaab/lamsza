@@ -7,7 +7,7 @@ alwaysApply: true
 
 lamsza.com is the source. szotar.lamsza.com, jatszoter.lamsza.com, and every future Lámsza app copy its theme, toolbar, and shared controls. A dictionary or a game may add its own pages. It does not invent a second look.
 
-Before adding or changing a shared control, open the same control in `/home/attila/projects/lamsza` and match it.
+Before adding or changing a shared control, open the same control in `/home/attila/projects/lamsza-network/lamsza` and match it.
 
 - Dev frontends stay on fixed ports with `strictPort: true`: Lámsza `5173`, Szótár `5174`, Játszótér `5175`. If that port is not free, do not start the app on another port.
 - Theme uses `data-theme` and the `theme` localStorage key (`light`, `dark`, `system`). Vanilla CSS. No Tailwind, Material, or a new font, color, or card system.
