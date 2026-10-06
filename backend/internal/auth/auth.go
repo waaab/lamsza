@@ -140,6 +140,7 @@ func Migrate() {
 		log.Printf("sessions expires index: %v", err)
 	}
 	migrateAdminSessions()
+	migrateAdminAuditLog()
 	log.Println("Users and sessions tables ready")
 }
 
@@ -171,6 +172,48 @@ func migrateAdminSessions() {
 	}
 	if _, err := db.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)`); err != nil {
 		log.Printf("admin_sessions expires index: %v", err)
+	}
+}
+
+// migrateAdminAuditLog creates the admin API's write trail (BOG-48).
+//
+// Same reason the table above lives here: this backend owns the schema of the
+// shared `lamsza` database and the admin process runs no DDL. Nothing in this
+// repo reads or writes the table — `lamsza-admin/backend/internal/audit` does,
+// through INSERT only.
+//
+// `backend/migrations/admin_audit_log.sql` is the explicit form of these
+// statements and carries the retention note.
+func migrateAdminAuditLog() {
+	if _, err := db.DB.Exec(`
+		CREATE TABLE IF NOT EXISTS admin_audit_log (
+			id BIGSERIAL PRIMARY KEY,
+			occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+			actor_email TEXT NOT NULL DEFAULT '',
+			resource TEXT NOT NULL,
+			resource_id TEXT NOT NULL DEFAULT '',
+			action TEXT NOT NULL,
+			method TEXT NOT NULL,
+			route TEXT NOT NULL,
+			status_code INTEGER NOT NULL DEFAULT 0,
+			payload JSONB,
+			before_state JSONB,
+			after_state JSONB,
+			diff JSONB
+		)
+	`); err != nil {
+		log.Printf("admin_audit_log table: %v", err)
+		return
+	}
+	for _, stmt := range []string{
+		`CREATE INDEX IF NOT EXISTS idx_admin_audit_log_occurred ON admin_audit_log(occurred_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_admin_audit_log_actor ON admin_audit_log(actor_user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_admin_audit_log_resource ON admin_audit_log(resource, resource_id)`,
+	} {
+		if _, err := db.DB.Exec(stmt); err != nil {
+			log.Printf("admin_audit_log index: %v", err)
+		}
 	}
 }
 
