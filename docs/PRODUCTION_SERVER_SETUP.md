@@ -146,8 +146,7 @@ Each app needs its own `.env` on the server (never commit these).
 | `ADMIN_GOOGLE_EMAILS` | Yes | Comma-separated admin emails |
 | `WEATHER_API_KEY` | Yes* | OpenWeather-style key |
 | `WEATHER_API_COM_KEY` | Optional | Alternate weather provider |
-| `VITE_API_BASE_URL` | Yes (build-time) | Public API base URL for frontend build |
-| `VITE_WEATHER_API_KEY` | If used by FE build | Build-time |
+| `API_BASE_URL` | Optional (build-time) | Backend URL for prerender only. Server-only name, never in the bundle. Default `http://127.0.0.1:3001` |
 | `FEATURE_WEATHER` | Optional | Default `true` |
 | `FEATURE_EVENTS` | Optional | Default `true` |
 | `FEATURE_NEWS` | Optional | Default `true` |

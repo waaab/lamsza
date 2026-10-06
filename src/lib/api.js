@@ -4,17 +4,25 @@
  *   and production reverse proxies can forward to the Go backend. A hard-coded
  *   `http://localhost:3000` bypasses the proxy and breaks `npm run dev` when the
  *   backend is only reachable via the proxy or another port.
- * - During SSR/prerender (no `window`), fall back to a direct backend URL unless
- *   `VITE_API_BASE_URL` is set.
+ * - During SSR/prerender (no `window`), fall back to a direct backend URL. Prefer the
+ *   server-only `API_BASE_URL`, then build-time `VITE_API_BASE_URL`, then local Go.
+ *
+ * The browser branch comes first on purpose. `VITE_API_BASE_URL` is baked into the
+ * bundle at build time, so while it held a dev value every visitor's browser tried to
+ * reach `http://localhost:3001`. It is an SSR/prerender fallback only, and must never
+ * hold a dev URL in a production build.
  */
 export function getApiBase() {
-    const env = import.meta.env.VITE_API_BASE_URL;
-    if (env) return String(env).replace(/\/$/, "");
     /** Same tab as the Svelte app - absolute origin so fetches always resolve (Vite proxy / reverse proxy). */
     if (typeof window !== "undefined" && window.location?.origin) {
         return window.location.origin;
     }
-    return "http://127.0.0.1:3000";
+    /** Server-only name, so it is never inlined into the client bundle. */
+    const serverEnv = typeof process !== "undefined" ? process.env?.API_BASE_URL : undefined;
+    if (serverEnv) return String(serverEnv).replace(/\/$/, "");
+    const env = import.meta.env.VITE_API_BASE_URL;
+    if (env) return String(env).replace(/\/$/, "");
+    return "http://127.0.0.1:3001";
 }
 
 /**

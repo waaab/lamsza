@@ -11,9 +11,17 @@ The application relies on a `.env` file at the root of the project. This file is
 ### Required Keys:
 - `PORT`: The port the Go backend listens on (default: `3000`).
 - `DATABASE_URL`: The PostgreSQL connection string. (e.g. `postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable`)
-- `VITE_API_BASE_URL`: The base URL for the backend API used by SvelteKit (e.g. `http://localhost:3000`).
-- `VITE_WEATHER_API_KEY`: OpenWeatherMap API key for weather data.
+- `WEATHER_API_KEY`: OpenWeatherMap API key. Backend only. The browser gets weather from `/api/weather`.
 - `FEATURE_[WEATHER|EVENTS|NEWS|MONDASOK|QUICKLINKS|SEARCH]`: Toggles for optional modules (default: `true`).
+
+### Never put a secret in a `VITE_*` variable
+Vite replaces every `VITE_*` name at build time, so the value is plain text inside the
+public JavaScript bundle and any visitor can read it. Secrets belong in plain, unprefixed
+names that only the Go backend reads.
+
+`VITE_API_BASE_URL` and `VITE_WEATHER_API_KEY` were removed. The browser reaches the API
+same-origin through the Vite dev proxy (`vite.config.js`) or the production reverse proxy.
+Set the server-only `API_BASE_URL` if a prerender must reach the backend on another port.
 
 ## Continuous Integration (CI)
 We use GitHub Actions for continuous integration.

@@ -57,9 +57,28 @@ export function joinOriginPath(origin, path = '') {
 	return `${base}${p.startsWith('/') ? p : `/${p}`}`;
 }
 
+/**
+ * Read one of the network-origin overrides.
+ *
+ * Must stay a static switch. A computed lookup (`import.meta.env[key]`) cannot be
+ * replaced at build time, so Vite inlines the whole env object into the client
+ * bundle - that leaked every `VITE_*` value, including an API key, to any visitor.
+ * One `import.meta.env.VITE_X` per key keeps the replacement static.
+ *
+ * @param {string} key
+ */
 function readEnv(key) {
 	try {
-		return import.meta.env?.[key];
+		switch (key) {
+			case 'VITE_LAMSZA_ORIGIN':
+				return import.meta.env.VITE_LAMSZA_ORIGIN;
+			case 'VITE_SZOTAR_ORIGIN':
+				return import.meta.env.VITE_SZOTAR_ORIGIN;
+			case 'VITE_JATSZOTER_ORIGIN':
+				return import.meta.env.VITE_JATSZOTER_ORIGIN;
+			default:
+				return undefined;
+		}
 	} catch {
 		return undefined;
 	}
