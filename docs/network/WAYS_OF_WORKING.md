@@ -231,11 +231,23 @@ next green run**. So the issue existing *is* the answer to "is `main` green righ
 now", readable without credentials by anyone who can see the repo.
 
 It had to be pushed from inside Actions rather than polled from here, because
-nothing on this machine can read CI: no `gh` CLI, git auth is SSH-key only,
-unauthenticated `api.github.com` reads from this IP are rate-limited to zero, and
-two of the four repos (`lamsza-szotar`, `lamsza-jatszoter`) are private. Inside
-Actions, `GITHUB_TOKEN` already exists, so this needs no secret configured and
-works the same in a private repo.
+this machine cannot read CI for all four repos: there is no `gh` CLI, git auth
+is SSH-key only, and two of the four repos (`lamsza-szotar`, `lamsza-jatszoter`)
+are private. Inside Actions, `GITHUB_TOKEN` already exists, so this needs no
+secret configured and works the same in a private repo.
+
+**The two public repos can be read from here.** When BOG-54 was written,
+unauthenticated `api.github.com` reads from this IP were rate-limited to zero.
+On 2026-10-07 they worked again, within GitHub's normal unauthenticated limit
+of 60 requests an hour:
+
+```bash
+curl -s "https://api.github.com/repos/waaab/lamsza/actions/runs?branch=main&per_page=3" \
+  | jq -r '.workflow_runs[] | "\(.head_sha[0:7]) \(.status)/\(.conclusion)"'
+```
+
+Use the same call for `lamsza-admin`. For the two private repos it returns
+`Not Found`, so the `CI is red on main` issue is still the only signal for them.
 
 - Logic: `.github/ci-status-issue.sh`, the same file in all four repos.
 - It only fires on pushes to `main`: a pull request shows its own checks, and a
