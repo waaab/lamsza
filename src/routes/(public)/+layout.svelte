@@ -388,6 +388,7 @@
         {/if}
         <div class="policy-links">
             <a href="/iranyelvek" title="Irányelvek">Irányelvek</a>
+            <a href="/iranyelvek/adatvedelem" title="Adatvédelem">Adatvédelem</a>
             <a href="/iranyelvek/feltetelek" title="Feltételek">Feltételek</a>
             <a href="/iranyelvek/sutik" title="Sütik">Sütik</a>
             &bull;

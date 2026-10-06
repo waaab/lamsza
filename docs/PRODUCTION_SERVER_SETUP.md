@@ -248,6 +248,13 @@ Optional:
 
 ## 10. Go-live checklist
 
+> **How to verify items 6–11 and 13:** follow `docs/GO_LIVE_VERIFICATION_RUNBOOK.md` — exact commands, expected output, and failure shapes per item.
+>
+> **Known blockers as of 2026-10-06:**
+> - `szotar.lamsza.com/api/*` and `jatszoter.lamsza.com/api/*` return **502** — the Go backends are not answering. Static files serve fine. Items 1–3 below cannot be ticked while this holds.
+> - `lamsza.com` serves a 301 to `www.lamsza.com` on **Squarespace** — the main app is not on the droplet yet, so item 8 is blocked on the DNS cutover.
+> - Production ports are **8080/8081/8082/8083** (see `PRODUCTION_ENVIRONMENT_NOTES.md` section 5). The ports in section 2 and 6 of this document are dev values and are stale.
+
 - [ ] `https://lamsza.com` loads (static + API)
 - [ ] `https://szotar.lamsza.com` loads (static + API)
 - [ ] `https://jatszoter.lamsza.com` loads (static + API)
