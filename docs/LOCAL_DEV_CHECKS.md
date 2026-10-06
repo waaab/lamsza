@@ -141,6 +141,65 @@ is a security bug, not a config issue.
 
 ---
 
+## Check — The admin session is separate from the public one
+
+`lamsza` and `lamsza-admin` share one database. They do **not** share a session (BOG-45):
+the public site uses cookie `lamsza_session` and table `sessions`, admin uses
+`lamsza_admin_session` and `admin_sessions`.
+
+This matters most on localhost, where both apps are host `localhost` and **cookies ignore
+the port** — a public cookie is offered to `:3000` whatever the ports are.
+
+Google sign-in cannot complete from a script, so mint the session rows the way the two
+backends do — a session *is* a random token whose SHA-256 is a row. Both apps hash the
+same way, so this is the real thing, not a stand-in.
+
+```bash
+psql(){ docker exec -i lamsza-db psql -U lamsza_user -d lamsza "$@"; }
+
+# the admin session table exists — the main lamsza backend creates it; admin runs no DDL
+psql -c '\d admin_sessions'
+
+# an account on ADMIN_GOOGLE_EMAILS, so the only thing under test is the session store
+EMAIL=$(grep -h '^ADMIN_GOOGLE_EMAILS' ~/projects/lamsza-admin/backend/.env 2>/dev/null \
+        | head -1 | cut -d= -f2 | cut -d, -f1)
+USERID=$(psql -qtAc "SELECT id FROM users WHERE lower(email) = lower('$EMAIL')")
+echo "admin user: $EMAIL -> id $USERID"
+
+mint(){ # mint <table> -> prints the raw token
+  local t h; t=$(openssl rand -hex 32); h=$(printf %s "$t" | sha256sum | cut -d' ' -f1)
+  psql -qtAc "INSERT INTO $1 (token_hash, user_id, expires_at)
+              VALUES ('$h', $USERID, NOW() + INTERVAL '1 hour')" >/dev/null
+  echo "$t"
+}
+PUB=$(mint sessions); ADM=$(mint admin_sessions)
+code(){ curl -s -o /dev/null -w '%{http_code}' --max-time 6 -H "Cookie: $2" "$1"; }
+
+printf 'public token -> admin /api/auth/me        %s\n' "$(code http://127.0.0.1:3000/api/auth/me     "lamsza_session=$PUB")"
+printf 'public token -> admin /api/admin/users    %s\n' "$(code http://127.0.0.1:3000/api/admin/users "lamsza_admin_session=$PUB")"
+printf 'admin token  -> admin /api/admin/users    %s\n' "$(code http://127.0.0.1:3000/api/admin/users "lamsza_admin_session=$ADM")"
+printf 'admin token  -> public /api/auth/me       %s\n' "$(code http://127.0.0.1:3001/api/auth/me     "lamsza_session=$ADM")"
+
+psql -qc "DELETE FROM sessions WHERE expires_at < NOW() + INTERVAL '2 hours'" \
+        -qc "DELETE FROM admin_sessions WHERE expires_at < NOW() + INTERVAL '2 hours'"
+```
+
+**Expect** `401`, `401`, `200`, `401`. In words:
+
+- a public token is refused by admin — under the public cookie name *and* renamed to the
+  admin one, so neither the browser nor a deliberate caller gets through;
+- an admin token works on admin (the sign-in path is intact);
+- and that same admin token is refused by the public API.
+
+A `200` on any of the three `401` lines means the two session stores have been merged back
+together. The `\d admin_sessions` failing means the table is missing: run the main `lamsza`
+backend, or `lamsza/backend/migrations/admin_sessions.sql`.
+
+The suites covering this: `lamsza/backend/admin_session_boundary_test.go` and
+`lamsza-admin/backend/internal/auth/session_boundary_test.go`.
+
+---
+
 ## Check — Weather
 
 Both endpoints need a `slug`:
