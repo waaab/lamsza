@@ -4,7 +4,8 @@ How the four Lámsza apps are organised, and the rules that let one Paperclip
 board drive four independent repos.
 
 Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. R7 added on
-BOG-54, 2026-10-06. This file is the source of truth. If a task comment and this
+BOG-54 and amended on BOG-57 (branch protection declined), 2026-10-06. This file
+is the source of truth. If a task comment and this
 file disagree, this file wins until it is changed here.
 
 ---
@@ -210,10 +211,11 @@ weaker in one: it will not catch something that only breaks on real content.
 A green CI therefore still does **not** mean the localhost checks passed. It is
 the weaker of the two gates, not the stronger.
 
-**How a red CI reaches a person: Attila chose both, on BOG-54.** A notification
-*and* branch protection with required checks. CI that nobody reads is not a
-gate — `lamsza` CI stayed red across four pushes in 17 minutes, three of them
-straight onto `main`, before BOG-44 noticed.
+**How a red CI reaches a person: a notification, and no branch protection.**
+Attila chose both on BOG-54, then on BOG-57 (2026-10-06) decided against the
+branch-protection half once its full cost was priced. The notification is what
+ships. CI that nobody reads is not a gate — `lamsza` CI stayed red across four
+pushes in 17 minutes, three of them straight onto `main`, before BOG-44 noticed.
 
 **Half one, shipped: the `ci-status` job.** A third job in every workflow mirrors
 the state of CI on `main` into one GitHub issue, titled exactly
@@ -258,43 +260,49 @@ works the same in a private repo.
   instead of guessed at. It still exits non-zero in every case: a receiver that
   cannot write must leave the job red, never look quiet.
 
-  Set it to **Read and write permissions** in all four repos. No repo content
-  needs to change.
+  **Attila approved setting it to *Read and write permissions* in all four
+  repos, on BOG-57, 2026-10-06.** No repo content needs to change. It was not
+  applied in that run: the setting is owner-console or token work and this
+  machine has neither, so it is still pending on BOG-57.
 
-- **Still unverified from here:** nothing on this machine has seen the
-  `ci-status` job actually run. The logic has 14 unit tests; the workflow wiring
-  and the `GITHUB_TOKEN` grant have none, because no agent here can read Actions
-  output. The first push to `main` after the receiver landed is the live test.
+- **The job has been seen running; its write path has not.** On 2026-10-06 the
+  `ci-status` job ran and passed on both public repos (`lamsza` run
+  `37489216167`, `lamsza-admin` run `37489231652`), which answers the older
+  "never observed" note. But `main` was green and neither repo had an open
+  issue, so the script only made its `gh issue list` **read** — which succeeds
+  under the read-only default. The write path, the one the setting above gates,
+  has still never executed. The setting is therefore unverified, not
+  verified-good, and the first push that matters is the first red `main`. That
+  is exactly the case the self-diagnosis above is built for: a wrong setting
+  costs one red run to discover, not silence.
 
-**Half two, specified but not applied: branch protection.** Required status
-checks on `main` need a GitHub token or the web UI, and neither exists here. The
-exact intended settings are committed as
-`docs/network/apply-branch-protection.sh` — run it with `--apply` and a
-`GITHUB_TOKEN` and all four repos are done in one command. Run it with no
-arguments to print the payload and change nothing.
+**Half two: branch protection on `main` was considered and declined.** Decided
+by Attila on BOG-57, 2026-10-06, after BOG-54 had provisionally asked for it.
+There is no branch protection on any of the four repos and none is planned.
 
-Three things in that spec are deliberate and worth knowing before it is applied:
+The reason is the cost of the one setting that would have made it work.
+"Include administrators" has to be on, because agents push with the owner's SSH
+key — to GitHub every agent push is an admin push, and admins bypass required
+checks, so with it off the rule is decorative. On it also stops Attila's own
+direct pushes to `main`. For a network with one engineering agent and one owner
+that buys little and costs the owner a working path to his own repos. Two of the
+four repos (`lamsza-szotar`, `lamsza-jatszoter`) are private on a personal
+account, which would additionally have needed a paid plan or rulesets.
 
-- **Required contexts are `frontend` and `backend` only — never `ci-status`.**
-  `ci-status` is gated on `refs/heads/main`, so it never runs on a pull-request
-  branch, and a required check that never reports blocks every pull request
-  forever.
-- **"Include administrators" must be on, and that constrains Attila too.** This
-  is the one that decides whether the setting does anything: agents push with the
-  owner's SSH key, so to GitHub every agent push is an admin push, and admins
-  bypass required checks. With it off the protection is decorative. The cost is
-  that direct pushes to `main` stop working for the owner as well; it is lifted
-  from *Settings > Branches* when a hand-fix is needed.
-- **No required reviewer.** One engineering agent and one owner — requiring a
-  review would mean nothing could ever merge. The gate is "green", not "seen".
+`docs/network/apply-branch-protection.sh` stays in the repo as the written-down
+spec of what was declined — **do not run it.** If the decision is ever revisited,
+one thing in it must survive the revisit: the required contexts are `frontend`
+and `backend` only, **never `ci-status`**, which is gated on `refs/heads/main`,
+never reports on a pull-request branch, and as a required check would block every
+pull request forever.
 
-**When it is applied, the git grant changes shape.** Not its scope — still git
-only, still nothing on the server — but the mechanics in
-`docs/AGENT_ENVIRONMENT_POLICY.md`: an agent stops pushing straight to `main` and
-instead pushes a branch, lets `frontend` and `backend` go green, then merges the
-pull request. Until it is applied, pushing to `main` is still how work lands.
+**So the git grant does not change.** `docs/AGENT_ENVIRONMENT_POLICY.md` stands
+as written: agents commit, merge and push, `main` included. Pushing to `main` is
+still how work lands, and nothing mechanical stops a red push. The whole weight
+of "do not break `main`" sits on the rules below and on the notification.
 
-**So the rule is: the local gate is the real gate.** Until that changes,
+**So the rule is: the local gate is the real gate.** This is now permanent, not
+a holding position — nothing is coming to replace it:
 
 1. Run the `docs/LOCAL_DEV_CHECKS.md` checks your change touches **before** you
    push, not after. `ci-status` tells someone that `main` broke; it does not
@@ -307,8 +315,10 @@ pull request. Until it is applied, pushing to `main` is still how work lands.
    it the prerender fails with `ECONNREFUSED`, the build still exits 0, and the
    error states get baked into the pages.
 
-**Open.** Only the applying of branch protection, which needs a GitHub token
-this machine does not have — tracked on BOG-54. Everything else in R7 is live.
+**Open.** One thing: *Workflow permissions* is approved but not yet set to read
+and write in the four repos, which needs the owner console or a GitHub token —
+tracked on BOG-57. Branch protection is closed, not open: declined. Everything
+else in R7 is live.
 
 ---
 

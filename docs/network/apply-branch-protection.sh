@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
 #
-# Applies the branch protection decided on BOG-54 to `main` in all four lamsza
-# network repos. Nobody can run this from the dev machine today: there is no
-# GitHub token there and no `gh` CLI. It is committed so that the moment a token
-# exists the decision is one command away instead of sixteen clicks across four
-# repo settings pages, and so the exact intended settings are reviewable in git
-# rather than living only in a repo's web UI.
+# DO NOT RUN THIS. Branch protection was declined by Attila on BOG-57,
+# 2026-10-06. There is no branch protection on any of the four lamsza network
+# repos and none is planned. Running this with --apply would apply a setting the
+# owner decided against, and would stop his own direct pushes to `main`.
 #
-#   GITHUB_TOKEN=ghp_... bash docs/network/apply-branch-protection.sh --apply
+# It is kept, unrun, as the written-down spec of what was declined: if the
+# decision is ever revisited, this is the payload that was on the table, in git
+# rather than in a repo's web UI. The reason it was declined is in R7 of
+# docs/network/WAYS_OF_WORKING.md — "include administrators" has to be on for the
+# rule to do anything, and that costs the owner more than it buys a network with
+# one engineering agent and one owner.
 #
-# The token needs `repo` scope (classic) or Administration: write (fine-grained)
-# on all four repos. Without --apply this prints the payload and changes nothing.
+# If it is ever revived, one thing below must survive the revival: the required
+# contexts are `frontend` and `backend` only, never `ci-status`. See the comment
+# on PAYLOAD.
 #
-# See R7 in docs/network/WAYS_OF_WORKING.md for the decision and its cost.
+# Originally written on BOG-54, before the decision was made.
 set -euo pipefail
 
 REPOS=(waaab/lamsza waaab/lamsza-admin waaab/lamsza-szotar waaab/lamsza-jatszoter)
@@ -56,15 +60,24 @@ JSON
 #   a rebase-and-wait loop to every merge for that narrow window. Flip this to
 #   true if parallel work per repo ever becomes normal.
 
-if [ "${1:-}" != "--apply" ]; then
-  echo "Dry run. Would PUT this to each repo's /branches/main/protection:"
-  echo
-  printf '%s\n' "$PAYLOAD"
-  echo
-  printf 'Repos: %s\n' "${REPOS[*]}"
-  echo "Re-run with --apply (and GITHUB_TOKEN set) to make the change."
-  exit 0
+# Declined on BOG-57. The spec below is kept for the record, but the script must
+# not be able to apply it by accident — a stale note at the top of a file is a
+# weaker guard than a refusal. Someone reviving the decision deletes this block
+# knowingly, and R7 is where they find out what they are taking on.
+if [ "${1:-}" = "--apply" ]; then
+  echo "Refusing to apply. Branch protection was declined by Attila on BOG-57," >&2
+  echo "2026-10-06; see R7 in docs/network/WAYS_OF_WORKING.md for why." >&2
+  echo "This file is kept as the spec of what was declined, not as a tool." >&2
+  exit 1
 fi
+
+echo "NOT APPLIED — declined on BOG-57, 2026-10-06. This is the spec only."
+echo "Would have PUT this to each repo's /branches/main/protection:"
+echo
+printf '%s\n' "$PAYLOAD"
+echo
+printf 'Repos: %s\n' "${REPOS[*]}"
+exit 0
 
 : "${GITHUB_TOKEN:?GITHUB_TOKEN is required to apply branch protection}"
 
