@@ -225,10 +225,6 @@ func sanitizeSocialLinks(raw json.RawMessage) json.RawMessage {
 	return json.RawMessage(b)
 }
 
-func photosOrEmpty(raw json.RawMessage) string {
-	return string(sanitizeListingPhotos(raw))
-}
-
 func sanitizeListingPhotos(raw json.RawMessage) json.RawMessage {
 	return sanitizeListingPhotosLimit(raw, maxListingPhotos)
 }
@@ -931,21 +927,6 @@ func writeListingFieldError(w http.ResponseWriter, field string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusBadRequest)
 	json.NewEncoder(w).Encode(map[string]string{"error": "invalid", "field": field})
-}
-
-func validateLeafCategoryID(categoryID int) error {
-	if categoryID <= 0 {
-		return sql.ErrNoRows
-	}
-	var parentID sql.NullInt64
-	err := db.DB.QueryRow(`SELECT parent_id FROM entry_categories WHERE id = $1`, categoryID).Scan(&parentID)
-	if err != nil {
-		return err
-	}
-	if !parentID.Valid {
-		return sql.ErrNoRows
-	}
-	return nil
 }
 
 func validateEntryTypeID(typeID int) error {

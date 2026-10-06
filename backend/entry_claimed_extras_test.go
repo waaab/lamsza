@@ -19,48 +19,15 @@ func mustLocID(t *testing.T) interface{} {
 	return locs[0]["id"]
 }
 
-func createEntry(t *testing.T, name string, locID interface{}) (interface{}, string) {
-	payload := map[string]interface{}{
-		"name":        name,
-		"location_id": locID,
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-	}
-	rr := doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	slug, _ := created["slug"].(string)
-	if slug == "" {
-		t.Fatalf("POST entries missing slug, got: %v", created)
-	}
-	return created["id"], slug
-}
-
 func TestUnclaimedPublicEntryHidesExtras(t *testing.T) {
-	payload := map[string]interface{}{
-		"name":        "UnclaimedExtras A",
-		"location_id": mustLocID(t),
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-		"hours":       map[string]any{"mon": map[string]any{"open": "09:00", "close": "17:00", "closed": false}},
-	}
-	rr := doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	slug, _ := created["slug"].(string)
-	if slug == "" {
-		t.Fatal("POST entries missing slug")
-	}
-	id := created["id"]
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+	id, slug := createEntryFixture(t, entryFixture{
+		Name:       "UnclaimedExtras A",
+		LocationID: mustLocID(t),
+		Hours:      map[string]any{"mon": map[string]any{"open": "09:00", "close": "17:00", "closed": false}},
+	})
+	defer deleteEntryFixture(t, id)
 
-	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	rr := doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d %s (slug=%s, id=%v)", rr.Code, rr.Body.String(), slug, id)
 	}
@@ -87,7 +54,7 @@ func TestUnclaimedPublicEntryHidesExtras(t *testing.T) {
 func TestClaimedRatingsEnabledEmptyReviews(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ClaimedRatingsEmpty A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner@test.lamsza")
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -98,7 +65,7 @@ func TestClaimedRatingsEnabledEmptyReviews(t *testing.T) {
 	}
 	acceptPendingClaim(t, entryID, "owner@test.lamsza")
 
-	entryIDInt := int(entryID.(float64))
+	entryIDInt := entryID
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
 		t.Fatalf("enable ratings: %v", err)
 	}
@@ -131,7 +98,7 @@ func TestClaimedRatingsEnabledEmptyReviews(t *testing.T) {
 func TestReviewUnsignedPOSTFails(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewUnsigned A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	payload := map[string]interface{}{
 		"slug":  slug,
@@ -147,7 +114,7 @@ func TestReviewUnsignedPOSTFails(t *testing.T) {
 func TestReviewUnclaimedPublishedListingFails(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewUnclaimed A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	userCookie := mustLogin("reviewer@test.lamsza")
 	payload := map[string]interface{}{
@@ -164,7 +131,7 @@ func TestReviewUnclaimedPublishedListingFails(t *testing.T) {
 func TestReviewClaimedButRatingsDisabledFails(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewRatingsOff A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner2@test.lamsza")
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -190,7 +157,7 @@ func TestReviewClaimedButRatingsDisabledFails(t *testing.T) {
 func TestReviewPostAndUpdateWorks(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewPostUpdate A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner3@test.lamsza")
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -201,7 +168,7 @@ func TestReviewPostAndUpdateWorks(t *testing.T) {
 	}
 	acceptPendingClaim(t, entryID, "owner3@test.lamsza")
 
-	entryIDInt := int(entryID.(float64))
+	entryIDInt := entryID
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
 		t.Fatalf("enable ratings: %v", err)
 	}
@@ -260,7 +227,7 @@ func TestReviewPostAndUpdateWorks(t *testing.T) {
 func TestReviewTwoUsersAverage(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewTwoUsers A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner4@test.lamsza")
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -271,7 +238,7 @@ func TestReviewTwoUsersAverage(t *testing.T) {
 	}
 	acceptPendingClaim(t, entryID, "owner4@test.lamsza")
 
-	entryIDInt := int(entryID.(float64))
+	entryIDInt := entryID
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
 		t.Fatalf("enable ratings: %v", err)
 	}
@@ -311,7 +278,7 @@ func TestReviewTwoUsersAverage(t *testing.T) {
 func TestReviewDeleteWorks(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewDelete A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner5@test.lamsza")
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -322,7 +289,7 @@ func TestReviewDeleteWorks(t *testing.T) {
 	}
 	acceptPendingClaim(t, entryID, "owner5@test.lamsza")
 
-	entryIDInt := int(entryID.(float64))
+	entryIDInt := entryID
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
 		t.Fatalf("enable ratings: %v", err)
 	}
@@ -364,7 +331,7 @@ func TestReviewDeleteWorks(t *testing.T) {
 func TestReviewValidationErrors(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewValidation A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner6@test.lamsza")
 	rr := doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -375,7 +342,7 @@ func TestReviewValidationErrors(t *testing.T) {
 	}
 	acceptPendingClaim(t, entryID, "owner6@test.lamsza")
 
-	entryIDInt := int(entryID.(float64))
+	entryIDInt := entryID
 	if _, err := db.DB.Exec(`UPDATE entries SET ratings_enabled = true WHERE id = $1`, entryIDInt); err != nil {
 		t.Fatalf("enable ratings: %v", err)
 	}
@@ -417,10 +384,10 @@ func TestReviewValidationErrors(t *testing.T) {
 func TestReviewUnpublishedListingStrangerFails(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "ReviewUnpublished A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	// Make the entry unpublished
-	entryIDInt := int(entryID.(float64))
+	entryIDInt := entryID
 	if _, err := db.DB.Exec(`UPDATE entries SET published = false WHERE id = $1`, entryIDInt); err != nil {
 		t.Fatalf("unpublish entry: %v", err)
 	}
@@ -440,13 +407,13 @@ func TestReviewUnpublishedListingStrangerFails(t *testing.T) {
 func TestMemberPatchRatingsEnabled(t *testing.T) {
 	locID := mustLocID(t)
 	entryID, slug := createEntry(t, "PatchRatings A", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	var typeID, categoryID, locationID int
 	err := db.DB.QueryRow(`
 		SELECT type_id, category_id, location_id
 		FROM entries WHERE id = $1
-	`, int(entryID.(float64))).Scan(&typeID, &categoryID, &locationID)
+	`, entryID).Scan(&typeID, &categoryID, &locationID)
 	if err != nil {
 		t.Fatalf("entry baseline: %v", err)
 	}

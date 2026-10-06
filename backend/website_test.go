@@ -3,7 +3,6 @@ package main
 import (
 	"backend/internal/account"
 	"backend/internal/db"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -29,7 +28,7 @@ func TestMigrateWebsitesBackfillsListingURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	id, _ := createEntry(t, "Backfill Sorozo", mustLocID(t))
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+	defer deleteEntryFixture(t, id)
 	if _, err := db.DB.Exec(`UPDATE entries SET url = $1 WHERE id = $2`, "https://www.backfill-sorozo.com/etlap", id); err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +39,7 @@ func TestMigrateWebsitesBackfillsListingURL(t *testing.T) {
 	if err != nil || key != "backfill-sorozo.com" || status != "approved" {
 		t.Fatalf("backfill %q %q err %v", key, status, err)
 	}
-	wantEntryID := int(id.(float64))
+	wantEntryID := id
 	if entryID != wantEntryID {
 		t.Fatalf("entry_id %d want %d", entryID, wantEntryID)
 	}
@@ -131,106 +130,6 @@ func submitWebsite(t *testing.T, cookie *http.Cookie, domain, title, description
 	return int(id)
 }
 
-func queueBody(t *testing.T, cookie *http.Cookie) string {
-	t.Helper()
-	rr := doRequestWithCookie(t, "GET", "/api/admin/listing-queue", nil, cookie)
-	if rr.Code != 200 {
-		t.Fatalf("queue: %d %s", rr.Code, rr.Body.String())
-	}
-	return rr.Body.String()
-}
-
-func queueWebsites(t *testing.T, cookie *http.Cookie) []map[string]interface{} {
-	t.Helper()
-	rr := doRequestWithCookie(t, "GET", "/api/admin/listing-queue", nil, cookie)
-	if rr.Code != 200 {
-		t.Fatalf("queue: %d %s", rr.Code, rr.Body.String())
-	}
-	var resp map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &resp)
-	raw, ok := resp["websites"].([]interface{})
-	if !ok {
-		t.Fatalf("websites missing %#v", resp)
-	}
-	out := make([]map[string]interface{}, len(raw))
-	for i, item := range raw {
-		out[i] = item.(map[string]interface{})
-	}
-	return out
-}
-
-func TestWebsiteApproveRejectAndBan(t *testing.T) {
-	cleanupReviewTestDomains := func() {
-		for _, d := range []string{"review-example.com", "reject-example.com", "ban-example.com", "after-ban.com"} {
-			if _, err := db.DB.Exec(`DELETE FROM websites WHERE domain_key = $1`, d); err != nil {
-				t.Errorf("cleanup %s: %v", d, err)
-			}
-		}
-		if _, err := db.DB.Exec(`UPDATE users SET website_banned = false WHERE email = $1`, "website-review@test.lamsza"); err != nil {
-			t.Errorf("cleanup ban flag: %v", err)
-		}
-	}
-	cleanupReviewTestDomains()
-	defer cleanupReviewTestDomains()
-
-	user := mustLogin("website-review@test.lamsza")
-	admin := mustLogin("admin@test.lamsza")
-	id := submitWebsite(t, user, "review-example.com", "Review", "A page.")
-	q := queueWebsites(t, admin)
-	if len(q) != 1 || q[0]["domain"] != "review-example.com" || q[0]["title"] != "Review" || q[0]["submitter"] == "" {
-		t.Fatalf("queue %#v", q)
-	}
-	rr := doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "approve"}, admin)
-	if rr.Code != 200 {
-		t.Fatalf("approve %d %s", rr.Code, rr.Body.String())
-	}
-	if strings.Contains(queueBody(t, admin), "review-example.com") {
-		t.Fatal("approved website stayed in the queue")
-	}
-	var approver string
-	var approvedAt sql.NullTime
-	if err := db.DB.QueryRow(`
-		SELECT COALESCE(u.email, ''), w.approved_at
-		FROM websites w
-		LEFT JOIN users u ON u.id = w.approved_by
-		WHERE w.domain_key = $1
-	`, "review-example.com").Scan(&approver, &approvedAt); err != nil {
-		t.Fatal(err)
-	}
-	if approver != "admin@test.lamsza" || !approvedAt.Valid {
-		t.Fatalf("approval record approver %q at %v", approver, approvedAt)
-	}
-	pub := doRequest(t, "GET", "/api/websites", nil)
-	if !strings.Contains(pub.Body.String(), "review-example.com") {
-		t.Fatal("approved website was not public")
-	}
-
-	id = submitWebsite(t, user, "reject-example.com", "Reject", "Gone.")
-	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "reject"}, admin)
-	if rr.Code != 200 {
-		t.Fatalf("reject %d", rr.Code)
-	}
-	again := submitWebsite(t, user, "reject-example.com", "Reject", "Again.")
-	if again <= 0 {
-		t.Fatal("rejected key was not freed")
-	}
-	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": again, "action": "reject"}, admin)
-
-	banID := submitWebsite(t, user, "ban-example.com", "Ban", "Nope.")
-	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": banID, "action": "ban"}, admin)
-	if rr.Code != 200 {
-		t.Fatalf("ban %d %s", rr.Code, rr.Body.String())
-	}
-	rr = doRequestWithCookie(t, "POST", "/api/websites", map[string]interface{}{
-		"domain": "after-ban.com", "title": "T", "description": "D",
-		"category_id": testLeafCategoryID,
-	}, user)
-	if rr.Code != 403 {
-		t.Fatalf("banned resubmit %d", rr.Code)
-	}
-	mustLogin("website-review@test.lamsza")
-}
-
 func searchJSON(t *testing.T, q string) map[string]interface{} {
 	t.Helper()
 	rr := doRequest(t, "GET", "/api/search?q="+url.QueryEscape(q), nil)
@@ -252,9 +151,8 @@ func TestWebsiteSearchDomainAndTitle(t *testing.T) {
 	}()
 
 	user := mustLogin("website-search@test.lamsza")
-	admin := mustLogin("admin@test.lamsza")
 	id := submitWebsite(t, user, "search-example.com", "Search Title", "Unique blurb zzq")
-	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "approve"}, admin)
+	approveWebsiteFixture(t, id)
 
 	domain := searchJSON(t, "https://www.search-example.com/path")
 	if domain["website_query"] != true {
@@ -311,9 +209,8 @@ func TestClaimWebsiteCreatesUnpublishedListing(t *testing.T) {
 
 	owner := mustLogin("website-owner@test.lamsza")
 	other := mustLogin("website-joiner@test.lamsza")
-	admin := mustLogin("admin@test.lamsza")
 	webID := submitWebsite(t, owner, "claim-example.com", "Claim Title", "Claim blurb")
-	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": webID, "action": "approve"}, admin)
+	approveWebsiteFixture(t, webID)
 
 	locID := mustLocID(t)
 	var catID, typeID int
@@ -342,7 +239,7 @@ func TestClaimWebsiteCreatesUnpublishedListing(t *testing.T) {
 		t.Fatalf("before publish %#v", before)
 	}
 	entryID := int(created["id"].(float64))
-	doRequestWithCookie(t, "POST", "/api/admin/listing-queue/publish", map[string]interface{}{"entry_id": entryID}, admin)
+	publishEntryFixture(t, entryID)
 	after := searchJSON(t, "www.claim-example.com")
 	ents := after["entries"].([]interface{})
 	if len(ents) != 1 || ents[0].(map[string]interface{})["claimed"] != true {
@@ -368,7 +265,7 @@ func TestClaimWebsiteCreatesUnpublishedListing(t *testing.T) {
 	banned := mustLogin("website-claim-ban@test.lamsza")
 	db.DB.Exec(`UPDATE users SET website_banned = true WHERE email = $1`, "website-claim-ban@test.lamsza")
 	freeID := submitWebsite(t, owner, "claim-free.com", "Free", "Free page.")
-	doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": freeID, "action": "approve"}, admin)
+	approveWebsiteFixture(t, freeID)
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
 		"website_id": freeID, "name": "Banned claim", "location_id": locID,
 		"category_id": catID, "type_id": typeID,
@@ -542,11 +439,7 @@ func TestWebsiteLookupFindsAnExistingDomain(t *testing.T) {
 	}
 
 	id := submitWebsite(t, owner, domain, "Lookup Title", "Lookup page.")
-	admin := mustLogin("admin@test.lamsza")
-	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{"id": id, "action": "approve"}, admin)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("approve: %d %s", rr.Code, rr.Body.String())
-	}
+	approveWebsiteFixture(t, id)
 
 	rr = doRequestWithCookie(t, "GET", "/api/account/websites/lookup?url="+url.QueryEscape("https://www."+domain+"/menu"), nil, owner)
 	if rr.Code != http.StatusOK {

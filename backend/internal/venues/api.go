@@ -3,10 +3,8 @@ package venues
 import (
 	"backend/internal/db"
 	"backend/internal/models"
-	"backend/internal/utils"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -97,22 +95,6 @@ func getVenueBySlugs(w http.ResponseWriter, countySlug, settlementSlug, venueSlu
 	json.NewEncoder(w).Encode(v)
 }
 
-// HandleAdmin GET/POST/PUT/DELETE /api/admin/venues
-func HandleAdmin(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		listVenues(w, r.URL.Query().Get("settlement_id"))
-	case http.MethodPost:
-		createVenue(w, r)
-	case http.MethodPut:
-		updateVenue(w, r)
-	case http.MethodDelete:
-		deleteVenue(w, r)
-	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
 func listVenues(w http.ResponseWriter, settlementIDStr string) {
 	var rows *sql.Rows
 	var err error
@@ -147,176 +129,16 @@ func listVenues(w http.ResponseWriter, settlementIDStr string) {
 }
 
 type venuePayload struct {
-	SettlementID    int     `json:"settlement_id"`
-	Name            string  `json:"name"`
-	NameRO          string  `json:"name_ro"`
-	NameDE          string  `json:"name_de"`
-	Slug            string  `json:"slug"`
-	Kind            string  `json:"kind"`
-	Address         string  `json:"address"`
-	Notes           string  `json:"notes"`
+	SettlementID    int      `json:"settlement_id"`
+	Name            string   `json:"name"`
+	NameRO          string   `json:"name_ro"`
+	NameDE          string   `json:"name_de"`
+	Slug            string   `json:"slug"`
+	Kind            string   `json:"kind"`
+	Address         string   `json:"address"`
+	Notes           string   `json:"notes"`
 	Latitude        *float64 `json:"latitude"`
 	Longitude       *float64 `json:"longitude"`
-	SeatingCapacity *int    `json:"seating_capacity"`
-	Description     string  `json:"description"`
-}
-
-func normalizeKind(k string) string {
-	k = strings.TrimSpace(strings.ToLower(k))
-	if k == "" {
-		return defaultVenueKindSlug()
-	}
-	var n int
-	err := db.DB.QueryRow(`SELECT COUNT(*) FROM venue_types WHERE slug = $1`, k).Scan(&n)
-	if err == nil && n > 0 {
-		return k
-	}
-	return defaultVenueKindSlug()
-}
-
-func defaultVenueKindSlug() string {
-	var s string
-	err := db.DB.QueryRow(`SELECT slug FROM venue_types ORDER BY LOWER(label_hu) ASC, id ASC LIMIT 1`).Scan(&s)
-	if err != nil || strings.TrimSpace(s) == "" {
-		return "other"
-	}
-	return s
-}
-
-func normalizeSlug(name, slug string) string {
-	if strings.TrimSpace(slug) != "" {
-		return utils.Slugify(slug)
-	}
-	base := utils.Slugify(strings.TrimSpace(name))
-	if base == "" {
-		base = "helyszin"
-	}
-	return base
-}
-
-func createVenue(w http.ResponseWriter, r *http.Request) {
-	var p venuePayload
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if p.SettlementID < 1 || strings.TrimSpace(p.Name) == "" {
-		http.Error(w, "settlement_id és név kötelező", http.StatusBadRequest)
-		return
-	}
-	slug := normalizeSlug(p.Name, p.Slug)
-	kind := normalizeKind(p.Kind)
-	var id int
-	err := db.DB.QueryRow(`
-		INSERT INTO venues (settlement_id, name, name_ro, name_de, slug, kind, address, notes, latitude, longitude, seating_capacity, description)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		RETURNING id`,
-		p.SettlementID, strings.TrimSpace(p.Name), strings.TrimSpace(p.NameRO), strings.TrimSpace(p.NameDE),
-		slug, kind, strings.TrimSpace(p.Address), strings.TrimSpace(p.Notes),
-		nullFloat64Ptr(p.Latitude), nullFloat64Ptr(p.Longitude), nullIntPtr(p.SeatingCapacity),
-		strings.TrimSpace(p.Description)).Scan(&id)
-	if err != nil {
-		if strings.Contains(err.Error(), "unique") || strings.Contains(err.Error(), "duplicate") {
-			http.Error(w, "ilyen slug már létezik ennél a településnél", http.StatusBadRequest)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"id": id})
-}
-
-func nullFloat64Ptr(p *float64) interface{} {
-	if p == nil {
-		return nil
-	}
-	return *p
-}
-
-func nullIntPtr(p *int) interface{} {
-	if p == nil {
-		return nil
-	}
-	return *p
-}
-
-func updateVenue(w http.ResponseWriter, r *http.Request) {
-	var p struct {
-		ID              int      `json:"id"`
-		SettlementID    int      `json:"settlement_id"`
-		Name            string   `json:"name"`
-		NameRO          string   `json:"name_ro"`
-		NameDE          string   `json:"name_de"`
-		Slug            string   `json:"slug"`
-		Kind            string   `json:"kind"`
-		Address         string   `json:"address"`
-		Notes           string   `json:"notes"`
-		Latitude        *float64 `json:"latitude"`
-		Longitude       *float64 `json:"longitude"`
-		SeatingCapacity *int     `json:"seating_capacity"`
-		Description     string   `json:"description"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if p.ID < 1 || p.SettlementID < 1 || strings.TrimSpace(p.Name) == "" {
-		http.Error(w, "id, settlement_id és név kötelező", http.StatusBadRequest)
-		return
-	}
-	slug := normalizeSlug(p.Name, p.Slug)
-	kind := normalizeKind(p.Kind)
-	_, err := db.DB.Exec(`
-		UPDATE venues SET settlement_id = $1, name = $2, name_ro = $3, name_de = $4, slug = $5, kind = $6, address = $7, notes = $8,
-			latitude = $9, longitude = $10, seating_capacity = $11, description = $12
-		WHERE id = $13`,
-		p.SettlementID, strings.TrimSpace(p.Name), strings.TrimSpace(p.NameRO), strings.TrimSpace(p.NameDE),
-		slug, kind, strings.TrimSpace(p.Address), strings.TrimSpace(p.Notes),
-		nullFloat64Ptr(p.Latitude), nullFloat64Ptr(p.Longitude), nullIntPtr(p.SeatingCapacity),
-		strings.TrimSpace(p.Description), p.ID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-func deleteVenue(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil || id < 1 {
-		http.Error(w, "id kötelező", http.StatusBadRequest)
-		return
-	}
-	res, err := db.DB.Exec(`DELETE FROM venues WHERE id = $1`, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		http.Error(w, "nem található", http.StatusNotFound)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
-// EnsureVenueBelongsToSettlement returns nil if venueID is nil/0 or matches settlement.
-func EnsureVenueBelongsToSettlement(venueID *int, settlementID int) error {
-	if venueID == nil || *venueID < 1 {
-		return nil
-	}
-	var sid int
-	err := db.DB.QueryRow(`SELECT settlement_id FROM venues WHERE id = $1`, *venueID).Scan(&sid)
-	if err == sql.ErrNoRows {
-		return fmt.Errorf("ismeretlen helyszín (épület)")
-	}
-	if err != nil {
-		return err
-	}
-	if sid != settlementID {
-		return fmt.Errorf("a helyszín nem ehhez a településhez tartozik")
-	}
-	return nil
+	SeatingCapacity *int     `json:"seating_capacity"`
+	Description     string   `json:"description"`
 }

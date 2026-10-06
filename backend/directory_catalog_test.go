@@ -64,13 +64,7 @@ func TestWebshopListingWithoutTown(t *testing.T) {
 	}
 	webID := int(submitted["id"].(float64))
 
-	admin := mustLogin("admin@test.lamsza")
-	rr = doRequestWithCookie(t, "POST", "/api/admin/websites", map[string]interface{}{
-		"id": webID, "action": "approve",
-	}, admin)
-	if rr.Code != 200 {
-		t.Fatalf("approve: %d %s", rr.Code, rr.Body.String())
-	}
+	approveWebsiteFixture(t, webID)
 
 	user := mustLogin("website-submit@test.lamsza")
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings", map[string]interface{}{
@@ -282,78 +276,6 @@ func TestLegacyCategoryMigrateDoesNotPruneTree(t *testing.T) {
 	}
 }
 
-func restoreSeedEtteremCategory(t *testing.T) {
-	t.Helper()
-	// Drop any stray copy first. The name is unique, so the seed row cannot go
-	// back while a duplicate is still there.
-	if _, err := db.DB.Exec(`
-		DELETE FROM entry_categories c
-		WHERE c.name = 'Étterem' AND c.id != 11
-		AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.category_id = c.id)`); err != nil {
-		t.Fatal(err)
-	}
-	var hasSeed bool
-	if err := db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM entry_categories WHERE id = 11)`).Scan(&hasSeed); err != nil {
-		t.Fatal(err)
-	}
-	if !hasSeed {
-		if _, err := db.DB.Exec(`
-			INSERT INTO entry_categories (id, name, slug, parent_id, sort_order)
-			VALUES (11, 'Étterem', 'etterem', 1, 1)`); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func TestDeleteCategoryRequiresMove(t *testing.T) {
-	handlers.MigrateDirectoryCatalog()
-	restoreSeedEtteremCategory(t)
-	// Étterem is 11. Attach nothing. Delete succeeds.
-	rr := doRequest(t, "DELETE", "/api/admin/entry_categories?id=11", nil)
-	if rr.Code != 200 {
-		t.Fatalf("empty delete: %d %s", rr.Code, rr.Body.String())
-	}
-	// Recreate Étterem under Étkezés (1) so later tests still have a leaf.
-	rr = doRequest(t, "POST", "/api/admin/entry_categories", strings.NewReader(`{"name":"Étterem","parent_id":1}`))
-	if rr.Code != 200 {
-		t.Fatalf("recreate: %d %s", rr.Code, rr.Body.String())
-	}
-	var created struct {
-		ID int `json:"id"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
-		t.Fatal(err)
-	}
-	// Drop the probe rows even when an assertion below fails, so the next run
-	// does not hit unique_category_name on the recreate above.
-	t.Cleanup(func() {
-		if _, err := db.DB.Exec(`DELETE FROM entries WHERE name = 'Próba étterem'`); err != nil {
-			t.Errorf("cleanup entry: %v", err)
-		}
-		restoreSeedEtteremCategory(t)
-	})
-	if _, err := db.DB.Exec(`
-		INSERT INTO entries (name, category_id, type_id, languages)
-		VALUES ('Próba étterem', $1, 2, '{HU}')`, created.ID); err != nil {
-		t.Fatal(err)
-	}
-	rr = doRequest(t, "DELETE", "/api/admin/entry_categories?id="+strconv.Itoa(created.ID), nil)
-	if rr.Code != 409 {
-		t.Fatalf("blocked delete: %d", rr.Code)
-	}
-	rr = doRequest(t, "DELETE", "/api/admin/entry_categories?id="+strconv.Itoa(created.ID)+"&move_to=12", nil)
-	if rr.Code != 200 {
-		t.Fatalf("move delete: %d %s", rr.Code, rr.Body.String())
-	}
-	var cat int
-	if err := db.DB.QueryRow(`SELECT category_id FROM entries WHERE name = 'Próba étterem'`).Scan(&cat); err != nil {
-		t.Fatal(err)
-	}
-	if cat != 12 {
-		t.Fatalf("moved category = %d, want 12 Kávézó", cat)
-	}
-}
-
 func TestCategoryBrowseIncludesWebshop(t *testing.T) {
 	const domain = "browse-webshop-test.ro"
 	cleanup := func() {
@@ -459,73 +381,6 @@ func TestCategoryBrowseIncludesWebshop(t *testing.T) {
 	}
 }
 
-func TestEntryTypesStayClosed(t *testing.T) {
-	handlers.MigrateDirectoryCatalog()
-	rr := doRequest(t, "POST", "/api/admin/entry_types", strings.NewReader(`{"name":"Weboldal"}`))
-	if rr.Code != 403 {
-		t.Fatalf("create type: %d", rr.Code)
-	}
-	if !strings.Contains(rr.Body.String(), "A típuslista zárt.") {
-		t.Fatalf("create type body: %s", rr.Body.String())
-	}
-	rr = doRequest(t, "PUT", "/api/admin/entry_types", strings.NewReader(`{"id":1,"name":"Más"}`))
-	if rr.Code != 403 {
-		t.Fatalf("update type: %d", rr.Code)
-	}
-	if !strings.Contains(rr.Body.String(), "A típuslista zárt.") {
-		t.Fatalf("update type body: %s", rr.Body.String())
-	}
-	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id=1", nil)
-	if rr.Code != 403 {
-		t.Fatalf("delete type: %d", rr.Code)
-	}
-	if !strings.Contains(rr.Body.String(), "A típuslista zárt.") {
-		t.Fatalf("delete type body: %s", rr.Body.String())
-	}
-	var n int
-	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 3 {
-		t.Fatalf("types = %d", n)
-	}
-}
-
-func TestAdminTags(t *testing.T) {
-	handlers.MigrateDirectoryCatalog()
-	const name = "admin-tag-probe"
-	t.Cleanup(func() {
-		db.DB.Exec(`DELETE FROM tags WHERE name = $1 OR name = $2`, name, name+"-2")
-	})
-	rr := doRequest(t, "POST", "/api/admin/tags", map[string]string{"name": "Bútor"})
-	if rr.Code != 400 {
-		t.Fatalf("category-shaped tag: %d %s", rr.Code, rr.Body.String())
-	}
-	rr = doRequest(t, "POST", "/api/admin/tags", map[string]string{"name": name})
-	if rr.Code != 201 {
-		t.Fatalf("create tag: %d %s", rr.Code, rr.Body.String())
-	}
-	var created struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
-		t.Fatal(err)
-	}
-	rr = doRequest(t, "POST", "/api/admin/tags", map[string]string{"name": name})
-	if rr.Code != 409 {
-		t.Fatalf("duplicate tag: %d %s", rr.Code, rr.Body.String())
-	}
-	rr = doRequest(t, "PUT", "/api/admin/tags", map[string]interface{}{"id": created.ID, "name": name + "-2"})
-	if rr.Code != 200 {
-		t.Fatalf("rename tag: %d %s", rr.Code, rr.Body.String())
-	}
-	rr = doRequest(t, "DELETE", "/api/admin/tags?id="+strconv.Itoa(created.ID), nil)
-	if rr.Code != 200 {
-		t.Fatalf("delete tag: %d %s", rr.Code, rr.Body.String())
-	}
-}
-
 func TestPublicEntryCategories(t *testing.T) {
 	rr := doAnonRequest(t, "GET", "/api/entry-categories", nil)
 	if rr.Code != 200 {
@@ -552,10 +407,7 @@ func TestPublicEntryCategories(t *testing.T) {
 	if !butor || !vasarlas {
 		t.Fatalf("catalog missing Bútor or Vásárlás: %d rows", len(rows))
 	}
-	rr = doRequest(t, "POST", "/api/admin/entries", map[string]interface{}{
-		"name": "Parent Shelf Entry", "category_id": 1, "type": "Vállalkozás",
-	})
-	if rr.Code != 400 {
-		t.Fatalf("parent category on entry: %d %s", rr.Code, rr.Body.String())
-	}
+	// Rejecting a parent shelf on a write is the admin app's job now (BOG-42);
+	// internal/directory has the unit coverage. What matters here is that the
+	// public catalog still exposes the shelf/leaf shape above.
 }
