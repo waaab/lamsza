@@ -51,7 +51,22 @@ test("service: claimed listing keeps the claim flag", () => {
     assert.equal(card.claimed, true);
 });
 
-test("service: category aliases use the catalog label", () => {
+// The search API sends entry_categories.name, so the card prints the stored name
+// and invents nothing. canonicalEntryCategory stopped mapping legacy aliases such
+// as "vendeglo" onto catalog labels when the v2 catalog landed (9ae96d4) - the v2
+// tree has no "Vendéglő" node at all.
+test("service: the meta line prints the stored category name", () => {
+    const card = searchResultCardModel("service", {
+        name: "Kőröspatak Étterem",
+        slug: "korospatak-etterem",
+        location: "Sepsiszentgyörgy",
+        category: "Étterem",
+        notes: "",
+    });
+    assert.equal(card.meta, "Sepsiszentgyörgy · Étterem");
+});
+
+test("service: an unknown category is passed through, not remapped", () => {
     const card = searchResultCardModel("service", {
         name: "Étterem",
         slug: "etterem",
@@ -59,7 +74,7 @@ test("service: category aliases use the catalog label", () => {
         category: "vendeglo",
         notes: "",
     });
-    assert.equal(card.meta, "Sepsiszentgyörgy · Vendéglő");
+    assert.equal(card.meta, "Sepsiszentgyörgy · vendeglo");
 });
 
 test("service: one side of the meta line has no separator", () => {
