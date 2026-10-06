@@ -43,5 +43,8 @@ backend/server.pid
 # Local agent session scratch (brainstorm server, review diffs)
 .superpowers/
 
+# Per-machine Claude Code settings (absolute paths, agent ids); shared .claude/ files stay tracked
+.claude/settings.local.json
+
 # Extension Build Output
 extension/

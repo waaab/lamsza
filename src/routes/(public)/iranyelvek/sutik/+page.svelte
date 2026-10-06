@@ -1,6 +1,9 @@
 <script>
     import { onMount } from "svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    // loadPageMeta runs the admin-written `content` through sanitizeHtml, so
+    // the {@html} below cannot carry a script or an event handler. Never read
+    // the pages API directly here: that would bypass the sanitizer.
     import { initialPageHeader, loadPageMeta } from "$lib/loadPageMeta.js";
 
     const fb = initialPageHeader("iranyelvek/sutik");
