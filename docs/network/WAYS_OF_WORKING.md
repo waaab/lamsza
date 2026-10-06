@@ -107,7 +107,8 @@ These standards are network-wide:
 - **Fixed ports**, as the start script defines them (§1).
 - **`/api/health` on every backend.** All four have it.
 - **A working `npm test` in every repo.** Not true yet — no repo defines a root
-  `test` script.
+  `test` script. Tracked per app: BOG-2 (lamsza), BOG-20 (admin), BOG-21
+  (szotar), BOG-22 (jatszoter).
 - **`docs/LOCAL_DEV_CHECKS.md` is the definition of "verified":** network up,
   every API smoked, every suite run, output recorded.
 
@@ -122,5 +123,5 @@ special-case it, and `npm run dev` means a different thing in lamsza than in the
 other three. There is also an empty, untracked `lamsza/frontend/` folder — a
 leftover that will mislead any agent that expects the common layout.
 
-Tracked as a low-priority issue. Until it is fixed, do not assume
-`frontend/` exists in the `lamsza` repo.
+Tracked as BOG-23, low priority. Until it is fixed, do not assume `frontend/`
+exists in the `lamsza` repo.
