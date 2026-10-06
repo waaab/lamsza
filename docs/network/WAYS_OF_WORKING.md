@@ -3,9 +3,9 @@
 How the four Lámsza apps are organised, and the rules that let one Paperclip
 board drive four independent repos.
 
-Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. This file is the
-source of truth. If a task comment and this file disagree, this file wins until
-it is changed here.
+Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. R7 added on
+BOG-54, 2026-10-06. This file is the source of truth. If a task comment and this
+file disagree, this file wins until it is changed here.
 
 ---
 
@@ -24,8 +24,8 @@ separate workspaces. Each app is its own git repo and its own deploy unit.
 Three Postgres databases: `lamsza` (shared by the main app and admin), `szotar`,
 `jatszoter`.
 
-`~/projects/start-lamsza-network.sh` starts and stops the whole network on fixed
-ports:
+`lamsza/scripts/start-lamsza-network.sh` starts and stops the whole network on
+fixed ports:
 
 | App | Backend | Frontend |
 | --- | --- | --- |
@@ -34,7 +34,22 @@ ports:
 | szotar | 3002 | 5175 |
 | jatszoter | 3003 | 5176 |
 
-The script finds the apps under `$LAMSZA_PROJECTS_ROOT` (default `~/projects`).
+**The tracked copy is the only copy.** The script lives in this repo, at
+`scripts/start-lamsza-network.sh`. Two symlinks point into it so the habitual
+paths keep working — edit neither, edit the repo file:
+
+- `~/projects/start-lamsza-network.sh` → `lamsza/scripts/start-lamsza-network.sh`
+- `~/.local/bin/lamsza-network` → `~/projects/start-lamsza-network.sh`
+
+It finds the four apps by resolving its own path through those symlinks and then
+walking up until it reaches the directory that contains all four repos — on this
+machine, `~/projects`. Set `LAMSZA_PROJECTS_ROOT` to override that, and
+`LAMSZA_STATE_DIR` to move the logs and PID files. `status` prints both as
+`Apps:` and `Logs:`. Run `scripts/tests/start-lamsza-network.test.sh` after
+changing the script.
+
+Until BOG-50 the script was an untracked file on one machine, which is why
+BOG-31's fix to it had no commit to point at.
 
 ---
 
@@ -69,7 +84,7 @@ workspace, so every agent already has it.
 
 ---
 
-## 4. The six rules
+## 4. The seven rules
 
 ### R1 — Every issue names its app
 
@@ -154,6 +169,65 @@ These standards are network-wide:
   (szotar), BOG-22 (jatszoter).
 - **`docs/LOCAL_DEV_CHECKS.md` is the definition of "verified":** network up,
   every API smoked, every suite run, output recorded.
+
+### R7 — CI is a gate only if somebody reads it. Today that somebody is you
+
+**What CI is.** GitHub Actions, on every push and every pull request. Two jobs
+per repo, named **`frontend`** and **`backend`** — two and not one, because when
+it was a single job a frontend failure marked the Go steps "skipped" and the
+backend went unbuilt and untested for hours without the summary saying so.
+
+| Repo | Workflow | Status |
+| --- | --- | --- |
+| `waaab/lamsza` | `.github/workflows/build-test.yml` | on `main` |
+| `waaab/lamsza-admin` | `.github/workflows/build.yml` | on `main` |
+| `waaab/lamsza-szotar` | — | BOG-44, on branch `bog-44-ci-redproof`, not merged |
+| `waaab/lamsza-jatszoter` | — | BOG-44, on branch `bog-44-ci-redproof`, not merged |
+
+**What CI does not cover.** There is no Postgres and no running backend in CI,
+so:
+
+- the database-bound suites are localhost-only. In `lamsza` the root `backend`
+  package is excluded by subtraction (`go list ./... | grep -vx 'backend'`), so
+  a package added later is tested automatically and only the known
+  database-bound one is left out. Making that suite run in CI needs a committed
+  schema bootstrap plus a service container — BOG-53.
+- `lamsza` runs `npm run build:no-preflight`, because `npm run build` refuses to
+  build when no Go backend answers on 3001.
+
+A green CI therefore does **not** mean the localhost checks passed. It is the
+weaker of the two gates, not the stronger.
+
+**Nothing reads CI automatically.** As of 2026-10-06, all four of these are true:
+
+- no branch protection on `main` in any of the four repos, so no required status
+  check;
+- agents merge to `main` with `git push`, not through a pull request, so nobody
+  ever sees a red check in a PR UI;
+- nothing routes an Actions failure to this board or to the owner;
+- and polling it from this machine does not work either. There is no `gh` CLI
+  here, git auth is SSH-key only, unauthenticated `api.github.com` reads from
+  this machine's IP are rate-limited and currently return `403`, and two of the
+  four repos (`lamsza-szotar`, `lamsza-jatszoter`) are private.
+
+That is how `lamsza` CI stayed red across four pushes in 17 minutes, three of
+them straight onto `main`, before BOG-44 noticed.
+
+**So the rule is: the local gate is the real gate.** Until that changes,
+
+1. Run the `docs/LOCAL_DEV_CHECKS.md` checks your change touches **before** you
+   push, not after. CI will not catch what you skipped — nobody is watching it.
+2. Never merge to `main` with a check you already know is red. A red local check
+   is a blocker whether or not anything reports it.
+3. `npm run build` in `lamsza` only counts with the backend up on 3001. Without
+   it the prerender fails with `ECONNREFUSED`, the build still exits 0, and the
+   error states get baked into the pages.
+
+**Open.** How a red CI reaches a person without an agent going to look — a
+notification, branch protection with `frontend` and `backend` as required
+checks, or both — is the owner's decision on BOG-54, because required status
+checks would change the standing git grant in
+`docs/AGENT_ENVIRONMENT_POLICY.md`. Record the answer here when it lands.
 
 ---
 

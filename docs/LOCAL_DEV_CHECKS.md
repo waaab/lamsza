@@ -14,7 +14,7 @@ it done.
 
 ## Local port map
 
-From `~/projects/start-lamsza-network.sh` (the source of truth):
+From `scripts/start-lamsza-network.sh` in this repo (the source of truth):
 
 | App | Backend | Frontend | Database |
 |---|---|---|---|
@@ -35,6 +35,26 @@ From `~/projects/start-lamsza-network.sh` (the source of truth):
 cd ~/projects
 ./start-lamsza-network.sh start      # start | stop | restart | status
 ```
+
+The script is tracked at `lamsza/scripts/start-lamsza-network.sh`.
+`~/projects/start-lamsza-network.sh` and `~/.local/bin/lamsza-network` are
+symlinks into it, so either path, and `lamsza-network start` from anywhere, run
+the same tracked file. Change it in the repo, not through a symlink.
+
+Because the symlink points into the working tree, it dangles — `No such file or
+directory` — while the `lamsza` checkout is parked on a branch cut before the
+script was committed (BOG-50, `5fc03cc`). Any branch cut after that has it. If
+you hit it, run the script from a worktree that is on `main`:
+
+```bash
+~/projects/lamsza/.worktrees/<some-branch-on-main>/scripts/start-lamsza-network.sh status
+```
+
+Do **not** `git checkout main -- scripts/start-lamsza-network.sh` into someone
+else's branch to paper over it: that leaves an uncommitted file in a checkout
+another run is using, and the `done` gate in
+`scripts/paperclip-issue-update.sh` will refuse their task for dirt that is not
+theirs.
 
 **Expect:** four backends and four frontends listening. Check it yourself rather than
 trusting the script's own summary:
@@ -138,6 +158,65 @@ Where the gate is checked in a browser differs per app, because the **main app h
 An allowlisted account must reach the admin UI of the app it belongs to; a
 non-allowlisted one must get 403. If a non-admin reaches an admin UI locally, stop — that
 is a security bug, not a config issue.
+
+---
+
+## Check — The admin session is separate from the public one
+
+`lamsza` and `lamsza-admin` share one database. They do **not** share a session (BOG-45):
+the public site uses cookie `lamsza_session` and table `sessions`, admin uses
+`lamsza_admin_session` and `admin_sessions`.
+
+This matters most on localhost, where both apps are host `localhost` and **cookies ignore
+the port** — a public cookie is offered to `:3000` whatever the ports are.
+
+Google sign-in cannot complete from a script, so mint the session rows the way the two
+backends do — a session *is* a random token whose SHA-256 is a row. Both apps hash the
+same way, so this is the real thing, not a stand-in.
+
+```bash
+psql(){ docker exec -i lamsza-db psql -U lamsza_user -d lamsza "$@"; }
+
+# the admin session table exists — the main lamsza backend creates it; admin runs no DDL
+psql -c '\d admin_sessions'
+
+# an account on ADMIN_GOOGLE_EMAILS, so the only thing under test is the session store
+EMAIL=$(grep -h '^ADMIN_GOOGLE_EMAILS' ~/projects/lamsza-admin/backend/.env 2>/dev/null \
+        | head -1 | cut -d= -f2 | cut -d, -f1)
+USERID=$(psql -qtAc "SELECT id FROM users WHERE lower(email) = lower('$EMAIL')")
+echo "admin user: $EMAIL -> id $USERID"
+
+mint(){ # mint <table> -> prints the raw token
+  local t h; t=$(openssl rand -hex 32); h=$(printf %s "$t" | sha256sum | cut -d' ' -f1)
+  psql -qtAc "INSERT INTO $1 (token_hash, user_id, expires_at)
+              VALUES ('$h', $USERID, NOW() + INTERVAL '1 hour')" >/dev/null
+  echo "$t"
+}
+PUB=$(mint sessions); ADM=$(mint admin_sessions)
+code(){ curl -s -o /dev/null -w '%{http_code}' --max-time 6 -H "Cookie: $2" "$1"; }
+
+printf 'public token -> admin /api/auth/me        %s\n' "$(code http://127.0.0.1:3000/api/auth/me     "lamsza_session=$PUB")"
+printf 'public token -> admin /api/admin/users    %s\n' "$(code http://127.0.0.1:3000/api/admin/users "lamsza_admin_session=$PUB")"
+printf 'admin token  -> admin /api/admin/users    %s\n' "$(code http://127.0.0.1:3000/api/admin/users "lamsza_admin_session=$ADM")"
+printf 'admin token  -> public /api/auth/me       %s\n' "$(code http://127.0.0.1:3001/api/auth/me     "lamsza_session=$ADM")"
+
+psql -qc "DELETE FROM sessions WHERE expires_at < NOW() + INTERVAL '2 hours'" \
+        -qc "DELETE FROM admin_sessions WHERE expires_at < NOW() + INTERVAL '2 hours'"
+```
+
+**Expect** `401`, `401`, `200`, `401`. In words:
+
+- a public token is refused by admin — under the public cookie name *and* renamed to the
+  admin one, so neither the browser nor a deliberate caller gets through;
+- an admin token works on admin (the sign-in path is intact);
+- and that same admin token is refused by the public API.
+
+A `200` on any of the three `401` lines means the two session stores have been merged back
+together. The `\d admin_sessions` failing means the table is missing: run the main `lamsza`
+backend, or `lamsza/backend/migrations/admin_sessions.sql`.
+
+The suites covering this: `lamsza/backend/admin_session_boundary_test.go` and
+`lamsza-admin/backend/internal/auth/session_boundary_test.go`.
 
 ---
 
