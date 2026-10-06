@@ -213,7 +213,7 @@ print_status() {
 		port_open "$bport" && bstate=":$bport"
 		port_open "$fport" && fstate=":$fport"
 		case "$name" in
-			admin) printf '%-10s  %-8s  %-8s  http://localhost:%s\n' "$name" "$bstate" "$fstate" "$fport" ;;
+			admin) printf '%-10s  %-8s  %-8s  https://admin.lamsza.test  http://localhost:%s\n' "$name" "$bstate" "$fstate" "$fport" ;;
 			lamsza) printf '%-10s  %-8s  %-8s  https://lamsza.test  http://localhost:%s\n' "$name" "$bstate" "$fstate" "$fport" ;;
 			szotar) printf '%-10s  %-8s  %-8s  https://szotar.lamsza.test  http://localhost:%s\n' "$name" "$bstate" "$fstate" "$fport" ;;
 			jatszoter) printf '%-10s  %-8s  %-8s  https://jatszoter.lamsza.test  http://localhost:%s\n' "$name" "$bstate" "$fstate" "$fport" ;;
