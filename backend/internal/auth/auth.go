@@ -139,7 +139,39 @@ func Migrate() {
 	if err != nil {
 		log.Printf("sessions expires index: %v", err)
 	}
+	migrateAdminSessions()
 	log.Println("Users and sessions tables ready")
+}
+
+// migrateAdminSessions creates the admin app's session store.
+//
+// The table lives here because this backend owns the schema of the shared
+// `lamsza` database (see lamsza-admin/docs/ARCHITECTURE.md) — the admin process
+// runs no DDL. Nothing in this repo reads or writes it.
+//
+// It is a separate table on purpose. Until BOG-45 both apps minted into
+// `sessions` under one cookie name, so a token handed out by the public site
+// was accepted by the admin API. Two stores make the boundary something the
+// database holds: an admin token hash exists only here, a public token hash
+// only in `sessions`, and neither API can accept the other's token.
+func migrateAdminSessions() {
+	if _, err := db.DB.Exec(`
+		CREATE TABLE IF NOT EXISTS admin_sessions (
+			token_hash CHAR(64) PRIMARY KEY,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			expires_at TIMESTAMP NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		log.Printf("admin_sessions table: %v", err)
+		return
+	}
+	if _, err := db.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_admin_sessions_user ON admin_sessions(user_id)`); err != nil {
+		log.Printf("admin_sessions user index: %v", err)
+	}
+	if _, err := db.DB.Exec(`CREATE INDEX IF NOT EXISTS idx_admin_sessions_expires ON admin_sessions(expires_at)`); err != nil {
+		log.Printf("admin_sessions expires index: %v", err)
+	}
 }
 
 func IsAdmin(email string) bool {
