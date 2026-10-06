@@ -114,14 +114,42 @@ These standards are network-wide:
 
 ---
 
-## 5. Known inconsistency
+## 5. Repo layout — two shapes, both correct
 
-szotar, jatszoter and admin all use `backend/` plus `frontend/`. The main
-`lamsza` repo has `backend/`, but its frontend is at the repo root (`src/`,
-`svelte.config.js`, `vite.config.js` at the top level). The start script has to
-special-case it, and `npm run dev` means a different thing in lamsza than in the
-other three. There is also an empty, untracked `lamsza/frontend/` folder — a
-leftover that will mislead any agent that expects the common layout.
+Three apps use a `backend/` plus `frontend/` split. The main `lamsza` repo keeps
+its frontend at the repo root.
 
-Tracked as BOG-23, low priority. Until it is fixed, do not assume `frontend/`
-exists in the `lamsza` repo.
+| App | Backend | Frontend | Build output |
+| --- | --- | --- | --- |
+| admin | `backend/` | `frontend/` | `frontend/dist/` |
+| szotar | `backend/` | `frontend/` | `frontend/dist/` |
+| jatszoter | `backend/` | `frontend/` | `frontend/dist/` |
+| **lamsza** | `backend/` | **repo root** (`src/`, `static/`, `svelte.config.js`, `vite.config.js`) | `dist/` |
+
+**The root layout in `lamsza` is accepted, not a defect.** Decided on BOG-23. Do
+not "fix" it by moving files into `frontend/`.
+
+Why it stays:
+
+- The cost of the move is real and reaches production. It renames `src/`,
+  `static/`, `tests/`, `scripts/`, `package.json`, `package-lock.json`,
+  `svelte.config.js`, `vite.config.js`, `jsconfig.json`, `manifest.json` and
+  `.npmrc`, then needs matching edits in `.gitignore`, the CI workflow, the
+  extension build, `docs/PRODUCTION_SERVER_SETUP.md`,
+  `docs/PRODUCTION_ENVIRONMENT_NOTES.md` and the owner's deploy path for
+  `dist/`. A wrong `dist/` path breaks a live site.
+- The benefit is small. The only mechanical cost today is one `.` in the start
+  script's app table (§1), which already works.
+- `npm run dev` at the repo root starts the frontend dev server in all four
+  apps. In the other three the root `package.json` is a thin proxy
+  (`npm run dev --prefix frontend`); in lamsza the root `package.json` *is* the
+  frontend package. Same command, same result.
+
+What this means for you:
+
+- **In `lamsza`, there is no `frontend/`.** Frontend paths are `src/…`,
+  `static/…`, `tests/…`. The empty `lamsza/frontend/` leftover was deleted on
+  BOG-23. If you ever see it again, something created it by mistake — delete it,
+  do not fill it.
+- Run frontend commands from the repo root in `lamsza`, and from `frontend/` (or
+  through the root proxy script) in the other three.
