@@ -38,6 +38,28 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # The root `backend` package is a database integration suite:
+    # handlers_test.go's init() calls db.InitDB(), and the tests read and write
+    # entries/websites/users. A bare Postgres is not enough on its own - the
+    # app's Migrate() calls add to the schema, they do not create those base
+    # tables - so the bootstrap step below loads the committed schema first.
+    # Postgres 16 and port 5433 match local dev.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lamsza_user
+          POSTGRES_PASSWORD: lamsza_password
+          POSTGRES_DB: lamsza
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U lamsza_user -d lamsza"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 
@@ -46,22 +68,22 @@ jobs:
           go-version: "1.25.x"
           cache-dependency-path: backend/go.sum
 
-      # Everything except the root `backend` package. That package's tests are
-      # database integration tests: handlers_test.go's init() calls db.InitDB()
-      # and the suite reads and writes entries/websites/users. There is no
-      # Postgres in CI, so it dies with
-      #   dial tcp [::1]:5433: connect: connection refused
-      # and a bare empty Postgres is not enough either - the app's own Migrate()
-      # calls do not create those base tables, so against an empty database you
-      # get `relation "entries" does not exist` instead. Making that suite run in
-      # CI needs a committed schema bootstrap plus a service container, which is
-      # its own task; see the BOG-44 follow-up. Until then it stays a localhost
-      # suite, where it does run and does pass.
-      #
-      # Excluding by subtraction on purpose: a package added later is tested
-      # automatically, and only the known database-bound one is left out.
+      # Same script and same committed schema a developer uses to create a
+      # fresh local database - not a CI-only fork of the schema. It fails the
+      # job if the reference rows did not load, because the suites skip rather
+      # than fail when settlements is empty, and a skipped test looks green.
+      - name: Bootstrap the database
+        # The runner image ships psql, and the script says so plainly when it is
+        # missing rather than guessing - but a missing client would fail the job
+        # for a reason that has nothing to do with the code, so install it if it
+        # ever stops being there. No-op on a runner that already has it.
+        run: |
+          command -v psql >/dev/null || sudo apt-get install -y --no-install-recommends postgresql-client
+          ../scripts/db-bootstrap.sh
+
+      # Every package, no exclusions (BOG-53).
       - name: Test Go backend
-        run: go test -count=1 $(go list ./... | grep -vx 'backend')
+        run: go test -count=1 ./...
 
       - name: Build Go backend
         run: go build -o /tmp/sz-gugel-bin main.go

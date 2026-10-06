@@ -181,22 +181,32 @@ backend went unbuilt and untested for hours without the summary saying so.
 | --- | --- | --- |
 | `waaab/lamsza` | `.github/workflows/build-test.yml` | on `main` |
 | `waaab/lamsza-admin` | `.github/workflows/build.yml` | on `main` |
-| `waaab/lamsza-szotar` | — | BOG-44, on branch `bog-44-ci-redproof`, not merged |
-| `waaab/lamsza-jatszoter` | — | BOG-44, on branch `bog-44-ci-redproof`, not merged |
+| `waaab/lamsza-szotar` | `.github/workflows/build-test.yml` | on `main` |
+| `waaab/lamsza-jatszoter` | `.github/workflows/build-test.yml` | on `main` |
 
-**What CI does not cover.** There is no Postgres and no running backend in CI,
-so:
+**Every backend job runs `go test -count=1 ./...`.** No workflow excludes a Go
+package by name any more — BOG-53 removed the last three exclusions. Three of
+the four backend jobs now run a `postgres:16` service, matching local dev, and
+each builds its own schema from the repo:
 
-- the database-bound suites are localhost-only. In `lamsza` the root `backend`
-  package is excluded by subtraction (`go list ./... | grep -vx 'backend'`), so
-  a package added later is tested automatically and only the known
-  database-bound one is left out. Making that suite run in CI needs a committed
-  schema bootstrap plus a service container — BOG-53.
-- `lamsza` runs `npm run build:no-preflight`, because `npm run build` refuses to
-  build when no Go backend answers on 3001.
+| Repo | How CI gets a schema |
+| --- | --- |
+| `lamsza` | `scripts/db-bootstrap.sh` applies the committed `backend/schema/` — the same script and files that create a fresh local database |
+| `szotar` | the backend's own `db.Migrate()`, which the suites call |
+| `jatszoter` | the backend's own `db.Migrate()`, which the suites call |
+| `lamsza-admin` | no database-bound suite; no service needed |
 
-A green CI therefore does **not** mean the localhost checks passed. It is the
-weaker of the two gates, not the stronger.
+Do not add a CI-only copy of a schema. If CI needs something the repo cannot
+build, that is a gap in the bootstrap, and the bootstrap is what to fix.
+
+**What CI still does not cover.** There is no running backend, so `lamsza` runs
+`npm run build:no-preflight` — `npm run build` refuses to build when no Go
+backend answers on 3001. CI also runs against an *empty* database seeded only
+from the repo, which is stricter than dev data in the ways that matter and
+weaker in one: it will not catch something that only breaks on real content.
+
+A green CI therefore still does **not** mean the localhost checks passed. It is
+the weaker of the two gates, not the stronger.
 
 **Nothing reads CI automatically.** As of 2026-10-06, all four of these are true:
 

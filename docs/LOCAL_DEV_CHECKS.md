@@ -76,6 +76,39 @@ docker ps --format '{{.Names}}\t{{.Status}}'     # lamsza-db, szotar-db, jatszot
 
 ---
 
+## Creating a lamsza database from scratch
+
+Only needed on a new machine, or when you want a throwaway database to test
+against. The existing `lamsza-db` container already has one.
+
+```bash
+cd ~/projects/lamsza
+scripts/db-bootstrap.sh --create                                  # the dev database
+scripts/db-bootstrap.sh --create --url "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza_scratch?sslmode=disable"
+```
+
+It applies the two committed files in `backend/schema/` — the full schema, then
+the reference rows (counties, settlements, venue types, weather translations).
+Postgres 16, as local dev and CI both run. The script works with
+`postgresql-client` on `PATH` or, as on this machine, by going through the
+`lamsza-db` container; it picks whichever is available.
+
+This is the same script and the same two files the CI backend job runs, so a
+green CI means this path works. **`backend/migrations/` is not that path** — its
+40 files are a hand-applied historical record with no runnable order. Do not try
+to build a database out of them.
+
+After a schema change, regenerate and commit:
+
+```bash
+scripts/db-dump-schema.sh
+```
+
+See `backend/schema/README.md` for what is in each file and which tables are
+deliberately not dumped (anything with personal data or configuration).
+
+---
+
 ## Step 2 — Smoke every API
 
 ```bash
@@ -358,6 +391,24 @@ branch: lamsza frontend **197 / 197**, lamsza backend green. The two
 `directory_catalog_test.go` failures were dirty-DB isolation caused by the admin
 CRUD tests in the same package; those tests went with the admin handlers they
 covered. The two frontend failures were fixed by their own task.
+
+> Three of these suites talk to Postgres, and since BOG-53 all three also run in
+> CI against a `postgres:16` service — nothing is excluded by name any more. If
+> you want to see a suite the way CI does, bootstrap a fresh database and point
+> `DATABASE_URL` at it rather than running against your dev data:
+>
+> ```bash
+> # lamsza: schema from backend/schema/, applied by the script
+> scripts/db-bootstrap.sh --create --url "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza_scratch?sslmode=disable"
+> cd backend && DATABASE_URL="postgres://lamsza_user:lamsza_password@localhost:5433/lamsza_scratch?sslmode=disable" go test -count=1 ./...
+>
+> # szotar and jatszoter: the backends migrate an empty database themselves
+> docker exec szotar-db psql -U szotar_user -d postgres -c 'CREATE DATABASE szotar_scratch'
+> cd ~/projects/szotar/backend && DATABASE_URL="postgres://szotar_user:szotar_password@localhost:5435/szotar_scratch?sslmode=disable" go test -count=1 ./...
+> ```
+>
+> A suite that passes on your dev data and fails on an empty database is the
+> failure CI used to be blind to.
 
 `tests/networkOrigins.test.js` was failing against stale pre-renumber ports (5173/5174/5175)
 and is fixed. The remaining failures are tracked as their own task.
