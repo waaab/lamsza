@@ -16,6 +16,38 @@ const config = {
 		}),
 		prerender: {
 			handleUnseenRoutes: 'ignore'
+		},
+		// Content-Security-Policy. The pages are static, so SvelteKit writes this
+		// into a <meta http-equiv> tag in every built page and hashes its own
+		// inline scripts and styles for us.
+		//
+		// script-src 'self' is the part that matters: it is the second lock on the
+		// Markdown XSS (src/lib/markdown.js is the first) and it blocks the
+		// exfiltration step as well, because connect-src names the only hosts the
+		// page may talk to. Keep both lists as short as the app allows.
+		//
+		// Nginx also serves security headers (docs/PRODUCTION_ENVIRONMENT_NOTES.md).
+		// frame-ancestors cannot work from a meta tag, so X-Frame-Options there
+		// stays the control for framing.
+		csp: {
+			mode: 'hash',
+			directives: {
+				'default-src': ['self'],
+				'base-uri': ['self'],
+				'object-src': ['none'],
+				'form-action': ['self'],
+				// Google Identity Services is injected by GoogleSignIn.svelte.
+				'script-src': ['self', 'https://accounts.google.com/gsi/client'],
+				'style-src': ['self', 'unsafe-inline', 'https://accounts.google.com/gsi/style'],
+				// Entry, event and news pictures come from feeds and from Google
+				// avatars, so the host cannot be listed one by one.
+				'img-src': ['self', 'data:', 'https:'],
+				'font-src': ['self', 'data:'],
+				'connect-src': ['self', 'https://accounts.google.com/gsi/'],
+				'frame-src': ['self', 'https://accounts.google.com/gsi/'],
+				'manifest-src': ['self'],
+				'worker-src': ['self']
+			}
 		}
 	}
 };

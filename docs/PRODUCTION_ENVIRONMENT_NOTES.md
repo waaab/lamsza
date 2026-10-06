@@ -71,6 +71,28 @@ add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 add_header Permissions-Policy "geolocation=(), camera=(), microphone=()" always;
 ```
 
+### Content-Security-Policy
+
+The Lámsza portal ships its own policy inside every built page as a
+`<meta http-equiv="content-security-policy">` tag (`kit.csp` in `svelte.config.js`), so the site is
+covered without any Nginx change. Keep `X-Frame-Options` above: `frame-ancestors` has no effect
+from a `meta` tag.
+
+Two prerendered redirect stubs, `/profil` and `/szek`, carry no policy because SvelteKit writes
+them as a bare redirect. They hold no user content, and their `<meta http-equiv="refresh">`
+fallback still forwards the visitor if the inline redirect is blocked.
+
+**Still to do (not yet applied on the droplet):** add the same policy as a response header so the
+stubs and any future non-SvelteKit page are covered too, and so the policy survives a page that
+does not go through SvelteKit. Take the exact value from a built page:
+
+```bash
+grep -o 'content-security-policy" content="[^"]*"' /var/www/lamsza/public/index.html
+```
+
+The admin, Szótár and Játszótér sites have no policy of their own yet; until they do, a header in
+their server blocks is the only cover they get.
+
 ### Server Token Masking
 
 `server_tokens off;` enabled inside `/etc/nginx/nginx.conf`.

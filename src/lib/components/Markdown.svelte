@@ -1,9 +1,13 @@
 <script>
-    import { marked } from "marked";
+    // renderMarkdown escapes raw HTML and refuses unsafe link targets, so the
+    // {@html} below cannot run a script even when `source` is user-written
+    // prose from an attraction suggestion. Never call the plain marked
+    // renderer here: it passes raw HTML straight through.
+    import { renderMarkdown } from "$lib/markdown.js";
 
     export let source = "";
 
-    $: html = source ? marked.parse(source, { async: false }) : "";
+    $: html = renderMarkdown(source);
 </script>
 
 {#if html}

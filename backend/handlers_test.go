@@ -150,6 +150,7 @@ func doRequestWithCookie(t *testing.T, method, path string, body interface{}, co
 	reqBody := requestBody(t, body)
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", testOrigin)
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
@@ -168,6 +169,7 @@ func doRequest(t *testing.T, method, path string, body interface{}) *httptest.Re
 	reqBody := requestBody(t, body)
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", testOrigin)
 	if strings.HasPrefix(strings.Split(path, "?")[0], "/api/admin/") && testAdminCookie != nil {
 		req.AddCookie(testAdminCookie)
 	}
@@ -180,16 +182,35 @@ func doRequest(t *testing.T, method, path string, body interface{}) *httptest.Re
 // CORS
 // ---------------------------------------------------------------------------
 
+// testOrigin is on the allowlist, so the test requests look like calls from one
+// of our own pages. The allowlist itself is covered in
+// internal/middleware/middleware_test.go.
+const testOrigin = "https://lamsza.com"
+
 func TestCORSHeaders(t *testing.T) {
 	rr := doRequest(t, "OPTIONS", "/api/entries", nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("OPTIONS /api/entries: expected 200, got %d", rr.Code)
 	}
-	if rr.Header().Get("Access-Control-Allow-Origin") != "*" {
-		t.Error("Missing Access-Control-Allow-Origin header")
+	if got := rr.Header().Get("Access-Control-Allow-Origin"); got != testOrigin {
+		t.Errorf("Access-Control-Allow-Origin = %q, want %q", got, testOrigin)
 	}
 	if rr.Header().Get("Access-Control-Allow-Methods") == "" {
 		t.Error("Missing Access-Control-Allow-Methods header")
+	}
+}
+
+func TestCORSRefusesForeignOrigin(t *testing.T) {
+	req := httptest.NewRequest("OPTIONS", "/api/entries", nil)
+	req.Header.Set("Origin", "https://evil.test")
+	rr := httptest.NewRecorder()
+	testMux.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusForbidden {
+		t.Errorf("preflight from a foreign origin: got %d, want 403", rr.Code)
+	}
+	if got := rr.Header().Get("Access-Control-Allow-Origin"); got != "" {
+		t.Errorf("foreign origin was reflected back as %q", got)
 	}
 }
 
