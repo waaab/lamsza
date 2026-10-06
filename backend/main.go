@@ -43,6 +43,8 @@ func main() {
 	auth.Migrate()
 	account.Migrate()
 	account.MigrateWebsites()
+	// Schema and seed only. The directory wipe is now a hand-run one-shot:
+	// migrations/0001_directory_catalog_v2.sql.
 	handlers.MigrateDirectoryCatalog()
 
 	mux := http.DefaultServeMux

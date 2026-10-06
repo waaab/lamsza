@@ -108,20 +108,6 @@ func TestWebshopListingWithoutTown(t *testing.T) {
 
 func TestDirectoryCatalogSeedIds(t *testing.T) {
 	handlers.MigrateDirectoryCatalog()
-	var flag string
-	if err := db.DB.QueryRow(`SELECT value FROM site_settings WHERE key = 'directory_catalog_v2'`).Scan(&flag); err != nil {
-		t.Fatal(err)
-	}
-	if flag != "1" {
-		t.Fatalf("flag = %q", flag)
-	}
-	var n int
-	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entries`).Scan(&n); err != nil {
-		t.Fatal(err)
-	}
-	if n != 0 {
-		t.Fatalf("entries = %d, want 0", n)
-	}
 	var name string
 	if err := db.DB.QueryRow(`SELECT name FROM entry_types WHERE id = 2`).Scan(&name); err != nil {
 		t.Fatal(err)
@@ -165,8 +151,107 @@ func TestDirectoryCatalogSeedIds(t *testing.T) {
 	if isCalled {
 		nextID++
 	}
-	if nextID != 1 {
-		t.Fatalf("entries next id = %d, want 1 (last_value=%d is_called=%v)", nextID, lastValue, isCalled)
+	var maxID int64
+	if err := db.DB.QueryRow(`SELECT COALESCE(MAX(id), 0) FROM entries`).Scan(&maxID); err != nil {
+		t.Fatal(err)
+	}
+	if nextID <= maxID {
+		t.Fatalf("entries next id = %d, want > max id %d (last_value=%d is_called=%v)", nextID, maxID, lastValue, isCalled)
+	}
+}
+
+// TestDirectoryCatalogMigrateKeepsRowsWithoutFlag is the BOG-15 guard. The boot
+// migrator must never empty the directory, not even when the
+// directory_catalog_v2 marker is gone. The wipe lives in
+// migrations/0001_directory_catalog_v2.sql and is run by hand.
+func TestDirectoryCatalogMigrateKeepsRowsWithoutFlag(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+
+	var savedFlag sql.NullString
+	if err := db.DB.QueryRow(`SELECT value FROM site_settings WHERE key = 'directory_catalog_v2'`).Scan(&savedFlag); err != nil && err != sql.ErrNoRows {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if !savedFlag.Valid {
+			return
+		}
+		if _, err := db.DB.Exec(`
+			INSERT INTO site_settings (key, value) VALUES ('directory_catalog_v2', $1)
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, savedFlag.String); err != nil {
+			t.Errorf("restore flag: %v", err)
+		}
+	})
+
+	const probe = "bog15-wipe-probe"
+	var entryID int
+	if err := db.DB.QueryRow(`
+		INSERT INTO entries (name, slug, category_id, type_id, languages)
+		VALUES ($1, $1, 39, 2, '{HU}') RETURNING id`, probe).Scan(&entryID); err != nil {
+		t.Fatal(err)
+	}
+	var tagID int
+	if err := db.DB.QueryRow(`INSERT INTO tags (name) VALUES ($1) RETURNING id`, probe).Scan(&tagID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := db.DB.Exec(`DELETE FROM entries WHERE id = $1`, entryID); err != nil {
+			t.Errorf("cleanup entry: %v", err)
+		}
+		if _, err := db.DB.Exec(`DELETE FROM tags WHERE id = $1`, tagID); err != nil {
+			t.Errorf("cleanup tag: %v", err)
+		}
+	})
+
+	var categoriesBefore, typesBefore int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories`).Scan(&categoriesBefore); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&typesBefore); err != nil {
+		t.Fatal(err)
+	}
+
+	// Lose the marker, the way a dump restore or an admin delete would.
+	if _, err := db.DB.Exec(`DELETE FROM site_settings WHERE key = 'directory_catalog_v2'`); err != nil {
+		t.Fatal(err)
+	}
+
+	handlers.MigrateDirectoryCatalog()
+
+	var stillThere int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entries WHERE id = $1`, entryID).Scan(&stillThere); err != nil {
+		t.Fatal(err)
+	}
+	if stillThere != 1 {
+		t.Fatal("the boot migrator deleted an entry with no directory_catalog_v2 flag")
+	}
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM tags WHERE id = $1`, tagID).Scan(&stillThere); err != nil {
+		t.Fatal(err)
+	}
+	if stillThere != 1 {
+		t.Fatal("the boot migrator deleted a tag with no directory_catalog_v2 flag")
+	}
+
+	var categoriesAfter, typesAfter int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_categories`).Scan(&categoriesAfter); err != nil {
+		t.Fatal(err)
+	}
+	if categoriesAfter < categoriesBefore {
+		t.Fatalf("entry_categories = %d, was %d", categoriesAfter, categoriesBefore)
+	}
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_types`).Scan(&typesAfter); err != nil {
+		t.Fatal(err)
+	}
+	if typesAfter != typesBefore {
+		t.Fatalf("entry_types = %d, was %d", typesAfter, typesBefore)
+	}
+
+	// The marker stays the hand-run migration's business.
+	var flagRows int
+	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM site_settings WHERE key = 'directory_catalog_v2'`).Scan(&flagRows); err != nil {
+		t.Fatal(err)
+	}
+	if flagRows != 0 {
+		t.Fatal("the boot migrator wrote directory_catalog_v2 back")
 	}
 }
 

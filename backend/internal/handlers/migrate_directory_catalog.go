@@ -8,9 +8,13 @@ import (
 	"log"
 )
 
+// directoryCatalogV2Key records that the one-shot catalog reset in
+// migrations/0001_directory_catalog_v2.sql has been run by hand. Nothing on the
+// boot path writes it, and nothing on the boot path deletes rows when it is
+// missing.
 const directoryCatalogV2Key = "directory_catalog_v2"
 
-// Tables wiped by the catalog migration or emptied via CASCADE. entry_tags and
+// Tables the catalog seed inserts into, directly or via CASCADE. entry_tags and
 // entry_members use composite primary keys and have no serial sequence.
 var directorySerialTables = []string{
 	"entries",
@@ -44,8 +48,12 @@ $migrate$`, table, table, table, table, table)
 	return nil
 }
 
-// MigrateDirectoryCatalog wipes directory rows once and seeds the two-level
-// category tree and three entry types. Guarded by site_settings.directory_catalog_v2.
+// MigrateDirectoryCatalog brings the directory schema and the seed catalog up to
+// date on every start. It adds rows and never removes a listing, a tag or a type.
+// Its one delete is dropVenueOnlySportpalya, which removes a single seeded
+// category only while nothing points at it. The one-shot wipe and reseed that
+// created catalog v2 is in migrations/0001_directory_catalog_v2.sql and is run by
+// hand.
 func MigrateDirectoryCatalog() {
 	schemaStmts := []string{
 		`ALTER TABLE entry_categories ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES entry_categories(id)`,
@@ -73,90 +81,14 @@ func MigrateDirectoryCatalog() {
 		}
 	}
 
-	var flag string
-	err := db.DB.QueryRow(`SELECT value FROM site_settings WHERE key = $1`, directoryCatalogV2Key).Scan(&flag)
-	if err != nil && err != sql.ErrNoRows {
-		log.Printf("MigrateDirectoryCatalog (flag check): %v", err)
-		return
-	}
-	alreadyDone := err == nil && flag == "1"
-
-	if !alreadyDone {
-		tx, err := db.DB.Begin()
-		if err != nil {
-			log.Printf("MigrateDirectoryCatalog (begin): %v", err)
-			return
-		}
-		defer tx.Rollback()
-
-		wipeStmts := []string{
-			`DELETE FROM entries`,
-			`DELETE FROM tags`,
-			`DELETE FROM entry_categories`,
-			`DELETE FROM entry_types`,
-		}
-		for _, stmt := range wipeStmts {
-			if _, err := tx.Exec(stmt); err != nil {
-				log.Printf("MigrateDirectoryCatalog (wipe): %v", err)
-				return
-			}
-		}
-
-		for _, t := range utils.DirectoryTypes() {
-			if _, err := tx.Exec(
-				`INSERT INTO entry_types (id, name) VALUES ($1, $2)`,
-				t.ID, t.Name,
-			); err != nil {
-				log.Printf("MigrateDirectoryCatalog (type %s): %v", t.Name, err)
-				return
-			}
-		}
-
-		insertCat := func(node utils.DirectoryNode) error {
-			slug := utils.Slugify(node.Name)
-			_, err := tx.Exec(
-				`INSERT INTO entry_categories (id, name, slug, parent_id, sort_order) VALUES ($1, $2, $3, $4, $5)`,
-				node.ID, node.Name, slug, node.ParentID, node.SortOrder,
-			)
-			return err
-		}
-
-		for _, node := range utils.DirectoryParents() {
-			if err := insertCat(node); err != nil {
-				log.Printf("MigrateDirectoryCatalog (parent %s): %v", node.Name, err)
-				return
-			}
-		}
-		for _, node := range utils.DirectoryChildren() {
-			if err := insertCat(node); err != nil {
-				log.Printf("MigrateDirectoryCatalog (child %s): %v", node.Name, err)
-				return
-			}
-		}
-
-		if _, err := tx.Exec(
-			`INSERT INTO site_settings (key, value) VALUES ($1, '1')
-			 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-			directoryCatalogV2Key,
-		); err != nil {
-			log.Printf("MigrateDirectoryCatalog (flag): %v", err)
-			return
-		}
-
-		if err := tx.Commit(); err != nil {
-			log.Printf("MigrateDirectoryCatalog (commit): %v", err)
-			return
-		}
-
-		log.Println("Directory catalog v2 seeded")
-	}
-
+	ensureDirectoryTypes()
+	ensureDirectoryNodes()
+	// After the seed inserts, so a sequence left behind by explicit ids is fixed.
 	if err := alignDirectorySequences(db.DB); err != nil {
 		log.Printf("MigrateDirectoryCatalog (align sequences): %v", err)
 		return
 	}
 	dropVenueOnlySportpalya()
-	ensureDirectoryNodes()
 	backfillCategoryLinks()
 }
 
@@ -192,6 +124,31 @@ func backfillCategoryLinks() {
 		if _, err := db.DB.Exec(stmt); err != nil {
 			log.Printf("MigrateDirectoryCatalog (category links): %v", err)
 			return
+		}
+	}
+}
+
+// ensureDirectoryTypes inserts the three closed entry types that are not in the
+// database yet. An existing id or name is left alone, so an admin rename is kept.
+func ensureDirectoryTypes() {
+	for _, t := range utils.DirectoryTypes() {
+		var existing int
+		err := db.DB.QueryRow(
+			`SELECT id FROM entry_types WHERE id = $1 OR name = $2`,
+			t.ID, t.Name,
+		).Scan(&existing)
+		if err == nil {
+			continue
+		}
+		if err != sql.ErrNoRows {
+			log.Printf("MigrateDirectoryCatalog (type lookup %s): %v", t.Name, err)
+			continue
+		}
+		if _, err := db.DB.Exec(
+			`INSERT INTO entry_types (id, name) VALUES ($1, $2)`,
+			t.ID, t.Name,
+		); err != nil {
+			log.Printf("MigrateDirectoryCatalog (type %s): %v", t.Name, err)
 		}
 	}
 }
