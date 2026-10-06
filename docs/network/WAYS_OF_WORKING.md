@@ -3,8 +3,9 @@
 How the four Lámsza apps are organised, and the rules that let one Paperclip
 board drive four independent repos.
 
-Approved on BOG-14, 2026-10-06. This file is the source of truth. If a task
-comment and this file disagree, this file wins until it is changed here.
+Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. This file is the
+source of truth. If a task comment and this file disagree, this file wins until
+it is changed here.
 
 ---
 
@@ -68,7 +69,7 @@ workspace, so every agent already has it.
 
 ---
 
-## 4. The five rules
+## 4. The six rules
 
 ### R1 — Every issue names its app
 
@@ -98,7 +99,29 @@ Two runs editing the same repo at the same time cause conflicts. Before you
 start, check that no other run holds that app. Cross-app work is sequential by
 R3, not parallel.
 
-### R5 — What is true for one app is true for all four
+### R5 — A task is not done until its code is committed
+
+Write every agent-driven status change through the script in the `lamsza` repo:
+
+```bash
+scripts/paperclip-issue-update.sh done --comment "what shipped"
+```
+
+It refuses to set `done` while `git status --porcelain` shows anything, prints
+the dirty paths, and exits non-zero. On success it appends the task's
+branch-only commits to the comment, so a reviewer can see what shipped.
+
+Pass `--allow-dirty` only when the dirty files are genuinely not the task's
+output — a task that produced a brief, a decision or a review, or a workspace
+shared with another run. The flag must be typed on purpose; the default is safe.
+
+Why this rule exists: BOG-32 found four tasks (BOG-3, BOG-4, BOG-5, BOG-7)
+marked `done` while all of their code sat uncommitted on one feature branch.
+None had shipped, and the work was discarded.
+
+Run `scripts/tests/paperclip-issue-update.test.sh` after changing the script.
+
+### R6 — What is true for one app is true for all four
 
 These standards are network-wide:
 
