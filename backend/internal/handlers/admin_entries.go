@@ -237,6 +237,20 @@ func scanEntryCategory(row interface {
 	return sc, nil
 }
 
+// categoryOccupied reports whether anything still points at the category.
+// Entries and websites reach a category two ways: through the link tables, and
+// through their own category_id column. Both block the delete, because the
+// category_id foreign keys are NO ACTION.
+func categoryOccupied(q directory.Queryer, id int) (bool, error) {
+	var occupied bool
+	err := q.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM entry_category_links WHERE category_id = $1)
+			OR EXISTS(SELECT 1 FROM website_category_links WHERE category_id = $1)
+			OR EXISTS(SELECT 1 FROM entries WHERE category_id = $1)
+			OR EXISTS(SELECT 1 FROM websites WHERE category_id = $1)`, id).Scan(&occupied)
+	return occupied, err
+}
+
 func validateCategoryParent(parentID *int) error {
 	if parentID == nil {
 		return nil
@@ -437,19 +451,13 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 					http.Error(w, err.Error(), 500)
 					return
 				}
-				var entries int
-				if err := tx.QueryRow(`SELECT COUNT(*) FROM entry_category_links WHERE category_id = $1`, id).Scan(&entries); err != nil {
+				occupied, err := categoryOccupied(tx, id)
+				if err != nil {
 					tx.Rollback()
 					http.Error(w, err.Error(), 500)
 					return
 				}
-				var websites int
-				if err := tx.QueryRow(`SELECT COUNT(*) FROM website_category_links WHERE category_id = $1`, id).Scan(&websites); err != nil {
-					tx.Rollback()
-					http.Error(w, err.Error(), 500)
-					return
-				}
-				if entries > 0 || websites > 0 {
+				if occupied {
 					tx.Rollback()
 					http.Error(w, "Előbb helyezd át a bejegyzéseket.", http.StatusConflict)
 					return
@@ -504,17 +512,12 @@ func HandleAdminEntryCategories(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		var entries int
-		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM entry_category_links WHERE category_id = $1`, id).Scan(&entries); err != nil {
+		occupied, err := categoryOccupied(db.DB, id)
+		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		var websites int
-		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM website_category_links WHERE category_id = $1`, id).Scan(&websites); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		if entries > 0 || websites > 0 {
+		if occupied {
 			http.Error(w, "Előbb helyezd át a bejegyzéseket.", http.StatusConflict)
 			return
 		}

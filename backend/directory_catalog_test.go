@@ -284,6 +284,14 @@ func TestLegacyCategoryMigrateDoesNotPruneTree(t *testing.T) {
 
 func restoreSeedEtteremCategory(t *testing.T) {
 	t.Helper()
+	// Drop any stray copy first. The name is unique, so the seed row cannot go
+	// back while a duplicate is still there.
+	if _, err := db.DB.Exec(`
+		DELETE FROM entry_categories c
+		WHERE c.name = 'Étterem' AND c.id != 11
+		AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.category_id = c.id)`); err != nil {
+		t.Fatal(err)
+	}
 	var hasSeed bool
 	if err := db.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM entry_categories WHERE id = 11)`).Scan(&hasSeed); err != nil {
 		t.Fatal(err)
@@ -294,12 +302,6 @@ func restoreSeedEtteremCategory(t *testing.T) {
 			VALUES (11, 'Étterem', 'etterem', 1, 1)`); err != nil {
 			t.Fatal(err)
 		}
-	}
-	if _, err := db.DB.Exec(`
-		DELETE FROM entry_categories c
-		WHERE c.name = 'Étterem' AND c.id != 11
-		AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.category_id = c.id)`); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -322,6 +324,14 @@ func TestDeleteCategoryRequiresMove(t *testing.T) {
 	if err := json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
+	// Drop the probe rows even when an assertion below fails, so the next run
+	// does not hit unique_category_name on the recreate above.
+	t.Cleanup(func() {
+		if _, err := db.DB.Exec(`DELETE FROM entries WHERE name = 'Próba étterem'`); err != nil {
+			t.Errorf("cleanup entry: %v", err)
+		}
+		restoreSeedEtteremCategory(t)
+	})
 	if _, err := db.DB.Exec(`
 		INSERT INTO entries (name, category_id, type_id, languages)
 		VALUES ('Próba étterem', $1, 2, '{HU}')`, created.ID); err != nil {
@@ -342,8 +352,6 @@ func TestDeleteCategoryRequiresMove(t *testing.T) {
 	if cat != 12 {
 		t.Fatalf("moved category = %d, want 12 Kávézó", cat)
 	}
-	_, _ = db.DB.Exec(`DELETE FROM entries WHERE name = 'Próba étterem'`)
-	restoreSeedEtteremCategory(t)
 }
 
 func TestCategoryBrowseIncludesWebshop(t *testing.T) {
