@@ -26,10 +26,15 @@ drafted here said otherwise; this line replaces it.
 The grant covers **git only**. It does not grant anything on the server. An agent still never
 deploys, never restarts a service, and never changes a live config.
 
-⚠️ **One condition to re-check:** the plan is to wire each repo's `main` to production. On the
-day that happens, a merge to `main` *becomes* a deploy, and this grant would hand agents the
-deploy button by a side door. Attila should re-confirm the rule then — likely as: agents merge
-to a staging branch, Attila promotes to `main`.
+**The reason Attila gave, and the limit that comes with it:** `main` is not connected to
+production, and will not be for now. A push is therefore only a push. His words: *"until then
+you are allowed to commit, merge."*
+
+⚠️ **So the grant expires on its own condition.** The plan is to wire each repo's `main` to
+production. On the day that happens, a merge to `main` *becomes* a deploy — the reason behind
+the grant is gone, and the grant goes with it. Agents stop merging to `main` at that point and
+wait for Attila to set the new rule. The usual shape: agents merge to a staging branch, Attila
+promotes to `main`.
 
 ## What this means in practice
 
