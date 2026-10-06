@@ -170,19 +170,21 @@ These standards are network-wide:
 - **`docs/LOCAL_DEV_CHECKS.md` is the definition of "verified":** network up,
   every API smoked, every suite run, output recorded.
 
-### R7 — CI is a gate only if somebody reads it. Today that somebody is you
+### R7 — CI is a gate only if somebody reads it
 
-**What CI is.** GitHub Actions, on every push and every pull request. Two jobs
-per repo, named **`frontend`** and **`backend`** — two and not one, because when
-it was a single job a frontend failure marked the Go steps "skipped" and the
-backend went unbuilt and untested for hours without the summary saying so.
+**What CI is.** GitHub Actions, on every push and every pull request. Two test
+jobs per repo, named **`frontend`** and **`backend`** — two and not one, because
+when it was a single job a frontend failure marked the Go steps "skipped" and
+the backend went unbuilt and untested for hours without the summary saying so.
+All four repos have the same two job names, which is what makes one required
+status-check setting work across the network.
 
-| Repo | Workflow | Status |
-| --- | --- | --- |
-| `waaab/lamsza` | `.github/workflows/build-test.yml` | on `main` |
-| `waaab/lamsza-admin` | `.github/workflows/build.yml` | on `main` |
-| `waaab/lamsza-szotar` | `.github/workflows/build-test.yml` | on `main` |
-| `waaab/lamsza-jatszoter` | `.github/workflows/build-test.yml` | on `main` |
+| Repo | Workflow | Test jobs | `ci-status` |
+| --- | --- | --- | --- |
+| `waaab/lamsza` | `.github/workflows/build-test.yml` | on `main` | yes |
+| `waaab/lamsza-admin` | `.github/workflows/build.yml` | on `main` | yes |
+| `waaab/lamsza-szotar` | `.github/workflows/build-test.yml` | on `main` | yes |
+| `waaab/lamsza-jatszoter` | `.github/workflows/build-test.yml` | on `main` | yes |
 
 **Every backend job runs `go test -count=1 ./...`.** No workflow excludes a Go
 package by name any more — BOG-53 removed the last three exclusions. Three of
@@ -208,36 +210,81 @@ weaker in one: it will not catch something that only breaks on real content.
 A green CI therefore still does **not** mean the localhost checks passed. It is
 the weaker of the two gates, not the stronger.
 
-**Nothing reads CI automatically.** As of 2026-10-06, all four of these are true:
+**How a red CI reaches a person: Attila chose both, on BOG-54.** A notification
+*and* branch protection with required checks. CI that nobody reads is not a
+gate — `lamsza` CI stayed red across four pushes in 17 minutes, three of them
+straight onto `main`, before BOG-44 noticed.
 
-- no branch protection on `main` in any of the four repos, so no required status
-  check;
-- agents merge to `main` with `git push`, not through a pull request, so nobody
-  ever sees a red check in a PR UI;
-- nothing routes an Actions failure to this board or to the owner;
-- and polling it from this machine does not work either. There is no `gh` CLI
-  here, git auth is SSH-key only, unauthenticated `api.github.com` reads from
-  this machine's IP are rate-limited and currently return `403`, and two of the
-  four repos (`lamsza-szotar`, `lamsza-jatszoter`) are private.
+**Half one, shipped: the `ci-status` job.** A third job in every workflow mirrors
+the state of CI on `main` into one GitHub issue, titled exactly
+**`CI is red on main`**. It opens that issue when `main` goes red, comments on it
+on each further red push instead of filing duplicates, and **closes it on the
+next green run**. So the issue existing *is* the answer to "is `main` green right
+now", readable without credentials by anyone who can see the repo.
 
-That is how `lamsza` CI stayed red across four pushes in 17 minutes, three of
-them straight onto `main`, before BOG-44 noticed.
+It had to be pushed from inside Actions rather than polled from here, because
+nothing on this machine can read CI: no `gh` CLI, git auth is SSH-key only,
+unauthenticated `api.github.com` reads from this IP are rate-limited to zero, and
+two of the four repos (`lamsza-szotar`, `lamsza-jatszoter`) are private. Inside
+Actions, `GITHUB_TOKEN` already exists, so this needs no secret configured and
+works the same in a private repo.
+
+- Logic: `.github/ci-status-issue.sh`, the same file in all four repos.
+- It only fires on pushes to `main`: a pull request shows its own checks, and a
+  feature branch being red mid-work is normal and must not notify anyone.
+- A cancelled or skipped run is not reported as a failure.
+- After editing it, run `bash .github/ci-status-issue.test.sh` (needs `jq`, no
+  network, no credential — it fakes `gh` and checks the real `--jq` filter). That
+  test is **not** wired into any automatic gate; it is on you to run it.
+- **One repo setting could still block it:** if a repo's *Settings > Actions >
+  Workflow permissions* is "read repository contents", `GITHUB_TOKEN` cannot open
+  an issue and the `ci-status` job itself goes red. That is visible rather than
+  silent, but it has not been verified from here — no agent can read Actions
+  output on this machine.
+
+**Half two, specified but not applied: branch protection.** Required status
+checks on `main` need a GitHub token or the web UI, and neither exists here. The
+exact intended settings are committed as
+`docs/network/apply-branch-protection.sh` — run it with `--apply` and a
+`GITHUB_TOKEN` and all four repos are done in one command. Run it with no
+arguments to print the payload and change nothing.
+
+Three things in that spec are deliberate and worth knowing before it is applied:
+
+- **Required contexts are `frontend` and `backend` only — never `ci-status`.**
+  `ci-status` is gated on `refs/heads/main`, so it never runs on a pull-request
+  branch, and a required check that never reports blocks every pull request
+  forever.
+- **"Include administrators" must be on, and that constrains Attila too.** This
+  is the one that decides whether the setting does anything: agents push with the
+  owner's SSH key, so to GitHub every agent push is an admin push, and admins
+  bypass required checks. With it off the protection is decorative. The cost is
+  that direct pushes to `main` stop working for the owner as well; it is lifted
+  from *Settings > Branches* when a hand-fix is needed.
+- **No required reviewer.** One engineering agent and one owner — requiring a
+  review would mean nothing could ever merge. The gate is "green", not "seen".
+
+**When it is applied, the git grant changes shape.** Not its scope — still git
+only, still nothing on the server — but the mechanics in
+`docs/AGENT_ENVIRONMENT_POLICY.md`: an agent stops pushing straight to `main` and
+instead pushes a branch, lets `frontend` and `backend` go green, then merges the
+pull request. Until it is applied, pushing to `main` is still how work lands.
 
 **So the rule is: the local gate is the real gate.** Until that changes,
 
 1. Run the `docs/LOCAL_DEV_CHECKS.md` checks your change touches **before** you
-   push, not after. CI will not catch what you skipped — nobody is watching it.
+   push, not after. `ci-status` tells someone that `main` broke; it does not
+   tell them about what CI never ran — the real `npm run build` against a live
+   backend, and anything that only breaks on real content rather than on the
+   empty schema CI builds.
 2. Never merge to `main` with a check you already know is red. A red local check
    is a blocker whether or not anything reports it.
 3. `npm run build` in `lamsza` only counts with the backend up on 3001. Without
    it the prerender fails with `ECONNREFUSED`, the build still exits 0, and the
    error states get baked into the pages.
 
-**Open.** How a red CI reaches a person without an agent going to look — a
-notification, branch protection with `frontend` and `backend` as required
-checks, or both — is the owner's decision on BOG-54, because required status
-checks would change the standing git grant in
-`docs/AGENT_ENVIRONMENT_POLICY.md`. Record the answer here when it lands.
+**Open.** Only the applying of branch protection, which needs a GitHub token
+this machine does not have — tracked on BOG-54. Everything else in R7 is live.
 
 ---
 
