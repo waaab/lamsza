@@ -5,7 +5,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "vite build",
+		"build": "npm run preflight && vite build",
+		"build:no-preflight": "vite build",
+		"preflight": "node scripts/preflight-api.js",
 		"build:extension": "npm run build && node scripts/extract-inline-scripts.js && rm -rf extension && cp -r dist extension && cp manifest.json extension/ && cp static/icon.png extension/",
 		"preview": "vite preview",
 		"test": "node --test \"tests/*.test.js\"",
