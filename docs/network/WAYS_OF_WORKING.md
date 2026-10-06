@@ -234,8 +234,15 @@ works the same in a private repo.
   feature branch being red mid-work is normal and must not notify anyone.
 - A cancelled or skipped run is not reported as a failure.
 - After editing it, run `bash .github/ci-status-issue.test.sh` (needs `jq`, no
-  network, no credential — it fakes `gh` and checks the real `--jq` filter). That
-  test is **not** wired into any automatic gate; it is on you to run it.
+  network, no credential — it fakes `gh` and checks the real `--jq` filter).
+- **That test also runs as a step of the `frontend` job, in all four repos**, so a
+  broken receiver fails a check somebody watches instead of failing silently. It
+  has to be guarded from outside itself: if `ci-status-issue.sh` breaks, the only
+  symptom is the `ci-status` job going red on `main` — and the thing that reports
+  a red `main` is that same script. It sits in `frontend` because `backend` runs
+  from `backend/` and waits on a database; in the three repos whose `frontend` job
+  runs from `frontend/` the step needs `working-directory: .`, because the test
+  lives at the repo root.
 - **One repo setting could still block it:** if a repo's *Settings > Actions >
   Workflow permissions* is "read repository contents", `GITHUB_TOKEN` cannot open
   an issue and the `ci-status` job itself goes red. That is visible rather than

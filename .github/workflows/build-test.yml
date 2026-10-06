@@ -13,6 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The receiver below has no other gate, and it is the one script whose
+      # failure is self-concealing: if ci-status-issue.sh breaks, the only symptom
+      # is the ci-status job going red on `main`, and the thing that reports a red
+      # `main` is that same script. So it is tested inside a job somebody watches.
+      # It lives in `frontend` rather than `backend` because the latter runs
+      # everything from backend/. Hermetic: fakes `gh`, no network, needs only jq,
+      # which is on the runner image. Takes under a second.
+      - name: Test the CI status receiver
+        run: bash .github/ci-status-issue.test.sh
+
       # 22, not 20: the test suite uses the node:test runner features that
       # landed after 20 and will not parse on it.
       - uses: actions/setup-node@v4
