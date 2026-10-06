@@ -10,7 +10,7 @@ import (
 
 func TestOwnerPatchUpdatesTags(t *testing.T) {
 	entryID, slug := createEntry(t, "Owner Tags", mustLocID(t))
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	var typeID, categoryID, locationID int
 	err := dbQueryIDs(t, entryID, &typeID, &categoryID, &locationID)
@@ -57,5 +57,5 @@ func dbQueryIDs(t *testing.T, entryID any, typeID, categoryID, locationID *int) 
 	t.Helper()
 	return db.DB.QueryRow(`
 		SELECT type_id, category_id, location_id FROM entries WHERE id = $1
-	`, int(entryID.(float64))).Scan(typeID, categoryID, locationID)
+	`, entryID).Scan(typeID, categoryID, locationID)
 }

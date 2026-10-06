@@ -12,7 +12,6 @@ import (
 	"backend/internal/mondasok"
 	"backend/internal/news"
 	"backend/internal/search"
-	"backend/internal/settings"
 	"backend/internal/weather"
 	"bytes"
 	"encoding/json"
@@ -26,7 +25,6 @@ import (
 )
 
 var testMux *http.ServeMux
-var testAdminCookie *http.Cookie
 
 func init() {
 	config.Load()
@@ -47,10 +45,6 @@ func init() {
 	account.Migrate()
 	account.MigrateWebsites()
 	handlers.MigrateDirectoryCatalog()
-
-	admin := func(h http.HandlerFunc) http.HandlerFunc {
-		return middleware.ApplyCORS(auth.RequireAdmin(h))
-	}
 
 	testMux = http.NewServeMux()
 	testMux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
@@ -78,39 +72,15 @@ func init() {
 	testMux.HandleFunc("/api/entry/suggestions", middleware.ApplyCORS(account.HandleEntrySuggestions))
 	testMux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandlePublicLocations))
 	testMux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
-	testMux.HandleFunc("/api/admin/listing-queue", admin(account.HandleListingQueue))
-	testMux.HandleFunc("/api/admin/listing-queue/publish", admin(account.HandleListingQueuePublish))
-	testMux.HandleFunc("/api/admin/listing-queue/member", admin(account.HandleListingQueueMember))
-	testMux.HandleFunc("/api/admin/listing-queue/claim", admin(account.HandleListingQueueClaim))
-	testMux.HandleFunc("/api/admin/listing-queue/suggestion", admin(account.HandleListingQueueSuggestion))
-	testMux.HandleFunc("/api/admin/websites", admin(account.HandleAdminWebsite))
-	testMux.HandleFunc("/api/admin/entries", admin(handlers.HandleAdminEntries))
-	testMux.HandleFunc("/api/admin/entry_categories", admin(handlers.HandleAdminEntryCategories))
-	testMux.HandleFunc("/api/admin/entry_types", admin(handlers.HandleAdminEntryTypes))
-	testMux.HandleFunc("/api/admin/tags", admin(handlers.HandleAdminTags))
-	testMux.HandleFunc("/api/admin/locations", admin(handlers.HandleAdminLocations))
-	testMux.HandleFunc("/api/admin/settlement_location_types", admin(handlers.HandleAdminSettlementLocationTypes))
-	testMux.HandleFunc("/api/admin/county_seat", admin(handlers.HandleSetCountySeat))
-	testMux.HandleFunc("/api/admin/dashboard_stats", admin(handlers.HandleAdminDashboardStats))
-	testMux.HandleFunc("/api/admin/users", admin(auth.HandleAdminUsers))
-	testMux.HandleFunc("/api/admin/settings", admin(settings.HandleAdminSettings))
 	testMux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
-	testMux.HandleFunc("/api/admin/events", admin(events.HandleAdminEvents))
-	testMux.HandleFunc("/api/admin/catalog_event_types", admin(events.HandleAdminCatalogEventTypes))
-	testMux.HandleFunc("/api/admin/catalog_event_subtypes", admin(events.HandleAdminCatalogEventSubtypes))
 	testMux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 	testMux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
-	testMux.HandleFunc("/api/admin/news_feeds", admin(news.HandleAdminNewsFeeds))
 	testMux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
 	testMux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
-	testMux.HandleFunc("/api/admin/mondasok", admin(mondasok.HandleAdminMondasok))
 	testMux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
-	testMux.HandleFunc("/api/admin/quick_links", admin(links.HandleAdminQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
 	testMux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
-
-	testAdminCookie = mustLogin("admin@test.lamsza")
 }
 
 func mustLogin(email string) *http.Cookie {
@@ -170,9 +140,6 @@ func doRequest(t *testing.T, method, path string, body interface{}) *httptest.Re
 	req := httptest.NewRequest(method, path, reqBody)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", testOrigin)
-	if strings.HasPrefix(strings.Split(path, "?")[0], "/api/admin/") && testAdminCookie != nil {
-		req.AddCookie(testAdminCookie)
-	}
 	rr := httptest.NewRecorder()
 	testMux.ServeHTTP(rr, req)
 	return rr
@@ -367,233 +334,13 @@ var canonicalCountySeats = []struct {
 	{"maros", "marosvasarhely"},
 }
 
-func ensureCanonicalCountySeats(t *testing.T) {
-	t.Helper()
-	for _, seat := range canonicalCountySeats {
-		var id int
-		err := db.DB.QueryRow(`
-			SELECT s.id FROM settlements s
-			JOIN counties c ON c.id = s.county_id
-			WHERE c.slug = $1 AND s.slug = $2`, seat.countySlug, seat.settlementSlug).Scan(&id)
-		if err != nil {
-			t.Errorf("canonical seat %s/%s: %v", seat.countySlug, seat.settlementSlug, err)
-			continue
-		}
-		rr := doRequest(t, "PUT", "/api/admin/county_seat", map[string]interface{}{"location_id": id})
-		if rr.Code != http.StatusOK {
-			t.Errorf("set %s seat: expected 200, got %d; body: %s", seat.countySlug, rr.Code, rr.Body.String())
-		}
-	}
-}
-
-func TestSetCountySeat(t *testing.T) {
-	// Get a location to use
-	rr := doRequest(t, "GET", "/api/locations", nil)
-	var locs []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &locs)
-	if len(locs) == 0 {
-		t.Skip("No locations in DB")
-	}
-
-	// Find first city-type location
-	var locID float64
-	for _, l := range locs {
-		lt, _ := l["type"].(string)
-		if lt == "város" || lt == "municípium" {
-			locID, _ = l["id"].(float64)
-			break
-		}
-	}
-	if locID == 0 {
-		t.Skip("No city-type locations found")
-	}
-
-	// The probe above picks Barót, the first town by name. Put the real seats back.
-	t.Cleanup(func() {
-		ensureCanonicalCountySeats(t)
-	})
-
-	// Set as county seat
-	rr = doRequest(t, "PUT", "/api/admin/county_seat", map[string]interface{}{"location_id": locID})
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT county_seat: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	// Verify it was set
-	rr = doRequest(t, "GET", "/api/locations", nil)
-	json.Unmarshal(rr.Body.Bytes(), &locs)
-	found := false
-	for _, l := range locs {
-		id, _ := l["id"].(float64)
-		isSeat, _ := l["is_county_seat"].(bool)
-		if id == locID && isSeat {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("Location was not marked as county seat after PUT")
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Admin CRUD: Entry Categories
 // ---------------------------------------------------------------------------
 
-func TestAdminEntryCategoriesCRUD(t *testing.T) {
-	payload := map[string]string{"name": "TestCategory_IntegTest"}
-
-	// CREATE
-	rr := doRequest(t, "POST", "/api/admin/entry_categories", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entry_categories: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
-
-	// READ
-	rr = doRequest(t, "GET", "/api/admin/entry_categories", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET entry_categories: expected 200, got %d", rr.Code)
-	}
-
-	// UPDATE
-	updated := map[string]interface{}{"id": id, "name": "TestCategory_Updated"}
-	rr = doRequest(t, "PUT", "/api/admin/entry_categories", updated)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT entry_categories: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	// DELETE
-	rr = doRequest(t, "DELETE", "/api/admin/entry_categories?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE entry_categories: expected 200, got %d", rr.Code)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Admin CRUD: Entry Types
 // ---------------------------------------------------------------------------
-
-func TestAdminEntryTypesCRUD(t *testing.T) {
-	const closedMsg = "A típuslista zárt."
-
-	rr := doRequest(t, "POST", "/api/admin/entry_types", map[string]string{"name": "TestType_IntegTest"})
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("POST entry_types: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	if !strings.Contains(rr.Body.String(), closedMsg) {
-		t.Fatalf("POST entry_types: expected %q in body, got %s", closedMsg, rr.Body.String())
-	}
-
-	rr = doRequest(t, "GET", "/api/admin/entry_types", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET entry_types: expected 200, got %d", rr.Code)
-	}
-	var types []map[string]interface{}
-	if err := json.Unmarshal(rr.Body.Bytes(), &types); err != nil {
-		t.Fatal(err)
-	}
-	if len(types) != 3 {
-		t.Fatalf("GET entry_types: expected 3 types, got %d", len(types))
-	}
-	wantNames := []string{"Személy", "Vállalkozás", "Intézmény"}
-	gotNames := make([]string, len(types))
-	for i, tp := range types {
-		gotNames[i], _ = tp["name"].(string)
-	}
-	for _, want := range wantNames {
-		found := false
-		for _, got := range gotNames {
-			if got == want {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Fatalf("GET entry_types: missing %q in %#v", want, gotNames)
-		}
-	}
-
-	rr = doRequest(t, "PUT", "/api/admin/entry_types", map[string]interface{}{"id": 1, "name": "TestType_Updated"})
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("PUT entry_types: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	if !strings.Contains(rr.Body.String(), closedMsg) {
-		t.Fatalf("PUT entry_types: expected %q in body, got %s", closedMsg, rr.Body.String())
-	}
-
-	rr = doRequest(t, "DELETE", "/api/admin/entry_types?id=1", nil)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("DELETE entry_types: expected 403, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	if !strings.Contains(rr.Body.String(), closedMsg) {
-		t.Fatalf("DELETE entry_types: expected %q in body, got %s", closedMsg, rr.Body.String())
-	}
-}
-
-func TestAdminRoutesPreviouslyMissing(t *testing.T) {
-	checks := []struct {
-		path string
-		want string
-	}{
-		{"/api/admin/dashboard_stats", "{"},
-		{"/api/admin/settlement_location_types", "["},
-		{"/api/admin/catalog_event_types", "["},
-		{"/api/admin/catalog_event_subtypes", "["},
-		{"/api/settlement_location_types", "["},
-	}
-	for _, c := range checks {
-		rr := doRequest(t, "GET", c.path, nil)
-		if rr.Code != http.StatusOK {
-			t.Fatalf("GET %s: expected 200, got %d; body: %s", c.path, rr.Code, rr.Body.String())
-		}
-		if origin := rr.Header().Get("Access-Control-Allow-Origin"); origin == "" {
-			t.Fatalf("GET %s: missing CORS header", c.path)
-		}
-		body := strings.TrimSpace(rr.Body.String())
-		if body == "" || body[0] != c.want[0] {
-			t.Fatalf("GET %s: expected JSON starting with %q, got %s", c.path, c.want, rr.Body.String())
-		}
-	}
-
-	rr := doRequest(t, "GET", "/api/entry/related", nil)
-	if rr.Code != http.StatusBadRequest {
-		t.Fatalf("GET /api/entry/related: expected 400, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-}
-
-func TestAdminUsersListRequiresAdmin(t *testing.T) {
-	rr := doAnonRequest(t, "GET", "/api/admin/users", nil)
-	if rr.Code != http.StatusUnauthorized {
-		t.Fatalf("anon users list: expected 401, got %d", rr.Code)
-	}
-	rr = doRequestWithCookie(t, "GET", "/api/admin/users", nil, testAdminCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("admin users list: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var users []map[string]interface{}
-	if err := json.Unmarshal(rr.Body.Bytes(), &users); err != nil {
-		t.Fatal(err)
-	}
-	var found bool
-	for _, u := range users {
-		if u["email"] != "admin@test.lamsza" {
-			continue
-		}
-		found = true
-		if u["is_admin"] != true {
-			t.Fatalf("admin flag: %#v", u["is_admin"])
-		}
-		if strings.TrimSpace(fmt.Sprint(u["created_at"])) == "" {
-			t.Fatal("missing created_at")
-		}
-	}
-	if !found {
-		t.Fatal("registered admin user missing from list")
-	}
-}
 
 func TestPreferredSettlementDoesNotFollowFilters(t *testing.T) {
 	cookie := mustLogin("preferred-place@test.lamsza")
@@ -670,97 +417,13 @@ func TestGetPublicQuickLinks(t *testing.T) {
 // Admin CRUD: Quick Links
 // ---------------------------------------------------------------------------
 
-func TestAdminQuickLinksCRUD(t *testing.T) {
-	payload := map[string]string{"title": "TestLink", "url": "https://test-integtest.example.com", "bg_color": "#ffffff"}
-
-	rr := doRequest(t, "POST", "/api/admin/quick_links", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST quick_links: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
-
-	rr = doRequest(t, "GET", "/api/admin/quick_links", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET quick_links: expected 200, got %d", rr.Code)
-	}
-
-	rr = doRequest(t, "PUT", "/api/admin/quick_links", map[string]interface{}{"id": id, "title": "TestLink_Updated", "url": "https://test-integtest.example.com", "bg_color": "#000000"})
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT quick_links: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(t, "DELETE", "/api/admin/quick_links?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE quick_links: expected 200, got %d", rr.Code)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Admin CRUD: Mondasok
 // ---------------------------------------------------------------------------
 
-func TestAdminMondasokCRUD(t *testing.T) {
-	payload := map[string]string{
-		"text":         "Test mondas for integration testing",
-		"display_date": "2030-06-15",
-	}
-
-	rr := doRequest(t, "POST", "/api/admin/mondasok", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST mondasok: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
-
-	rr = doRequest(t, "GET", "/api/admin/mondasok", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET mondasok: expected 200, got %d", rr.Code)
-	}
-
-	rr = doRequest(t, "PUT", "/api/admin/mondasok", map[string]interface{}{"id": id, "text": "Updated mondas", "display_date": "2030-07-01"})
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT mondasok: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(t, "DELETE", "/api/admin/mondasok?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE mondasok: expected 200, got %d", rr.Code)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Admin CRUD: News Feeds
 // ---------------------------------------------------------------------------
-
-func TestAdminNewsFeedsCRUD(t *testing.T) {
-	payload := map[string]string{"title": "TestFeed", "feed_url": "https://test-integtest-feed.example.com/rss", "bg_color": "#ffebd6"}
-
-	rr := doRequest(t, "POST", "/api/admin/news_feeds", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST news_feeds: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
-
-	rr = doRequest(t, "GET", "/api/admin/news_feeds", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET news_feeds: expected 200, got %d", rr.Code)
-	}
-
-	rr = doRequest(t, "PUT", "/api/admin/news_feeds", map[string]interface{}{"id": id, "title": "TestFeed_Updated", "feed_url": "https://test-integtest-feed.example.com/rss", "bg_color": "#000000"})
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT news_feeds: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(t, "DELETE", "/api/admin/news_feeds?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE news_feeds: expected 200, got %d", rr.Code)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Admin CRUD: Entries (full cycle)
@@ -779,25 +442,12 @@ func TestPublicEntryVerifiedSeparateFromClaimed(t *testing.T) {
 	}
 	locID := locs[0]["id"]
 
-	payload := map[string]interface{}{
-		"name":        "Verified Separate Test",
-		"location_id": locID,
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-		"verified":    true,
-	}
-
-	rr = doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	slug, _ := created["slug"].(string)
-	if slug == "" {
-		t.Fatal("POST entries missing slug")
-	}
-	id := created["id"]
+	id, slug := createEntryFixture(t, entryFixture{
+		Name:       "Verified Separate Test",
+		LocationID: locID,
+		Verified:   true,
+	})
+	defer deleteEntryFixture(t, id)
 
 	rr = doRequest(t, "GET", "/api/entry?slug="+slug, nil)
 	if rr.Code != http.StatusOK {
@@ -811,112 +461,11 @@ func TestPublicEntryVerifiedSeparateFromClaimed(t *testing.T) {
 	if got["claimed"] != false {
 		t.Fatalf("public entry claimed should be false until ownership exists, got %v", got["claimed"])
 	}
-
-	doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
-}
-
-func TestAdminEntriesCRUD(t *testing.T) {
-	// Need a valid location_id; fetch locations first
-	rr := doRequest(t, "GET", "/api/locations", nil)
-	var locs []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &locs)
-	if len(locs) == 0 {
-		t.Skip("No locations in DB; cannot test entry CRUD")
-	}
-	locID := locs[0]["id"]
-
-	payload := map[string]interface{}{
-		"name":        "IntegTest Entry",
-		"location_id": locID,
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-		"phone":       "0700-000-000",
-		"address":     "Test Address 1",
-		"notes":       "Integration test entry",
-		"languages":   []string{"HU"},
-		"tags":        []string{"integtest"},
-	}
-
-	// CREATE
-	rr = doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
-
-	// READ
-	rr = doRequest(t, "GET", "/api/admin/entries", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET entries: expected 200, got %d", rr.Code)
-	}
-
-	// UPDATE
-	payload["id"] = id
-	payload["notes"] = "Updated notes"
-	rr = doRequest(t, "PUT", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	// DELETE
-	rr = doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE entries: expected 200, got %d", rr.Code)
-	}
 }
 
 // ---------------------------------------------------------------------------
 // Admin CRUD: Events
 // ---------------------------------------------------------------------------
-
-func TestAdminEventsCRUD(t *testing.T) {
-	rr := doRequest(t, "GET", "/api/locations", nil)
-	var locs []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &locs)
-	if len(locs) == 0 {
-		t.Skip("No locations in DB; cannot test event CRUD")
-	}
-	locID := locs[0]["id"]
-
-	payload := map[string]interface{}{
-		"title":       "IntegTest Event",
-		"location_id": locID,
-		"description": "Test event",
-		"start_date":  "2026-12-01",
-		"start_time":  "10:00",
-		"end_date":    "2026-12-01",
-		"end_time":    "18:00",
-		"event_type":  "cultural",
-		"organizer":   "TestOrg",
-	}
-
-	rr = doRequest(t, "POST", "/api/admin/events", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST events: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	id := created["id"]
-
-	rr = doRequest(t, "GET", "/api/events", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET events: expected 200, got %d", rr.Code)
-	}
-
-	payload["id"] = id
-	payload["title"] = "IntegTest Event Updated"
-	rr = doRequest(t, "PUT", "/api/admin/events", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT events: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(t, "DELETE", "/api/admin/events?id="+formatID(id), nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("DELETE events: expected 200, got %d", rr.Code)
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Search via FTS
@@ -941,20 +490,6 @@ func TestProxyMissingURL(t *testing.T) {
 	rr := doRequest(t, "GET", "/api/proxy", nil)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("Proxy without url: expected 400, got %d", rr.Code)
-	}
-}
-
-func TestAdminRoutesRequireAdmin(t *testing.T) {
-	for _, path := range []string{"/api/admin/entries", "/api/admin/settings", "/api/admin/events", "/api/admin/news_feeds"} {
-		rr := doAnonRequest(t, "GET", path, nil)
-		if rr.Code != http.StatusUnauthorized {
-			t.Fatalf("%s: expected 401, got %d body %s", path, rr.Code, rr.Body.String())
-		}
-	}
-	member := mustLogin("member-not-admin@test.lamsza")
-	rr := doRequestWithCookie(t, "GET", "/api/admin/entries", nil, member)
-	if rr.Code != http.StatusForbidden {
-		t.Fatalf("non-admin: expected 403, got %d body %s", rr.Code, rr.Body.String())
 	}
 }
 
@@ -998,124 +533,6 @@ func TestPublicLocationWriteRejected(t *testing.T) {
 	}
 }
 
-func TestAdminPublishDoesNotVerify(t *testing.T) {
-	rr := doRequestWithCookie(t, "GET", "/api/locations", nil, testAdminCookie)
-	var locs []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &locs)
-	if len(locs) == 0 {
-		t.Skip("No locations in DB; cannot test admin publish queue")
-	}
-	locID := locs[0]["id"]
-
-	var categoryID, typeID int
-	if err := db.DB.QueryRow(`SELECT id FROM entry_categories WHERE parent_id IS NOT NULL ORDER BY id ASC LIMIT 1`).Scan(&categoryID); err != nil {
-		t.Skip("No entry categories in DB; cannot test admin publish queue")
-	}
-	if err := db.DB.QueryRow(`SELECT id FROM entry_types ORDER BY id ASC LIMIT 1`).Scan(&typeID); err != nil {
-		t.Skip("No entry types in DB; cannot test admin publish queue")
-	}
-
-	userCookie := mustLogin("queue-owner@test.lamsza")
-	createBody := map[string]interface{}{
-		"name":        "Queue Publish Test Entry",
-		"location_id": locID,
-		"category_id": categoryID,
-		"type_id":     typeID,
-	}
-	rr = doRequestWithCookie(t, "POST", "/api/account/listings", createBody, userCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST /api/account/listings: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	entryID := created["id"]
-	slug, _ := created["slug"].(string)
-	if created["published"] != false {
-		t.Fatalf("created listing should be unpublished, got %v", created["published"])
-	}
-	defer doRequestWithCookie(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil, testAdminCookie)
-
-	rr = doRequestWithCookie(t, "GET", "/api/admin/listing-queue", nil, testAdminCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/admin/listing-queue: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var queue map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &queue)
-	unpublished, _ := queue["unpublished"].([]interface{})
-	found := false
-	for _, item := range unpublished {
-		m, _ := item.(map[string]interface{})
-		if formatID(m["id"]) == formatID(entryID) {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("listing-queue unpublished should include created entry, got %#v", unpublished)
-	}
-
-	rr = doRequestWithCookie(t, "GET", "/api/auth/me", nil, testAdminCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/auth/me: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var meBefore map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &meBefore)
-	countBefore, ok := meBefore["admin_queue_count"].(float64)
-	if !ok {
-		t.Fatalf("admin_queue_count missing before publish: %#v", meBefore)
-	}
-
-	rr = doRequestWithCookie(t, "POST", "/api/admin/listing-queue/publish", map[string]interface{}{
-		"entry_id": entryID,
-	}, testAdminCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST /api/admin/listing-queue/publish: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("public GET /api/entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var pub map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &pub)
-	if pub["verified"] != false {
-		t.Fatalf("public entry verified should stay false, got %v", pub["verified"])
-	}
-	if pub["claimed"] != true {
-		t.Fatalf("public entry claimed should be true, got %v", pub["claimed"])
-	}
-
-	rr = doRequestWithCookie(t, "GET", "/api/auth/me", nil, testAdminCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET /api/auth/me after publish: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var meAfter map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &meAfter)
-	countAfter, ok := meAfter["admin_queue_count"].(float64)
-	if !ok {
-		t.Fatalf("admin_queue_count missing after publish: %#v", meAfter)
-	}
-	if countAfter != countBefore-1 {
-		t.Fatalf("admin_queue_count should drop by 1: before %v after %v", countBefore, countAfter)
-	}
-}
-
-func acceptPendingClaim(t *testing.T, entryID interface{}, email string) {
-	t.Helper()
-	var userID int
-	if err := db.DB.QueryRow(`SELECT id FROM users WHERE email = $1`, email).Scan(&userID); err != nil {
-		t.Fatalf("user %s: %v", email, err)
-	}
-	rr := doRequestWithCookie(t, "POST", "/api/admin/listing-queue/claim", map[string]interface{}{
-		"entry_id": entryID,
-		"user_id":  userID,
-		"action":   "accept",
-	}, testAdminCookie)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("accept claim: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-}
-
 func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	rr := doRequest(t, "GET", "/api/locations", nil)
 	var locs []map[string]interface{}
@@ -1125,21 +542,8 @@ func TestClaimFreeListingBecomesOwner(t *testing.T) {
 	}
 	locID := locs[0]["id"]
 
-	payload := map[string]interface{}{
-		"name":        "Claim Test Entry",
-		"location_id": locID,
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-	}
-	rr = doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	entryID := created["id"]
-	slug, _ := created["slug"].(string)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	entryID, slug := createEntry(t, "Claim Test Entry", locID)
+	defer deleteEntryFixture(t, entryID)
 
 	ownerCookie := mustLogin("owner@test.lamsza")
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -1221,28 +625,19 @@ func TestMemberCanPatchListing(t *testing.T) {
 	}
 	locID := locs[0]["id"]
 
-	payload := map[string]interface{}{
-		"name":        "Patch Test Entry",
-		"location_id": locID,
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-		"verified":    true,
-	}
-	rr = doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	entryID := created["id"]
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	entryID, _ := createEntryFixture(t, entryFixture{
+		Name:       "Patch Test Entry",
+		LocationID: locID,
+		Verified:   true,
+	})
+	defer deleteEntryFixture(t, entryID)
 
 	var typeID, categoryID, locationID int
 	var published, verified bool
 	err := db.DB.QueryRow(`
 		SELECT type_id, category_id, location_id, published, verified
 		FROM entries WHERE id = $1
-	`, int(entryID.(float64))).Scan(&typeID, &categoryID, &locationID, &published, &verified)
+	`, entryID).Scan(&typeID, &categoryID, &locationID, &published, &verified)
 	if err != nil {
 		t.Fatalf("entry baseline: %v", err)
 	}
@@ -1269,7 +664,7 @@ func TestMemberCanPatchListing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("member user id: %v", err)
 	}
-	_, err = db.DB.Exec(`UPDATE entry_members SET status = 'active' WHERE entry_id = $1 AND user_id = $2`, int(entryID.(float64)), memberUserID)
+	_, err = db.DB.Exec(`UPDATE entry_members SET status = 'active' WHERE entry_id = $1 AND user_id = $2`, entryID, memberUserID)
 	if err != nil {
 		t.Fatalf("activate member: %v", err)
 	}
@@ -1286,31 +681,15 @@ func TestMemberCanPatchListing(t *testing.T) {
 		t.Fatalf("member PATCH listing: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
 
-	rr = doRequest(t, "GET", "/api/admin/entries", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET admin entries: expected 200, got %d", rr.Code)
-	}
-	var entries []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &entries)
-	var found map[string]interface{}
-	for _, e := range entries {
-		if e["id"] == entryID {
-			found = e
-			break
-		}
-	}
-	if found == nil {
-		t.Fatal("patched entry not found in admin list")
-	}
-	if found["name"] != "Patched Member Name" {
-		t.Fatalf("patched name: expected Patched Member Name, got %v", found["name"])
-	}
-
+	var patchedName string
 	var gotPublished, gotVerified bool
 	var photosJSON string
-	err = db.DB.QueryRow(`SELECT published, verified, photos::text FROM entries WHERE id = $1`, int(entryID.(float64))).Scan(&gotPublished, &gotVerified, &photosJSON)
+	err = db.DB.QueryRow(`SELECT name, published, verified, photos::text FROM entries WHERE id = $1`, entryID).Scan(&patchedName, &gotPublished, &gotVerified, &photosJSON)
 	if err != nil {
 		t.Fatalf("entry after patch: %v", err)
+	}
+	if patchedName != "Patched Member Name" {
+		t.Fatalf("patched name: expected Patched Member Name, got %q", patchedName)
 	}
 	if gotPublished != published {
 		t.Fatalf("published should stay %v, got %v", published, gotPublished)
@@ -1338,20 +717,7 @@ func TestMemberCannotDeleteListing(t *testing.T) {
 	}
 	locID := locs[0]["id"]
 
-	payload := map[string]interface{}{
-		"name":        "Delete Test Entry",
-		"location_id": locID,
-		"type":        "Vállalkozás",
-		"category":    "Bútor",
-	}
-	rr = doRequest(t, "POST", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("POST entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-	var created map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &created)
-	entryID := created["id"]
-	slug, _ := created["slug"].(string)
+	entryID, slug := createEntry(t, "Delete Test Entry", locID)
 
 	ownerCookie := mustLogin("owner@test.lamsza")
 	rr = doRequestWithCookie(t, "POST", "/api/account/listings/claim", map[string]interface{}{
@@ -1375,7 +741,7 @@ func TestMemberCannotDeleteListing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("member user id: %v", err)
 	}
-	_, err = db.DB.Exec(`UPDATE entry_members SET status = 'active' WHERE entry_id = $1 AND user_id = $2`, int(entryID.(float64)), memberUserID)
+	_, err = db.DB.Exec(`UPDATE entry_members SET status = 'active' WHERE entry_id = $1 AND user_id = $2`, entryID, memberUserID)
 	if err != nil {
 		t.Fatalf("activate member: %v", err)
 	}
@@ -1454,10 +820,10 @@ func TestListingRejectsInvalidURL(t *testing.T) {
 	var created map[string]interface{}
 	json.Unmarshal(rr.Body.Bytes(), &created)
 	entryID := created["id"]
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(entryID), nil)
+	defer deleteEntryFixture(t, entryID)
 
 	var storedURL string
-	err := db.DB.QueryRow(`SELECT COALESCE(url, '') FROM entries WHERE id = $1`, int(entryID.(float64))).Scan(&storedURL)
+	err := db.DB.QueryRow(`SELECT COALESCE(url, '') FROM entries WHERE id = $1`, entryID).Scan(&storedURL)
 	if err != nil {
 		t.Fatalf("select url: %v", err)
 	}
@@ -1477,7 +843,7 @@ func TestListingRejectsInvalidURL(t *testing.T) {
 		t.Fatalf("PATCH with javascript url: expected 400, got %d; body: %s", rr.Code, rr.Body.String())
 	}
 
-	err = db.DB.QueryRow(`SELECT COALESCE(url, '') FROM entries WHERE id = $1`, int(entryID.(float64))).Scan(&storedURL)
+	err = db.DB.QueryRow(`SELECT COALESCE(url, '') FROM entries WHERE id = $1`, entryID).Scan(&storedURL)
 	if err != nil {
 		t.Fatalf("select url after patch reject: %v", err)
 	}

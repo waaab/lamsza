@@ -112,11 +112,6 @@ func LoadEntryCategoryIDs(q Queryer, entryID int) ([]int, error) {
 	return loadIDs(q, "entry_category_links", "entry_id", entryID)
 }
 
-// LoadWebsiteCategoryIDs returns the primary leaf first, then the other leaves.
-func LoadWebsiteCategoryIDs(q Queryer, websiteID int) ([]int, error) {
-	return loadIDs(q, "website_category_links", "website_id", websiteID)
-}
-
 func loadIDs(q Queryer, table, column string, id int) ([]int, error) {
 	rows, err := q.Query(fmt.Sprintf(`
 		SELECT category_id FROM %s WHERE %s = $1
@@ -191,65 +186,4 @@ func NamesForWebsites(q Queryer, ids []int) (map[int][]string, error) {
 		out[websiteID] = append(out[websiteID], name)
 	}
 	return out, rows.Err()
-}
-
-// MoveCategoryLinks retargets membership rows from one leaf to another.
-func MoveCategoryLinks(q Queryer, fromID, toID int) error {
-	for _, table := range []string{"entry_category_links", "website_category_links"} {
-		if _, err := q.Exec(fmt.Sprintf(`
-			DELETE FROM %s AS old
-			WHERE old.category_id = $1
-			AND EXISTS (
-				SELECT 1 FROM %s AS keep
-				WHERE keep.category_id = $2
-				AND keep.%s = old.%s
-			)
-		`, table, table, ownerColumn(table), ownerColumn(table)), fromID, toID); err != nil {
-			return err
-		}
-		if _, err := q.Exec(fmt.Sprintf(`
-			UPDATE %s SET category_id = $1 WHERE category_id = $2
-		`, table), toID, fromID); err != nil {
-			return err
-		}
-		if _, err := q.Exec(fmt.Sprintf(`
-			UPDATE %s AS dest
-			SET is_primary = true
-			WHERE dest.category_id = $1
-			AND NOT EXISTS (
-				SELECT 1 FROM %s AS prim
-				WHERE prim.%s = dest.%s AND prim.is_primary
-			)
-		`, table, table, ownerColumn(table), ownerColumn(table)), toID); err != nil {
-			return err
-		}
-	}
-	if _, err := q.Exec(`
-		UPDATE entries e
-		SET category_id = l.category_id,
-			cat_name = (
-				SELECT string_agg(c.name, ' ' ORDER BY l2.is_primary DESC, c.sort_order, c.name)
-				FROM entry_category_links l2
-				JOIN entry_categories c ON c.id = l2.category_id
-				WHERE l2.entry_id = e.id
-			)
-		FROM entry_category_links l
-		WHERE l.entry_id = e.id AND l.is_primary AND l.category_id = $1
-	`, toID); err != nil {
-		return err
-	}
-	_, err := q.Exec(`
-		UPDATE websites w
-		SET category_id = l.category_id
-		FROM website_category_links l
-		WHERE l.website_id = w.id AND l.is_primary AND l.category_id = $1
-	`, toID)
-	return err
-}
-
-func ownerColumn(table string) string {
-	if table == "website_category_links" {
-		return "website_id"
-	}
-	return "entry_id"
 }

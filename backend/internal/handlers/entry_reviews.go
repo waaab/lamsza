@@ -159,7 +159,7 @@ func writeReviewSummary(w http.ResponseWriter, entryID, viewerUserID int) {
 		FROM entries e
 		WHERE e.id = $1
 	`, entryID).Scan(&idInt, &hours, &delivery, &photos, &e.RatingsEnabled, &e.Claimed)
-	
+
 	if err != nil {
 		http.Error(w, "entry not found", http.StatusNotFound)
 		return
