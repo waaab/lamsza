@@ -51,6 +51,51 @@ them are not answering. Users get a page shell with no data.
 
 Items 6, 7 and 9 cannot pass until this is fixed, so fix it first.
 
+### Re-probed 2026-10-06 09:36 UTC — still down, and now narrower
+
+Run `scripts/probe-prod.sh` to repeat this from outside at any time. Agents may run it;
+it only makes public HTTPS requests.
+
+```
+szotar static              200   ok
+szotar API health          502   FAIL    ttfb 0.114s
+szotar API words           502   FAIL    ttfb 0.113s
+jatszoter static           200   ok
+jatszoter API health       502   FAIL    ttfb 0.114s
+jatszoter API config       502   FAIL    ttfb 0.111s
+jatszoter API daily        502   FAIL    ttfb 0.115s
+```
+
+Two things this adds:
+
+1. **69 minutes with no self-recovery.** If systemd were restarting the services on a
+   loop we would expect an occasional `200`. We get none, across probes at 08:27 and
+   09:33–09:36. The services are steadily down, not flapping.
+2. **The 502 comes back in ~0.11 s.** That is nginx receiving `connection refused`
+   immediately — not an upstream timeout. So **nothing is listening** on
+   `127.0.0.1:8081` or `:8082`. A hung-but-running backend is ruled out; that shape
+   gives a slow 502 or a 504 after the `proxy_read_timeout`.
+
+Remaining causes, in order: service stopped or failed (most likely); `.env` `PORT` not
+matching the nginx `proxy_pass` target; binary missing because a deploy never landed.
+A crash-loop against a down Postgres also fits, if it has already hit systemd's start
+limit and given up.
+
+### One paste instead of five commands
+
+`scripts/owner-prod-502-triage.sh` runs everything below in order, writes a labelled
+report to `~/prod-502-triage-<timestamp>.log`, and **stops before changing anything**.
+It restarts only with `--restart`.
+
+```bash
+scp scripts/owner-prod-502-triage.sh attila@146.190.204.232:~/
+ssh attila@146.190.204.232 'bash ~/owner-prod-502-triage.sh'
+# read the report, find the cause, then:
+ssh attila@146.190.204.232 'bash ~/owner-prod-502-triage.sh --restart'
+```
+
+The long form, if you prefer to type it:
+
 ```bash
 ssh attila@146.190.204.232
 
