@@ -95,15 +95,21 @@ Migration also backfills `slug` and `county_slug` for existing rows and inserts 
 
 ### 3.1 Location Endpoints
 
-| Method | Endpoint              | Handler               | Description                    |
-|--------|------------------------|------------------------|--------------------------------|
-| GET    | `/api/locations`       | `HandleAdminLocations` | List locations (optional `?type=`, `?county_slug=`) |
-| POST   | `/api/locations`       | `HandleAdminLocations` | Create location                |
-| PUT    | `/api/locations`       | `HandleAdminLocations` | Update location                |
-| DELETE | `/api/locations?id=`    | `HandleAdminLocations` | Delete location                |
-| PUT    | `/api/admin/county_seat`| `HandleSetCountySeat`  | Set county seat                |
+**In this app (`lamsza`) — read only:**
 
-**Note:** Both `/api/locations` and `/api/admin/locations` are registered and use the same handler.
+| Method | Endpoint              | Handler                 | Description                    |
+|--------|------------------------|--------------------------|--------------------------------|
+| GET    | `/api/locations`       | `HandlePublicLocations`  | List locations (optional `?type=`, `?county_slug=`) |
+
+**Writes live in [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin)** — `POST` /
+`PUT` / `DELETE` on locations and `PUT /api/admin/county_seat`. This app's
+`backend/main.go` registers **no `/api/admin/*` route**; `HandlePublicLocations` rejects
+anything but `GET` with 405.
+
+**Note:** `backend/internal/handlers/admin_locations.go` still contains
+`HandleAdminLocations` and `HandleSetCountySeat` in this repo. They are unregistered dead
+code kept only because `backend/handlers_test.go` still mounts them on its own test mux.
+Changing location writes means changing `lamsza-admin`, not these.
 
 **Query params (GET):** Optional `?type=` and `?county_slug=` for server-side filtering.
 
@@ -137,7 +143,16 @@ Migration also backfills `slug` and `county_slug` for existing rows and inserts 
 
 ## 4. Admin Interface
 
-### 4.1 Locations Tab (`src/routes/admin/+page.svelte`)
+> **Not in this repo.** The admin UI is the independent
+> [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) app —
+> `http://localhost:5173` locally, `admin.lamsza.com` in production. This app has no
+> `/admin` route and no `src/routes/admin/`. See `docs/ADMIN_EXTRACTION.md`.
+>
+> The field and API details below are the data contract both sides share, so they stay
+> here next to the schema. The screens that render them are in `lamsza-admin` at
+> `frontend/src/routes/+page.svelte`.
+
+### 4.1 Locations Tab (`lamsza-admin`: `frontend/src/routes/+page.svelte`)
 
 **Create/Edit form fields:**
 
@@ -293,18 +308,22 @@ The codebase uses different terms for the same concept. Summary:
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           BACKEND (Go)                                   │
-│  /api/locations          → CRUD, optional ?type=, ?county_slug=         │
-│  /api/admin/county_seat  → Set county seat                              │
+│                      BACKEND (Go) — lamsza :3001                         │
+│  /api/locations          → GET only, optional ?type=, ?county_slug=     │
 │  /api/directory          → location_slug, county_slug (entries filter)  │
 │  /api/weather, /api/events, /api/search, /api/config/public              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                   BACKEND (Go) — lamsza-admin :3000                      │
+│  /api/admin/locations    → POST, PUT, DELETE                            │
+│  /api/admin/county_seat  → Set county seat                              │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                           FRONTEND (SvelteKit)                           │
-│  Admin: Locations tab, Counties tab, Site settings                     │
-│  Public: /megyek, /varosok, /falvak, /[county]-megye, /[county]-megye/[slug] │
+│  Admin (lamsza-admin :5173): Locations tab, Counties tab, Site settings  │
+│  Public (lamsza :5174): /megyek, /varosok, /falvak, /[county]-megye,     │
+│                         /[county]-megye/[slug]                           │
 │  Filtering: Server-side for megyek; client-side for varosok/falvak      │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

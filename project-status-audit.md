@@ -16,7 +16,7 @@ Shipped and recorded in `src/lib/publicChangelog.js` and `changelog.md`:
 
 The footer version is the first entry of `src/lib/publicChangelog.js`. It is not a separate hardcoded string.
 
-`/api/admin/*` requires an admin Google session. `/api/proxy` only fetches crests, attraction images, and news-feed URLs already stored in the database, and it refuses private addresses. Dated specs under `docs/superpowers/` were not rewritten; they are the design records for the features above. A public launch still needs the remaining go-live checks (consent, content pages, SEO, schema, accessibility).
+This app's backend no longer serves `/api/admin/*`; those routes moved to `lamsza-admin` (the Go handler files are still present in `backend/internal/handlers/` but are not registered in `backend/main.go`). `/api/proxy` only fetches crests, attraction images, and news-feed URLs already stored in the database, and it refuses private addresses. Dated specs under `docs/superpowers/` were not rewritten; they are the design records for the features above. A public launch still needs the remaining go-live checks (consent, content pages, SEO, schema, accessibility).
 
 ---
 
@@ -63,9 +63,16 @@ This section audits the project against `project-brief.md` as it stood for v1.1.
 ---
 
 ## 5. Admin UI State
-**Status: ✅ Functional**
+**Status: moved out of this app**
 
-The `/admin` route is active and provides full CRUD for:
+> **Superseded.** As of the admin extraction (commit `bf7e8f0`), this app has **no
+> `/admin` route**. The admin UI lives in the independent
+> [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) repo —
+> `http://localhost:5173` locally, `admin.lamsza.com` in production. See
+> `docs/ADMIN_EXTRACTION.md`. The paragraph below describes March 2026 and is kept
+> only as the historical record.
+
+As of March 2026 the `/admin` route was active in this repo and provided full CRUD for:
 1. **Mondások**
 2. **Gyorslinkek**
 3. **News Feeds**

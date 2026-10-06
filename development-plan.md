@@ -10,6 +10,12 @@
 - No inline styles – always use classes from global.css
 - No em dashes in content – use standard hyphens only
 
+> **Historical record.** Every phase below is marked done and describes v1.0 as it was
+> built. One item has since been undone: the `/admin` panel (steps 8 and 16) was extracted
+> to the separate [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) app
+> (`http://localhost:5173` locally, `admin.lamsza.com` in production). **This app has no
+> `/admin` route.** See `docs/ADMIN_EXTRACTION.md`.
+
 ## Phases (updated)
 
 ### Phase 0 – Initialization (done)

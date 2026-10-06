@@ -23,8 +23,9 @@ From `~/projects/start-lamsza-network.sh` (the source of truth):
 | szotar | `3002` | `5175` | `szotar-db` `:5435` |
 | jatszoter | `3003` | `5176` | `jatszoter-db` `:5434` |
 
-> `tests/frontend-test-checklist.md` still says backend `3131` and frontend `5173` for
-> lamsza. Those are pre-renumber values. Use the table above.
+> `tests/frontend-test-checklist.md` used to say backend `3131` and frontend `5173` for
+> lamsza. Those were pre-renumber values; it now points at this table. This table stays the
+> source of truth.
 
 ---
 
@@ -122,9 +123,21 @@ cd ~/projects/szotar/backend      && go test ./internal/auth/...
 cd ~/projects/lamsza-admin/backend && go test ./internal/auth/...
 ```
 
-**Expect:** pass. These cover allowlist matching (case-insensitivity, separators). An
-allowlisted account must reach `/admin`; a non-allowlisted one must get 403. If a
-non-admin reaches the admin UI locally, stop — that is a security bug, not a config issue.
+**Expect:** pass. These cover allowlist matching (case-insensitivity, separators).
+
+Where the gate is checked in a browser differs per app, because the **main app has no
+`/admin` route** — it was extracted to `lamsza-admin` (see `docs/ADMIN_EXTRACTION.md`):
+
+| App | Admin UI |
+|---|---|
+| admin (`lamsza-admin`) | `http://localhost:5173/` — the whole app is the admin UI |
+| szotar | `http://localhost:5175/admin` |
+| jatszoter | `http://localhost:5176/admin` |
+| lamsza | **none.** `http://localhost:5174/admin` must 404 |
+
+An allowlisted account must reach the admin UI of the app it belongs to; a
+non-allowlisted one must get 403. If a non-admin reaches an admin UI locally, stop — that
+is a security bug, not a config issue.
 
 ---
 
