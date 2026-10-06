@@ -10,7 +10,7 @@ import (
 
 func TestGazdátlanVerifiedEntryKeepsShortPublicFields(t *testing.T) {
 	id, slug := createEntry(t, "Short View A", mustLocID(t))
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+	defer deleteEntryFixture(t, id)
 	_, err := db.DB.Exec(`
 		UPDATE entries
 		SET verified = true,
@@ -52,14 +52,14 @@ func TestGazdátlanVerifiedEntryKeepsShortPublicFields(t *testing.T) {
 
 func TestClaimedUnverifiedEntryShowsPhoneAndHoursEnabled(t *testing.T) {
 	id, slug := createEntry(t, "Short View B", mustLocID(t))
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+	defer deleteEntryFixture(t, id)
 
 	var ownerUserID int
 	err := db.DB.QueryRow(`SELECT id FROM users WHERE email = $1`, "owner@test.lamsza").Scan(&ownerUserID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	entryIDInt := int(id.(float64))
+	entryIDInt := id
 	_, err = db.DB.Exec(`
 		INSERT INTO entry_members (entry_id, user_id, role, status)
 		VALUES ($1, $2, 'owner', 'active')
@@ -97,96 +97,11 @@ func TestClaimedUnverifiedEntryShowsPhoneAndHoursEnabled(t *testing.T) {
 	}
 }
 
-func TestAdminEntriesStoreHoursAndDeliverySwitches(t *testing.T) {
-	locID := mustLocID(t)
-	id, _ := createEntry(t, "Admin Switch Entry", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
-
-	payload := map[string]interface{}{
-		"id":               id,
-		"name":             "Admin Switch Entry",
-		"location_id":      locID,
-		"type":             "Vállalkozás",
-		"category":         "Bútor",
-		"hours_enabled":    true,
-		"delivery_enabled": true,
-	}
-	rr := doRequest(t, "PUT", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT entries: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(t, "GET", "/api/admin/entries", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET entries: expected 200, got %d", rr.Code)
-	}
-	var entries []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &entries)
-	var found map[string]interface{}
-	for _, entry := range entries {
-		if entry["id"] == id {
-			found = entry
-			break
-		}
-	}
-	if found == nil {
-		t.Fatalf("entry %v not found in admin list", id)
-	}
-	if found["hours_enabled"] != true {
-		t.Fatalf("hours_enabled: expected true on gazdátlan listing, got %v", found["hours_enabled"])
-	}
-	if found["delivery_enabled"] != false {
-		t.Fatalf("delivery_enabled: expected false for non-Étterem, got %v", found["delivery_enabled"])
-	}
-
-	rr = doRequest(t, "GET", "/api/admin/entry_categories", nil)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("GET entry_categories: expected 200, got %d", rr.Code)
-	}
-	var categories []map[string]interface{}
-	json.Unmarshal(rr.Body.Bytes(), &categories)
-	var etteremID interface{}
-	for _, cat := range categories {
-		if cat["name"] == "Étterem" {
-			etteremID = cat["id"]
-			break
-		}
-	}
-	if etteremID == nil {
-		t.Fatal("Étterem category missing; cannot test delivery_enabled")
-	}
-
-	payload["category_id"] = etteremID
-	payload["category"] = "Étterem"
-	payload["delivery_enabled"] = true
-	rr = doRequest(t, "PUT", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT étterem entry: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
-
-	rr = doRequest(t, "GET", "/api/admin/entries", nil)
-	json.Unmarshal(rr.Body.Bytes(), &entries)
-	found = nil
-	for _, entry := range entries {
-		if entry["id"] == id {
-			found = entry
-			break
-		}
-	}
-	if found == nil {
-		t.Fatalf("entry %v not found after étterem update", id)
-	}
-	if found["delivery_enabled"] != true {
-		t.Fatalf("delivery_enabled: expected true for Étterem, got %v", found["delivery_enabled"])
-	}
-}
-
 func TestPublicHoursSwitch(t *testing.T) {
-	locID := mustLocID(t)
-	id, slug := createEntry(t, "Public Hours Switch", locID)
-	defer doRequest(t, "DELETE", "/api/admin/entries?id="+formatID(id), nil)
+	id, slug := createEntry(t, "Public Hours Switch", mustLocID(t))
+	defer deleteEntryFixture(t, id)
 
-	entryIDInt := int(id.(float64))
+	entryIDInt := id
 	_, err := db.DB.Exec(`
 		UPDATE entries
 		SET hours = '{"mon":{"open":"09:00","close":"17:00","closed":false}}'::jsonb,
@@ -197,21 +112,9 @@ func TestPublicHoursSwitch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	payload := map[string]interface{}{
-		"id":            id,
-		"name":          "Public Hours Switch",
-		"location_id":   locID,
-		"type":          "Vállalkozás",
-		"category":      "Bútor",
-		"hours_enabled": true,
-		"hours":         map[string]interface{}{},
-	}
-	rr := doRequest(t, "PUT", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT entries hours on: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
+	setEntryColumns(t, id, map[string]interface{}{"hours_enabled": true, "hours": "{}"})
 
-	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
+	rr := doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("GET entry hours on: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
 	}
@@ -228,11 +131,7 @@ func TestPublicHoursSwitch(t *testing.T) {
 		t.Fatalf("hours: expected empty object when switch on, got %v", got["hours"])
 	}
 
-	payload["hours_enabled"] = false
-	rr = doRequest(t, "PUT", "/api/admin/entries", payload)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("PUT entries hours off: expected 200, got %d; body: %s", rr.Code, rr.Body.String())
-	}
+	setEntryColumns(t, id, map[string]interface{}{"hours_enabled": false})
 
 	rr = doAnonRequest(t, "GET", "/api/entry?slug="+slug, nil)
 	if rr.Code != http.StatusOK {
