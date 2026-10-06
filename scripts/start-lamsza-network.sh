@@ -12,7 +12,7 @@ set -euo pipefail
 #
 # The script now lives in the lamsza repo, at scripts/start-lamsza-network.sh
 # (BOG-50), and is reached through two symlinks into it:
-#   ~/projects/start-lamsza-network.sh  and  ~/.local/bin/lamsza-network
+#   ~/projects/lamsza-network/start-lamsza-network.sh  and  ~/.local/bin/lamsza-network
 # readlink -f resolves both to the repo copy, so the script's own directory is
 # the repo's scripts/ folder, NOT the projects root. Walk up from there until we
 # find the directory that holds all four app repos. That also works from a git

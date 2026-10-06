@@ -38,7 +38,7 @@ make_tree() {
 }
 
 complete_tree() {
-	make_tree lamsza lamsza-admin szotar jatszoter
+	make_tree lamsza lamsza-admin lamsza-szotar lamsza-jatszoter
 }
 
 # Run the script at $1 with the remaining arguments, in an environment with no
@@ -79,7 +79,7 @@ run 0 "direct call from lamsza/scripts" "$T/lamsza/scripts/start-lamsza-network.
 expect_root "resolves to the projects root, not lamsza/scripts" "$T"
 rm -rf "$T"
 
-# 2. Through ~/projects/start-lamsza-network.sh, the operator's path.
+# 2. Through ~/projects/lamsza-network/start-lamsza-network.sh, the operator's path.
 T="$(complete_tree)"
 ln -s "$T/lamsza/scripts/start-lamsza-network.sh" "$T/start-lamsza-network.sh"
 run 0 "through the projects-root symlink" "$T/start-lamsza-network.sh" status
@@ -104,8 +104,8 @@ expect_root "a worktree copy still finds the projects root" "$T"
 rm -rf "$T"
 
 # 5. An incomplete tree is refused loudly instead of guessing a root.
-T="$(make_tree lamsza szotar)"
-run 1 "tree missing lamsza-admin and jatszoter" "$T/lamsza/scripts/start-lamsza-network.sh" status
+T="$(make_tree lamsza lamsza-szotar)"
+run 1 "tree missing lamsza-admin and lamsza-jatszoter" "$T/lamsza/scripts/start-lamsza-network.sh" status
 case "$LAST_OUT" in
 	*LAMSZA_PROJECTS_ROOT*) PASS=$((PASS + 1)); printf '  ok   the error names LAMSZA_PROJECTS_ROOT\n' ;;
 	*) FAIL=$((FAIL + 1)); printf '  FAIL the error does not name LAMSZA_PROJECTS_ROOT\n%s\n' "$LAST_OUT" ;;
@@ -113,7 +113,7 @@ esac
 rm -rf "$T"
 
 # 6. LAMSZA_PROJECTS_ROOT still wins, and skips the walk entirely.
-T="$(make_tree lamsza szotar)"
+T="$(make_tree lamsza lamsza-szotar)"
 STATE="$(mktemp -d)"
 LAST_OUT="$(LAMSZA_PROJECTS_ROOT=/somewhere/else LAMSZA_STATE_DIR="$STATE" \
 	"$T/lamsza/scripts/start-lamsza-network.sh" status 2>&1)"
@@ -202,8 +202,8 @@ live_tree() {
 	LIVE_ROOT="$(complete_tree)"
 	mkdir -p "$LIVE_ROOT"/lamsza-admin/{backend,frontend} \
 		"$LIVE_ROOT"/lamsza/backend \
-		"$LIVE_ROOT"/szotar/{backend,frontend} \
-		"$LIVE_ROOT"/jatszoter/{backend,frontend}
+		"$LIVE_ROOT"/lamsza-szotar/{backend,frontend} \
+		"$LIVE_ROOT"/lamsza-jatszoter/{backend,frontend}
 	LIVE_BIN="$LIVE_ROOT/stub-bin"
 	make_stubs "$LIVE_BIN"
 	LIVE_STATE="$(mktemp -d)"

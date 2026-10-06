@@ -9,7 +9,7 @@ lamsza.com is the source. szotar.lamsza.com, jatszoter.lamsza.com, and every fut
 
 Before adding or changing a shared control, open the same control in `/home/attila/projects/lamsza-network/lamsza` and match it.
 
-- Dev frontends stay on fixed ports with `strictPort: true`: Lámsza `5173`, Szótár `5174`, Játszótér `5175`. If that port is not free, do not start the app on another port.
+- Dev frontends stay on fixed ports with `strictPort: true`: Admin `5173`, Lámsza `5174`, Szótár `5175`, Játszótér `5176`. If that port is not free, do not start the app on another port.
 - Theme uses `data-theme` and the `theme` localStorage key (`light`, `dark`, `system`). Vanilla CSS. No Tailwind, Material, or a new font, color, or card system.
 - Toolbar: left side is the app's sections, icon plus visible name. Right side is account and settings, icon only. The name goes in `title` and `<span class="sr-only">`, the same way Lámsza does **Belépés** and **Kijelentkezés**.
 - Toolbar icons are the Lámsza set: 24 viewBox, stroke 2, drawn at 16×16 by `.nav-btn svg`. Copy the path from `AppIcon.svelte`. Do not give one toolbar icon its own size.

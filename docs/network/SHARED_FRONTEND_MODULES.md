@@ -21,7 +21,7 @@
 Changing a shared module:
 
 ```bash
-cd ~/projects/lamsza
+cd ~/projects/lamsza-network/lamsza
 $EDITOR src/lib/entryHours.js
 scripts/sync-shared-frontend.sh          # copies + rewrites both manifests
 node --test 'tests/*.test.js'            # green here

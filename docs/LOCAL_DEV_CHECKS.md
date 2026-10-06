@@ -32,12 +32,12 @@ From `scripts/start-lamsza-network.sh` in this repo (the source of truth):
 ## Step 1 — Bring the whole network up
 
 ```bash
-cd ~/projects
+cd ~/projects/lamsza-network
 ./start-lamsza-network.sh start      # start | stop | restart | status
 ```
 
 The script is tracked at `lamsza/scripts/start-lamsza-network.sh`.
-`~/projects/start-lamsza-network.sh` and `~/.local/bin/lamsza-network` are
+`~/projects/lamsza-network/start-lamsza-network.sh` and `~/.local/bin/lamsza-network` are
 symlinks into it, so either path, and `lamsza-network start` from anywhere, run
 the same tracked file. Change it in the repo, not through a symlink.
 
@@ -47,14 +47,13 @@ script was committed (BOG-50, `5fc03cc`). Any branch cut after that has it. If
 you hit it, run the script from a worktree that is on `main`:
 
 ```bash
-~/projects/lamsza/.worktrees/<some-branch-on-main>/scripts/start-lamsza-network.sh status
+~/projects/lamsza-network/lamsza/.worktrees/<some-branch-on-main>/scripts/start-lamsza-network.sh status
 ```
 
 Do **not** `git checkout main -- scripts/start-lamsza-network.sh` into someone
 else's branch to paper over it: that leaves an uncommitted file in a checkout
-another run is using, and the `done` gate in
-`scripts/paperclip-issue-update.sh` will refuse their task for dirt that is not
-theirs.
+another run is using, and their task then fails the "committed" check (WoW R5)
+for dirt that is not theirs.
 
 **Expect:** four backends and four frontends listening. Check it yourself rather than
 trusting the script's own summary:
@@ -71,7 +70,7 @@ docker ps --format '{{.Names}}\t{{.Status}}'     # lamsza-db, szotar-db, jatszot
 | Symptom | Cause |
 |---|---|
 | `rg: command not found`, every app reported `down` while it is actually up | the script uses `ripgrep` for its status check. The apps are fine; the *report* is wrong. Verify with the `ss` command above. |
-| `cd: …/projects/lamsza-admin/backend: No such file or directory` | `$HOME` is not `/home/attila` in this shell. Run with `LAMSZA_PROJECTS_ROOT=/home/attila/projects` |
+| `cd: …/projects/lamsza-network/lamsza-admin/backend: No such file or directory` | `$HOME` is not `/home/attila` in this shell. Run with `LAMSZA_PROJECTS_ROOT=/home/attila/projects/lamsza-network` |
 | a backend never appears | first run compiles Go and downloads modules — jatszoter pulls a large dependency tree. Give it a few minutes and read `${XDG_CACHE_HOME:-$HOME/.cache}/lamsza-network/<app>-backend.log` |
 
 ---
@@ -82,7 +81,7 @@ Only needed on a new machine, or when you want a throwaway database to test
 against. The existing `lamsza-db` container already has one.
 
 ```bash
-cd ~/projects/lamsza
+cd ~/projects/lamsza-network/lamsza
 scripts/db-bootstrap.sh --create                                  # the dev database
 scripts/db-bootstrap.sh --create --url "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza_scratch?sslmode=disable"
 ```
@@ -166,14 +165,14 @@ out of their own site":
 | jatszoter | `ADMIN_EMAILS` |
 
 ```bash
-grep -H '^ADMIN' ~/projects/{lamsza,szotar,jatszoter,lamsza-admin}/backend/.env 2>/dev/null
+grep -H '^ADMIN' ~/projects/lamsza-network/{lamsza,lamsza-szotar,lamsza-jatszoter,lamsza-admin}/backend/.env 2>/dev/null
 ```
 
 What you verify locally is the **gate logic**, not any particular email list:
 
 ```bash
-cd ~/projects/szotar/backend      && go test ./internal/auth/...
-cd ~/projects/lamsza-admin/backend && go test ./internal/auth/...
+cd ~/projects/lamsza-network/lamsza-szotar/backend      && go test ./internal/auth/...
+cd ~/projects/lamsza-network/lamsza-admin/backend && go test ./internal/auth/...
 ```
 
 **Expect:** pass. These cover allowlist matching (case-insensitivity, separators).
@@ -214,7 +213,7 @@ psql(){ docker exec -i lamsza-db psql -U lamsza_user -d lamsza "$@"; }
 psql -c '\d admin_sessions'
 
 # an account on ADMIN_GOOGLE_EMAILS, so the only thing under test is the session store
-EMAIL=$(grep -h '^ADMIN_GOOGLE_EMAILS' ~/projects/lamsza-admin/backend/.env 2>/dev/null \
+EMAIL=$(grep -h '^ADMIN_GOOGLE_EMAILS' ~/projects/lamsza-network/lamsza-admin/backend/.env 2>/dev/null \
         | head -1 | cut -d= -f2 | cut -d, -f1)
 USERID=$(psql -qtAc "SELECT id FROM users WHERE lower(email) = lower('$EMAIL')")
 echo "admin user: $EMAIL -> id $USERID"
@@ -288,7 +287,7 @@ curl -s http://127.0.0.1:3003/api/config/public
 **Verified 2026-10-06:** `{"dictionary":{"ok":true,"source":"http","word_count":475},"version":"0.1.0"}`
 — the live pair works locally, against Szótár on `:3002`.
 
-If `source` is `local` and you want the pair, set in `~/projects/jatszoter/backend/.env`:
+If `source` is `local` and you want the pair, set in `~/projects/lamsza-network/lamsza-jatszoter/backend/.env`:
 
 ```
 DICTIONARY_SOURCE=http
@@ -310,8 +309,8 @@ docker exec -i szotar-db    psql -U postgres -d szotar    -c 'select count(*) fr
 docker exec -i jatszoter-db psql -U postgres -d jatszoter -c 'select count(*) from users;'
 
 # full restart of apps and containers
-cd ~/projects && ./start-lamsza-network.sh stop
-docker compose -f ~/projects/szotar/docker-compose.yml restart
+cd ~/projects/lamsza-network && ./start-lamsza-network.sh stop
+docker compose -f ~/projects/lamsza-network/lamsza-szotar/docker-compose.yml restart
 ./start-lamsza-network.sh start
 
 # same counts?
@@ -358,11 +357,11 @@ tables or constraint violations mean the dump is bad.
 
 ```bash
 # lamsza frontend — node:test, no npm script yet
-cd ~/projects/lamsza && node --test 'tests/*.test.js'
+cd ~/projects/lamsza-network/lamsza && node --test 'tests/*.test.js'
 
 # backends
-for d in lamsza szotar jatszoter lamsza-admin; do
-  (cd ~/projects/$d/backend && go test ./...)
+for d in lamsza lamsza-szotar lamsza-jatszoter lamsza-admin; do
+  (cd ~/projects/lamsza-network/$d/backend && go test ./...)
 done
 ```
 
@@ -404,7 +403,7 @@ covered. The two frontend failures were fixed by their own task.
 >
 > # szotar and jatszoter: the backends migrate an empty database themselves
 > docker exec szotar-db psql -U szotar_user -d postgres -c 'CREATE DATABASE szotar_scratch'
-> cd ~/projects/szotar/backend && DATABASE_URL="postgres://szotar_user:szotar_password@localhost:5435/szotar_scratch?sslmode=disable" go test -count=1 ./...
+> cd ~/projects/lamsza-network/lamsza-szotar/backend && DATABASE_URL="postgres://szotar_user:szotar_password@localhost:5435/szotar_scratch?sslmode=disable" go test -count=1 ./...
 > ```
 >
 > A suite that passes on your dev data and fails on an empty database is the

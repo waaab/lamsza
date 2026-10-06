@@ -1,10 +1,11 @@
 # Lámsza network — ways of working
 
-How the four Lámsza apps are organised, and the rules that let one Paperclip
-board drive four independent repos.
+How the four Lámsza apps are organised, and the rules that let one task list
+drive four independent repos.
 
 Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. R7 added on
-BOG-54 and amended on BOG-57 (branch protection declined), 2026-10-06. This file
+BOG-54 and amended on BOG-57 (branch protection declined), 2026-10-06. Paperclip switched
+off and R5 made tool-independent, 2026-10-07. This file
 is the source of truth. If a task comment and this
 file disagree, this file wins until it is changed here.
 
@@ -12,15 +13,15 @@ file disagree, this file wins until it is changed here.
 
 ## 1. The four apps
 
-One Paperclip project — **lamsza.com network** — holds all four apps as
-separate workspaces. Each app is its own git repo and its own deploy unit.
+One project — **lamsza.com network** — holds all four apps. Each app is its
+own git repo and its own deploy unit.
 
 | App | Folder | Repo | Role |
 | --- | --- | --- | --- |
-| lamsza | `~/projects/lamsza` | `waaab/lamsza` | Main app: startlap and search. **Primary workspace.** |
-| admin | `~/projects/lamsza-admin` | `waaab/lamsza-admin` | Admin: writes the directory data |
-| szotar | `~/projects/szotar` | `waaab/lamsza-szotar` | Dictionary |
-| jatszoter | `~/projects/jatszoter` | `waaab/lamsza-jatszoter` | Word games |
+| lamsza | `~/projects/lamsza-network/lamsza` | `waaab/lamsza` | Main app: startlap and search. **Primary workspace.** |
+| admin | `~/projects/lamsza-network/lamsza-admin` | `waaab/lamsza-admin` | Admin: writes the directory data |
+| szotar | `~/projects/lamsza-network/lamsza-szotar` | `waaab/lamsza-szotar` | Dictionary |
+| jatszoter | `~/projects/lamsza-network/lamsza-jatszoter` | `waaab/lamsza-jatszoter` | Word games |
 
 Three Postgres databases: `lamsza` (shared by the main app and admin), `szotar`,
 `jatszoter`.
@@ -39,12 +40,12 @@ fixed ports:
 `scripts/start-lamsza-network.sh`. Two symlinks point into it so the habitual
 paths keep working — edit neither, edit the repo file:
 
-- `~/projects/start-lamsza-network.sh` → `lamsza/scripts/start-lamsza-network.sh`
-- `~/.local/bin/lamsza-network` → `~/projects/start-lamsza-network.sh`
+- `~/projects/lamsza-network/start-lamsza-network.sh` → `lamsza/scripts/start-lamsza-network.sh`
+- `~/.local/bin/lamsza-network` → `~/projects/lamsza-network/start-lamsza-network.sh`
 
 It finds the four apps by resolving its own path through those symlinks and then
 walking up until it reaches the directory that contains all four repos — on this
-machine, `~/projects`. Set `LAMSZA_PROJECTS_ROOT` to override that, and
+machine, `~/projects/lamsza-network`. Set `LAMSZA_PROJECTS_ROOT` to override that, and
 `LAMSZA_STATE_DIR` to move the logs and PID files. `status` prints both as
 `Apps:` and `Logs:`. Run `scripts/tests/start-lamsza-network.test.sh` after
 changing the script.
@@ -70,15 +71,22 @@ Four boards would split work that belongs together:
 Give an app its own project only when all three are true: its own release
 schedule, its own owner, and almost no shared tasks. No app is there yet.
 
-## 3. The folders stay flat
+## 3. One parent folder, four repos
 
-The four folders sit directly under `~/projects` with no parent folder. **Leave
-them there.** A parent folder would give a tidier `ls` and would break four
-Paperclip workspace paths, the start script, and every absolute path in the
-docs and the task history.
+The four repos sit side by side under `~/projects/lamsza-network/`. That folder
+is not a git repo; it holds the repos, the `start-lamsza-network.sh` symlink, a
+`CLAUDE.md` for the whole network, and a VS Code workspace file.
 
-A monorepo is the same trade, bigger, and it also loses the four independent
-deploys. Not recommended.
+Until 2026-10-07 the repos sat directly under `~/projects`, and `szotar` and
+`jatszoter` had no `lamsza-` prefix. Paths in the task history still use those
+names. One thing had to follow the move:
+
+- **The szotar and jatszoter compose files pin `name:`** so their database
+  volumes (`szotar_pgdata_szotar`, `jatszoter_pgdata_jatszoter`) survive the
+  rename. Do not remove it: compose would derive a new project name from the
+  folder and start on an empty volume.
+
+A monorepo is still not recommended: it loses the four independent deploys.
 
 Shared docs go in **`lamsza/docs/network/`** instead. `lamsza` is the primary
 workspace, so every agent already has it.
@@ -117,45 +125,38 @@ R3, not parallel.
 
 ### R5 — A task is not done until its code is committed, merged and pushed
 
-Write every agent-driven status change through the script in the `lamsza` repo:
+"Done" means the owner has the change on `origin/main`, not that an agent wrote
+the code. Before calling a task done, check three things in each repo it
+touched, in this order:
 
-```bash
-scripts/paperclip-issue-update.sh done --comment "what shipped"
-```
-
-Setting `done` has to clear three gates, in this order:
-
-| Gate | It refuses when | Escape hatch |
+| Check | Not done while | How to check |
 |---|---|---|
-| 1 — committed | `git status --porcelain` shows anything | `--allow-dirty` |
-| 2 — merged | `HEAD` is not an ancestor of `main` | `--allow-unmerged` |
-| 3 — pushed | local `main` is ahead of `origin/main` | `--allow-unpushed` |
+| 1 — committed | anything is uncommitted | `git status --porcelain` prints nothing |
+| 2 — merged | the work sits only on a branch | `git merge-base --is-ancestor HEAD main` exits 0 |
+| 3 — pushed | local `main` is ahead of `origin/main` | `git fetch && git log --oneline origin/main..main` prints nothing |
 
-Each refusal prints what is wrong — the dirty paths, the branch-only commits,
-or the unpushed commits — and exits non-zero. On success the script appends the
-task's branch-only commits to the comment, so a reviewer can see what shipped.
+When you report the task done, list the commits that shipped it, so a reviewer
+can see what landed.
 
-Gate 1 came from BOG-32: four tasks were marked done with every line of their
-code uncommitted, and the work was lost. Gates 2 and 3 came from BOG-38:
-BOG-17 and BOG-28 cleared gate 1 and still shipped nothing, because the commits
-sat on a branch nobody merged. "Done" means the owner has the fix on
-`origin/main`, not that an agent wrote the code.
+Work that is meant to land somewhere other than `main` checks against that
+branch instead. A repo with no remote skips check 3.
 
-Use `--base <ref>` when the work is meant to land somewhere other than `main`.
-Gate 3 is skipped when the repo has no `origin/<base>`, so a local-only repo is
-not a failure.
+Skip a check only when it is genuinely wrong for the task — check 1 for a task
+that produced a brief, a decision or a review; check 2 for work meant to stay on
+a branch, such as a snapshot or a spike. Say which check you skipped and why.
 
-Pass an escape hatch only when the gate is genuinely wrong for the task —
-`--allow-dirty` for a task that produced a brief, a decision or a review, or a
-workspace shared with another run; `--allow-unmerged` for work meant to stay on
-a branch, such as a snapshot or a spike. Say why in the comment. Each flag must
-be typed on purpose; the default is safe.
+Check 1 came from BOG-32: four tasks were marked done with every line of their
+code uncommitted, and the work was lost. Checks 2 and 3 came from BOG-38:
+BOG-17 and BOG-28 cleared check 1 and still shipped nothing, because the commits
+sat on a branch nobody merged.
+
+Until 2026-10-07 these checks were enforced by `scripts/paperclip-issue-update.sh`
+when it set a Paperclip issue to `done`. Paperclip is switched off and that
+script is no longer part of the workflow; the checks stand on their own.
 
 Why this rule exists: BOG-32 found four tasks (BOG-3, BOG-4, BOG-5, BOG-7)
 marked `done` while all of their code sat uncommitted on one feature branch.
 None had shipped, and the work was discarded.
-
-Run `scripts/tests/paperclip-issue-update.test.sh` after changing the script.
 
 ### R6 — What is true for one app is true for all four
 
