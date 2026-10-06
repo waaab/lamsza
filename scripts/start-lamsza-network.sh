@@ -97,7 +97,7 @@ app_root() {
 
 stop_all() {
 	echo "Stopping Lámsza network frontends and backends…"
-	local row name rel fe bport fport
+	local row name rel fe bport fport i ok
 	for row in "${APPS[@]}"; do
 		IFS='|' read -r name rel fe bport fport <<<"$row"
 		kill_port "$fport"
@@ -108,7 +108,22 @@ stop_all() {
 	pkill -f "$PROJECTS_ROOT/lamsza/backend" 2>/dev/null || true
 	pkill -f "$PROJECTS_ROOT/szotar/backend" 2>/dev/null || true
 	pkill -f "$PROJECTS_ROOT/jatszoter/backend" 2>/dev/null || true
-	sleep 1
+
+	# Wait for the ports to actually close, not just for the signals to be
+	# sent. start_apps now skips anything still listening (BOG-56), so a
+	# shutdown that outlives this function would make "restart" quietly skip
+	# the very app it just killed.
+	for i in $(seq 1 "${LAMSZA_STOP_TIMEOUT:-10}"); do
+		ok=1
+		for row in "${APPS[@]}"; do
+			IFS='|' read -r name rel fe bport fport <<<"$row"
+			if port_open "$bport" || port_open "$fport"; then
+				ok=0
+			fi
+		done
+		[ "$ok" = 1 ] && break
+		sleep 1
+	done
 	echo "Stopped app processes (databases left running)."
 }
 
@@ -127,33 +142,56 @@ start_dbs() {
 	sleep 2
 }
 
+# Never start a second copy of something that is already listening (BOG-56).
+# The two halves fail differently, and the quiet one is the dangerous one:
+# a duplicate backend dies on its own with "address already in use", but a
+# duplicate Vite dev server does not — with strictPort unset it moves to the
+# next free port and keeps running, and stop_all only kills the four fixed
+# frontend ports, so the stray survives "stop" and has to be hunted by hand.
+# Skipping also leaves the existing PID files alone instead of overwriting
+# them with the PIDs of processes that are about to die.
 start_apps() {
 	echo "Starting backends and frontends…"
-	local row name rel fe bport fport root blog flog
+	local row name rel fe bport fport root blog flog bstate fstate
 	for row in "${APPS[@]}"; do
 		IFS='|' read -r name rel fe bport fport <<<"$row"
 		root="$(app_root "$rel")"
 		blog="$STATE_DIR/${name}-backend.log"
 		flog="$STATE_DIR/${name}-frontend.log"
 
-		(
-			cd "$root/backend"
-			nohup go run . >"$blog" 2>&1 &
-			echo $! >"$STATE_DIR/${name}-backend.pid"
-		)
-		(
-			cd "$root/$fe"
-			nohup npm run dev >"$flog" 2>&1 &
-			echo $! >"$STATE_DIR/${name}-frontend.pid"
-		)
-		echo "  $name  backend :$bport  frontend :$fport"
+		if port_open "$bport"; then
+			bstate="already running"
+		else
+			(
+				cd "$root/backend"
+				nohup go run . >"$blog" 2>&1 &
+				echo $! >"$STATE_DIR/${name}-backend.pid"
+			)
+			bstate="started"
+		fi
+
+		if port_open "$fport"; then
+			fstate="already running"
+		else
+			(
+				cd "$root/$fe"
+				nohup npm run dev >"$flog" 2>&1 &
+				echo $! >"$STATE_DIR/${name}-frontend.pid"
+			)
+			fstate="started"
+		fi
+
+		printf '  %-10s backend :%s %-15s frontend :%s %s\n' \
+			"$name" "$bport" "$bstate" "$fport" "$fstate"
 	done
 }
 
 wait_ready() {
 	echo "Waiting for ports…"
 	local row name rel fe bport fport i ok
-	for i in $(seq 1 60); do
+	# LAMSZA_READY_TIMEOUT exists so the test suite can drive "start" to
+	# completion in a second instead of waiting out a real boot.
+	for i in $(seq 1 "${LAMSZA_READY_TIMEOUT:-60}"); do
 		ok=1
 		for row in "${APPS[@]}"; do
 			IFS='|' read -r name rel fe bport fport <<<"$row"
