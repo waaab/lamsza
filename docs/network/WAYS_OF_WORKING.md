@@ -99,7 +99,7 @@ Two runs editing the same repo at the same time cause conflicts. Before you
 start, check that no other run holds that app. Cross-app work is sequential by
 R3, not parallel.
 
-### R5 — A task is not done until its code is committed
+### R5 — A task is not done until its code is committed, merged and pushed
 
 Write every agent-driven status change through the script in the `lamsza` repo:
 
@@ -107,13 +107,33 @@ Write every agent-driven status change through the script in the `lamsza` repo:
 scripts/paperclip-issue-update.sh done --comment "what shipped"
 ```
 
-It refuses to set `done` while `git status --porcelain` shows anything, prints
-the dirty paths, and exits non-zero. On success it appends the task's
-branch-only commits to the comment, so a reviewer can see what shipped.
+Setting `done` has to clear three gates, in this order:
 
-Pass `--allow-dirty` only when the dirty files are genuinely not the task's
-output — a task that produced a brief, a decision or a review, or a workspace
-shared with another run. The flag must be typed on purpose; the default is safe.
+| Gate | It refuses when | Escape hatch |
+|---|---|---|
+| 1 — committed | `git status --porcelain` shows anything | `--allow-dirty` |
+| 2 — merged | `HEAD` is not an ancestor of `main` | `--allow-unmerged` |
+| 3 — pushed | local `main` is ahead of `origin/main` | `--allow-unpushed` |
+
+Each refusal prints what is wrong — the dirty paths, the branch-only commits,
+or the unpushed commits — and exits non-zero. On success the script appends the
+task's branch-only commits to the comment, so a reviewer can see what shipped.
+
+Gate 1 came from BOG-32: four tasks were marked done with every line of their
+code uncommitted, and the work was lost. Gates 2 and 3 came from BOG-38:
+BOG-17 and BOG-28 cleared gate 1 and still shipped nothing, because the commits
+sat on a branch nobody merged. "Done" means the owner has the fix on
+`origin/main`, not that an agent wrote the code.
+
+Use `--base <ref>` when the work is meant to land somewhere other than `main`.
+Gate 3 is skipped when the repo has no `origin/<base>`, so a local-only repo is
+not a failure.
+
+Pass an escape hatch only when the gate is genuinely wrong for the task —
+`--allow-dirty` for a task that produced a brief, a decision or a review, or a
+workspace shared with another run; `--allow-unmerged` for work meant to stay on
+a branch, such as a snapshot or a spike. Say why in the comment. Each flag must
+be typed on purpose; the default is safe.
 
 Why this rule exists: BOG-32 found four tasks (BOG-3, BOG-4, BOG-5, BOG-7)
 marked `done` while all of their code sat uncommitted on one feature branch.
