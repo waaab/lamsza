@@ -73,7 +73,13 @@ jobs:
       # job if the reference rows did not load, because the suites skip rather
       # than fail when settlements is empty, and a skipped test looks green.
       - name: Bootstrap the database
-        run: ../scripts/db-bootstrap.sh
+        # The runner image ships psql, and the script says so plainly when it is
+        # missing rather than guessing - but a missing client would fail the job
+        # for a reason that has nothing to do with the code, so install it if it
+        # ever stops being there. No-op on a runner that already has it.
+        run: |
+          command -v psql >/dev/null || sudo apt-get install -y --no-install-recommends postgresql-client
+          ../scripts/db-bootstrap.sh
 
       # Every package, no exclusions (BOG-53).
       - name: Test Go backend
