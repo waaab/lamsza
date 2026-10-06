@@ -248,12 +248,15 @@ Optional:
 
 ## 10. Go-live checklist
 
-> **How to verify items 6–11 and 13:** follow `docs/GO_LIVE_VERIFICATION_RUNBOOK.md` — exact commands, expected output, and failure shapes per item.
+> **Who does what (owner decision, 2026-10-06):** agents work on the local machine only and never touch production — see `docs/AGENT_ENVIRONMENT_POLICY.md`. Attila runs every step against the live server and is the only one who commits or merges to `main`.
+>
+> **How to verify items 6–11 and 13:** the owner follows `docs/GO_LIVE_VERIFICATION_RUNBOOK.md` — exact commands, expected output, and failure shapes per item. Agents first clear the same ground on localhost with `docs/LOCAL_VERIFICATION_RUNBOOK.md`, so the production pass is a confirmation and not a debug session.
 >
 > **Known blockers as of 2026-10-06:**
 > - `szotar.lamsza.com/api/*` and `jatszoter.lamsza.com/api/*` return **502** — the Go backends are not answering. Static files serve fine. Items 1–3 below cannot be ticked while this holds.
 > - `lamsza.com` serves a 301 to `www.lamsza.com` on **Squarespace** — the main app is not on the droplet yet, so item 8 is blocked on the DNS cutover.
 > - Production ports are **8080/8081/8082/8083** (see `PRODUCTION_ENVIRONMENT_NOTES.md` section 5). The ports in section 2 and 6 of this document are dev values and are stale.
+> - `/api/health` is **not implemented** in the lamsza and admin backends (verified on localhost 2026-10-06 — both 404). Probe `/api/config/public` for those two instead.
 
 - [ ] `https://lamsza.com` loads (static + API)
 - [ ] `https://szotar.lamsza.com` loads (static + API)

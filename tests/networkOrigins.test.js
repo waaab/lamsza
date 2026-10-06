@@ -28,17 +28,18 @@ test('hostname sniff selects .test hosts', () => {
 });
 
 test('localhost uses Vite strictPort origins', () => {
+	// Admin 5173, Lámsza 5174, Szótár 5175, Játszótér 5176 since the port renumber.
 	assert.equal(
 		resolveNetworkOrigin('lamsza', { envOrigin: '', hostname: 'localhost' }),
-		'http://localhost:5173'
-	);
-	assert.equal(
-		resolveNetworkOrigin('szotar', { envOrigin: '', hostname: '127.0.0.1' }),
 		'http://localhost:5174'
 	);
 	assert.equal(
-		resolveNetworkOrigin('jatszoter', { envOrigin: '', hostname: 'localhost' }),
+		resolveNetworkOrigin('szotar', { envOrigin: '', hostname: '127.0.0.1' }),
 		'http://localhost:5175'
+	);
+	assert.equal(
+		resolveNetworkOrigin('jatszoter', { envOrigin: '', hostname: 'localhost' }),
+		'http://localhost:5176'
 	);
 });
 

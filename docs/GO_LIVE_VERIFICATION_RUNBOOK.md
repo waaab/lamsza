@@ -1,9 +1,18 @@
 # Go-Live Verification Runbook — the 7 checks that need server or browser access
 
-**Audience:** the owner (`attila`), or an agent with SSH as `attila`
+**Audience: the owner (`attila`) only.**
 **Target:** DigitalOcean droplet `146.190.204.232` (FRA1, Ubuntu 24.04)
 **Covers:** items 6, 7, 8, 9, 10, 11 and 13 of the go-live checklist in `docs/PRODUCTION_SERVER_SETUP.md` section 10
 **Last updated:** 2026-10-06
+
+> **Agents must not run any command in this document.**
+> Agents work only on the local machine. They never get SSH to the droplet, never
+> change production config, DNS or domains, and never commit or merge to `main`.
+> The owner runs every step here and every deploy. See `docs/AGENT_ENVIRONMENT_POLICY.md`.
+>
+> The agent-owned companion is `docs/LOCAL_VERIFICATION_RUNBOOK.md`: it proves the same
+> behaviour on localhost *before* the owner deploys, so each item below is a confirmation,
+> not a discovery.
 
 Each step gives the exact command, the expected result, and what a failure looks like.
 Record the real output next to each item. "Looked fine" is not evidence.
@@ -28,6 +37,13 @@ Checked from outside on 2026-10-06 08:27 UTC:
 | `https://jatszoter.lamsza.com/api/health` | **502** |
 | `https://jatszoter.lamsza.com/api/config/public` | **502** |
 | `https://admin.lamsza.com/api/health` | **502** (Phase 2, expected) |
+
+> **Caveat found locally on 2026-10-06:** `/api/health` **does not exist** in the lamsza or
+> admin backends — they return `404`, not `200`, even when perfectly healthy. Only szotar
+> and jatszoter implement it. So a 404 from `lamsza.com/api/health` or
+> `admin.lamsza.com/api/health` is a missing route, not a down service. Use
+> `/api/config/public` as the liveness probe for those two until the route is added.
+> The 502s above are still real — a 502 is nginx failing to reach the backend at all.
 
 Three retries, same result — not a blip. Nginx and TLS are fine; the Go backends behind
 them are not answering. Users get a page shell with no data.
@@ -153,11 +169,14 @@ After the cutover, verify like this:
 ```bash
 # on the server
 sudo grep -H -E '^(WEATHER_API_KEY|WEATHER_API_COM_KEY|FEATURE_WEATHER)' /var/www/lamsza/.env
-curl -s http://127.0.0.1:8080/api/weather | head -c 400
+curl -s 'http://127.0.0.1:8080/api/weather?slug=csikszereda' | head -c 400
 curl -s 'http://127.0.0.1:8080/api/weather/county?slug=hargita' | head -c 400
 # from outside
-curl -s https://lamsza.com/api/weather | head -c 400
+curl -s 'https://lamsza.com/api/weather?slug=csikszereda' | head -c 400
 ```
+
+> Both endpoints **require** `?slug=`. Without it you get `400 Missing slug` — that is the
+> endpoint working, not a failure. Verified on localhost 2026-10-06.
 
 **Expect:** HTTP 200 and JSON with a real current temperature and a location name.
 Then open `https://lamsza.com` and confirm the widget shows that same temperature —
