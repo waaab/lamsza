@@ -6,9 +6,10 @@
 **Last updated:** 2026-10-06
 
 > **Agents must not run any command in this document.**
-> Agents work only on the local machine. They never get SSH to the droplet, never
-> change production config, DNS or domains, and never commit or merge to `main`.
-> The owner runs every step here and every deploy. See `docs/AGENT_ENVIRONMENT_POLICY.md`.
+> Agents work only on the local machine. They never get SSH to the droplet and never
+> change production config, DNS or domains. Agents *may* commit, merge and push to
+> GitHub (granted 2026-10-06), but that grant stops at git — the owner runs every step
+> here and every deploy. See `docs/AGENT_ENVIRONMENT_POLICY.md`.
 >
 > The agent-owned companion is `docs/LOCAL_VERIFICATION_RUNBOOK.md`: it proves the same
 > behaviour on localhost *before* the owner deploys, so each item below is a confirmation,

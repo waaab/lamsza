@@ -14,13 +14,22 @@
 | develop and test on `localhost` | touch the production server |
 | run the local DBs, backends and frontends | hold or ask for SSH keys or server credentials |
 | run the unit tests and local smoke checks | change production `.env`, nginx, systemd or TLS |
-| push branches to GitHub | change DNS, domains or registrar settings |
-| open pull requests | commit or merge to `main` |
-| write runbooks for the owner to execute | deploy, restart services, or reboot the droplet |
+| commit, merge and push to GitHub | change DNS, domains or registrar settings |
+| open and merge pull requests | deploy, restart services, or reboot the droplet |
+| write runbooks for the owner to execute | log in to the droplet by any route |
 
-`main` on each repo is the production branch. **Only Attila commits and merges to `main`,
-and only Attila deploys.** An agent that wants a production change describes it as an exact
-command list for the owner and stops there.
+## Git: granted (2026-10-06)
+
+Attila granted agents **commit, merge and push to GitHub**, including `main`. The first rule
+drafted here said otherwise; this line replaces it.
+
+The grant covers **git only**. It does not grant anything on the server. An agent still never
+deploys, never restarts a service, and never changes a live config.
+
+⚠️ **One condition to re-check:** the plan is to wire each repo's `main` to production. On the
+day that happens, a merge to `main` *becomes* a deploy, and this grant would hand agents the
+deploy button by a side door. Attila should re-confirm the rule then — likely as: agents merge
+to a staging branch, Attila promotes to `main`.
 
 ## What this means in practice
 
