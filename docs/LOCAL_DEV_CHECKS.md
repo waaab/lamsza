@@ -41,6 +41,21 @@ The script is tracked at `lamsza/scripts/start-lamsza-network.sh`.
 symlinks into it, so either path, and `lamsza-network start` from anywhere, run
 the same tracked file. Change it in the repo, not through a symlink.
 
+Because the symlink points into the working tree, it dangles — `No such file or
+directory` — while the `lamsza` checkout is parked on a branch cut before the
+script was committed (BOG-50, `5fc03cc`). Any branch cut after that has it. If
+you hit it, run the script from a worktree that is on `main`:
+
+```bash
+~/projects/lamsza/.worktrees/<some-branch-on-main>/scripts/start-lamsza-network.sh status
+```
+
+Do **not** `git checkout main -- scripts/start-lamsza-network.sh` into someone
+else's branch to paper over it: that leaves an uncommitted file in a checkout
+another run is using, and the `done` gate in
+`scripts/paperclip-issue-update.sh` will refuse their task for dirt that is not
+theirs.
+
 **Expect:** four backends and four frontends listening. Check it yourself rather than
 trusting the script's own summary:
 
