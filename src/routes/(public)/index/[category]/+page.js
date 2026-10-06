@@ -1,15 +1,13 @@
+import { directoryPrerenderSlugs } from '$lib/entryCategory.js';
+
 export const prerender = true;
 
-/** @type {import('./$types').EntryGenerator} */
+/**
+ * One prerendered page per catalog category, parents and children alike.
+ * Never hand-write this list: the old hand-written one drifted and kept
+ * shipping dead slugs (egeszsegugy, egyeb, vendeglo, bolt) for months.
+ * @type {import('./$types').EntryGenerator}
+ */
 export function entries() {
-    return [
-        { category: 'egeszsegugy' },
-        { category: 'oktatas' },
-        { category: 'mesteremberek' },
-        { category: 'hivatalok' },
-        { category: 'egyeb' },
-        { category: 'vendeglo' },
-        { category: 'bolt' },
-        { category: 'sportegyesulet' },
-    ];
+    return directoryPrerenderSlugs().map((slug) => ({ category: slug }));
 }

@@ -122,6 +122,20 @@ export const DIRECTORY_CATALOG = DIRECTORY_TREE.flatMap(([parentName, children],
 });
 
 /**
+ * Every category slug that `/index/[category]` prerenders, parents and children.
+ *
+ * Derived from the catalog on purpose. The route used to carry a hand-written
+ * list, which kept shipping slugs the v2 tree had already dropped.
+ *
+ * @param {Array<{ slug: string }>} [catalog]
+ * @returns {string[]}
+ */
+export function directoryPrerenderSlugs(catalog = DIRECTORY_CATALOG) {
+    const rows = catalog?.length ? catalog : DIRECTORY_CATALOG;
+    return [...new Set(rows.map((row) => String(row.slug || "")).filter(Boolean))];
+}
+
+/**
  * Parents in catalog order, each with its subcategories.
  *
  * @param {Array<{ id: string, name: string, slug: string, parent_id: string | null, sort_order: number }>} [catalog]
