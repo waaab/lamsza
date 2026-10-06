@@ -3,7 +3,7 @@
 **Audience:** Project manager / ops helper setting up the production server  
 **Owner apps (now):** lamsza.com, szotar.lamsza.com, jatszoter.lamsza.com  
 **Hosting target:** DigitalOcean Droplet, Ubuntu 24.04 LTS, Nginx  
-**Last updated:** 2026-10-04
+**Last updated:** 2026-10-06
 
 This document is the single handoff checklist for production server setup and configuration. It covers what must exist before go-live, and what to install/configure on the droplet.
 
@@ -83,6 +83,10 @@ Point these to the droplet IP:
   - `https://szotar.lamsza.com`
   - `https://jatszoter.lamsza.com`
   - `https://www.lamsza.com` (if used)
+  - `https://admin.lamsza.com` — **add this now, not at cutover.** Admin is
+    Phase 2 (§1), but its whole UI is behind Google sign-in, so a missing origin
+    means nobody can log in on day one. Registering an origin for a host that is
+    not live yet costs nothing and breaks nothing.
 - [ ] Admin email allowlists decided for each app
 
 ### 3.4 External API keys
@@ -225,6 +229,18 @@ Optional:
 
 - Redirect `http` → `https`
 - Redirect `www.lamsza.com` → `lamsza.com`
+
+For `admin.lamsza.com` (Phase 2), the vhost must additionally send
+
+```nginx
+add_header X-Robots-Tag "noindex, nofollow, noarchive" always;
+```
+
+Admin has no public page and no application layer to add the header itself —
+Nginx serves `dist/` as static files. `robots.txt` in that app is already
+`Disallow: /`, but that only asks a crawler not to fetch; it does not keep a
+URL someone linked out of an index. The ready-to-copy vhost is in
+`lamsza-admin/docs/ARCHITECTURE.md`, "Production (Phase 2)".
 
 ---
 
