@@ -1,27 +1,67 @@
 name: Build and Test Lamsza
 
-on: [push]
+on:
+  push:
+  pull_request:
 
+# Two jobs, not one. When this was a single job a frontend failure marked the Go
+# steps "skipped", so the backend went unbuilt and untested for hours without the
+# summary saying so. Separate jobs always report separately.
 jobs:
-  build_and_deploy:
+  frontend:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      # 22, not 20: the test suite uses the node:test runner features that
+      # landed after 20 and will not parse on it.
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
 
+      - run: npm ci
+
+      - name: Test Svelte frontend
+        run: npm test
+
+      # build:no-preflight, not build. `npm run build` runs scripts/preflight-api.js,
+      # which refuses to build when no Go backend answers on 3001. That gate is for
+      # cutting releases on a live stack; there is no backend in CI, and dist/ comes
+      # out the same either way because component fetches are gated on canReachApi().
       - name: Build Svelte frontend
-        run: npm install && npm run build
+        run: npm run build:no-preflight
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
         with:
-          go-version: '1.25.7'
+          go-version: "1.25.x"
           cache-dependency-path: backend/go.sum
 
+      # Everything except the root `backend` package. That package's tests are
+      # database integration tests: handlers_test.go's init() calls db.InitDB()
+      # and the suite reads and writes entries/websites/users. There is no
+      # Postgres in CI, so it dies with
+      #   dial tcp [::1]:5433: connect: connection refused
+      # and a bare empty Postgres is not enough either - the app's own Migrate()
+      # calls do not create those base tables, so against an empty database you
+      # get `relation "entries" does not exist` instead. Making that suite run in
+      # CI needs a committed schema bootstrap plus a service container, which is
+      # its own task; see the BOG-44 follow-up. Until then it stays a localhost
+      # suite, where it does run and does pass.
+      #
+      # Excluding by subtraction on purpose: a package added later is tested
+      # automatically, and only the known database-bound one is left out.
+      - name: Test Go backend
+        run: go test -count=1 $(go list ./... | grep -vx 'backend')
+
       - name: Build Go backend
-        run: cd backend && go build -o sz-gugel-bin main.go
+        run: go build -o /tmp/sz-gugel-bin main.go
