@@ -64,9 +64,13 @@ Accounts, favorites, the saved settlement, claimed listings, and directory websi
 
 ## P4 – Admin and content parity ✅
 
+> The admin items below shipped while the admin UI was part of this repo. It has since moved
+> to [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) and this app has no
+> `/admin` route — new admin work belongs in that repo. See `docs/ADMIN_EXTRACTION.md`.
+
 ### P4.1 – Counties and historical seats in admin
 
-- **Done:** Megyék tab: Markdown textareas + `PUT /api/admin/counties` and `PUT /api/admin/historical_seats`.
+- **Done:** Megyék tab: Markdown textareas + `PUT /api/admin/counties` and `PUT /api/admin/historical_seats`. Now served by `lamsza-admin`.
 
 ### P4.2 – Markdown preview consistency
 

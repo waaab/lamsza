@@ -1,5 +1,13 @@
 # Weather Multi-Provider, Caching & Admin Controls – Implementation Plan
 
+> **Where the admin half of this plan lives now.** This plan was written while the admin UI
+> and the `/api/admin/*` routes were part of this repo. They are not any more — they were
+> extracted to [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin)
+> (`http://localhost:5173` locally, `admin.lamsza.com` in production). See
+> `docs/ADMIN_EXTRACTION.md`. Wherever this document says `src/routes/admin/+page.svelte`
+> or an admin endpoint, read it as `lamsza-admin`. This app keeps only the public reads
+> (`GET /api/config/public`) and the widgets.
+
 ## Overview
 
 **Main goal:** Keep weather data as fresh as possible for all visitors on lamsza.com.
@@ -114,12 +122,12 @@ ON CONFLICT (key) DO NOTHING;
 
 ### 2.3 Backend Endpoints
 
-| Endpoint | Auth | Purpose |
-|----------|------|---------|
-| `GET /api/config/public` | No | Returns `{ weather_cache_ttl_minutes, weather_cache_version }` for frontend |
-| `GET /api/admin/settings` | Admin | All settings |
-| `PUT /api/admin/settings` | Admin | Update settings |
-| `POST /api/admin/settings/clear-weather-cache` | Admin | Increment `weather_cache_version` |
+| Endpoint | App | Auth | Purpose |
+|----------|-----|------|---------|
+| `GET /api/config/public` | lamsza `:3001` | No | Returns `{ weather_cache_ttl_minutes, weather_cache_version }` for frontend |
+| `GET /api/admin/settings` | lamsza-admin `:3000` | Admin | All settings |
+| `PUT /api/admin/settings` | lamsza-admin `:3000` | Admin | Update settings |
+| `POST /api/admin/settings/clear-weather-cache` | lamsza-admin `:3000` | Admin | Increment `weather_cache_version` |
 
 ### 2.4 Smart TTL (Optional Phase 2)
 
@@ -214,11 +222,11 @@ Forrás: Open-Meteo, WeatherAPI.com
 | `backend/internal/config/config.go` | Add `WeatherAPIComKey` |
 | `backend/internal/weather/weather.go` | Multi-provider fetch, unified response, read provider settings from DB |
 | `backend/migrations/site_settings.sql` | New migration |
-| `backend/main.go` | Register `/api/config/public`, admin settings routes |
+| `backend/main.go` | Register `/api/config/public` (the admin settings routes moved to `lamsza-admin`) |
 | `src/lib/components/WeatherWidget.svelte` | Config fetch, source/timestamp, cache_version |
 | `src/routes/(public)/+page.svelte` | Add DateTimeWidget |
 | `src/lib/components/DateTimeWidget.svelte` | New component |
-| `src/routes/admin/+page.svelte` | Settings tab, clear cache button |
+| `lamsza-admin`: `frontend/src/routes/+page.svelte` | Settings tab, clear cache button (was `src/routes/admin/+page.svelte` in this repo before the extraction) |
 | `src/styles/global.css` | DateTimeWidget styles |
 
 ---

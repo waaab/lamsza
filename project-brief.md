@@ -55,7 +55,14 @@ Primary use case: every new browser tab + browsing local entries.
 - Backend: PostgreSQL + Go API for dynamic queries (/api/entry?q=...&category=...)
 
 **Admin Panel Design**
-- Protected page: /admin (basic password or Google Sign-In in v1.2)
+
+> **Shipped differently.** The admin panel is no longer a page in this app. It is the
+> separate [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) app
+> (`http://localhost:5173` locally, `admin.lamsza.com` in production), and this app has no
+> `/admin` route. See `docs/ADMIN_EXTRACTION.md`. The v1.0 intent is kept below.
+
+- Protected page: `/admin` — *as originally planned; now the whole `lamsza-admin` app*
+  (basic password or Google Sign-In in v1.2)
 - Tabs/sections:
   - Quick Links (add/edit/delete)
   - News Feeds (add/edit RSS URLs + names, manual refresh trigger, last update timestamp)

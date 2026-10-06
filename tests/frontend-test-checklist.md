@@ -1,6 +1,6 @@
 # Frontend Manual Test Checklist
 
-Run these tests against the live development server (`npm run dev` on port 5173) with the backend running (port 3131).
+Run these tests against the live development server (`npm run dev` on port 5174) with the backend running (port 3001). The ports above are the main app's; see `docs/LOCAL_DEV_CHECKS.md` for the whole network's port map.
 
 **Legend:** `[ ]` = not tested, `[x]` = pass, `[!]` = fail (add notes)
 
@@ -164,75 +164,18 @@ Run these tests against the live development server (`npm run dev` on port 5173)
 
 ---
 
-## 5. Admin Panel (`/admin`)
+## 5. Admin — not in this app
 
-### 5.1 Authentication
+The main app has **no `/admin` route**. The admin UI was extracted to the
+independent [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) repo
+(`http://localhost:5173`, API `:3000`; `admin.lamsza.com` in production).
+See `docs/ADMIN_EXTRACTION.md`.
 
-- [ ] `/admin` shows login form
-- [ ] Entering wrong password shows error
-- [ ] Entering correct password grants access to dashboard
-- [ ] Logout button clears session and returns to login
+Admin CRUD for entries, locations, categories, types, quick links, news feeds,
+mondások and events is checked in that repo, not here. The only thing to check
+in this app is the absence:
 
-### 5.2 Dashboard Tabs
-
-- [ ] All tabs are visible: Entries, Locations, Categories, Types, Quick Links, News Feeds, Mondások, Events
-- [ ] Switching tabs loads the correct data
-
-### 5.3 CRUD: Entries
-
-- [ ] List loads all entries with name, location, category
-- [ ] Create new entry with all fields (name, location, phone, URL, etc.)
-- [ ] Edit existing entry - changes persist after reload
-- [ ] Delete entry - removed from list
-
-### 5.4 CRUD: Locations
-
-- [ ] List loads all locations
-- [ ] Create new location (name, county, type)
-- [ ] Edit existing location
-- [ ] Delete location
-
-### 5.5 CRUD: Entry Categories
-
-- [ ] List loads all categories
-- [ ] Create new category
-- [ ] Edit category name
-- [ ] Delete category
-
-### 5.6 CRUD: Entry Types
-
-- [ ] List loads all entry types
-- [ ] Create new type
-- [ ] Edit type name
-- [ ] Delete type
-
-### 5.7 CRUD: Quick Links
-
-- [ ] List loads all quick links with title, URL, color
-- [ ] Create new quick link
-- [ ] Edit existing quick link
-- [ ] Delete quick link
-
-### 5.8 CRUD: News Feeds
-
-- [ ] List loads all news feeds
-- [ ] Create new feed (title, feed_url, bg_color)
-- [ ] Edit existing feed
-- [ ] Delete feed
-
-### 5.9 CRUD: Mondások
-
-- [ ] List loads all quotes
-- [ ] Create new quote
-- [ ] Edit existing quote
-- [ ] Delete quote
-
-### 5.10 CRUD: Events
-
-- [ ] List loads all events
-- [ ] Create new event (title, location, dates, organizer)
-- [ ] Edit existing event
-- [ ] Delete event
+- [ ] `http://localhost:5174/admin` returns 404, not a login form
 
 ---
 

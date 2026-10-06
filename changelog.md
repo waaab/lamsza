@@ -5,6 +5,23 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Removed
+- The `/admin` route and the `/api/admin/*` routes. The admin UI is now the independent
+  [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) app — `localhost:5173`
+  locally, `admin.lamsza.com` in production. See `docs/ADMIN_EXTRACTION.md`. Entries in
+  older releases below that describe an admin panel in this app are historical; this app no
+  longer serves one.
+- The frontend modules that extraction orphaned: `EntryPhotosEditor.svelte`,
+  `EntryFields.svelte`, `Accordion.svelte`, `HuDateInput.svelte`, `src/lib/index.js`.
+
+### Changed
+- Local ports renumbered for the four-app network: lamsza is backend `3001` / frontend
+  `5174`. See `docs/LOCAL_DEV_CHECKS.md` for the whole map.
+
+---
+
 ## [1.2.0] - 2026-09-24
 
 ### Added
