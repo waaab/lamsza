@@ -61,7 +61,9 @@ func TestAdminSessionIsRejectedByPublicAPI(t *testing.T) {
 	token := mintAdminSession(t)
 	cookie := &http.Cookie{Name: auth.SessionCookieName, Value: token}
 
-	for _, path := range []string{"/api/auth/me", "/api/admin/entries", "/api/admin/users", "/api/account/favorites"} {
+	// This app routes no /api/admin/* any more (BOG-42), so the paths worth
+	// probing are the signed-in surface it does still own.
+	for _, path := range []string{"/api/auth/me", "/api/account/favorites", "/api/account/listings", "/api/account/websites"} {
 		rr := doRequestWithCookie(t, http.MethodGet, path, nil, cookie)
 		if rr.Code != http.StatusUnauthorized {
 			t.Errorf("GET %s with an admin-minted token: got %d, want 401 (body %q)",
@@ -73,10 +75,10 @@ func TestAdminSessionIsRejectedByPublicAPI(t *testing.T) {
 // TestPublicSessionNeverLandsInAdminSessions is the other direction, at the
 // store level: a sign-in here must not write a row the admin API would accept.
 func TestPublicSessionNeverLandsInAdminSessions(t *testing.T) {
-	if testAdminCookie == nil {
+	if testAllowlistedSession == nil {
 		t.Fatal("no public session cookie from the test login")
 	}
-	hash := hashSessionToken(testAdminCookie.Value)
+	hash := hashSessionToken(testAllowlistedSession.Value)
 
 	var inPublic int
 	if err := db.DB.QueryRow(`SELECT COUNT(*) FROM sessions WHERE token_hash = $1`, hash).Scan(&inPublic); err != nil {

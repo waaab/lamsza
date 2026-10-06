@@ -26,6 +26,12 @@ import (
 
 var testMux *http.ServeMux
 
+// testAllowlistedSession is a normal public session for an account that happens
+// to be on ADMIN_GOOGLE_EMAILS. This app has no admin surface any more (BOG-42),
+// so it buys nothing extra here - admin_session_boundary_test.go uses it to
+// prove a public sign-in never lands in the admin session store.
+var testAllowlistedSession *http.Cookie
+
 func init() {
 	config.Load()
 	config.AppConfig.GoogleClientID = "test-google-client-id"
@@ -81,6 +87,8 @@ func init() {
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
 	testMux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
+
+	testAllowlistedSession = mustLogin("admin@test.lamsza")
 }
 
 func mustLogin(email string) *http.Cookie {
