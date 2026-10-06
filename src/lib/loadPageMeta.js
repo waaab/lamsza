@@ -1,5 +1,6 @@
 import { apiFetch } from "$lib/api.js";
 import { PAGE_HEADER_FALLBACK } from "$lib/pageHeaderDefaults.js";
+import { sanitizeHtml } from "$lib/sanitizeHtml.js";
 
 /** @param {unknown} s @param {string} fallback */
 function nonEmptyOrFallback(s, fallback) {
@@ -24,6 +25,10 @@ export function initialPageHeader(slug) {
 }
 
 /**
+ * `content` is HTML an admin wrote, and the pages render it with `{@html}`.
+ * Sanitizing it here, at the one place it enters the app, is what keeps every
+ * caller safe — including pages added later, which do not have to remember.
+ *
  * @param {string} slug - `pages.slug` (pl. `szekek`, `home`, `iranyelvek/sutik`)
  * @returns {Promise<{ title: string, greeting: string, content?: string, slug?: string }>}
  */
@@ -34,7 +39,7 @@ export async function loadPageMeta(slug) {
         return {
             title: nonEmptyOrFallback(page?.title, fb.title),
             greeting: nonEmptyOrFallback(page?.greeting, fb.greeting),
-            content: page?.content ?? "",
+            content: sanitizeHtml(page?.content),
             slug: page?.slug,
         };
     } catch {
