@@ -243,11 +243,28 @@ works the same in a private repo.
   from `backend/` and waits on a database; in the three repos whose `frontend` job
   runs from `frontend/` the step needs `working-directory: .`, because the test
   lives at the repo root.
-- **One repo setting could still block it:** if a repo's *Settings > Actions >
-  Workflow permissions* is "read repository contents", `GITHUB_TOKEN` cannot open
-  an issue and the `ci-status` job itself goes red. That is visible rather than
-  silent, but it has not been verified from here — no agent can read Actions
-  output on this machine.
+- **One repo setting can still switch it off, and it says so.** *Settings >
+  Actions > General > Workflow permissions* is a per-repo ceiling on
+  `GITHUB_TOKEN`. While it reads "Read repository contents and packages
+  permissions", the `issues` scope is dropped no matter what the job's
+  `permissions:` block asks for, every call 403s, and the receiver is dead — the
+  BOG-54 failure one level up. The job's `permissions: issues: write` is
+  necessary but not sufficient.
+
+  So the script diagnoses its own refusal rather than dying with a bare `HTTP
+  403`. It prints which setting to change, in which repo, to the step log **and
+  to `$GITHUB_STEP_SUMMARY`**, which renders on the run's summary page — the one
+  screen a person actually opens. An unrecognised failure is quoted verbatim
+  instead of guessed at. It still exits non-zero in every case: a receiver that
+  cannot write must leave the job red, never look quiet.
+
+  Set it to **Read and write permissions** in all four repos. No repo content
+  needs to change.
+
+- **Still unverified from here:** nothing on this machine has seen the
+  `ci-status` job actually run. The logic has 14 unit tests; the workflow wiring
+  and the `GITHUB_TOKEN` grant have none, because no agent here can read Actions
+  output. The first push to `main` after the receiver landed is the live test.
 
 **Half two, specified but not applied: branch protection.** Required status
 checks on `main` need a GitHub token or the web UI, and neither exists here. The
