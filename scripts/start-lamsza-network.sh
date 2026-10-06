@@ -10,10 +10,35 @@ set -euo pipefail
 # pointing at a sandbox directory, so $HOME-derived paths send the logs and
 # PID files somewhere the operator cannot find them (BOG-31).
 #
-# The projects root is the directory this script lives in. Resolve symlinks
-# first, because the script is usually invoked through ~/.local/bin/lamsza-network.
+# The script now lives in the lamsza repo, at scripts/start-lamsza-network.sh
+# (BOG-50), and is reached through two symlinks into it:
+#   ~/projects/start-lamsza-network.sh  and  ~/.local/bin/lamsza-network
+# readlink -f resolves both to the repo copy, so the script's own directory is
+# the repo's scripts/ folder, NOT the projects root. Walk up from there until we
+# find the directory that holds all four app repos. That also works from a git
+# worktree under lamsza/.worktrees/<branch>/scripts.
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
-PROJECTS_ROOT="${LAMSZA_PROJECTS_ROOT:-$(dirname "$SCRIPT_PATH")}"
+
+find_projects_root() {
+	local dir="$1" app ok
+	while :; do
+		ok=1
+		for app in lamsza lamsza-admin szotar jatszoter; do
+			[ -d "$dir/$app" ] || ok=0
+		done
+		[ "$ok" = 1 ] && { echo "$dir"; return 0; }
+		[ "$dir" = "/" ] && return 1
+		dir="$(dirname "$dir")"
+	done
+}
+
+PROJECTS_ROOT="${LAMSZA_PROJECTS_ROOT:-$(find_projects_root "$(dirname "$SCRIPT_PATH")" || true)}"
+if [ -z "$PROJECTS_ROOT" ]; then
+	echo "$(basename "$0"): cannot find the projects root above $SCRIPT_PATH." >&2
+	echo "Expected a directory containing lamsza, lamsza-admin, szotar and jatszoter." >&2
+	echo "Set LAMSZA_PROJECTS_ROOT to point at it." >&2
+	exit 1
+fi
 
 # The state belongs to the person who owns the checkout, not to whoever runs
 # the script. Fall back to $HOME only if the owner lookup fails.
@@ -156,6 +181,7 @@ print_status() {
 			jatszoter) printf '%-10s  %-8s  %-8s  https://jatszoter.lamsza.test  http://localhost:%s\n' "$name" "$bstate" "$fstate" "$fport" ;;
 		esac
 	done
+	echo "Apps: $PROJECTS_ROOT"
 	echo "Logs: $STATE_DIR/"
 }
 
