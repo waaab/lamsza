@@ -14,7 +14,7 @@ it done.
 
 ## Local port map
 
-From `~/projects/start-lamsza-network.sh` (the source of truth):
+From `scripts/start-lamsza-network.sh` in this repo (the source of truth):
 
 | App | Backend | Frontend | Database |
 |---|---|---|---|
@@ -35,6 +35,11 @@ From `~/projects/start-lamsza-network.sh` (the source of truth):
 cd ~/projects
 ./start-lamsza-network.sh start      # start | stop | restart | status
 ```
+
+The script is tracked at `lamsza/scripts/start-lamsza-network.sh`.
+`~/projects/start-lamsza-network.sh` and `~/.local/bin/lamsza-network` are
+symlinks into it, so either path, and `lamsza-network start` from anywhere, run
+the same tracked file. Change it in the repo, not through a symlink.
 
 **Expect:** four backends and four frontends listening. Check it yourself rather than
 trusting the script's own summary:

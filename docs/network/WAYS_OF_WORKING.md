@@ -24,8 +24,8 @@ separate workspaces. Each app is its own git repo and its own deploy unit.
 Three Postgres databases: `lamsza` (shared by the main app and admin), `szotar`,
 `jatszoter`.
 
-`~/projects/start-lamsza-network.sh` starts and stops the whole network on fixed
-ports:
+`lamsza/scripts/start-lamsza-network.sh` starts and stops the whole network on
+fixed ports:
 
 | App | Backend | Frontend |
 | --- | --- | --- |
@@ -34,7 +34,22 @@ ports:
 | szotar | 3002 | 5175 |
 | jatszoter | 3003 | 5176 |
 
-The script finds the apps under `$LAMSZA_PROJECTS_ROOT` (default `~/projects`).
+**The tracked copy is the only copy.** The script lives in this repo, at
+`scripts/start-lamsza-network.sh`. Two symlinks point into it so the habitual
+paths keep working — edit neither, edit the repo file:
+
+- `~/projects/start-lamsza-network.sh` → `lamsza/scripts/start-lamsza-network.sh`
+- `~/.local/bin/lamsza-network` → `~/projects/start-lamsza-network.sh`
+
+It finds the four apps by resolving its own path through those symlinks and then
+walking up until it reaches the directory that contains all four repos — on this
+machine, `~/projects`. Set `LAMSZA_PROJECTS_ROOT` to override that, and
+`LAMSZA_STATE_DIR` to move the logs and PID files. `status` prints both as
+`Apps:` and `Logs:`. Run `scripts/tests/start-lamsza-network.test.sh` after
+changing the script.
+
+Until BOG-50 the script was an untracked file on one machine, which is why
+BOG-31's fix to it had no commit to point at.
 
 ---
 
