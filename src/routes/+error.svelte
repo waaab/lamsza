@@ -4,6 +4,12 @@
 
 <svelte:head>
     <title>Hiba {$page.status} - Székely Gugel</title>
+    <!--
+      nginx answers an unknown path with app.html and HTTP 200, so a crawler
+      reaching this page over the SPA fallback sees a 200. Keep it out of the
+      index until the server can return a real 404 status.
+    -->
+    <meta name="robots" content="noindex" />
 </svelte:head>
 
 <div class="layout-bg error-layout">
