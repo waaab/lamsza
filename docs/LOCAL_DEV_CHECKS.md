@@ -60,8 +60,8 @@ docker ps --format '{{.Names}}\t{{.Status}}'     # lamsza-db, szotar-db, jatszot
 ```bash
 probe(){ printf '%-48s %s\n' "$1" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 6 "$1")"; }
 
-probe http://127.0.0.1:3000/api/config/public          # admin
-probe http://127.0.0.1:3001/api/config/public          # lamsza
+probe http://127.0.0.1:3000/api/health                 # admin
+probe http://127.0.0.1:3001/api/health                 # lamsza
 probe http://127.0.0.1:3002/api/health                 # szotar
 probe http://127.0.0.1:3002/api/words
 probe http://127.0.0.1:3003/api/health                 # jatszoter
@@ -71,11 +71,10 @@ for p in 5173 5174 5175 5176; do probe http://127.0.0.1:$p/; done
 
 **Expect:** `200` everywhere.
 
-**Verified 2026-10-06 12:13 UTC:** all `200`, with one gap —
-
-> **`/api/health` does not exist on lamsza (`:3001`) or admin (`:3000`). Both return 404.**
-> Only szotar and jatszoter have it. Until it is added, use `/api/config/public` as the
-> liveness probe for lamsza and admin. Tracked as its own task.
+> **All four apps answer `/api/health`** since 2026-10-06. On lamsza and admin the route
+> pings Postgres and returns `503 {"ok":false,"db":"down"}` when the database does not
+> answer, so a process that is up with a dead DB reads as down. szotar and jatszoter return
+> a plain `{"ok":true}`.
 
 ---
 

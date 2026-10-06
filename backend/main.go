@@ -10,6 +10,7 @@ import (
 	"backend/internal/db"
 	"backend/internal/events"
 	"backend/internal/handlers"
+	"backend/internal/health"
 	"backend/internal/links"
 	"backend/internal/middleware"
 	"backend/internal/mondasok"
@@ -45,6 +46,8 @@ func main() {
 	handlers.MigrateDirectoryCatalog()
 
 	mux := http.DefaultServeMux
+
+	mux.HandleFunc("/api/health", middleware.ApplyCORS(health.HandleHealth))
 
 	mux.HandleFunc("/api/auth/google", middleware.ApplyCORS(auth.HandleGoogleLogin))
 	mux.HandleFunc("/api/auth/me", middleware.ApplyCORS(auth.HandleMe))
