@@ -1,7 +1,7 @@
 <script>
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import Markdown from "./Markdown.svelte";
-    import { getApiBase } from "$lib/api.js";
+    import { canReachApi, getApiBase } from "$lib/api.js";
 
     /** Logical section key - must match `page_faq_sections.section_key` */
     export let sectionKey = "home";
@@ -16,6 +16,13 @@
 
     async function loadSection(key) {
         if (!key) return;
+        /**
+         * Prerender: the renderer does not await this fetch, so its result never
+         * reaches the prerendered page. Skipping it keeps `npm run build` from
+         * needing the backend on port 3001. The reactive statement runs again on
+         * the client, which is where the FAQ has always come from.
+         */
+        if (!canReachApi()) return;
         const seq = ++loadSeq;
         loading = true;
         loadError = false;

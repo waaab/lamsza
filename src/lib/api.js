@@ -12,6 +12,25 @@
  * reach `http://localhost:3001`. It is an SSR/prerender fallback only, and must never
  * hold a dev URL in a production build.
  */
+/**
+ * Whether API calls make sense in the current context.
+ *
+ * Prerender runs component code on the server. A fetch started from a component
+ * body there is never awaited by the renderer, so its result cannot reach the
+ * prerendered HTML - `dist/` comes out byte-identical with the backend up or
+ * down. What the fetch does change is `npm run build`: with no backend on port
+ * 3001 the build prints an ECONNREFUSED stack per page and still exits 0, so
+ * real failures hide in noise nobody reads.
+ *
+ * Components must gate their fetches on this instead of relying on a try/catch,
+ * which turns a dead backend into silence. See PageFaqDisclaimer.svelte.
+ *
+ * @returns {boolean} true in the browser, false during SSR / prerender
+ */
+export function canReachApi() {
+    return typeof window !== "undefined";
+}
+
 export function getApiBase() {
     /** Same tab as the Svelte app - absolute origin so fetches always resolve (Vite proxy / reverse proxy). */
     if (typeof window !== "undefined" && window.location?.origin) {
