@@ -1,13 +1,14 @@
-# Local Verification Runbook — the agent-owned half of the go-live checks
+# Local Dev Checks — bring the four apps up and prove they work
 
-**Audience: agents (and anyone working on the local machine).**
+**Audience:** anyone developing the network on this machine, agents included.
 **Target:** `localhost` only. See `docs/AGENT_ENVIRONMENT_POLICY.md`.
-**Covers:** the localhost equivalent of go-live items 6, 7, 8, 9, 10, 11 and 13.
+**Covers:** starting the network, smoking every API, and the feature checks that are easy
+to get wrong (sign-in config, admin allowlists, weather, the Szótár↔Játszótér pair,
+restart and data persistence, dump and restore).
 **Last updated:** 2026-10-06 — every command below was run and the output recorded.
 
-Agents prove the behaviour here. The owner then confirms the same behaviour on the live
-droplet with `docs/GO_LIVE_VERIFICATION_RUNBOOK.md`. A green run here does **not** tick a
-go-live item — it removes the code and config causes, so only environment causes remain.
+All four apps are in development. This is the check to run after a change, before calling
+it done.
 
 ---
 
@@ -73,17 +74,15 @@ for p in 5173 5174 5175 5176; do probe http://127.0.0.1:$p/; done
 **Verified 2026-10-06 12:13 UTC:** all `200`, with one gap —
 
 > **`/api/health` does not exist on lamsza (`:3001`) or admin (`:3000`). Both return 404.**
-> Only szotar and jatszoter have it. The go-live checklist and any nginx or uptime check
-> that probes `/api/health` will report those two apps down when they are healthy.
-> Tracked separately; until it is added, use `/api/config/public` as the liveness probe
-> for lamsza and admin.
+> Only szotar and jatszoter have it. Until it is added, use `/api/config/public` as the
+> liveness probe for lamsza and admin. Tracked as its own task.
 
 ---
 
-## Item 6 (local) — Google sign-in
+## Check — Google sign-in
 
-Sign-in cannot be fully proved on localhost — Google OAuth needs the real origins
-registered. What agents **can** prove:
+Sign-in cannot be fully proved on localhost — Google OAuth needs the dev origins
+registered. What you **can** prove:
 
 ```bash
 curl -s http://127.0.0.1:3002/api/config/public | head -c 300   # szotar
@@ -94,14 +93,14 @@ curl -s http://127.0.0.1:3003/api/config/public | head -c 300   # jatszoter
 string. Then, in a browser at `http://localhost:5175` and `http://localhost:5176`, confirm
 the **Google button renders**. A missing button means `VITE_GOOGLE_CLIENT_ID` was empty at
 build time — a code/config bug the agent fixes. A button that renders but fails at Google
-is an origin-registration problem, which is the owner's to fix.
+is an origin-registration problem in the Google console, not a code bug.
 
 `http://localhost:<port>` must be in the dev OAuth client's authorized origins for the
 button to complete locally.
 
 ---
 
-## Item 7 (local) — Admin allowlists
+## Check — Admin allowlists
 
 The variable name differs per app. Getting this wrong is the usual cause of "admin locked
 out of their own site":
@@ -117,7 +116,7 @@ out of their own site":
 grep -H '^ADMIN' ~/projects/{lamsza,szotar,jatszoter,lamsza-admin}/backend/.env 2>/dev/null
 ```
 
-What agents verify locally is the **gate logic**, not the production list:
+What you verify locally is the **gate logic**, not any particular email list:
 
 ```bash
 cd ~/projects/szotar/backend      && go test ./internal/auth/...
@@ -130,10 +129,9 @@ non-admin reaches the admin UI locally, stop — that is a security bug, not a c
 
 ---
 
-## Item 8 (local) — Weather
+## Check — Weather
 
-The live item is blocked on the `lamsza.com` DNS cutover, which is the owner's. The
-**code** is verifiable locally, and both endpoints need a `slug`:
+Both endpoints need a `slug`:
 
 ```bash
 curl -s 'http://127.0.0.1:3001/api/weather?slug=csikszereda' | head -c 300
@@ -141,8 +139,7 @@ curl -s 'http://127.0.0.1:3001/api/weather/county?slug=hargita' | head -c 300
 ```
 
 > `/api/weather` with **no** `slug` returns `400 Missing slug`. That is correct behaviour,
-> not a failure. The production runbook's bare `curl /api/weather` will show 400 — pass a
-> slug.
+> not a failure — pass a slug.
 
 **Verified 2026-10-06:** both `200` with live data from Open-Meteo —
 `{"temp":15,"desc":"Vannak felhők es...","source":"Open-Meteo",...}` and a county array
@@ -153,7 +150,7 @@ API data with a blank widget is a frontend bug.
 
 ---
 
-## Item 9 (local) — Játszótér reaches the dictionary
+## Check — Játszótér reaches the dictionary
 
 ```bash
 curl -s http://127.0.0.1:3003/api/config/public
@@ -161,7 +158,7 @@ curl -s http://127.0.0.1:3003/api/config/public
 
 **Expect:** `dictionary.ok: true`, and read `source`:
 
-- `source: "http"` — Játszótér is really calling Szótár. This is the pair the checklist means.
+- `source: "http"` — Játszótér is really calling Szótár. This is the pair that matters.
 - `source: "local"` — bundled word files. `ok:true` here says nothing about reaching Szótár.
 
 **Verified 2026-10-06:** `{"dictionary":{"ok":true,"source":"http","word_count":475},"version":"0.1.0"}`
@@ -179,10 +176,9 @@ SZOTAR_BASE_URL=http://127.0.0.1:3002
 
 ---
 
-## Items 10 + 11 (local) — Restart and data persistence
+## Check — Restart and data persistence
 
-Agents cannot reboot the droplet. They *can* prove the apps come back cleanly and that no
-data lives only in memory, which is what items 10 and 11 actually test.
+Prove the apps come back cleanly after a full stop, and that no data lives only in memory.
 
 ```bash
 # record the counts
@@ -202,16 +198,15 @@ docker exec -i jatszoter-db psql -U postgres -d jatszoter -c 'select count(*) fr
 **Expect:** identical counts, and every app back to `200` in Step 2 with no manual fixing.
 
 **The thing to actually look for:** each `docker-compose.yml` must mount a **named volume
-or bind mount** for Postgres data. A container with no volume loses everything on restart —
-locally that is an annoyance, in production it is the data loss item 11 exists to catch.
+or bind mount** for Postgres data. A container with no volume loses everything on restart.
 Check it in the compose file, not by hoping.
 
 ---
 
-## Item 13 (local) — Backup and restore
+## Check — Backup and restore
 
-The production backup is the owner's. The agent's job is to prove the dump/restore
-*commands* work, so the owner is not debugging `pg_restore` syntax during an incident.
+Prove the dump/restore *commands* work, so nobody is debugging `pg_restore` syntax on the
+day they need it.
 
 ```bash
 STAMP=$(date +%F-%H%M)
@@ -269,9 +264,7 @@ and is fixed. The remaining failures are tracked as their own task.
 
 1. Eight listeners up, three DB containers up.
 2. Every API in Step 2 returns `200`.
-3. Items 6–9 verified as above, with the output pasted into the task, not summarised.
+3. The feature checks above verified, with the output pasted into the task, not summarised.
 4. Restart test: counts unchanged, everything back without manual help.
 5. Dump and restore: matching counts.
 6. All test suites green.
-
-Only then is the owner's production pass expected to be a confirmation.
