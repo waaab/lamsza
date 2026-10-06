@@ -47,6 +47,7 @@ func MigratePages() {
 		{"terkep", "Székelyföld Térkép", "Hamarosan érkezik az interaktív térképünk helyi adatokkal!"},
 		{"valtozasnaplo", "Változásnapló", "Újítások, javítások - emberi nyelven."},
 		{"iranyelvek", "Irányelvek", "Adatvédelem, sütik és felhasználási feltételek - összefoglaló."},
+		{"iranyelvek/adatvedelem", "Adatvédelem", "Milyen adatot kezelünk, miért, mennyi ideig - és milyen jogai vannak."},
 		{"iranyelvek/sutik", "Sütik", "Hogyan használjuk a sütiket és mire valók."},
 		{"iranyelvek/feltetelek", "Feltételek", "A szolgáltatás igénybevételének feltételei."},
 	}

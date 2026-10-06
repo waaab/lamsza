@@ -46,6 +46,7 @@
         <h4 class="page-nav-title">Oldal navigáció</h4>
         <ul>
             <li><a class="btn nav-btn" href="/iranyelvek">Irányelvek</a></li>
+            <li><a class="btn nav-btn" href="/iranyelvek/adatvedelem">Adatvédelem</a></li>
             <li><a class="btn nav-btn" href="/iranyelvek/sutik">Sütik</a></li>
         </ul>
     </nav>

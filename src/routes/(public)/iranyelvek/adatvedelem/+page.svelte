@@ -3,14 +3,14 @@
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { initialPageHeader, loadPageMeta } from "$lib/loadPageMeta.js";
 
-    const fb = initialPageHeader("iranyelvek");
+    const fb = initialPageHeader("iranyelvek/adatvedelem");
     let page = null;
     let loading = true;
     let error = false;
 
     onMount(async () => {
         try {
-            page = await loadPageMeta("iranyelvek");
+            page = await loadPageMeta("iranyelvek/adatvedelem");
         } catch {
             error = true;
             page = { ...fb, content: "" };
@@ -25,9 +25,9 @@
         title={page?.title ?? fb.title}
         greeting={page?.greeting ?? fb.greeting}
         loading={false}
-        breadcrumbLabel="Irányelvek"
-        breadcrumbParentLabel=""
-        breadcrumbParentUrl=""
+        breadcrumbLabel="Adatvédelem"
+        breadcrumbParentLabel="Irányelvek"
+        breadcrumbParentUrl="/iranyelvek"
         documentTitleSuffix=" – Lámsza"
     />
 
@@ -45,7 +45,7 @@
     <nav class="page-nav">
         <h4 class="page-nav-title">Oldal navigáció</h4>
         <ul>
-            <li><a class="btn nav-btn" href="/iranyelvek/adatvedelem">Adatvédelem</a></li>
+            <li><a class="btn nav-btn" href="/iranyelvek">Irányelvek</a></li>
             <li><a class="btn nav-btn" href="/iranyelvek/sutik">Sütik</a></li>
             <li><a class="btn nav-btn" href="/iranyelvek/feltetelek">Feltételek</a></li>
         </ul>

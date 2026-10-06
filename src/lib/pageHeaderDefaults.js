@@ -52,6 +52,10 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
         title: "Irányelvek",
         greeting: "Adatvédelem, sütik és felhasználási feltételek - összefoglaló.",
     },
+    "iranyelvek/adatvedelem": {
+        title: "Adatvédelem",
+        greeting: "Milyen adatot kezelünk, miért, mennyi ideig - és milyen jogai vannak.",
+    },
     "iranyelvek/sutik": {
         title: "Sütik",
         greeting: "Hogyan használjuk a sütiket és mire valók.",
