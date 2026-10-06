@@ -257,6 +257,13 @@ done
 > `node --test tests/` (directory form) crashes with `MODULE_NOT_FOUND` on Node 24.
 > Use the glob `'tests/*.test.js'`.
 
+The lamsza suite includes `tests/sharedFrontendModules.test.js`, the drift guard for
+the 17 frontend files that `lamsza` and `lamsza-admin` share. `lamsza` owns them and
+`scripts/sync-shared-frontend.sh` copies them over; each repo checks its own copies
+against the committed hash manifest, so a drifted module goes red in whichever repo
+drifted. Do **not** keep the copies in step by hand — run the script. The rule is
+`docs/network/SHARED_FRONTEND_MODULES.md`.
+
 **Status 2026-10-06:**
 
 | Suite | Result |
@@ -266,6 +273,12 @@ done
 | szotar backend | pass |
 | jatszoter backend | pass |
 | lamsza-admin backend | pass |
+
+**Update 2026-10-06, BOG-42:** the table above is stale. Measured on the BOG-42
+branch: lamsza frontend **197 / 197**, lamsza backend green. The two
+`directory_catalog_test.go` failures were dirty-DB isolation caused by the admin
+CRUD tests in the same package; those tests went with the admin handlers they
+covered. The two frontend failures were fixed by their own task.
 
 `tests/networkOrigins.test.js` was failing against stale pre-renumber ports (5173/5174/5175)
 and is fixed. The remaining failures are tracked as their own task.
