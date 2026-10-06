@@ -5,7 +5,8 @@ drive four independent repos.
 
 Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. R7 added on
 BOG-54 and amended on BOG-57 (branch protection declined), 2026-10-06. Paperclip switched
-off and R5 made tool-independent, 2026-10-07. This file
+off and R5 made tool-independent, 2026-10-07. Pushing to `main` made subject to
+the owner's confirmation (R5, R7), 2026-10-07. This file
 is the source of truth. If a task comment and this
 file disagree, this file wins until it is changed here.
 
@@ -140,6 +141,10 @@ can see what landed.
 
 Work that is meant to land somewhere other than `main` checks against that
 branch instead. A repo with no remote skips check 3.
+
+Check 3 needs a push, and pushing to `main` needs Attila's explicit confirmation
+(R7, `docs/AGENT_ENVIRONMENT_POLICY.md`). Until Attila confirms, the task is
+committed and merged but not done: report it as ready to push, with the commits.
 
 Skip a check only when it is genuinely wrong for the task — check 1 for a task
 that produced a brief, a decision or a review; check 2 for work meant to stay on
@@ -297,10 +302,12 @@ and `backend` only, **never `ci-status`**, which is gated on `refs/heads/main`,
 never reports on a pull-request branch, and as a required check would block every
 pull request forever.
 
-**So the git grant does not change.** `docs/AGENT_ENVIRONMENT_POLICY.md` stands
-as written: agents commit, merge and push, `main` included. Pushing to `main` is
-still how work lands, and nothing mechanical stops a red push. The whole weight
-of "do not break `main`" sits on the rules below and on the notification.
+**The git grant: commit and merge locally, push only on confirmation.** Agents
+commit and merge locally, `main` included. Pushing to `main`, or merging a pull
+request into it, always needs Attila's explicit confirmation first (narrowed on
+2026-10-07; see `docs/AGENT_ENVIRONMENT_POLICY.md`). Pushing to `main` is still
+how work lands, and nothing on GitHub stops a red push. The whole weight of "do
+not break `main`" sits on that confirmation, the rules below and the notification.
 
 **So the rule is: the local gate is the real gate.** This is now permanent, not
 a holding position — nothing is coming to replace it:
