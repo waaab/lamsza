@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; Mondások plan, simplified).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; Mondások plan, simplified; admin move done).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -52,6 +52,15 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      show their dashboards with counts; on the server,
      `curl -s 127.0.0.1:<szotar port>/internal/admin/stats` without the token
      answers 401.
+  6. **The old admin settings go:** remove `ADMIN_GOOGLE_EMAILS` from Szótár's
+     `.env` and `ADMIN_EMAILS` from Játszótér's (neither app reads them any
+     more). Keep admin's `CORS_ALLOWED_ORIGINS=https://admin.lamsza.com`: the
+     sibling toolbars use `/api/auth/admin-status`, which admits the network's
+     sites on its own. `VITE_ADMIN_ORIGIN` is needed in Szótár's and
+     Játszótér's builds only if the admin app is not at
+     `https://admin.lamsza.com`. Check: `https://szotar.lamsza.com/admin` and
+     `https://jatszoter.lamsza.com/admin` land on the admin app's `/dictionary`
+     and `/games`.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
@@ -94,12 +103,6 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
 
 ## Work
 
-- **[admin] [szotar] [jatszoter] Move Szótár's and Játszótér's admin into the
-  admin app (R18).** Approved plan, 2026-10-07: Batch A builds the internal
-  admin APIs, the admin backend relay and the `/dictionary` and `/games`
-  sections, then verifies feature parity on a throwaway stack (nothing is
-  removed); Batch B removes the old `/admin` pages, their public admin
-  endpoints and both apps' own admin lists, once the owner has reviewed Batch A.
 - **[szotar] [lamsza] [admin] One Mondások, owned by Szótár (start after
   Batch B).** Owner's decisions, 2026-10-07: Szótár's `proverbs` is the only
   mondás store, managed only from the admin app's `/dictionary`; every existing

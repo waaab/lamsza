@@ -186,13 +186,13 @@ Where the gate is checked in a browser differs per app, because the **main app h
 
 | App | Admin UI |
 |---|---|
-| admin (`lamsza-admin`) | `http://localhost:5173/` — the whole app is the admin UI |
-| szotar | `http://localhost:5175/admin` |
-| jatszoter | `http://localhost:5176/admin` |
+| admin (`lamsza-admin`) | `http://localhost:5173/`, `/dictionary` (Szótár), `/games` (Játszótér): the network's one admin UI (WoW R18) |
+| szotar | none. `http://localhost:5175/admin` redirects to the admin app's `/dictionary` |
+| jatszoter | none. `http://localhost:5176/admin` redirects to the admin app's `/games` |
 | lamsza | **none.** `http://localhost:5174/admin` must 404 |
 
-An allowlisted account must reach the admin UI of the app it belongs to; a
-non-allowlisted one must get 403. If a non-admin reaches an admin UI locally, stop — that
+An allowlisted account must reach the admin UI; a non-allowlisted one is sent on to
+Lámsza, and Szótár's and Játszótér's admin writes under `/api/` answer 403 to anyone. If a non-admin reaches an admin UI locally, stop — that
 is a security bug, not a config issue.
 
 ---

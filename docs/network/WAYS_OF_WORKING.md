@@ -474,9 +474,16 @@ the public pages listed nothing from the last two weeks.
 Every app is administered from the admin app (`lamsza-admin`): `/` for the main
 Lámsza data, `/dictionary` for Szótár, `/games` for Játszótér. Routes are
 English, the UI is Hungarian. The admin app's `ADMIN_GOOGLE_EMAILS` is the
-network's one admin list; a person signs in as admin only there. Decided on
-2026-10-07; the move runs in batches (OPEN_ITEMS), and until it ends Szótár and
-Játszótér still carry their own `/admin` pages.
+network's one admin list; a person signs in as admin only there. Decided and
+done on 2026-10-07: Szótár and Játszótér have no admin pages and no admin list of
+their own. Their old `/admin` URLs redirect to the matching section, and their
+admin writes answer only the internal admin API below (403 under `/api/`). For a
+browser signed in to the admin app as an admin, their toolbar shows an Admin link
+(and Szótár's entry page a "Szerkesztés" link to the word's editor); they ask
+`GET <admin>/api/auth/admin-status`, which answers only yes or no and is the one
+admin route open to the network's sites, so the admin API's own CORS list stays
+limited to the admin app. The admin origin comes from each app's
+`networkOrigins.js`.
 
 How the admin app reaches another app's data, without touching its database:
 
