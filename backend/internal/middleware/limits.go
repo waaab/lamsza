@@ -16,25 +16,21 @@ import (
 // Apply LimitBody once, around the whole mux.
 const (
 	// DefaultMaxBodyBytes covers every JSON route. The largest real JSON
-	// payload is an admin page or event body, far under 1 MiB.
+	// payload is a listing or account body, far under 1 MiB.
 	DefaultMaxBodyBytes = 1 << 20 // 1 MiB
 
 	// ImportMaxBodyBytes covers /api/account/import, which posts a whole
 	// browser-local favourites and history dump in one request.
 	ImportMaxBodyBytes = 4 << 20 // 4 MiB
-
-	// UploadMaxBodyBytes covers multipart image uploads. The handlers cap the
-	// image itself at 8 MiB; this leaves room for the multipart envelope.
-	UploadMaxBodyBytes = 10 << 20 // 10 MiB
 )
+
+// No upload limit here: this backend has no multipart route. Entry and event
+// image uploads moved to lamsza-admin with the admin handlers (BOG-42).
 
 // bodyLimitByPrefix holds the routes that need more than the default. Longest
 // matching prefix wins, so an exact path and a subtree can both be listed.
 var bodyLimitByPrefix = map[string]int64{
-	"/api/account/import":      ImportMaxBodyBytes,
-	"/api/admin/entry-images":  UploadMaxBodyBytes,
-	"/api/admin/event-images":  UploadMaxBodyBytes,
-	"/api/account/entry-image": UploadMaxBodyBytes,
+	"/api/account/import": ImportMaxBodyBytes,
 }
 
 // MaxBodyBytesFor returns the body limit that applies to a request path.

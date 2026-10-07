@@ -32,10 +32,10 @@ func TestMaxBodyBytesForDefault(t *testing.T) {
 
 func TestMaxBodyBytesForOverrides(t *testing.T) {
 	cases := map[string]int64{
-		"/api/account/import":              ImportMaxBodyBytes,
-		"/api/admin/entry-images":          UploadMaxBodyBytes,
-		"/api/admin/event-images/anything": UploadMaxBodyBytes,
-		"/api/search":                      DefaultMaxBodyBytes,
+		"/api/account/import": ImportMaxBodyBytes,
+		"/api/search":         DefaultMaxBodyBytes,
+		// Uploads moved to lamsza-admin; a stray request here gets the default.
+		"/api/admin/entry-images": DefaultMaxBodyBytes,
 	}
 	for path, want := range cases {
 		if got := MaxBodyBytesFor(path); got != want {
