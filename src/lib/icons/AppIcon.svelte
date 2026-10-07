@@ -266,6 +266,20 @@
             <polyline points="16 17 21 12 16 7"></polyline>
             <line x1="21" y1="12" x2="9" y2="12"></line>
         </svg>
+    {:else if name === "list"}
+        <!-- Szótár "Lista": three lines getting shorter -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="6" x2="16" y2="6"></line>
+            <line x1="4" y1="12" x2="12" y2="12"></line>
+            <line x1="4" y1="18" x2="8" y2="18"></line>
+        </svg>
+    {:else if name === "add"}
+        <!-- Plus in a circle (Szótár "Új szó") -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 8v8"></path>
+            <path d="M8 12h8"></path>
+        </svg>
     {:else if name === "page_faq"}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>

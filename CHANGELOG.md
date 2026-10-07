@@ -20,6 +20,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `AppIcon.svelte` gains the Játszótér icon and round caps on the gear; it, the confirm, notice and sign-in dialogs and the three base stylesheets are now shared with lamsza-admin under the drift guard.
 - `docs/network/UI_BASELINE.md` records the owner's 59 UI decisions; the Cursor UI rule points to it.
 - `GoogleSignIn` / `SignInDialog` take an optional `signIn(credential)` so an app can sign in through its own API; `AppIcon` gains `trophy`, `login` and `logout`.
+- `AppIcon` gains `list` and `add` (Szótár's Lista and Új szó toolbar buttons).
 
 ### Fixed
 - The Lámsza button tooltip typo ("főódalra"). [public]
