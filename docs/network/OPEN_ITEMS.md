@@ -145,25 +145,14 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      resource, the dashboard count, the model, the tests); update WAYS_OF_WORKING
      R18, UI_BASELINE, ARCHITECTURE, the changelogs and this file.
 - **[network] R19: "today" is a Bucharest day, decided by the server.** The
-  owner's rule (WAYS_OF_WORKING R19) and the audit of 2026-10-07; one repo per
-  step, tests at the edge times in each:
-  - [lamsza] `internal/clock`; the events list, filters and search use
-    Bucharest's date; the event badges read Bucharest wall-clock times and the
-    server's "now" (`src/lib/bucharestTime.js`). The mondás goes to Szótár in
-    the Mondások plan above.
-  - [szotar] `internal/clock` for the daily word; `GET /api/proverbs/today`
-    (the widget sends no date); the public `/api/proverbs` and `/mondasok` list
-    only mondások dated up to today; the home page shows the server's date;
-    the internal admin API reports `today`.
-  - [jatszoter] `internal/clock` for every game; the Rovásfejtő daily counts
-    calendar days (it served yesterday's puzzle from 00:00 to 01:00 every summer
-    night); the leaderboards' "today" and "week" start at Bucharest midnight
-    (they started at 03:00 in summer); the Kaptár migrations stop creating or
-    enabling boards by the database's UTC date; the internal admin API reports
-    `today`.
-  - [admin] the date defaults and "today" in `/dictionary` and `/games` come
-    from Szótár's and Játszótér's `today` (the main admin's Mondások goes in
-    the Mondások cleanup).
+  owner's rule (WAYS_OF_WORKING R19). Done on 2026-10-07 in every repo (each one's
+  `internal/clock`, events, Szótár's daily word and `/api/proverbs/today`, the
+  Játszótér games, leaderboards and Kaptár migrations, the admin's date
+  defaults). What is left goes with the Mondások plan above: Lámsza's
+  `MondasWidget` still sends the visitor's date (step 3 moves it to
+  `/api/proverbs/today`), and the main admin's Mondások ("ma", the today
+  warning, the date defaults) and Lámsza's `/api/mondasok` (Budapest) still use
+  the old dates until the cleanup removes them.
 - **[lamsza] The browser extension (`extension/`, git-ignored, built by
   `npm run build:extension`) is not used.** Its March build calls
   `/api/admin/mondasok` on `localhost:3000` and no longer works. A future
