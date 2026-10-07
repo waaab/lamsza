@@ -1,4 +1,7 @@
 <script>
+    import JsonLd from "$lib/components/JsonLd.svelte";
+    import { breadcrumbItems, breadcrumbListJsonLd } from "$lib/structuredData.js";
+
     export let label = "";
     export let parentLabel = "Index";
     export let parentUrl = "/index";
@@ -9,7 +12,25 @@
     export let settlementSlug = "";
     export let settlementName = "";
     export let settlementType = ""; // e.g., 'város', 'falu'
+
+    // Same trail the markup below renders, as schema.org BreadcrumbList.
+    $: crumbJsonLd = breadcrumbListJsonLd(
+        breadcrumbItems({
+            label,
+            parentLabel,
+            parentUrl,
+            extraLabel,
+            extraUrl,
+            countySlug,
+            countyName,
+            settlementSlug,
+            settlementName,
+            settlementType,
+        }),
+    );
 </script>
+
+<JsonLd data={crumbJsonLd} />
 
 <div class="breadcrumbs">
     <a href="/">Főoldal</a>

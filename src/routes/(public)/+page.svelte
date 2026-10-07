@@ -23,6 +23,7 @@
     } from "$lib/quickLinksDisplay.js";
     import { homepageAttractionWeather, homepageEventPlace, homepageSettlements } from "$lib/favoriteHomepage.js";
     import { weatherDescPlaceholder, weatherSourcePlaceholder } from "$lib/weatherDescPlaceholder.js";
+    import { storageAllowed } from "$lib/stores/consent.js";
 
     const USER_LINKS_KEY = "user_quick_links";
     const PROMOTED_CACHE_KEY = "promoted_links_cache";
@@ -248,7 +249,8 @@
             }
         }
 
-        const cached = localStorage.getItem(PROMOTED_CACHE_KEY);
+        const mayCache = storageAllowed("gyorsitotar");
+        const cached = mayCache ? localStorage.getItem(PROMOTED_CACHE_KEY) : null;
         if (cached && cacheVersion) {
             try {
                 const { items, timestamp, version } = JSON.parse(cached);
@@ -263,14 +265,16 @@
         try {
             const data = await apiFetch("/api/quick_links");
             promotedLinks = data || [];
-            localStorage.setItem(
-                PROMOTED_CACHE_KEY,
-                JSON.stringify({
-                    items: promotedLinks,
-                    timestamp: Date.now(),
-                    version: cacheVersion ?? "",
-                }),
-            );
+            if (mayCache) {
+                localStorage.setItem(
+                    PROMOTED_CACHE_KEY,
+                    JSON.stringify({
+                        items: promotedLinks,
+                        timestamp: Date.now(),
+                        version: cacheVersion ?? "",
+                    }),
+                );
+            }
         } catch (err) {
             promotedError = true;
         } finally {

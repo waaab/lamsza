@@ -1,4 +1,8 @@
 import { getApiBase } from "./api.js";
+import { storageAllowed } from "./stores/consent.js";
+
+/** Consent category that owns ENTRY_HISTORY_STORAGE_KEY. */
+const CONSENT_CATEGORY = "kenyelmi";
 
 export const ENTRY_HISTORY_STORAGE_KEY = "lamsza_entry_history";
 export const ENTRY_HISTORY_STORE_MAX = 12;
@@ -42,6 +46,7 @@ export function normalizeHistory(raw) {
 
 export function readHistory() {
     if (typeof localStorage === "undefined") return [];
+    if (!storageAllowed(CONSENT_CATEGORY)) return [];
     try {
         return normalizeHistory(localStorage.getItem(ENTRY_HISTORY_STORAGE_KEY));
     } catch {
@@ -51,6 +56,7 @@ export function readHistory() {
 
 export function recordHistoryVisit(raw) {
     const item = asItem(raw);
+    if (!storageAllowed(CONSENT_CATEGORY)) return [];
     const prev = readHistory().filter((row) => !item || row.slug !== item.slug);
     const next = item ? [item, ...prev].slice(0, ENTRY_HISTORY_STORE_MAX) : prev;
     if (typeof localStorage !== "undefined") {

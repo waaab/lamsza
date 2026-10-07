@@ -1,3 +1,8 @@
-# allow crawling everything by default
+# allow crawling everything except signed-in-only pages
 User-agent: *
-Disallow:
+Allow: /
+Disallow: /beallitasok
+Disallow: /fiok
+Disallow: /profil
+
+Sitemap: https://lamsza.com/sitemap.xml

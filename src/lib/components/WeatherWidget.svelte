@@ -4,6 +4,7 @@
     import { formatTime } from "$lib/utils";
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
     import { weatherDescPlaceholder, weatherSourcePlaceholder } from "$lib/weatherDescPlaceholder.js";
+    import { storageAllowed } from "$lib/stores/consent.js";
 
     export let settlementSlug = "csikszereda";
     /** When set, fetch weather by coordinates (e.g. for attractions) */
@@ -46,7 +47,9 @@
 
         if (gen !== fetchGen) return;
 
-        if (browser) {
+        const mayCache = browser && storageAllowed("gyorsitotar");
+
+        if (mayCache) {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
                 try {
@@ -93,7 +96,7 @@
                 precipMm: data.precip_mm ?? null,
             };
 
-            if (browser) {
+            if (mayCache) {
                 localStorage.setItem(
                     cacheKey,
                     JSON.stringify({

@@ -29,6 +29,8 @@
     import EntryStars from "$lib/components/EntryStars.svelte";
     import EntryPhotoGallery from "$lib/components/EntryPhotoGallery.svelte";
     import EntryReviews from "$lib/components/EntryReviews.svelte";
+    import JsonLd from "$lib/components/JsonLd.svelte";
+    import { listingJsonLd } from "$lib/structuredData.js";
     import { displayTagLabel } from "$lib/directoryTagCloud.js";
 
     /** @type {{
@@ -109,37 +111,7 @@
             : [],
     );
     let tagLabels = $derived(tags.map((t) => displayTagLabel(t)));
-    let jsonLd = $derived.by(() => {
-        if (placeholder || !entry?.name) return null;
-        /** @type {Record<string, unknown>} */
-        const data = {
-            "@context": "https://schema.org",
-            "@type": "LocalBusiness",
-            name: String(entry.name),
-        };
-        if (url) data.url = url;
-        if (showListingPhone(entry) && phone) data.telephone = phone;
-        /** @type {Record<string, string>} */
-        const postal = { "@type": "PostalAddress" };
-        if (address !== EMPTY_PLACEHOLDER) postal.streetAddress = address;
-        if (locationName !== EMPTY_PLACEHOLDER) {
-            postal.addressLocality = locationName;
-        }
-        if (countyName !== EMPTY_PLACEHOLDER) {
-            postal.addressRegion = countyName;
-        }
-        if (Object.keys(postal).length > 1) data.address = postal;
-        if (categoryLabels.length) data.knowsAbout = [...categoryLabels];
-        if (locationName !== EMPTY_PLACEHOLDER) {
-            data.areaServed = locationName;
-        }
-        return data;
-    });
-    let jsonLdScript = $derived.by(() => {
-        if (!jsonLd) return "";
-        const payload = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
-        return "<script type=\"application/ld+json\">" + payload + "</" + "script>";
-    });
+    let jsonLd = $derived(placeholder ? null : listingJsonLd(entry));
     let languages = $derived(displayText(entry?.languages));
     let initials = $derived(displayInitials(entry?.name));
     let rating = $derived.by(() => {
@@ -248,11 +220,7 @@
     {/if}
 {/snippet}
 
-<svelte:head>
-    {#if jsonLdScript}
-        {@html jsonLdScript}
-    {/if}
-</svelte:head>
+<JsonLd data={jsonLd} />
 
 {#if placeholder}
     <article

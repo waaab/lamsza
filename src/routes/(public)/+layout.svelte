@@ -4,14 +4,25 @@
     import { page } from "$app/stores";
     import PageFaqDisclaimer from "$lib/components/PageFaqDisclaimer.svelte";
     import { deriveFaqSectionKey } from "$lib/pageFaqSection.js";
+    import Seo from "$lib/components/Seo.svelte";
+    import { resolveSeo } from "$lib/seo.js";
+    import JsonLd from "$lib/components/JsonLd.svelte";
+    import { organizationJsonLd } from "$lib/structuredData.js";
 
     $: faqSectionKey = deriveFaqSectionKey($page.url.pathname);
+    /** Per-page override: return `seo: { title, description, image, type }` from a `load`. */
+    $: seo = resolveSeo({
+        pathname: $page.url.pathname,
+        ...($page.data?.seo ?? {}),
+    });
     import { auth } from "$lib/stores/auth";
     import { apiFetch } from "$lib/api.js";
     import SignInDialog from "$lib/components/SignInDialog.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
     import { APP_VERSION } from "$lib/publicChangelog.js";
+    import CookieConsent from "$lib/components/CookieConsent.svelte";
+    import { openConsentSettings } from "$lib/stores/consent.js";
 
     const NETWORK_LAUNCH_YEAR = 2009;
     const year = new Date().getFullYear();
@@ -70,6 +81,19 @@
     }
 
 </script>
+
+<Seo
+    title={seo.title}
+    description={seo.description}
+    canonical={seo.canonical}
+    image={seo.image}
+    type={seo.type}
+    siteName={seo.siteName}
+    locale={seo.locale}
+/>
+
+<!-- Site-wide publisher node; `sameAs` fills in once the public config lands. -->
+<JsonLd data={organizationJsonLd({ socialLinks })} />
 
 <svelte:window
     bind:scrollY
@@ -391,6 +415,14 @@
             <a href="/iranyelvek/adatvedelem" title="Adatvédelem">Adatvédelem</a>
             <a href="/iranyelvek/feltetelek" title="Feltételek">Feltételek</a>
             <a href="/iranyelvek/sutik" title="Sütik">Sütik</a>
+            <button
+                type="button"
+                class="policy-link-btn"
+                on:click={openConsentSettings}
+                title="Süti beállítások"
+            >
+                Süti beállítások
+            </button>
             &bull;
             <a href="/valtozasnaplo" title="Verzió és Változásnapló"
                 >v{APP_VERSION} - Változásnapló</a
@@ -408,6 +440,8 @@
     onSignedIn={onGoogleSignedIn}
 />
 
+<CookieConsent />
+
 {#if scrollY > 500}
     <button
         class="btn back-to-top"
@@ -420,6 +454,17 @@
 {/if}
 
 <style>
+    /* Reads as one of the footer policy links, but reopens the consent panel. */
+    .policy-link-btn {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+
     .nav-btn--admin {
         position: relative;
     }

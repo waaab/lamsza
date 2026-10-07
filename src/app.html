@@ -4,10 +4,7 @@
 <head>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
-	<title>Szekely Gugel - Erdélyi magyar startlap és kereső</title>
 	<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-	<meta name="description"
-		content="Szekely Gugel - gyors kereses, idojares, hirek es gyorslinkek Szekelyfoldon es Erdelyben. Na lamsza, kicsibaratom!" />
 	<!--
 		Keep this as an external file, not an inline block: the
 		Content-Security-Policy in svelte.config.js allows scripts from this
@@ -16,6 +13,15 @@
 	-->
 	<script src="%sveltekit.assets%/theme-init.js"></script>
 	%sveltekit.head%
+	<!--
+		Below are the fallback title and description for the SPA shell only.
+		They must stay AFTER %sveltekit.head%: a document can hold more than one
+		<title> / description, and crawlers and browsers read the first one, so the
+		page-specific tags above must come first.
+	-->
+	<title>Lámsza - Erdélyi magyar startlap és kereső</title>
+	<meta name="description"
+		content="Lámsza - gyors keresés, időjárás, hírek és gyorslinkek Székelyföldön és Erdélyben. Na lámsza, kicsibarátom!" />
 </head>
 
 <body data-sveltekit-preload-data="hover">

@@ -4,6 +4,7 @@
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { apiFetch } from "$lib/api.js";
+    import { storageAllowed } from "$lib/stores/consent.js";
 
     let pageHeader = initialPageHeader("hirek");
     let pageHeaderLoading = false;
@@ -217,10 +218,11 @@
 
         const NEWS_CACHE_KEY = "hirek_cache";
         const NEWS_TTL = 30 * 60 * 1000;
+        const mayCache = storageAllowed("gyorsitotar");
 
         try {
             // Try cache first
-            const cached = localStorage.getItem(NEWS_CACHE_KEY);
+            const cached = mayCache ? localStorage.getItem(NEWS_CACHE_KEY) : null;
             if (cached) {
                 const { items, feedSources, timestamp } = JSON.parse(cached);
                 if (Date.now() - timestamp < NEWS_TTL && items?.length > 0) {
@@ -246,20 +248,22 @@
                 allNewsItems = allItems;
                 const now = Date.now();
                 cacheTimestamp = now;
-                localStorage.setItem(
-                    NEWS_CACHE_KEY,
-                    JSON.stringify({
-                        items: allItems,
-                        feedSources: sources,
-                        timestamp: now,
-                    }),
-                );
+                if (mayCache) {
+                    localStorage.setItem(
+                        NEWS_CACHE_KEY,
+                        JSON.stringify({
+                            items: allItems,
+                            feedSources: sources,
+                            timestamp: now,
+                        }),
+                    );
+                }
             } else {
                 error = true;
             }
         } catch (err) {
             console.error("News fetch error:", err);
-            const staleNews = localStorage.getItem(NEWS_CACHE_KEY);
+            const staleNews = mayCache ? localStorage.getItem(NEWS_CACHE_KEY) : null;
             if (staleNews) {
                 try {
                     const { items, feedSources, timestamp } =

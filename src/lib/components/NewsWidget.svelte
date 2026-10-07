@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from "svelte";
     import { apiFetch } from "$lib/api";
     import { formatDate } from "$lib/utils";
+    import { storageAllowed } from "$lib/stores/consent.js";
 
     export let settlementSlug = null;
     export let limit = 20;
@@ -20,7 +21,8 @@
     let tickerDirection = 1;
 
     onMount(async () => {
-        const cached = localStorage.getItem(NEWS_CACHE_KEY);
+        const mayCache = storageAllowed("gyorsitotar");
+        const cached = mayCache ? localStorage.getItem(NEWS_CACHE_KEY) : null;
         if (cached) {
             try {
                 const data = JSON.parse(cached);
@@ -45,13 +47,15 @@
 
             items = allItems;
 
-            localStorage.setItem(
-                NEWS_CACHE_KEY,
-                JSON.stringify({
-                    items,
-                    timestamp: Date.now(),
-                }),
-            );
+            if (mayCache) {
+                localStorage.setItem(
+                    NEWS_CACHE_KEY,
+                    JSON.stringify({
+                        items,
+                        timestamp: Date.now(),
+                    }),
+                );
+            }
         } catch (err) {
             error = true;
         } finally {
