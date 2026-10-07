@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -18,13 +18,39 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
   docs to what the server actually runs, and set lamsza's `SZOTAR_ORIGIN` to
   `http://127.0.0.1:<szotar port>` there (R13: server-to-server calls stay on
   the machine).
-- **[network] owner: production setup for the one admin app (R18)**, once the
-  admin move is deployed. Generate two long random tokens and set them on the
-  server, never in git: `ADMIN_SERVICE_TOKEN` in Szótár's and Játszótér's
-  `.env`, the same values as `SZOTAR_ADMIN_TOKEN` and `JATSZOTER_ADMIN_TOKEN` in
-  admin's `.env`, with `SZOTAR_ADMIN_URL` / `JATSZOTER_ADMIN_URL` pointing at the
-  apps' backends on `127.0.0.1`. Confirm that no nginx vhost proxies
-  `/internal/` (each proxies only `/api/`).
+- **[network] owner: production setup for the one admin app (R18)**, before or
+  with the deploy of the admin move. The internal admin API of Szótár and
+  Játszótér (`/internal/admin/`) is closed unless all of this holds, so do it in
+  this order and check each step on the server:
+  1. **Tokens, never in git.** Generate two long random tokens (for example
+     `openssl rand -hex 32`). Set `ADMIN_SERVICE_TOKEN` in Szótár's `.env` and
+     the same value as `SZOTAR_ADMIN_TOKEN` in admin's `.env`; likewise
+     Játszótér's `ADMIN_SERVICE_TOKEN` = admin's `JATSZOTER_ADMIN_TOKEN`. Use a
+     different token per app. Without a token an app's internal API answers 404
+     to everything (fail closed), and admin's `/dictionary` or `/games` says
+     "nincs beállítva".
+  2. **Server-to-server on the machine.** Set `SZOTAR_ADMIN_URL` and
+     `JATSZOTER_ADMIN_URL` in admin's `.env` to `http://127.0.0.1:<port>` of
+     each app's backend (the real ports, see the Node upgrade item). The apps
+     accept the internal API only from loopback.
+  3. **nginx must not expose `/internal/`.** Every vhost (szotar, jatszoter,
+     admin, lamsza) proxies only `location /api/` to a backend; nothing proxies
+     `/` or `/internal/`. Each `/api/` block keeps `proxy_set_header X-Real-IP`
+     and `X-Forwarded-For` (as in `PRODUCTION_ENVIRONMENT_NOTES.md`): the apps
+     refuse an internal call that carries either header, which is what stops a
+     request that came through nginx even though nginx connects from
+     127.0.0.1. Check: `curl -i https://szotar.lamsza.com/internal/admin/stats`
+     and the same on jatszoter must not reach the backend (the SPA page or a
+     404, never JSON), and `https://<host>/api/internal/admin/stats` must be 404.
+  4. **Backend ports closed from outside.** The backends listen on all
+     interfaces (`:<port>`); confirm the firewall (ufw / DigitalOcean) only
+     opens 22, 80 and 443, so the backend ports are not reachable from the
+     internet. (The apps refuse non-loopback internal calls anyway; this is the
+     second lock.)
+  5. **Smoke test after deploy, GET only:** admin `/dictionary` and `/games`
+     show their dashboards with counts; on the server,
+     `curl -s 127.0.0.1:<szotar port>/internal/admin/stats` without the token
+     answers 401.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
