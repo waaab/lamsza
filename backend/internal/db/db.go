@@ -12,6 +12,9 @@ var DB *sql.DB
 
 func InitDB() {
 	connStr := config.AppConfig.DatabaseURL
+	if err := guardTestConnection(connStr); err != nil {
+		log.Fatal(err)
+	}
 
 	var err error
 	DB, err = sql.Open("postgres", connStr)

@@ -11,7 +11,7 @@
 		"build:extension": "npm run build && node scripts/extract-inline-scripts.js && rm -rf extension && cp -r dist extension && cp manifest.json extension/ && cp static/icon.png extension/",
 		"preview": "vite preview",
 		"test": "node --test \"tests/*.test.js\"",
-		"test:go": "cd backend && go test -count=1 ./...",
+		"test:go": "scripts/test-go.sh",
 		"restart": "./scripts/restart_all.sh",
 		"prepare": "svelte-kit sync || echo ''"
 	},

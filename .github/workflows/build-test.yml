@@ -70,6 +70,9 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable
+      # The suites read only TEST_DATABASE_URL (backend/internal/db/testguard.go).
+      # Here it is the throwaway service database above.
+      TEST_DATABASE_URL: postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable
     steps:
       - uses: actions/checkout@v4
 

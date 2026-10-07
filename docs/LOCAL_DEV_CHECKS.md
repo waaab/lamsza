@@ -356,14 +356,25 @@ tables or constraint violations mean the dump is bad.
 ## Step 3 — The test suites (run these on every change)
 
 ```bash
-# lamsza frontend — node:test, no npm script yet
-cd ~/projects/lamsza-network/lamsza && node --test 'tests/*.test.js'
+# lamsza frontend (node:test)
+cd ~/projects/lamsza-network/lamsza && npm test
 
-# backends
-for d in lamsza lamsza-szotar lamsza-jatszoter lamsza-admin; do
+# lamsza backend: drops and recreates the scratch database lamsza_test from
+# backend/schema/, then runs every Go package against it
+cd ~/projects/lamsza-network/lamsza && npm run test:go
+
+# the other backends
+for d in lamsza-szotar lamsza-jatszoter lamsza-admin; do
   (cd ~/projects/lamsza-network/$d/backend && go test ./...)
 done
 ```
+
+The lamsza Go suites read only `TEST_DATABASE_URL`, never `DATABASE_URL` or
+`.env`, and refuse a local database whose name does not end in `_test`
+(`backend/internal/db/testguard.go`). A plain `go test ./...` in `backend/`
+therefore fails the root package with "TEST_DATABASE_URL is not set" instead of
+writing to the dev database, which is what it used to do: 43 of the 46 users in
+the dev `lamsza` database on 2026-10-07 were `*@test.lamsza` fixtures.
 
 > `node --test tests/` (directory form) crashes with `MODULE_NOT_FOUND` on Node 24.
 > Use the glob `'tests/*.test.js'`.
@@ -392,15 +403,15 @@ CRUD tests in the same package; those tests went with the admin handlers they
 covered. The two frontend failures were fixed by their own task.
 
 > Three of these suites talk to Postgres, and since BOG-53 all three also run in
-> CI against a `postgres:16` service — nothing is excluded by name any more. If
-> you want to see a suite the way CI does, bootstrap a fresh database and point
-> `DATABASE_URL` at it rather than running against your dev data:
+> CI against a `postgres:16` service; nothing is excluded by name any more.
+> `npm run test:go` already runs lamsza the way CI does: an empty database built
+> from the committed schema.
+>
+> **The szotar, jatszoter and admin backends still read `.env` in their tests,
+> so their DB-bound suites write to the dev databases.** Until each gets the
+> same guard, run them against a scratch database:
 >
 > ```bash
-> # lamsza: schema from backend/schema/, applied by the script
-> scripts/db-bootstrap.sh --create --url "postgres://lamsza_user:lamsza_password@localhost:5433/lamsza_scratch?sslmode=disable"
-> cd backend && DATABASE_URL="postgres://lamsza_user:lamsza_password@localhost:5433/lamsza_scratch?sslmode=disable" go test -count=1 ./...
->
 > # szotar and jatszoter: the backends migrate an empty database themselves
 > docker exec szotar-db psql -U szotar_user -d postgres -c 'CREATE DATABASE szotar_scratch'
 > cd ~/projects/lamsza-network/lamsza-szotar/backend && DATABASE_URL="postgres://szotar_user:szotar_password@localhost:5435/szotar_scratch?sslmode=disable" go test -count=1 ./...

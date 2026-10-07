@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -34,6 +35,11 @@ var testAllowlistedSession *http.Cookie
 
 func init() {
 	config.Load()
+	testURL, err := db.TestDatabaseURL()
+	if err != nil {
+		log.Fatal(err)
+	}
+	config.AppConfig.DatabaseURL = testURL
 	config.AppConfig.GoogleClientID = "test-google-client-id"
 	config.AppConfig.AdminGoogleEmails = []string{"admin@test.lamsza"}
 	auth.VerifyIDToken = auth.ParseTestIDToken
