@@ -469,6 +469,37 @@ page and the footer version read. Admin has no public page. *Why:* lamsza's
 changelog stopped at the admin extraction, szotar and jatszoter had none, and
 the public pages listed nothing from the last two weeks.
 
+### R18 — One admin app for the network
+
+Every app is administered from the admin app (`lamsza-admin`): `/` for the main
+Lámsza data, `/dictionary` for Szótár, `/games` for Játszótér. Routes are
+English, the UI is Hungarian. The admin app's `ADMIN_GOOGLE_EMAILS` is the
+network's one admin list; a person signs in as admin only there. Decided on
+2026-10-07; the move runs in batches (OPEN_ITEMS), and until it ends Szótár and
+Játszótér still carry their own `/admin` pages.
+
+How the admin app reaches another app's data, without touching its database:
+
+- The other app keeps owning its database and its rules (R3). It offers its
+  admin features as an **internal admin API** under `/internal/admin/...`.
+- The admin backend relays its own `/api/admin/dictionary/...` and
+  `/api/admin/games/...` routes to that API, server-to-server on
+  `http://127.0.0.1:<port>` from an env var (`SZOTAR_ADMIN_URL`,
+  `JATSZOTER_ADMIN_URL`; R13). The admin browser only talks to its own backend,
+  every relayed write lands in `admin_audit_log`, and the acting admin's email
+  goes along in `X-Admin-Email`.
+- The internal API trusts the admin backend, not a person, and only when all
+  three hold: the path is outside `/api/` (production nginx proxies only
+  `/api/`, so `/internal/` is never public); the request comes from loopback
+  with no `X-Forwarded-For` or `X-Real-IP` header (anything through nginx has
+  one); and it carries `Authorization: Bearer <token>`, a secret per app pair
+  (`ADMIN_SERVICE_TOKEN` in the app, `SZOTAR_ADMIN_TOKEN` /
+  `JATSZOTER_ADMIN_TOKEN` in admin), compared in constant time. No token
+  configured means the API is off.
+
+*Why:* three sign-ins, three admin lists and three admin UIs, and only one of
+them kept an audit trail.
+
 ---
 
 ## 5. Repo layout — two shapes, both correct

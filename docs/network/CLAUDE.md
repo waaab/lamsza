@@ -17,9 +17,9 @@ Never push to main without my explicit confirmation.
 | Repo | What it is | Notes |
 |---|---|---|
 | `lamsza` | Main app (lamsza.com): startlap, directory, search. **Primary repo.** | Owns the `lamsza` DB schema (`backend/schema/`), the shared frontend modules, the network docs, rules and scripts. Frontend sits at the repo root, with no `frontend/` folder (deliberate, WoW §5). |
-| `lamsza-admin` | Write side of the main app's data | Shares the `lamsza` DB and **runs no DDL**: schema changes go in `lamsza`. Needs public data? Call `lamsza` on :3001. |
-| `lamsza-szotar` | Székely dictionary (szotar.lamsza.com) | Own DB, own `/admin`. |
-| `lamsza-jatszoter` | Word games (jatszoter.lamsza.com) | Own DB, own `/admin`. |
+| `lamsza-admin` | The network's one admin app (WoW R18): `/` main data, `/dictionary`, `/games` | Shares the `lamsza` DB and **runs no DDL**: schema changes go in `lamsza`. Needs public data? Call `lamsza` on :3001. Szótár and Játszótér data only through their internal admin APIs. |
+| `lamsza-szotar` | Székely dictionary (szotar.lamsza.com) | Own DB. Administered from the admin app's `/dictionary` (WoW R18); its own `/admin` goes once the move is verified. |
+| `lamsza-jatszoter` | Word games (jatszoter.lamsza.com) | Own DB. Administered from the admin app's `/games` (WoW R18); its own `/admin` goes once the move is verified. |
 
 How they relate:
 - Admin writes the data that lamsza reads. A cross-app change goes contract-first:
@@ -91,9 +91,9 @@ added to the OAuth client.
 
 ## Where shared conventions live
 
-- `lamsza/docs/network/WAYS_OF_WORKING.md`: the rules R1-R17 (tasks and tags, one agent
+- `lamsza/docs/network/WAYS_OF_WORKING.md`: the rules R1-R18 (tasks and tags, one agent
   per repo, "done" = committed, merged, pushed and closed out, CI, test data, docs,
-  changelogs), repo layouts.
+  changelogs, one admin app), repo layouts.
 - `lamsza/docs/network/OPEN_ITEMS.md`: the task list, including what only the owner does.
 - `lamsza/docs/network/SHARED_FRONTEND_MODULES.md`: the files lamsza shares with the other apps.
 - `lamsza/docs/AGENT_ENVIRONMENT_POLICY.md`: **localhost only, never touch production.**

@@ -13,6 +13,8 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- WAYS_OF_WORKING R18: one admin app for the network (`/`, `/dictionary`, `/games`), reaching Szótár and Játszótér only through their internal admin APIs (loopback, a path outside `/api/`, a shared token). UI_BASELINE, the network CLAUDE.md and OPEN_ITEMS follow it.
+- `AppIcon` gains `external`, `inbox`, `rovasfejto` and `szokereso` for the admin sections' sidebars.
 - `tests/noEmdash.test.js`, shared with every app: `npm test` (and CI) fails on an em dash in code or UI text; Markdown is exempt (rule D5).
 - WAYS_OF_WORKING R13: server-to-server calls go to `http://127.0.0.1:<port>`, set by an env var (owner's decision).
 - `ErrorShell.svelte`: the network's one minimal error shell (the Lámsza button, a sub-app's own button, the shared `ErrorPage`), shared with every app. Lámsza's root error page uses it and looks the same.

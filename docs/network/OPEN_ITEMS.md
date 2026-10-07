@@ -18,6 +18,13 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
   docs to what the server actually runs, and set lamsza's `SZOTAR_ORIGIN` to
   `http://127.0.0.1:<szotar port>` there (R13: server-to-server calls stay on
   the machine).
+- **[network] owner: production setup for the one admin app (R18)**, once the
+  admin move is deployed. Generate two long random tokens and set them on the
+  server, never in git: `ADMIN_SERVICE_TOKEN` in Szótár's and Játszótér's
+  `.env`, the same values as `SZOTAR_ADMIN_TOKEN` and `JATSZOTER_ADMIN_TOKEN` in
+  admin's `.env`, with `SZOTAR_ADMIN_URL` / `JATSZOTER_ADMIN_URL` pointing at the
+  apps' backends on `127.0.0.1`. Confirm that no nginx vhost proxies
+  `/internal/` (each proxies only `/api/`).
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
@@ -60,6 +67,12 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
 
 ## Work
 
+- **[admin] [szotar] [jatszoter] Move Szótár's and Játszótér's admin into the
+  admin app (R18).** Approved plan, 2026-10-07: Batch A builds the internal
+  admin APIs, the admin backend relay and the `/dictionary` and `/games`
+  sections, then verifies feature parity on a throwaway stack (nothing is
+  removed); Batch B removes the old `/admin` pages, their public admin
+  endpoints and both apps' own admin lists, once the owner has reviewed Batch A.
 - **[admin] [szotar] [jatszoter] server timeouts.** lamsza got read, write and
   idle timeouts (BOG-18); the other three backends still use a bare
   `http.ListenAndServe`.
