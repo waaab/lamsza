@@ -25,8 +25,9 @@ How they relate:
 - Admin writes the data that lamsza reads. A cross-app change goes contract-first:
   DB/API first, then the apps that consume it (WoW R3). A schema change lands with
   `scripts/db-dump-schema.sh` output in the same commit.
-- The frontend files listed in `lamsza/shared-frontend-modules.json` are shared by lamsza and admin. Edit them in `lamsza` only, then run
-  `lamsza/scripts/sync-shared-frontend.sh` and commit in both repos.
+- The frontend files listed in `lamsza/shared-frontend-modules.json` are shared with the other apps
+  (admin gets all of them; szotar and jatszoter get the icons, sign-in, error page and `global.css`).
+  Edit them in `lamsza` only, then run `lamsza/scripts/sync-shared-frontend.sh` and commit in every repo that changed.
 - `.cursor/rules/lamsza-network.mdc` and `no-emdash.mdc` are canonical in `lamsza`; run
   `lamsza/scripts/sync-cursor-rules.sh` and commit in all four repos (WoW R11).
 
@@ -94,7 +95,7 @@ added to the OAuth client.
   per repo, "done" = committed, merged, pushed and closed out, CI, test data, docs,
   changelogs), repo layouts.
 - `lamsza/docs/network/OPEN_ITEMS.md`: the task list, including what only the owner does.
-- `lamsza/docs/network/SHARED_FRONTEND_MODULES.md`: the lamsza → admin shared files.
+- `lamsza/docs/network/SHARED_FRONTEND_MODULES.md`: the files lamsza shares with the other apps.
 - `lamsza/docs/AGENT_ENVIRONMENT_POLICY.md`: **localhost only, never touch production.**
 - `lamsza/docs/LOCAL_DEV_CHECKS.md`: what "verified" means. Run the checks your
   change touches *before* pushing, because CI is not the real gate.

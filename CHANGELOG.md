@@ -12,7 +12,14 @@ the footer version read (WAYS_OF_WORKING R17).
 
 ## [Unreleased]
 
+### Added
+- One error page for the whole network (`ErrorPage.svelte`): a lantern illustration that follows the theme (`icons/ErrorLantern.svelte`), "Hoppácska!", the error code, and a plain Hungarian title and explanation for 400, 401, 403, 404, 408, 410, 429 and any other error, instead of SvelteKit's English "Not Found". Still noindex. [public]
+- A `--warm-light` token (the lantern's glow) in both themes.
+- `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
+
 ### Changed
+- `scripts/sync-shared-frontend.sh` also serves lamsza-szotar and lamsza-jatszoter: a `consumers` map in `shared-frontend-modules.json` says which app gets which module, every app gets its own manifest, and `--check` also reports a stale app manifest. Szótár and Játszótér share the icons, the error page, the sign-in dialog and `global.css`.
+- `UI_BASELINE.md`: the close-button rule (`dlg-close-label`: "Bezárás" for a dialog that only shows content, "Mégse" only next to an action) and the shared error page (`err-page`).
 - The confirm dialog follows the network baseline (Szótár's): a native dialog with a blurred backdrop, Mégse first and the confirm button on the right. [public]
 - A refused Google sign-in says "Belépés sikertelen." instead of the server's reply. [public]
 - "Székely Gugel" is now "Lámsza" in page titles, descriptions, the news placeholder and the extension manifest. [public]

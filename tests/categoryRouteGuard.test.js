@@ -83,6 +83,12 @@ test("the route does not fetch during prerender", () => {
 });
 
 test("the error page is not indexable", () => {
-    const source = readFileSync(new URL(`../${ERROR_PAGE}`, import.meta.url), "utf8");
-    assert.match(source, /name="robots"[^>]*content="noindex"/);
+    // The route renders the network's shared ErrorPage, which carries the tag.
+    const route = readFileSync(new URL(`../${ERROR_PAGE}`, import.meta.url), "utf8");
+    assert.match(route, /<ErrorPage\b/);
+    const shared = readFileSync(
+        new URL("../src/lib/components/ErrorPage.svelte", import.meta.url),
+        "utf8",
+    );
+    assert.match(shared, /name="robots"[^>]*content="noindex"/);
 });

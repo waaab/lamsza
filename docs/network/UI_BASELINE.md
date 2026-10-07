@@ -90,6 +90,7 @@ reference; each item names its own.
 | Confirm dialog (`dlg-confirm`) | Szótár's |  |
 | Notice / alert dialog (`dlg-notice`) | Lámsza's |  |
 | Content dialog shell (`dlg-content`) | Lámsza's |  |
+| Close-button wording (`dlg-close-label`) | Owner's rule | A dialog that only shows content (media, notices, help, info) closes with "Bezárás". "Mégse" is only for cancelling an action, in a dialog that asks for one (confirm, forms, sign-in), next to the action button. Added by the owner on 2026-10-07. |
 
 ## Settings and profile
 
@@ -104,7 +105,7 @@ reference; each item names its own.
 
 | Item | Baseline | Note |
 |---|---|---|
-| 404 / error page (`err-page`) | Lámsza's |  |
+| 404 / error page (`err-page`) | Lámsza's | One shared page for the network: `ErrorPage.svelte` with the lantern illustration (`icons/ErrorLantern.svelte`, inline SVG on the `--text-muted`, `--warm-light` and `--szekely-red` tokens), "Hoppácska!", "Hiba: <code>", a Hungarian title and explanation for 400, 401, 403, 404, 408, 410 and 429 and a fallback for any other code; noindex. Each app's `+error.svelte` renders it inside its own shell. Owner's decision, 2026-10-07. |
 | Old brand name in titles (`err-brand`) | Szótár's | No old brand anywhere: "Székely Gugel" becomes "Lámsza". |
 
 ## Sign-in states

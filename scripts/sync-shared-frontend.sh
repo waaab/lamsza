@@ -1,26 +1,31 @@
 #!/usr/bin/env bash
-# Copy the shared frontend modules from lamsza (the owner) into lamsza-admin,
-# then regenerate the hash manifest in both repos.
+# Copy the shared frontend modules from lamsza (the owner) into the apps that
+# use them, then regenerate the hash manifest in every repo.
 #
 # The decision behind this script is docs/network/SHARED_FRONTEND_MODULES.md.
-# Short version: lamsza owns these files, lamsza-admin gets a generated copy,
-# and each repo's own test suite hashes its own copies against the manifest, so
-# drift is a red build in whichever repo drifted - with only that repo checked
-# out.
+# Short version: lamsza owns these files, each consumer app gets a generated
+# copy, and each repo's own test suite hashes its own copies against its own
+# manifest, so drift is a red build in whichever repo drifted - with only that
+# repo checked out.
+#
+# Which app gets which module is the "consumers" map in lamsza's
+# shared-frontend-modules.json: "all", or a list of module paths. The module
+# list itself is the key order of "modules"; to share a new file, add its path
+# there (any hash) and to the consumers that need it, then run this script.
+# Every consumer keeps its frontend under frontend/.
 #
 # Usage:
-#   scripts/sync-shared-frontend.sh            # copy + rewrite both manifests
+#   scripts/sync-shared-frontend.sh            # copy + rewrite every manifest
 #   scripts/sync-shared-frontend.sh --check    # verify only, change nothing
 #
-# LAMSZA_ADMIN_ROOT overrides where lamsza-admin lives (default ../lamsza-admin
-# next to this repo).
+# LAMSZA_ADMIN_ROOT, LAMSZA_SZOTAR_ROOT and LAMSZA_JATSZOTER_ROOT override
+# where each app lives (default: next to this repo).
 
 set -euo pipefail
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-admin=${LAMSZA_ADMIN_ROOT:-$(cd "$here/.." && pwd)/lamsza-admin}
+projects=$(cd "$here/.." && pwd)
 manifest="$here/shared-frontend-modules.json"
-admin_manifest="$admin/frontend/shared-frontend-modules.json"
 check_only=0
 [ "${1:-}" = "--check" ] && check_only=1
 
@@ -28,21 +33,51 @@ if [ ! -f "$manifest" ]; then
   echo "missing $manifest" >&2
   exit 1
 fi
-if [ ! -d "$admin/frontend/src" ]; then
-  echo "lamsza-admin frontend not found at $admin/frontend - set LAMSZA_ADMIN_ROOT" >&2
-  exit 1
-fi
 
-# The manifest's own key order is the module list.
-modules=$(node -e '
+root_for() {
+  case "$1" in
+    lamsza-admin) echo "${LAMSZA_ADMIN_ROOT:-$projects/lamsza-admin}" ;;
+    lamsza-szotar) echo "${LAMSZA_SZOTAR_ROOT:-$projects/lamsza-szotar}" ;;
+    lamsza-jatszoter) echo "${LAMSZA_JATSZOTER_ROOT:-$projects/lamsza-jatszoter}" ;;
+    *) echo "$projects/$1" ;;
+  esac
+}
+
+# One "consumer<TAB>module path" line per copy to make. Fails on a consumer
+# list that names a path missing from "modules".
+plan=$(node -e '
   const m = require(process.argv[1]);
-  console.log(Object.keys(m.modules).join("\n"));
+  const all = Object.keys(m.modules);
+  const consumers = m.consumers || {};
+  if (!Object.keys(consumers).length) {
+    console.error("shared-frontend-modules.json has no consumers");
+    process.exit(1);
+  }
+  for (const [name, list] of Object.entries(consumers)) {
+    const paths = list === "all" ? all : list;
+    for (const p of paths) {
+      if (!all.includes(p)) {
+        console.error(`consumer ${name} lists ${p}, which is not in "modules"`);
+        process.exit(1);
+      }
+      console.log(`${name}\t${p}`);
+    }
+  }
 ' "$manifest")
 
+consumers=$(printf '%s\n' "$plan" | cut -f1 | uniq)
+for name in $consumers; do
+  root=$(root_for "$name")
+  if [ ! -d "$root/frontend/src" ]; then
+    echo "$name frontend not found at $root/frontend - set the matching LAMSZA_*_ROOT" >&2
+    exit 1
+  fi
+done
+
 fail=0
-for path in $modules; do
+while IFS=$'\t' read -r name path; do
   src="$here/$path"
-  dst="$admin/frontend/$path"
+  dst="$(root_for "$name")/frontend/$path"
   if [ ! -f "$src" ]; then
     echo "MISSING in lamsza: $path" >&2
     fail=1
@@ -50,44 +85,73 @@ for path in $modules; do
   fi
   if [ "$check_only" = 1 ]; then
     if ! cmp -s "$src" "$dst"; then
-      echo "DRIFT: $path differs between lamsza and lamsza-admin" >&2
+      echo "DRIFT: $path differs between lamsza and $name" >&2
       fail=1
     fi
     continue
   fi
   mkdir -p "$(dirname "$dst")"
   cp "$src" "$dst"
-done
+done <<< "$plan"
 
 if [ "$check_only" = 1 ]; then
+  # A consumer's committed manifest must list exactly its share, with the
+  # owner's hashes; anything else would make its drift test check the wrong set.
+  for name in $consumers; do
+    want=$(node -e '
+      const crypto = require("crypto"), fs = require("fs"), path = require("path");
+      const [manifest, here, name] = process.argv.slice(1);
+      const m = require(manifest);
+      const list = m.consumers[name] === "all" ? Object.keys(m.modules) : m.consumers[name];
+      const out = {};
+      for (const p of list) {
+        out[p] = "sha256:" + crypto.createHash("sha256").update(fs.readFileSync(path.join(here, p))).digest("hex");
+      }
+      console.log(JSON.stringify(out));
+    ' "$manifest" "$here" "$name")
+    have=$(node -e 'console.log(JSON.stringify(require(process.argv[1]).modules))' \
+      "$(root_for "$name")/frontend/shared-frontend-modules.json" 2>/dev/null || true)
+    if [ "$want" != "$have" ]; then
+      echo "STALE: $name/frontend/shared-frontend-modules.json does not match lamsza - run this script" >&2
+      fail=1
+    fi
+  done
   [ "$fail" = 0 ] && echo "shared frontend modules: in step"
   exit "$fail"
 fi
 [ "$fail" = 0 ] || exit 1
 
-tmp=$(mktemp)
-{
-  echo '{'
-  echo '  "_": "Generated by lamsza/scripts/sync-shared-frontend.sh. Do not hand-edit the hashes.",'
-  echo '  "owner": "waaab/lamsza",'
-  echo '  "consumer": "waaab/lamsza-admin (frontend/ prefix)",'
-  echo '  "doc": "docs/network/SHARED_FRONTEND_MODULES.md",'
-  echo '  "modules": {'
-  first=1
-  for path in $modules; do
-    sum=$(sha256sum "$here/$path" | cut -d' ' -f1)
-    [ "$first" = 1 ] || echo ','
-    first=0
-    printf '    "%s": "sha256:%s"' "$path" "$sum"
-  done
-  echo
-  echo '  }'
-  echo '}'
-} > "$tmp"
+# Rewrite lamsza's manifest (all modules, with the consumers map) and one
+# manifest per consumer (only its own modules).
+node -e '
+  const crypto = require("crypto"), fs = require("fs"), path = require("path");
+  const [manifestPath, here, ...roots] = process.argv.slice(1);
+  const m = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const hash = (p) => "sha256:" + crypto.createHash("sha256").update(fs.readFileSync(path.join(here, p))).digest("hex");
+  const modules = {};
+  for (const p of Object.keys(m.modules)) modules[p] = hash(p);
+  const note = "Generated by lamsza/scripts/sync-shared-frontend.sh. Do not hand-edit the hashes.";
+  const doc = "docs/network/SHARED_FRONTEND_MODULES.md";
+  const write = (file, obj) => fs.writeFileSync(file, JSON.stringify(obj, null, 2) + "\n");
+  write(manifestPath, { _: note, owner: "waaab/lamsza", doc, consumers: m.consumers, modules });
+  for (const pair of roots) {
+    const [name, root] = pair.split("=");
+    const list = m.consumers[name] === "all" ? Object.keys(modules) : m.consumers[name];
+    const own = {};
+    for (const p of list) own[p] = modules[p];
+    write(path.join(root, "frontend", "shared-frontend-modules.json"), {
+      _: note,
+      owner: "waaab/lamsza",
+      consumer: `waaab/${name} (frontend/ prefix)`,
+      doc: `lamsza ${doc}`,
+      modules: own,
+    });
+  }
+' "$manifest" "$here" $(for name in $consumers; do printf '%s=%s ' "$name" "$(root_for "$name")"; done)
 
-mv "$tmp" "$manifest"
-cp "$manifest" "$admin_manifest"
-echo "synced $(echo "$modules" | wc -l | tr -d ' ') shared modules into $admin/frontend"
-echo "manifests rewritten: $manifest"
-echo "                     $admin_manifest"
-echo "Commit both repos."
+for name in $consumers; do
+  count=$(printf '%s\n' "$plan" | awk -F'\t' -v n="$name" '$1 == n' | wc -l | tr -d ' ')
+  echo "synced $count shared modules into $(root_for "$name")/frontend"
+done
+echo "manifests rewritten in lamsza and in each app's frontend/."
+echo "Commit lamsza and every app that changed."

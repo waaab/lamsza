@@ -1,56 +1,26 @@
 <script>
     import { page } from "$app/stores";
+    import ErrorPage from "$lib/components/ErrorPage.svelte";
+    import AppIcon from "$lib/icons/AppIcon.svelte";
 </script>
 
-<svelte:head>
-    <title>Hiba {$page.status} - Lámsza</title>
-    <!--
-      nginx answers an unknown path with app.html and HTTP 200, so a crawler
-      reaching this page over the SPA fallback sees a 200. Keep it out of the
-      index until the server can return a real 404 status.
-    -->
-    <meta name="robots" content="noindex" />
-</svelte:head>
-
+<!--
+  The root error page does not get the public layout, so it carries Lámsza's
+  minimal shell itself: the toolbar's home button, no footer. The page body is
+  the network's shared ErrorPage (title, noindex, Hungarian text).
+-->
 <div class="layout-bg error-layout">
-    <!-- Simple header specifically for the root error page when it doesn't get the public layout -->
     <header class="toolbar error-toolbar">
         <div class="nav">
             <a href="/" class="btn nav-btn" title="Vissza a főoldalra">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                </svg>
+                <AppIcon name="home" size={16} />
                 <span>Lámsza</span>
             </a>
         </div>
     </header>
 
     <main class="container home-main error-main">
-        <h1 class="page-title error-title">
-            Hoppácska! (Hiba: {$page.status})
-        </h1>
-        <p class="greeting error-greeting">
-            {$page.error?.message || "Valami hiba történt a rendszerben."}
-        </p>
-
-        <div class="error-actions">
-            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-            <button class="btn" on:click={() => (window.location.href = "/")}>
-                Vissza a főoldalra
-            </button>
-        </div>
+        <ErrorPage status={$page.status} appName="Lámsza" />
     </main>
 </div>
 
@@ -65,17 +35,5 @@
     }
     .error-main {
         flex: 1;
-    }
-    .error-title {
-        color: var(--szekely-red);
-    }
-    .error-greeting {
-        text-align: center;
-        margin-top: 1rem;
-        color: var(--text-primary);
-    }
-    .error-actions {
-        text-align: center;
-        margin-top: 2rem;
     }
 </style>

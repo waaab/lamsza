@@ -1,42 +1,55 @@
-# Shared frontend modules — lamsza owns, lamsza-admin gets a generated copy
+# Shared frontend modules: lamsza owns, the apps get generated copies
 
-**Decided on BOG-42, 2026-10-06.** This file is the source of truth for the
-frontend files that exist in both `lamsza` and `lamsza-admin` (the list in
+**Decided on BOG-42, 2026-10-06** for `lamsza-admin`; **extended to
+`lamsza-szotar` and `lamsza-jatszoter` on 2026-10-07**, when the owner asked for
+one error page for the whole network. This file is the source of truth for the
+frontend files that `lamsza` shares with the other apps (the list in
 `shared-frontend-modules.json`).
 
 ---
 
 ## The rule
 
-1. **`lamsza` owns every shared module.** Edit it there, never in `lamsza-admin`.
-2. **`lamsza-admin/frontend` carries a generated copy.** It is a real committed
-   file, not a link or a submodule, so the admin repo still clones, builds and
-   deploys on its own.
-3. **`scripts/sync-shared-frontend.sh` in `lamsza` does the copying** and
-   rewrites `shared-frontend-modules.json` — a path → SHA-256 manifest — in
-   **both** repos.
-4. **Each repo's own test suite checks its own copies against that manifest.**
-   `tests/sharedFrontendModules.test.js` (which is itself one of the shared
-   files) hashes every listed module and fails on a mismatch.
+1. **`lamsza` owns every shared module.** Edit it there, never in an app.
+2. **Each consumer app's `frontend/` carries a generated copy of its share.**
+   It is a real committed file, not a link or a submodule, so every repo still
+   clones, builds and deploys on its own.
+3. **Which app gets which module is the `consumers` map** in
+   `lamsza/shared-frontend-modules.json`: `"all"` for `lamsza-admin`, a list of
+   paths for `lamsza-szotar` and `lamsza-jatszoter`.
+4. **`scripts/sync-shared-frontend.sh` in `lamsza` does the copying** and
+   rewrites the manifest (path → SHA-256) in `lamsza` and one per app,
+   `frontend/shared-frontend-modules.json`, listing only that app's share.
+5. **Each repo's own test suite checks its own copies against its own
+   manifest.** `tests/sharedFrontendModules.test.js` (itself one of the shared
+   files, in every app's share) hashes every listed module and fails on a
+   mismatch.
 
 Changing a shared module:
 
 ```bash
 cd ~/projects/lamsza-network/lamsza
 $EDITOR src/lib/entryHours.js
-scripts/sync-shared-frontend.sh          # copies + rewrites both manifests
-node --test 'tests/*.test.js'            # green here
-(cd ../lamsza-admin/frontend && npm test)  # green there
-# commit both repos
+scripts/sync-shared-frontend.sh          # copies + rewrites every manifest
+npm test                                 # green here
+(cd ../lamsza-admin/frontend && npm test)      # and in each app that got the file
+(cd ../lamsza-szotar/frontend && npm test)
+(cd ../lamsza-jatszoter/frontend && npm test)
+# commit lamsza and every app that changed
 ```
 
 Adding or removing a shared module: add or delete the path under `modules` in
-`lamsza/shared-frontend-modules.json` (any placeholder hash will do) and run
-the script — it re-hashes from `lamsza` and writes both manifests.
+`lamsza/shared-frontend-modules.json` (any placeholder hash will do), add it to
+or drop it from the `consumers` lists that need it, and run the script. It
+re-hashes from `lamsza` and writes every manifest. A consumer list that names a
+path missing from `modules` is refused before anything is copied.
 
-`scripts/sync-shared-frontend.sh --check` verifies without writing, for when
-both repos are checked out. `LAMSZA_ADMIN_ROOT` overrides where `lamsza-admin`
-lives; the default is `../lamsza-admin`.
+`scripts/sync-shared-frontend.sh --check` verifies without writing, for when the
+repos are checked out side by side: it reports a copy that drifted (`DRIFT`) and
+an app manifest that no longer matches lamsza (`STALE`). `LAMSZA_ADMIN_ROOT`,
+`LAMSZA_SZOTAR_ROOT` and `LAMSZA_JATSZOTER_ROOT` override where each app lives;
+the default is next to `lamsza`. The script's own test is
+`scripts/tests/sync-shared-frontend.test.sh`.
 
 ## Why this shape and not another
 
@@ -55,32 +68,37 @@ would never run where it matters.
 | **A cross-repo test that diffs the two trees** | Cannot run in single-repo CI — exactly where drift would be caught. Useful as a local extra, which is what `--check` is. |
 | **Leave it hand-kept and documented** | The status quo BOG-42 was opened to end. |
 
-What this costs: the admin copy is committed, so a shared-module change touches
-two repos and two commits. That is the price of keeping the two deploys
-independent, and the manifest test makes forgetting the second commit loud.
+What this costs: each app's copy is committed, so a shared-module change touches
+up to four repos and four commits. That is the price of keeping the deploys
+independent, and the manifest test makes forgetting a commit loud.
 
 ## What is shared, and what is not
 
-The list lives in `shared-frontend-modules.json`. Today: `src/lib/accountPrefs.js`,
-`entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`,
-`entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`,
-`websiteDomain.js`, `src/lib/stores/{auth,theme}.js`,
-`src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`,
-`src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog}.svelte`, `src/lib/icons/AppIcon.svelte`,
-`src/styles/{global,typography,component-typography}.css`
-and `tests/sharedFrontendModules.test.js`.
+The lists live in `shared-frontend-modules.json`. Today:
+
+| Consumer | Share |
+|---|---|
+| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage}.svelte`, `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css` and `tests/sharedFrontendModules.test.js` |
+| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,GoogleSignIn,SignInDialog}.svelte`, `src/styles/global.css` and `tests/sharedFrontendModules.test.js` |
 
 `AppIcon`, the dialogs, `SignInDialog` and the three stylesheets joined on 2026-10-07,
 when the owner chose one icon system, one set of dialogs and one base stylesheet for the
-network (`docs/network/UI_BASELINE.md`). The stylesheets were already byte-identical
-copies; now drift is caught.
+network (`docs/network/UI_BASELINE.md`). `ErrorPage` and `ErrorLantern` joined the same day,
+together with Szótár and Játszótér, for the one network error page.
 
-Deliberately **not** shared, because the two apps legitimately differ:
+Deliberately **not** shared, because the apps legitimately differ:
 
-- `src/lib/api.js` — different base URLs and different endpoint sets.
+- `src/lib/api.js`: different base URLs and different endpoint sets. The shared
+  Svelte files only import `getApiBase` from it, which every app has.
+- `typography.css` and `component-typography.css` in Szótár and Játszótér: the
+  owner chose "keep each app's own" (UI_BASELINE "typo-files").
+- `theme.js`, `networkOrigins.js` and `openLogin.js` in Szótár and Játszótér: their
+  content differs per app (Lámsza's theme store saves to the account, for one).
+- Szótár's and Játszótér's confirm dialog (`AppDialog.svelte`, the baseline look
+  that Lámsza's `ConfirmDialog` copies, driven by a store).
 
 Paths are relative to each app's frontend root: the repo root in `lamsza`,
-`frontend/` in `lamsza-admin` (`WAYS_OF_WORKING.md` §5).
+`frontend/` in the other three (`WAYS_OF_WORKING.md` §5).
 
 The duplicated **unit tests** for these modules (`accountPrefs.test.js`,
 `entryHours.test.js`, …) stay duplicated on purpose. They are cheap, they run

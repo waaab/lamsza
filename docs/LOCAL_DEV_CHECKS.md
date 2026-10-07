@@ -392,12 +392,16 @@ the 46 users in the dev `lamsza` database were `*@test.lamsza` fixtures.
 > `node --test tests/` (directory form) crashes with `MODULE_NOT_FOUND` on Node 24.
 > Use the glob `'tests/*.test.js'`.
 
-The lamsza suite includes `tests/sharedFrontendModules.test.js`, the drift guard for
-the frontend files that `lamsza` and `lamsza-admin` share (listed in `shared-frontend-modules.json`). `lamsza` owns them and
+Every frontend suite (lamsza, admin, szotar, jatszoter) includes
+`tests/sharedFrontendModules.test.js`, the drift guard for the frontend files that
+`lamsza` shares with the other apps (listed in `shared-frontend-modules.json`, with a
+`consumers` map of who gets what). `lamsza` owns them and
 `scripts/sync-shared-frontend.sh` copies them over; each repo checks its own copies
-against the committed hash manifest, so a drifted module goes red in whichever repo
-drifted. Do **not** keep the copies in step by hand — run the script. The rule is
-`docs/network/SHARED_FRONTEND_MODULES.md`.
+against its own committed hash manifest, so a drifted module goes red in whichever
+repo drifted. Do **not** keep the copies in step by hand: run the script. With all
+four repos checked out, `scripts/sync-shared-frontend.sh --check` verifies them in
+one go, and `scripts/tests/sync-shared-frontend.test.sh` tests the script itself.
+The rule is `docs/network/SHARED_FRONTEND_MODULES.md`.
 
 > Three of these suites talk to Postgres, and since BOG-53 all three also run in
 > CI against a `postgres:16` service; nothing is excluded by name any more. CI
