@@ -1,39 +1,11 @@
 <script>
     import { page } from "$app/stores";
-    import ErrorPage from "$lib/components/ErrorPage.svelte";
-    import AppIcon from "$lib/icons/AppIcon.svelte";
+    import ErrorShell from "$lib/components/ErrorShell.svelte";
 </script>
 
 <!--
-  The root error page does not get the public layout, so it carries Lámsza's
-  minimal shell itself: the toolbar's home button, no footer. The page body is
-  the network's shared ErrorPage (title, noindex, Hungarian text).
+  The root error page sits outside the (public) layout, so it never gets the
+  site's toolbar, footer or data. The network's shared ErrorShell draws the
+  minimal shell and the page (title, noindex, Hungarian text).
 -->
-<div class="layout-bg error-layout">
-    <header class="toolbar error-toolbar">
-        <div class="nav">
-            <a href="/" class="btn nav-btn" title="Vissza a főoldalra">
-                <AppIcon name="home" size={16} />
-                <span>Lámsza</span>
-            </a>
-        </div>
-    </header>
-
-    <main class="container home-main error-main">
-        <ErrorPage status={$page.status} appName="Lámsza" />
-    </main>
-</div>
-
-<style>
-    .error-layout {
-        display: flex;
-        flex-direction: column;
-        min-height: 100vh;
-    }
-    .error-toolbar {
-        padding: 1rem;
-    }
-    .error-main {
-        flex: 1;
-    }
-</style>
+<ErrorShell status={$page.status} appName="Lámsza" />

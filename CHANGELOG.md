@@ -13,6 +13,7 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- `ErrorShell.svelte`: the network's one minimal error shell (the Lámsza button, a sub-app's own button, the shared `ErrorPage`), shared with every app. Lámsza's root error page uses it and looks the same.
 - One error page for the whole network (`ErrorPage.svelte`): a lantern illustration that follows the theme (`icons/ErrorLantern.svelte`), "Hoppácska!", the error code, and a plain Hungarian title and explanation for 400, 401, 403, 404, 408, 410, 429 and any other error, instead of SvelteKit's English "Not Found". Still noindex. [public]
 - A `--warm-light` token (the lantern's glow) in both themes.
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.

@@ -78,12 +78,12 @@ The lists live in `shared-frontend-modules.json`. Today:
 
 | Consumer | Share |
 |---|---|
-| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage}.svelte`, `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css` and `tests/sharedFrontendModules.test.js` |
-| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,GoogleSignIn,SignInDialog}.svelte`, `src/styles/global.css` and `tests/sharedFrontendModules.test.js` |
+| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css` and `tests/sharedFrontendModules.test.js` |
+| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog}.svelte`, `src/styles/global.css` and `tests/sharedFrontendModules.test.js` |
 
 `AppIcon`, the dialogs, `SignInDialog` and the three stylesheets joined on 2026-10-07,
 when the owner chose one icon system, one set of dialogs and one base stylesheet for the
-network (`docs/network/UI_BASELINE.md`). `ErrorPage` and `ErrorLantern` joined the same day,
+network (`docs/network/UI_BASELINE.md`). `ErrorPage`, `ErrorShell` and `ErrorLantern` joined the same day,
 together with Szótár and Játszótér, for the one network error page.
 
 Deliberately **not** shared, because the apps legitimately differ:

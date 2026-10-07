@@ -105,7 +105,7 @@ reference; each item names its own.
 
 | Item | Baseline | Note |
 |---|---|---|
-| 404 / error page (`err-page`) | Lámsza's | One shared page for the network: `ErrorPage.svelte` with the lantern illustration (`icons/ErrorLantern.svelte`, inline SVG on the `--text-muted`, `--warm-light` and `--szekely-red` tokens), "Hoppácska!", "Hiba: <code>", a Hungarian title and explanation for 400, 401, 403, 404, 408, 410 and 429 and a fallback for any other code; noindex. Each app's `+error.svelte` renders it inside its own shell. Owner's decision, 2026-10-07. |
+| 404 / error page (`err-page`) | Lámsza's | One shared page for the network: `ErrorPage.svelte` with the lantern illustration (`icons/ErrorLantern.svelte`, inline SVG on the `--text-muted`, `--warm-light` and `--szekely-red` tokens), "Hoppácska!", "Hiba: <code>", a Hungarian title and explanation for 400, 401, 403, 404, 408, 410 and 429 and a fallback for any other code; noindex. Every app's root `+error.svelte` renders it through `ErrorShell.svelte`, one minimal shell for the network: the Lámsza button and, in a sub-app, its own button; no footer, sidebar or right-side icons; "Vissza a főoldalra" goes to the app's home; nothing is fetched, so it works with the backend down. The app's own shell lives in a route group (`(public)` in Lámsza, `(app)` in Szótár and Játszótér) that the root error page sits outside. Owner's decisions, 2026-10-07. |
 | Old brand name in titles (`err-brand`) | Szótár's | No old brand anywhere: "Székely Gugel" becomes "Lámsza". |
 
 ## Sign-in states
