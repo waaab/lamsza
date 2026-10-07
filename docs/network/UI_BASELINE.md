@@ -25,7 +25,7 @@ reference; each item names its own.
 | Item | Baseline | Note |
 |---|---|---|
 | global.css as a whole (`css-fork`) | Lámsza's |  |
-| Base .btn (`css-btn`) | Játszótér's | Játszótér's `user-select: none`, but the font size is inherited (Lámsza's): no font-family or font-size on `.btn`. Clarified by the owner. |
+| Base .btn (`css-btn`) | Játszótér's | Only Játszótér's `user-select: none`. No font-family or font-size on `.btn`, so a `<button>` keeps the browser's own button font, as on Lámsza (owner's decision after seeing step 2). |
 | Hover lift on buttons (`css-hover-lift`) | Lámsza's |  |
 | .link-dialog box (`css-link-dialog`) | Lámsza's |  |
 | .note text colour (`css-note`) | Lámsza's |  |
@@ -40,7 +40,7 @@ reference; each item names its own.
 |---|---|---|
 | typography.css / component-typography.css (`typo-files`) | Keep each app's own |  |
 | Web font loaded (`typo-webfont`) | Játszótér's |  |
-| Button font size (`typo-btn-size`) | Lámsza's |  |
+| Button font size (`typo-btn-size`) | Lámsza's | `<button>`s use the browser's default button font; `<a class="btn">` links use the site font. |
 | Admin page title size (`typo-admin-title`) | Admin's |  |
 
 ## Header and toolbar

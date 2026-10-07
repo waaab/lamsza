@@ -135,11 +135,11 @@ registered. What you **can** prove:
 
 ```bash
 curl -s http://127.0.0.1:3002/api/config/public | head -c 300   # szotar
+curl -s http://127.0.0.1:3003/api/config/public | head -c 300   # jatszoter
 ```
 
 **Expect:** the payload reports a Google client id is configured (non-empty), not an empty
-string. jatszoter does not report one: it builds its client id into the frontend from
-`VITE_GOOGLE_CLIENT_ID`. Then, in a browser at `http://localhost:5175` and `http://localhost:5176`, confirm
+string. jatszoter reports it the same way since 2026-10-07 (`google_client_id`). Then, in a browser at `http://localhost:5175` and `http://localhost:5176`, confirm
 the **Google button renders**. A missing button means `VITE_GOOGLE_CLIENT_ID` was empty at
 build time — a code/config bug the agent fixes. A button that renders but fails at Google
 is an origin-registration problem in the Google console, not a code bug.
