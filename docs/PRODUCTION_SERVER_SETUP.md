@@ -169,6 +169,7 @@ Each app needs its own `.env` on the server (never commit these).
 | `PORT` | Yes | `3010` |
 | `GOOGLE_CLIENT_ID` | Yes | Google OAuth |
 | `ADMIN_SERVICE_TOKEN` | Yes | Opens the internal admin API to the admin app (WAYS_OF_WORKING R18). Long random secret, equal to admin's `SZOTAR_ADMIN_TOKEN` (§6.4). Unset turns the API off. Szótár has no admin list of its own. |
+| `GAMES_SERVICE_TOKEN` | Yes, before Tájszórejtvény goes live | Opens `/internal/games/` (the full mondás list, future days included) to Játszótér's backend. Long random secret, equal to Játszótér's `SZOTAR_GAMES_TOKEN`; a different value from `ADMIN_SERVICE_TOKEN`. Unset turns it off, and Tájszórejtvény uses only its own proverb list. |
 
 Also needed for content: dictionary import source / dump for initial seed (`szotar_db1` import path).
 

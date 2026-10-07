@@ -67,6 +67,13 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      production build needs no setting (its CSP already lists
      `https://szotar.lamsza.com`). Once lamsza and admin without the mondás
      code are deployed, apply `backend/migrations/drop_mondasok.sql`.
+  8. **Szótár's games endpoint (Tájszórejtvény), before that game goes live.**
+     Generate a third token and set it as `GAMES_SERVICE_TOKEN` in Szótár's
+     `.env` and as `SZOTAR_GAMES_TOKEN` in Játszótér's (a different value from
+     the admin tokens). The same nginx rule covers it: nothing proxies
+     `/internal/`. Check on the server: `curl -s 127.0.0.1:<szotar
+     port>/internal/games/proverbs` without the token answers 401, and
+     `https://szotar.lamsza.com/internal/games/proverbs` never returns JSON.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
