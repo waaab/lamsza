@@ -32,10 +32,13 @@ No workflow names a Node or Go version itself.
 
 | App | Node 20.20.2 | Node 24.21 | Go 1.25.7 |
 |---|---|---|---|
-| lamsza | build ok; tests pass (198/198) when given the file list | build ok, `npm test` 198/198 | vet, build and tests ok |
-| admin | build ok; tests 97/97 with the file list | build ok, `npm test` 97/97 | vet, build and tests ok |
-| szotar | build ok; tests 25/25 with the file list | build ok, `npm test` 25/25 | vet, build and tests ok |
-| jatszoter | build ok; tests 11/11 with the file list | build ok, `npm test` 11/11 | vet, build and tests ok |
+| lamsza | build ok; tests pass when given the file list | build ok, `npm test` passes | vet, build and tests ok |
+| admin | build ok; tests pass with the file list | build ok, `npm test` passes | vet, build and tests ok |
+| szotar | build ok; tests pass with the file list | build ok, `npm test` passes | vet, build and tests ok |
+| jatszoter | build ok; tests pass with the file list | build ok, `npm test` passes | vet, build and tests ok |
+
+(Results, not counts: the suites grow, and a count here goes stale with the next
+test, WAYS_OF_WORKING R10.)
 
 On Node 20 `npm test` itself fails in every repo: the scripts pass a quoted glob
 (`node --test "tests/*.test.js"`), and Node 20's test runner does not expand

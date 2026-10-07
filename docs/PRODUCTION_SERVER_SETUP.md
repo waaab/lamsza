@@ -286,7 +286,7 @@ URL someone linked out of an index. The ready-to-copy vhost is in
 1. **No auto-deploy** — GitHub Actions does not push to DigitalOcean; deploy is manual (or a script you add later).
 2. **Static frontends** — Node is for building only; Nginx serves `dist/`.
 3. **Build-time env** — `VITE_*` must be set when running `npm run build`, not only in the backend `.env`.
-4. **Szótár CORS** — current code allowlists local Vite (`localhost:5174`). Prefer same-origin Nginx proxy (`https://szotar.lamsza.com/api` → `:3010`) so browsers do not need cross-origin calls. If the frontend calls the API on another origin, CORS must be updated.
+4. **Szótár CORS** — the code allowlists the local frontends and the `*.lamsza.com` origins (`CORS_ALLOWED_ORIGINS` in szotar's `.env.example`). Prefer same-origin Nginx proxy (`https://szotar.lamsza.com/api` → `:3010`) so browsers do not need cross-origin calls. If the frontend calls the API on another origin, CORS must be updated.
 5. **Do not reuse local compose passwords** in production.
 6. **Three separate databases** — do not share one DB across apps.
 7. Future subdomains (`admin`, `api`, `account`, etc.) are out of scope for this first production pass.
@@ -319,4 +319,4 @@ Useful when comparing to local docker-compose; **not** for public exposure.
 
 ---
 
-*Source of truth for network rules: `jatszoter/docs/lamsza-network.md`. App stack details: each repo’s README / config.*
+*Source of truth for network rules: `lamsza/docs/network/WAYS_OF_WORKING.md`; for the UI, `lamsza/docs/network/UI_BASELINE.md`. App stack details: each repo’s README / config. The production ports in this file are to be verified on the server (`docs/network/OPEN_ITEMS.md`).*

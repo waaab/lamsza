@@ -52,7 +52,7 @@ reference; each item names its own.
 | Own-app home button (`tb-own-home`) | Other | keep as is |
 | Left-side sections (`tb-left-items`) | Other | keep as is |
 | Links to the sister apps (`tb-cross-links`) | Other | keep as is |
-| Profile / account button (`tb-profile`) | Lámsza's |  |
+| Profile / account button (`tb-profile`) | Lámsza's | Szótár is exempt for now: it has no account page, so no Fiók button. Owner's decision, 2026-10-07. |
 | Settings control (`tb-settings`) | Lámsza's | Szótár and Játszótér keep their theme dropdown (localStorage); Lámsza keeps its settings page. Clarified by the owner. |
 | Admin link in toolbar (`tb-admin-link`) | Other | keep as is |
 | App-only toolbar buttons (`tb-extra`) | Other | keep as is |
@@ -75,7 +75,7 @@ reference; each item names its own.
 | Item | Baseline | Note |
 |---|---|---|
 | Icon system (`ic-system`) | Admin's | One icon system for all four apps: the shared `AppIcon.svelte` (the admin set, which also has Játszótér). |
-| Játszótér icon (`ic-jatszoter`) | Játszótér's |  |
+| Játszótér icon (`ic-jatszoter`) | Játszótér's | Its cross-of-tiles drawing, at the set's stroke 2 like every other icon (not the original 1.75). Confirmed by the owner, 2026-10-07. |
 | Rendered icon sizes (`ic-sizes`) | Other | keep as is |
 | Settings gear attributes (`ic-gear`) | Lámsza's |  |
 | aria-hidden on the magnifier (`ic-aria`) | Lámsza's |  |

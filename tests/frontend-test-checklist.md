@@ -43,7 +43,7 @@ Run these tests against the live development server (`npm run dev` on port 5174)
 
 ### 1.4 Directory Category (`/index/[category]`)
 
-- [ ] Navigating to `/index/egeszsegugy` (or another **category** slug) shows filtered entries
+- [ ] Navigating to `/index/etkezes` (or another **category** slug) shows filtered entries; a retired slug such as `/index/egeszsegugy` shows the error page
 - [ ] `/index/szolgaltatasok` is **not** a category: it lists type Szolgáltatás (including legacy `service`), not Cég / Egyéb
 - [ ] URL updates correctly
 - [ ] Browser back button returns to previous category/page
@@ -184,7 +184,6 @@ in this app is the absence:
 - [ ] Homepage renders correctly on mobile (< 480px)
 - [ ] Navigation is accessible on mobile (hamburger or scroll)
 - [ ] Directory cards stack vertically on small screens
-- [ ] Admin panel is usable on tablet (768px+)
 - [ ] No horizontal scroll on any page at standard breakpoints
 
 ---

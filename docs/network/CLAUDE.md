@@ -99,6 +99,8 @@ added to the OAuth client.
 - `lamsza/docs/AGENT_ENVIRONMENT_POLICY.md`: **localhost only, never touch production.**
 - `lamsza/docs/LOCAL_DEV_CHECKS.md`: what "verified" means. Run the checks your
   change touches *before* pushing, because CI is not the real gate.
-- `lamsza-jatszoter/docs/lamsza-network.md`: network UI notes (vanilla CSS, design tokens, theme).
+- `lamsza/docs/network/UI_BASELINE.md`: the owner's UI decisions, one per item; the
+  reference for any UI change in any app. The Cursor rule `.cursor/rules/lamsza-network.mdc`
+  points to it.
 - Every repo's `CHANGELOG.md`: a notable change adds a line under `[Unreleased]` in the
   same commit (WoW R17).

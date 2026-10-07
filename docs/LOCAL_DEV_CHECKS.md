@@ -5,7 +5,9 @@
 **Covers:** starting the network, smoking every API, and the feature checks that are easy
 to get wrong (sign-in config, admin allowlists, weather, the Szótár↔Játszótér pair,
 restart and data persistence, dump and restore).
-**Last updated:** 2026-10-06 — every command below was run and the output recorded.
+Commands and what to expect, not recorded results: run them and compare (WAYS_OF_WORKING R10).
+**Never write to dev data while checking** (R8, R9): every check here is a read, a GET or a
+test suite on a scratch database.
 
 All four apps are in development. This is the check to run after a change, before calling
 it done.
@@ -130,22 +132,23 @@ for p in 5173 5174 5175 5176; do probe http://127.0.0.1:$p/; done
 
 ## Check — Google sign-in
 
-Sign-in cannot be fully proved on localhost — Google OAuth needs the dev origins
-registered. What you **can** prove:
+Google sign-in works on the `localhost` ports of every app (`http://localhost:5173` to
+`5176`), not on `*.lamsza.test`: Google rejects `.test` origins, so they cannot be in the
+OAuth client. What to check:
 
 ```bash
+curl -s http://127.0.0.1:3001/api/config/public | head -c 300   # lamsza
+curl -s http://127.0.0.1:3000/api/config/public | head -c 300   # admin
 curl -s http://127.0.0.1:3002/api/config/public | head -c 300   # szotar
 curl -s http://127.0.0.1:3003/api/config/public | head -c 300   # jatszoter
 ```
 
-**Expect:** the payload reports a Google client id is configured (non-empty), not an empty
-string. jatszoter reports it the same way since 2026-10-07 (`google_client_id`). Then, in a browser at `http://localhost:5175` and `http://localhost:5176`, confirm
-the **Google button renders**. A missing button means `VITE_GOOGLE_CLIENT_ID` was empty at
-build time — a code/config bug the agent fixes. A button that renders but fails at Google
-is an origin-registration problem in the Google console, not a code bug.
-
-`http://localhost:<port>` must be in the dev OAuth client's authorized origins for the
-button to complete locally.
+**Expect:** a non-empty `google_client_id` in every payload. All four frontends read it from
+there at runtime; none bakes it in at build time. Then open each app on its `localhost`
+port and confirm the **Google button renders** in the sign-in dialog. A missing button with
+an empty `google_client_id` means the backend's `GOOGLE_CLIENT_ID` is not set. A button
+that renders but fails at Google is an origin-registration problem in the Google console,
+not a code bug. Signing in is the owner's to do (R9); agents stop at the button.
 
 ---
 
@@ -203,52 +206,24 @@ the public site uses cookie `lamsza_session` and table `sessions`, admin uses
 This matters most on localhost, where both apps are host `localhost` and **cookies ignore
 the port** — a public cookie is offered to `:3000` whatever the ports are.
 
-Google sign-in cannot complete from a script, so mint the session rows the way the two
-backends do — a session *is* a random token whose SHA-256 is a row. Both apps hash the
-same way, so this is the real thing, not a stand-in.
+Prove it with the two boundary suites. They mint real session rows (a random token whose
+SHA-256 is the row, the way both backends do it) for a fixture user, but only in a scratch
+database, never in the dev `lamsza` database and never for the owner's account (R8, R9):
 
 ```bash
-psql(){ docker exec -i lamsza-db psql -U lamsza_user -d lamsza "$@"; }
-
-# the admin session table exists — the main lamsza backend creates it; admin runs no DDL
-psql -c '\d admin_sessions'
-
-# an account on ADMIN_GOOGLE_EMAILS, so the only thing under test is the session store
-EMAIL=$(grep -h '^ADMIN_GOOGLE_EMAILS' ~/projects/lamsza-network/lamsza-admin/backend/.env 2>/dev/null \
-        | head -1 | cut -d= -f2 | cut -d, -f1)
-USERID=$(psql -qtAc "SELECT id FROM users WHERE lower(email) = lower('$EMAIL')")
-echo "admin user: $EMAIL -> id $USERID"
-
-mint(){ # mint <table> -> prints the raw token
-  local t h; t=$(openssl rand -hex 32); h=$(printf %s "$t" | sha256sum | cut -d' ' -f1)
-  psql -qtAc "INSERT INTO $1 (token_hash, user_id, expires_at)
-              VALUES ('$h', $USERID, NOW() + INTERVAL '1 hour')" >/dev/null
-  echo "$t"
-}
-PUB=$(mint sessions); ADM=$(mint admin_sessions)
-code(){ curl -s -o /dev/null -w '%{http_code}' --max-time 6 -H "Cookie: $2" "$1"; }
-
-printf 'public token -> admin /api/auth/me        %s\n' "$(code http://127.0.0.1:3000/api/auth/me     "lamsza_session=$PUB")"
-printf 'public token -> admin /api/admin/users    %s\n' "$(code http://127.0.0.1:3000/api/admin/users "lamsza_admin_session=$PUB")"
-printf 'admin token  -> admin /api/admin/users    %s\n' "$(code http://127.0.0.1:3000/api/admin/users "lamsza_admin_session=$ADM")"
-printf 'admin token  -> public /api/auth/me       %s\n' "$(code http://127.0.0.1:3001/api/auth/me     "lamsza_session=$ADM")"
-
-psql -qc "DELETE FROM sessions WHERE expires_at < NOW() + INTERVAL '2 hours'" \
-        -qc "DELETE FROM admin_sessions WHERE expires_at < NOW() + INTERVAL '2 hours'"
+cd ~/projects/lamsza-network/lamsza       && scripts/test-go.sh -run 'AdminSession|PublicSession' -v .
+cd ~/projects/lamsza-network/lamsza-admin && scripts/test-backend.sh -run 'Session' -v ./internal/auth/...
 ```
 
-**Expect** `401`, `401`, `200`, `401`. In words:
+**Expect:** both pass. Between them they check that
 
-- a public token is refused by admin — under the public cookie name *and* renamed to the
+- a public token is refused by admin, under the public cookie name *and* renamed to the
   admin one, so neither the browser nor a deliberate caller gets through;
 - an admin token works on admin (the sign-in path is intact);
 - and that same admin token is refused by the public API.
 
-A `200` on any of the three `401` lines means the two session stores have been merged back
-together. The `\d admin_sessions` failing means the table is missing: run the main `lamsza`
-backend, or `lamsza/backend/migrations/admin_sessions.sql`.
-
-The suites covering this: `lamsza/backend/admin_session_boundary_test.go` and
+A failure there means the two session stores have been merged back together. The suites
+are `lamsza/backend/admin_session_boundary_test.go` and
 `lamsza-admin/backend/internal/auth/session_boundary_test.go`.
 
 ---
@@ -265,9 +240,8 @@ curl -s 'http://127.0.0.1:3001/api/weather/county?slug=hargita' | head -c 300
 > `/api/weather` with **no** `slug` returns `400 Missing slug`. That is correct behaviour,
 > not a failure — pass a slug.
 
-**Verified 2026-10-06:** both `200` with live data from Open-Meteo —
-`{"temp":15,"desc":"Vannak felhők es...","source":"Open-Meteo",...}` and a county array
-including Tusnádfürdő and Gyergyószentmiklós.
+**Expect:** both `200` with live data, e.g. `"source":"Open-Meteo"`, and a county array of
+towns.
 
 Then open `http://localhost:5174` and confirm the widget **renders** that temperature.
 API data with a blank widget is a frontend bug.
@@ -285,8 +259,8 @@ curl -s http://127.0.0.1:3003/api/config/public
 - `source: "http"` — Játszótér is really calling Szótár. This is the pair that matters.
 - `source: "local"` — bundled word files. `ok:true` here says nothing about reaching Szótár.
 
-**Verified 2026-10-06:** `{"dictionary":{"ok":true,"source":"http","word_count":475},"version":"0.1.0"}`
-— the live pair works locally, against Szótár on `:3002`.
+With the pair working, the payload reads `"dictionary":{"ok":true,"source":"http",...}` with
+Szótár's word count.
 
 If `source` is `local` and you want the pair, set in `~/projects/lamsza-network/lamsza-jatszoter/.env`:
 
@@ -309,9 +283,11 @@ Prove the apps come back cleanly after a full stop, and that no data lives only 
 docker exec -i szotar-db    psql -U szotar_user -d szotar    -c 'select count(*) from words;'
 docker exec -i jatszoter-db psql -U jatszoter_user -d jatszoter -c 'select count(*) from users;'
 
-# full restart of apps and containers
+# full restart of the apps, through the launcher (WAYS_OF_WORKING R12)
 cd ~/projects/lamsza-network && ./start-lamsza-network.sh stop
-docker compose -f ~/projects/lamsza-network/lamsza-szotar/docker-compose.yml restart
+# the one sanctioned container step: restart (never `down`) one database container, to
+# prove its data lives in the named volume and not in the container
+docker restart szotar-db
 ./start-lamsza-network.sh start
 
 # same counts?
@@ -385,7 +361,7 @@ every run:
 
 Each script passes extra arguments to `go test`, e.g. `scripts/test-backend.sh
 ./internal/auth/...`. A plain `go test ./...` in `backend/` fails the DB-bound
-packages with "TEST_DATABASE_URL is not set" (admin skips its two DB tests)
+packages with "TEST_DATABASE_URL is not set" (admin's DB-bound tests skip instead)
 instead of writing to dev data, which is what it used to do: on 2026-10-07, 43 of
 the 46 users in the dev `lamsza` database were `*@test.lamsza` fixtures.
 
@@ -403,9 +379,10 @@ four repos checked out, `scripts/sync-shared-frontend.sh --check` verifies them 
 one go, and `scripts/tests/sync-shared-frontend.test.sh` tests the script itself.
 The rule is `docs/network/SHARED_FRONTEND_MODULES.md`.
 
-> Three of these suites talk to Postgres, and since BOG-53 all three also run in
-> CI against a `postgres:16` service; nothing is excluded by name any more. CI
-> sets `TEST_DATABASE_URL` to that service database. The local scripts above run
+> The lamsza, szotar and jatszoter Go suites also run in CI against a `postgres:16`
+> service (since BOG-53); CI sets `TEST_DATABASE_URL` to that service database.
+> Admin's CI has no Postgres service, so its DB-bound tests skip there and run only
+> locally (`OPEN_ITEMS.md`). The local scripts above run
 > the suites the way CI does: on an empty database built from the repo. A suite
 > that passes on your dev data and fails on an empty database is the failure CI
 > used to be blind to.

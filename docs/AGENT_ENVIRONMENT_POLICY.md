@@ -1,7 +1,7 @@
 # Agent Environment Policy — local development only
 
 **Set by:** Attila (owner), 2026-10-06
-**Applies to:** every agent working on `lamsza`, `szotar`, `jatszoter`, `lamsza-admin`
+**Applies to:** every agent working on `lamsza`, `lamsza-szotar`, `lamsza-jatszoter`, `lamsza-admin`
 
 ---
 

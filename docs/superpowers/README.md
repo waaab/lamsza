@@ -11,7 +11,7 @@ Read them as history. For what is true now, use the live docs:
 |---|---|
 | How the four apps are organised | `docs/network/WAYS_OF_WORKING.md` |
 | What "verified" means, and the port map | `docs/LOCAL_DEV_CHECKS.md` |
-| Current product state | `project-status-audit.md`, `changelog.md` |
+| Current product state | `CHANGELOG.md` (the old `project-status-audit.md` is in `docs/history/`) |
 | Locations / settlements data contract | `docs/SETTLEMENTS_AND_LOCATIONS.md` |
 
 ## The one trap to know about

@@ -2,6 +2,11 @@
 #
 # paperclip-issue-update.sh — the one way an agent writes a Paperclip issue status.
 #
+# UNUSED since Paperclip was switched off (WAYS_OF_WORKING R1-R4, item 13 of the
+# 2026-10-07 review). Kept on the owner's decision, with its test, in case the
+# tracker comes back; nothing in the network calls it. Tasks live in
+# docs/network/OPEN_ITEMS.md now.
+#
 # Why this exists: BOG-32 found four tasks (BOG-3, BOG-4, BOG-5, BOG-7) marked
 # "done" while every line of their code was still uncommitted on a feature
 # branch. Nothing had shipped, and the work was later discarded. This script is

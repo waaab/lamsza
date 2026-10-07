@@ -29,7 +29,7 @@ columns got there.
 
 ## Generated, and committed
 
-Generated, because nobody keeps 2700 lines of DDL correct by hand, and a
+Generated, because nobody keeps thousands of lines of DDL correct by hand, and a
 bootstrap that is subtly wrong is worse than none at all. Committed, because CI
 has to build the database out of the repo, and because a reviewer should see the
 schema move in a diff.

@@ -5,14 +5,17 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (network review; GA4 item; UI backlog).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
 
 ## Production and accounts (owner only; agents never touch production)
 
 - **[network] owner: upgrade production Node 20.20.2 (end of life) to Node 24 LTS.**
   A planned task with a backup and a rollback path. Every app already builds
   and tests on Node 24 (`VERSIONS.md`). After it, nothing else needs to change:
-  CI and `.nvmrc` already say 24.
+  CI and `.nvmrc` already say 24. While on the server, verify the production
+  ports: `PRODUCTION_SERVER_SETUP.md` (lamsza 3000, szotar 3010, jatszoter 3001)
+  and `PRODUCTION_ENVIRONMENT_NOTES.md` (8081, 8082, 8083) disagree. Correct both
+  docs to what the server actually runs.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
@@ -55,8 +58,18 @@ Last updated: 2026-10-07 (network review; GA4 item; UI backlog).
 
 ## Work
 
-- **[admin] server timeouts.** lamsza got read, write and idle timeouts (BOG-18);
-  admin still uses a bare `http.ListenAndServe`.
+- **[admin] [szotar] [jatszoter] server timeouts.** lamsza got read, write and
+  idle timeouts (BOG-18); the other three backends still use a bare
+  `http.ListenAndServe`.
+- **[admin] CI runs no Postgres.** Admin's workflow has no `postgres:16` service,
+  so its DB-bound tests (about 44) skip in CI and run only locally
+  (`npm run test:backend`). lamsza, szotar and jatszoter run theirs in CI.
+- **[lamsza] [admin] test the `site_settings` contract.** Admin writes the
+  `weather_provider_*` and `social_*_url` keys that lamsza reads; no test pins
+  the key names on either side.
+- **[lamsza] two orphan images** in `backend/data/entry-images/`
+  (`990e305eead49770.png`, `verify-manifesto.png`, 2026-09-22): untracked and
+  referenced by no row. Delete them or find their owner.
 - **[szotar] [jatszoter] Content-Security-Policy.** lamsza and admin send one;
   szotar and jatszoter do not.
 - **[jatszoter] archive before the first puzzle** answers "Játék hiba." instead
@@ -81,3 +94,11 @@ follows `UI_BASELINE.md` when it is done.
   text if one fits Szótár, and remove the add icon from the toolbar. To decide
   when it is done: which pages carry it (the home page at least), and what a
   signed-out visitor sees (the button opening the sign-in dialog, or no button).
+- **[network] Content dialogs on phones.** The shared `.link-dialog` shell in
+  `global.css` is `min(70vw, 100vw - 2rem)` wide, about 273px on a 390px phone,
+  in every app. Admin already overrides it to the screen width on small screens
+  (`admin.css`); make that the shell's own small-screen rule in lamsza and sync.
+- **[lamsza] [admin] One icon system everywhere** (UI_BASELINE "ic-system").
+  Lámsza's own toolbar (`src/routes/(public)/+layout.svelte`) still draws 11
+  inline SVGs that `AppIcon` already has, and admin's `AdminPlusIcon` duplicates
+  `AppIcon`'s `add`. Switch them to `AppIcon`.

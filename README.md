@@ -3,7 +3,7 @@
 A high-performance, culturally authentic startpage and directory for the Szekely region.
 
 ## Overview
-Lamsza is a full-stack platform: a local directory of services and websites, bilingual search, weather, news, events, and a daily quote ("mondás"). Signed-in people have a Fiók page, settings, and favorite places. The published product version is the first entry in `src/lib/publicChangelog.js` (currently v1.2.0). The footer and `/valtozasnaplo` both read that list.
+Lamsza is a full-stack platform: a local directory of services and websites, bilingual search, weather, news, events, and a daily quote ("mondás"). Signed-in people have a Fiók page, settings, and favorite places. The published product version is the first entry in `src/lib/publicChangelog.js`. The footer and `/valtozasnaplo` both read that list.
 
 ## Repo layout
 This repo has **no `frontend/` folder**. The Go backend is in `backend/`; the
@@ -11,7 +11,7 @@ SvelteKit frontend lives at the repo root (`src/`, `static/`, `tests/`,
 `svelte.config.js`, `vite.config.js`, root `package.json`), and `npm run build`
 writes to `dist/`.
 
-The other three network apps (`lamsza-admin`, `szotar`, `jatszoter`) do use
+The other three network apps (`lamsza-admin`, `lamsza-szotar`, `lamsza-jatszoter`) do use
 `backend/` + `frontend/`. The difference is deliberate — see §5 of
 [docs/network/WAYS_OF_WORKING.md](docs/network/WAYS_OF_WORKING.md). Do not create
 a `frontend/` folder here.

@@ -429,6 +429,15 @@ No dev code path calls a `*.lamsza.com` host; network origins come from
 *Why:* jatszoter fetched production's `/api/config/public` on every page load
 in dev.
 
+**Server-to-server calls go to `http://127.0.0.1:<port>`, set by an env var.** A
+backend that calls another app's backend (lamsza → szotar, jatszoter → szotar)
+reads the target from its `.env` (`SZOTAR_ORIGIN`, `SZOTAR_BASE_URL`, …), and
+the dev value is the other backend on `127.0.0.1` with its port from §1, never a
+`*.lamsza.test` host. *Why:* lamsza reached szotar through
+`https://szotar.lamsza.test`, which depends on the local nginx and mkcert setup
+that lives in no repo; jatszoter already called `127.0.0.1:3002`. Owner's
+decision, 2026-10-07.
+
 ### R14 — A GET never creates data
 
 Except today's lazily created daily puzzle. *Why:* a GET for a future date
