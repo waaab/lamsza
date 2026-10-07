@@ -8,7 +8,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eCRBMNlYavstPK6mwefiS6gt85m5AHRb4Cc9zwFHKj1qXTkicDlFT0mPEK5BPpH
+\restrict 1oyVzh6XFE4h8K6Xk2OGWoUQQiw3HCwcNcJy9Gn7RxVA4UwaJVcOvSvbpJyn8jz
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -171,6 +171,47 @@ $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: admin_audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_audit_log (
+    id bigint NOT NULL,
+    occurred_at timestamp with time zone DEFAULT now() NOT NULL,
+    actor_user_id integer,
+    actor_email text DEFAULT ''::text NOT NULL,
+    resource text NOT NULL,
+    resource_id text DEFAULT ''::text NOT NULL,
+    action text NOT NULL,
+    method text NOT NULL,
+    route text NOT NULL,
+    status_code integer DEFAULT 0 NOT NULL,
+    payload jsonb,
+    before_state jsonb,
+    after_state jsonb,
+    diff jsonb
+);
+
+
+--
+-- Name: admin_audit_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.admin_audit_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: admin_audit_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.admin_audit_log_id_seq OWNED BY public.admin_audit_log.id;
+
 
 --
 -- Name: admin_sessions; Type: TABLE; Schema: public; Owner: -
@@ -1426,6 +1467,13 @@ ALTER SEQUENCE public.websites_id_seq OWNED BY public.websites.id;
 
 
 --
+-- Name: admin_audit_log id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_audit_log ALTER COLUMN id SET DEFAULT nextval('public.admin_audit_log_id_seq'::regclass);
+
+
+--
 -- Name: attraction_images id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1633,6 +1681,14 @@ ALTER TABLE ONLY public.weather_desc_translations ALTER COLUMN id SET DEFAULT ne
 --
 
 ALTER TABLE ONLY public.websites ALTER COLUMN id SET DEFAULT nextval('public.websites_id_seq'::regclass);
+
+
+--
+-- Name: admin_audit_log admin_audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_audit_log
+    ADD CONSTRAINT admin_audit_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -2200,6 +2256,27 @@ CREATE UNIQUE INDEX entry_suggestions_one_open ON public.entry_suggestions USING
 
 
 --
+-- Name: idx_admin_audit_log_actor; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_audit_log_actor ON public.admin_audit_log USING btree (actor_user_id);
+
+
+--
+-- Name: idx_admin_audit_log_occurred; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_audit_log_occurred ON public.admin_audit_log USING btree (occurred_at DESC);
+
+
+--
+-- Name: idx_admin_audit_log_resource; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_admin_audit_log_resource ON public.admin_audit_log USING btree (resource, resource_id);
+
+
+--
 -- Name: idx_admin_sessions_expires; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2323,6 +2400,14 @@ CREATE TRIGGER trg_sync_entry_settlement AFTER UPDATE OF name, name_ro, name_de 
 --
 
 CREATE TRIGGER trg_sync_entry_tags AFTER INSERT OR DELETE OR UPDATE ON public.entry_tags FOR EACH ROW EXECUTE FUNCTION public.sync_entry_tags();
+
+
+--
+-- Name: admin_audit_log admin_audit_log_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_audit_log
+    ADD CONSTRAINT admin_audit_log_actor_user_id_fkey FOREIGN KEY (actor_user_id) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -2721,5 +2806,5 @@ ALTER TABLE ONLY public.websites
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eCRBMNlYavstPK6mwefiS6gt85m5AHRb4Cc9zwFHKj1qXTkicDlFT0mPEK5BPpH
+\unrestrict 1oyVzh6XFE4h8K6Xk2OGWoUQQiw3HCwcNcJy9Gn7RxVA4UwaJVcOvSvbpJyn8jz
 

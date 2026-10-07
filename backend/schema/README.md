@@ -5,7 +5,7 @@ database in one command:
 
 | File | What it is |
 |---|---|
-| `001_schema.sql` | The whole current schema, structure only: 41 tables, the `locations` view, the `pg_slugify`/`sync_*` functions and their triggers, indexes, constraints, and the `pg_trgm` and `unaccent` extensions. |
+| `001_schema.sql` | The whole current schema, structure only: 42 tables, the `locations` view, the `pg_slugify`/`sync_*` functions and their triggers, indexes, constraints, and the `pg_trgm` and `unaccent` extensions. |
 | `002_reference.sql` | The reference rows the app cannot work without: `counties`, `geo_locations`, `settlements`, `settlement_location_types`, `historical_seats`, `county_historical_seats`, `venue_types`, `weather_desc_translations`. |
 
 ```bash
@@ -16,7 +16,7 @@ scripts/db-bootstrap.sh --url "$DATABASE_URL"
 
 ## Why this exists
 
-`backend/migrations/` holds 40 files that were applied by hand over the life of
+`backend/migrations/` holds 41 files that were applied by hand over the life of
 the project. It is a historical record, not a runnable sequence: there is no
 recorded order, and several files only ever applied to a schema that has since
 moved on. Before BOG-53 there was no way to create a working lamsza database
@@ -57,9 +57,20 @@ rows before you do it.
 
 ## Drift
 
-Nothing checks automatically that these files still match the live dev database
-— that check would need a database, and CI only has an empty one. What CI does
-catch is the case that matters: if the committed schema stops being enough for
-the code, the `backend` suite fails against the bootstrapped database. A column
-that exists in dev and was never dumped here shows up as a red test, not as a
-silent pass.
+Nothing checks that these files match the live dev database byte for byte; that
+would need a database, and CI only has an empty one.
+
+What is checked is the drift that broke things: **boot DDL that never reached
+the dump.** The backend creates tables and adds columns on startup (`CREATE TABLE
+IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`). The dev database
+gets them, a bootstrapped one does not. The `backend` test suite cannot see the
+gap, because its own setup runs the same boot DDL on the scratch database first:
+`admin_audit_log` was missing from this dump for a day and every suite stayed
+green while lamsza-admin, which runs no DDL, had no audit table on any fresh
+database.
+
+`schema_test.go` in this folder closes that gap without a database: it reads the
+non-test Go sources, collects every table and added column the boot DDL names,
+and fails if `001_schema.sql` lacks one. It runs in plain `go test ./...` and in
+CI. When it goes red, boot the new code against the dev database, run
+`scripts/db-dump-schema.sh`, and commit the result with the change.

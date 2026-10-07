@@ -94,7 +94,7 @@ Postgres 16, as local dev and CI both run. The script works with
 
 This is the same script and the same two files the CI backend job runs, so a
 green CI means this path works. **`backend/migrations/` is not that path** — its
-40 files are a hand-applied historical record with no runnable order. Do not try
+41 files are a hand-applied historical record with no runnable order. Do not try
 to build a database out of them.
 
 After a schema change, regenerate and commit:

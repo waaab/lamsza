@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Bring an empty Postgres up to the current lamsza schema in one command.
 #
-# The 40 files in backend/migrations/ are a historical record of hand-run
+# The 41 files in backend/migrations/ are a historical record of hand-run
 # changes, not a runnable sequence - there is no recorded order and several of
 # them only ever applied to a schema that has since moved on. So there was no
 # way to create a working lamsza database from this repo at all, which is why
