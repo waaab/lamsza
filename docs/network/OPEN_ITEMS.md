@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -74,11 +74,6 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   repos** (GitHub, Settings > Actions > General). Approved on BOG-57; without it
   the `ci-status` job cannot open the "CI is red on main" issue (WAYS_OF_WORKING
   R7).
-- **[admin] owner: set the default branch of `waaab/lamsza-admin` to `main`.**
-  It is `extract-admin`, which holds lamsza's history, so the repo's front page,
-  new pull requests and fresh clones point at the wrong code. Then delete
-  `extract-admin` (`git push origin --delete extract-admin`; GitHub refuses
-  while it is the default).
 
 ## Decisions
 
