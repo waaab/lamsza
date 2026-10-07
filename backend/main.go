@@ -14,7 +14,6 @@ import (
 	"backend/internal/health"
 	"backend/internal/links"
 	"backend/internal/middleware"
-	"backend/internal/mondasok"
 	"backend/internal/news"
 	"backend/internal/pagefaq"
 	"backend/internal/pages"
@@ -28,7 +27,6 @@ func main() {
 	config.Load()
 	db.InitDB()
 	db.SeedHistoricalSeatsContent()
-	mondasok.Migrate()
 	settings.MigrateSiteSettings()
 	weather.MigrateWeatherTranslations()
 	pages.MigratePages()
@@ -115,11 +113,6 @@ func main() {
 		mux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(middleware.JSONByDefault(news.HandlePublicNewsFeeds)))
 		news.WarmNews()
 		log.Println("Module [News] enabled")
-	}
-
-	if config.AppConfig.Features.Mondasok {
-		mux.HandleFunc("/api/mondasok", middleware.ApplyCORS(middleware.JSONByDefault(mondasok.HandlePublicMondasok)))
-		log.Println("Module [Mondasok] enabled")
 	}
 
 	if config.AppConfig.Features.QuickLinks {

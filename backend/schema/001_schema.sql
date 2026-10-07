@@ -8,7 +8,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1oyVzh6XFE4h8K6Xk2OGWoUQQiw3HCwcNcJy9Gn7RxVA4UwaJVcOvSvbpJyn8jz
+\restrict h6ZSDETeibZDkc1IwBnnkv859xf4EVXBnx66sTNYaXUQEXczoTW7eeY8KUMQdpC
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -891,39 +891,6 @@ UNION ALL
 
 
 --
--- Name: mondasok; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.mondasok (
-    id integer NOT NULL,
-    text text NOT NULL,
-    category character varying(100),
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    display_date date DEFAULT CURRENT_DATE NOT NULL
-);
-
-
---
--- Name: mondasok_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.mondasok_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: mondasok_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.mondasok_id_seq OWNED BY public.mondasok.id;
-
-
---
 -- Name: news_feeds; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1586,13 +1553,6 @@ ALTER TABLE ONLY public.historical_seats ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
--- Name: mondasok id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.mondasok ALTER COLUMN id SET DEFAULT nextval('public.mondasok_id_seq'::regclass);
-
-
---
 -- Name: news_feeds id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -1937,14 +1897,6 @@ ALTER TABLE ONLY public.historical_seats
 
 ALTER TABLE ONLY public.historical_seats
     ADD CONSTRAINT historical_seats_slug_key UNIQUE (slug);
-
-
---
--- Name: mondasok mondasok_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.mondasok
-    ADD CONSTRAINT mondasok_pkey PRIMARY KEY (id);
 
 
 --
@@ -2316,13 +2268,6 @@ CREATE INDEX idx_event_schedule_activities_day ON public.event_schedule_activiti
 --
 
 CREATE INDEX idx_event_schedule_days_event ON public.event_schedule_days USING btree (event_id);
-
-
---
--- Name: idx_mondasok_display_date; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_mondasok_display_date ON public.mondasok USING btree (display_date);
 
 
 --
@@ -2806,5 +2751,5 @@ ALTER TABLE ONLY public.websites
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1oyVzh6XFE4h8K6Xk2OGWoUQQiw3HCwcNcJy9Gn7RxVA4UwaJVcOvSvbpJyn8jz
+\unrestrict h6ZSDETeibZDkc1IwBnnkv859xf4EVXBnx66sTNYaXUQEXczoTW7eeY8KUMQdpC
 

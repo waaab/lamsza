@@ -481,6 +481,10 @@ under `/api/`). No user-facing app links to the admin app: admins open it by its
 URL. The old `/admin` URLs show the normal error page, and the admin app has no
 route open to the network's sites (its `CORS_ALLOWED_ORIGINS` alone decides).
 
+The daily mondás has one store: Szótár's `proverbs`, managed in `/dictionary`
+(2026-10-07). Lámsza keeps no mondás data and no mondás endpoint; its home page
+reads the day's mondás from Szótár's `/api/proverbs/today` in the browser.
+
 How the admin app reaches another app's data, without touching its database:
 
 - The other app keeps owning its database and its rules (R3). It offers its

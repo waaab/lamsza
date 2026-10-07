@@ -9,7 +9,6 @@ import (
 	"backend/internal/handlers"
 	"backend/internal/links"
 	"backend/internal/middleware"
-	"backend/internal/mondasok"
 	"backend/internal/news"
 	"backend/internal/search"
 	"backend/internal/weather"
@@ -44,7 +43,6 @@ func init() {
 	config.AppConfig.AdminGoogleEmails = []string{"admin@test.lamsza"}
 	auth.VerifyIDToken = auth.ParseTestIDToken
 	db.InitDB()
-	mondasok.Migrate()
 	handlers.MigrateEntryVerified()
 	handlers.MigrateEntryReviews()
 	handlers.MigrateEntrySuggestions()
@@ -88,7 +86,6 @@ func init() {
 	testMux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 	testMux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
 	testMux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
-	testMux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
 	testMux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))

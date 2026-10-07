@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; Mondások plan, simplified; admin move done; R19 time zone).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -57,15 +57,16 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      more). Keep admin's `CORS_ALLOWED_ORIGINS=https://admin.lamsza.com`: no
      public app calls the admin app. Check: `https://szotar.lamsza.com/admin`
      and `https://jatszoter.lamsza.com/admin` show the 404 error page.
-  7. **Mondások move to Szótár (OPEN_ITEMS, Mondások).** Production's
-     mondások are test data too: `pg_dump` lamsza's `mondasok` and Szótár's
-     `proverbs` (keep the dumps off the server's repos), then delete every row
-     in both. Szótár's `CORS_ALLOWED_ORIGINS` must include
-     `https://lamsza.com` and `https://www.lamsza.com`: Lámsza's home page
-     reads the daily mondás from `https://szotar.lamsza.com/api/proverbs/today`
-     in the browser. Lámsza's production build needs no setting (its CSP
-     already lists `https://szotar.lamsza.com`). Drop lamsza's `mondasok`
-     table only after the cleanup step is deployed.
+  7. **Mondások live only in Szótár (WAYS_OF_WORKING R18; done on dev
+     2026-10-07).** Production's mondások are test data too: `pg_dump`
+     lamsza's `mondasok` and Szótár's `proverbs` (keep the dumps off the
+     server's repos), then delete every row in both. Szótár's
+     `CORS_ALLOWED_ORIGINS` must include `https://lamsza.com` and
+     `https://www.lamsza.com`: Lámsza's home page reads the daily mondás from
+     `https://szotar.lamsza.com/api/proverbs/today` in the browser. Lámsza's
+     production build needs no setting (its CSP already lists
+     `https://szotar.lamsza.com`). Once lamsza and admin without the mondás
+     code are deployed, apply `backend/migrations/drop_mondasok.sql`.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
@@ -108,62 +109,6 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
 
 ## Work
 
-- **[szotar] [lamsza] [admin] One Mondások, owned by Szótár (start after
-  Batch B).** Owner's decisions, 2026-10-07: Szótár's `proverbs` is the only
-  mondás store, managed only from the admin app's `/dictionary`; every existing
-  mondás (lamsza's 8, Szótár's 2, and production's) is test data, so there is no
-  migration and both start empty. Steps, one repo per step, tested on scratch
-  databases first:
-  1. **Backup, then empty. Done on dev 2026-10-07** (8 + 2 rows; dumps in
-     `~/.cache/lamsza-network/backups/2026-10-07-mondasok/`, both proven to
-     restore). A quick `pg_dump` of lamsza's `mondasok` and
-     Szótár's `proverbs` (kept outside the repos), then delete every row in
-     both, on dev. Szótár's table keeps its one-per-day unique index on
-     `display_date`. Production starts empty too: the owner runs the same
-     dump and delete there (to go into the production upgrade item).
-  2. **[admin] `/dictionary` Mondások at full parity with the main admin's
-     page:** add, edit, delete, search (text or ID), 10 rows a page, the
-     display date with "Mai nap", the "ma" badge and highlighted row (all
-     with Szótár's Bucharest `today`, R19, never the browser's date), the
-     explanatory text, and the "no mondás today" warning in the tab and as a
-     message on Vezérlőpult Szótár (with Megnyitás). Szótár's optional
-     `meaning` stays.
-  3. **[lamsza] The home page reads Szótár directly.** `MondasWidget.svelte`
-     changes only its script: it fetches `szotarUrl('/api/proverbs/today')`
-     through `networkOrigins.js` (localhost:5175, szotar.lamsza.test,
-     szotar.lamsza.com), without cookies and without a date: Szótár decides
-     today in Europe/Bucharest (R19) and answers with that day's mondás. The
-     template and CSS stay byte-identical, pinned by a test. Lámsza's CSP
-     `connect-src` gets `https://szotar.lamsza.com` (plus the .test and
-     localhost:5175 origins in non-production builds), checked in
-     `tests/csp.test.js`. Szótár's default CORS list already has the Lámsza
-     origins; production's `CORS_ALLOWED_ORIGINS` on Szótár must include
-     `https://lamsza.com` and `https://www.lamsza.com` (production item).
-     Proof: before/after screenshots of the Lámsza and Szótár home pages,
-     compared pixel by pixel, with a temporary mondás on a scratch database
-     only.
-  4. **Verification** on a throwaway stack: both home pages, Szótár's public
-     Mondások page (only mondások dated up to Bucharest today, owner's
-     decision) and word pages on Szótár's data, every Mondások flow in
-     `/dictionary`, and the dev databases unchanged except for step 1.
-  5. **Cleanup, last, once verified:** remove Lámsza's `/api/mondasok` and all
-     its mondás code (`internal/mondasok` with the boot `Migrate()`,
-     `models.Mondas`, `FEATURE_MONDASOK`, `migrations/mondasok_display_date.sql`,
-     test references) and drop the `mondasok` table with the
-     `db-dump-schema.sh` output in the same commit (R3); remove the main
-     admin's Mondások (tab, sidebar entry and card, the today message,
-     `/api/admin/mondasok`, `internal/mondasok`, `FEATURE_MONDASOK`, the audit
-     resource, the dashboard count, the model, the tests); update WAYS_OF_WORKING
-     R18, UI_BASELINE, ARCHITECTURE, the changelogs and this file.
-- **[network] R19: "today" is a Bucharest day, decided by the server.** The
-  owner's rule (WAYS_OF_WORKING R19). Done on 2026-10-07 in every repo (each one's
-  `internal/clock`, events, Szótár's daily word and `/api/proverbs/today`, the
-  Játszótér games, leaderboards and Kaptár migrations, the admin's date
-  defaults). What is left goes with the Mondások plan above: Lámsza's
-  `MondasWidget` still sends the visitor's date (step 3 moves it to
-  `/api/proverbs/today`), and the main admin's Mondások ("ma", the today
-  warning, the date defaults) and Lámsza's `/api/mondasok` (Budapest) still use
-  the old dates until the cleanup removes them.
 - **[lamsza] The browser extension (`extension/`, git-ignored, built by
   `npm run build:extension`) is not used.** Its March build calls
   `/api/admin/mondasok` on `localhost:3000` and no longer works. A future

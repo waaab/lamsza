@@ -154,7 +154,6 @@ Each app needs its own `.env` on the server (never commit these).
 | `FEATURE_WEATHER` | Optional | Default `true` |
 | `FEATURE_EVENTS` | Optional | Default `true` |
 | `FEATURE_NEWS` | Optional | Default `true` |
-| `FEATURE_MONDASOK` | Optional | Default `true` |
 | `FEATURE_QUICKLINKS` | Optional | Default `true` |
 | `FEATURE_SEARCH` | Optional | Default `true` |
 | `DATA_API` | Optional | Default `true` |

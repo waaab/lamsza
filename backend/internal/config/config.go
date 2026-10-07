@@ -28,7 +28,6 @@ type Config struct {
 		Weather    bool
 		Events     bool
 		News       bool
-		Mondasok   bool
 		QuickLinks bool
 		Search     bool
 	}
@@ -71,7 +70,6 @@ func Load() {
 	AppConfig.Features.Weather = getBoolEnv("FEATURE_WEATHER", true)
 	AppConfig.Features.Events = getBoolEnv("FEATURE_EVENTS", true)
 	AppConfig.Features.News = getBoolEnv("FEATURE_NEWS", true)
-	AppConfig.Features.Mondasok = getBoolEnv("FEATURE_MONDASOK", true)
 	AppConfig.Features.QuickLinks = getBoolEnv("FEATURE_QUICKLINKS", true)
 	AppConfig.Features.Search = getBoolEnv("FEATURE_SEARCH", true)
 }
