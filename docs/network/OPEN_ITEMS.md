@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -74,6 +74,21 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   repos** (GitHub, Settings > Actions > General). Approved on BOG-57; without it
   the `ci-status` job cannot open the "CI is red on main" issue (WAYS_OF_WORKING
   R7).
+- **[network] Consider least-privilege CI tokens (replaces the item above if
+  adopted).** Not decided yet.
+  - **Owner:** set every repo's default *Workflow permissions* to "Read
+    repository contents and packages permissions". Keep "Allow GitHub Actions
+    to create and approve pull requests" off.
+  - **Agent:** the `ci-status` job already declares `contents: read` and
+    `issues: write` in all four workflows. Add a top-level
+    `permissions: contents: read` so the other jobs stay read-only whatever
+    the repo default is.
+  - **Proof:** the "CI is red on main" issue must still open. `ci-status` only
+    runs on a push to `main`, so a failing test on a branch alone proves
+    nothing. Either let the job also run for that one test branch
+    (temporarily, reverted afterwards), or push a failing test to `main` and
+    revert it at once; the second needs the owner's OK. Then check that the
+    issue opened, and that it closed after the next green run.
 
 ## Decisions
 
