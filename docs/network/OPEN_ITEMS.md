@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (network review; GA4 item added).
+Last updated: 2026-10-07 (network review; GA4 item; UI backlog).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -66,3 +66,18 @@ Last updated: 2026-10-07 (network review; GA4 item added).
 - **[lamsza] Test claim and membership decisions** (planned in
   `docs/superpowers/plans/2026-09-27-listing-claim-membership.md`, never
   written): the `claim_pending` 409 and member accept/deny have no test.
+
+## UI backlog
+
+UI changes the owner has asked for but not scheduled yet. Not implemented; each
+follows `UI_BASELINE.md` when it is done.
+
+- **[szotar] The add-word button moves from the toolbar to the page title row.**
+  Today it is a "+" icon in the top toolbar ("Új szó", signed-in visitors only,
+  opens the word dialog). Move it to the far right of the page title row, the
+  way Lámsza's Index puts "Új Bejegyzés" there (`index-heading__add` in
+  `src/routes/(public)/index/+page.svelte`: a `btn btn-primary btn-lg` with a
+  short helper text under it, from `src/lib/indexCreateCopy.js`). Add a helper
+  text if one fits Szótár, and remove the add icon from the toolbar. To decide
+  when it is done: which pages carry it (the home page at least), and what a
+  signed-out visitor sees (the button opening the sign-in dialog, or no button).
