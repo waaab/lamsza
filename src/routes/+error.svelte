@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-    <title>Hiba {$page.status} - Székely Gugel</title>
+    <title>Hiba {$page.status} - Lámsza</title>
     <!--
       nginx answers an unknown path with app.html and HTTP 200, so a crawler
       reaching this page over the SPA fallback sees a 200. Keep it out of the

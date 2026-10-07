@@ -376,7 +376,7 @@
           : "Index"}
     breadcrumbParentLabel={indexView === "all" ? "" : "Index"}
     breadcrumbParentUrl={indexView === "all" ? "" : "/index"}
-    documentTitleSuffix=" - Székely Gugel"
+    documentTitleSuffix=" - Lámsza"
 >
     <div slot="title" class="index-heading">
         <div class="index-heading__main">

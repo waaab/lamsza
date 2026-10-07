@@ -25,7 +25,7 @@ How they relate:
 - Admin writes the data that lamsza reads. A cross-app change goes contract-first:
   DB/API first, then the apps that consume it (WoW R3). A schema change lands with
   `scripts/db-dump-schema.sh` output in the same commit.
-- 17 frontend files are shared by lamsza and admin. Edit them in `lamsza` only, then run
+- The frontend files listed in `lamsza/shared-frontend-modules.json` are shared by lamsza and admin. Edit them in `lamsza` only, then run
   `lamsza/scripts/sync-shared-frontend.sh` and commit in both repos.
 - `.cursor/rules/lamsza-network.mdc` and `no-emdash.mdc` are canonical in `lamsza`; run
   `lamsza/scripts/sync-cursor-rules.sh` and commit in all four repos (WoW R11).

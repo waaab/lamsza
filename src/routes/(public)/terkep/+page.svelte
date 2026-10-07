@@ -17,7 +17,7 @@
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}
     showBreadcrumbs={false}
-    documentTitleSuffix=" - Székely Gugel"
+    documentTitleSuffix=" - Lámsza"
 />
 
 <div class="map-container">

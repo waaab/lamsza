@@ -81,7 +81,7 @@
         <a
             href="/"
             class="btn nav-btn {$page.url.pathname === '/' ? 'active' : ''}"
-            title="Vissza a főódalra"
+            title="Vissza a főoldalra"
         >
             <svg
                 xmlns="http://www.w3.org/2000/svg"

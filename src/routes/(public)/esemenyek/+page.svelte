@@ -556,7 +556,7 @@
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}
     breadcrumbLabel="Események"
-    documentTitleSuffix=" - Székely Gugel"
+    documentTitleSuffix=" - Lámsza"
 />
 
 <div class="header-tabs">

@@ -1,7 +1,8 @@
 # Shared frontend modules — lamsza owns, lamsza-admin gets a generated copy
 
 **Decided on BOG-42, 2026-10-06.** This file is the source of truth for the
-17 frontend files that exist in both `lamsza` and `lamsza-admin`.
+frontend files that exist in both `lamsza` and `lamsza-admin` (the list in
+`shared-frontend-modules.json`).
 
 ---
 
@@ -64,13 +65,19 @@ The list lives in `shared-frontend-modules.json`. Today: `src/lib/accountPrefs.j
 `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`,
 `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`,
 `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`,
-`src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`
+`src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`,
+`src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog}.svelte`, `src/lib/icons/AppIcon.svelte`,
+`src/styles/{global,typography,component-typography}.css`
 and `tests/sharedFrontendModules.test.js`.
+
+`AppIcon`, the dialogs, `SignInDialog` and the three stylesheets joined on 2026-10-07,
+when the owner chose one icon system, one set of dialogs and one base stylesheet for the
+network (`docs/network/UI_BASELINE.md`). The stylesheets were already byte-identical
+copies; now drift is caught.
 
 Deliberately **not** shared, because the two apps legitimately differ:
 
 - `src/lib/api.js` — different base URLs and different endpoint sets.
-- `src/lib/icons/AppIcon.svelte` — the admin app's icon set is its own.
 
 Paths are relative to each app's frontend root: the repo root in `lamsza`,
 `frontend/` in `lamsza-admin` (`WAYS_OF_WORKING.md` §5).

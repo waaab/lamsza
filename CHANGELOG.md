@@ -12,6 +12,17 @@ the footer version read (WAYS_OF_WORKING R17).
 
 ## [Unreleased]
 
+### Changed
+- The confirm dialog follows the network baseline (Szótár's): a native dialog with a blurred backdrop, Mégse first and the confirm button on the right. [public]
+- A refused Google sign-in says "Belépés sikertelen." instead of the server's reply. [public]
+- "Székely Gugel" is now "Lámsza" in page titles, descriptions, the news placeholder and the extension manifest. [public]
+- Buttons no longer select their label on a double click.
+- `AppIcon.svelte` gains the Játszótér icon and round caps on the gear; it, the confirm, notice and sign-in dialogs and the three base stylesheets are now shared with lamsza-admin under the drift guard.
+- `docs/network/UI_BASELINE.md` records the owner's 59 UI decisions; the Cursor UI rule points to it.
+
+### Fixed
+- The Lámsza button tooltip typo ("főódalra"). [public]
+
 ---
 
 ## [1.3.0] - 2026-10-07

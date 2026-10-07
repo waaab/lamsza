@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "Szekely Gugel",
+    "name": "Lámsza",
     "version": "1.2.0",
     "description": "Erdelyi magyar startlap es kereso - Na lamsza, kicsibaratom!",
     "chrome_url_overrides": {

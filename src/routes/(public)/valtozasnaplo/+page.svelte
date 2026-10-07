@@ -16,7 +16,7 @@
 <svelte:head>
     <meta
         name="description"
-        content="Székely Gugel változásnapló - új funkciók és fejlesztések listája."
+        content="Lámsza változásnapló - új funkciók és fejlesztések listája."
     />
 </svelte:head>
 
@@ -25,7 +25,7 @@
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}
     showBreadcrumbs={false}
-    documentTitleSuffix=" - Székely Gugel"
+    documentTitleSuffix=" - Lámsza"
 />
 
 <section class="faq" id="gyik">

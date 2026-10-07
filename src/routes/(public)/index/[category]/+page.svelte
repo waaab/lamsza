@@ -221,7 +221,7 @@
     breadcrumbLabel="Index"
     breadcrumbParentLabel=""
     breadcrumbParentUrl=""
-    documentTitleSuffix=" - Székely Gugel"
+    documentTitleSuffix=" - Lámsza"
 />
 
 {#if loading}

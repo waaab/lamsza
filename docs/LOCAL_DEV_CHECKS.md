@@ -393,7 +393,7 @@ the 46 users in the dev `lamsza` database were `*@test.lamsza` fixtures.
 > Use the glob `'tests/*.test.js'`.
 
 The lamsza suite includes `tests/sharedFrontendModules.test.js`, the drift guard for
-the 17 frontend files that `lamsza` and `lamsza-admin` share. `lamsza` owns them and
+the frontend files that `lamsza` and `lamsza-admin` share (listed in `shared-frontend-modules.json`). `lamsza` owns them and
 `scripts/sync-shared-frontend.sh` copies them over; each repo checks its own copies
 against the committed hash manifest, so a drifted module goes red in whichever repo
 drifted. Do **not** keep the copies in step by hand — run the script. The rule is

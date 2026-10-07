@@ -188,7 +188,7 @@
     }
 
     const DEFAULT_IMAGE =
-        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='225' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%232f4f4f'/%3E%3Ctext x='200' y='113' text-anchor='middle' dominant-baseline='middle' fill='%23a0c0b0' font-size='15' font-family='system-ui'%3E%F0%9F%93%B0 Sz%C3%A9kely Gugel%3C%2Ftext%3E%3C%2Fsvg%3E";
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='225' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%232f4f4f'/%3E%3Ctext x='200' y='113' text-anchor='middle' dominant-baseline='middle' fill='%23a0c0b0' font-size='15' font-family='system-ui'%3E%F0%9F%93%B0 L%C3%A1msza%3C%2Ftext%3E%3C%2Fsvg%3E";
 
     function formatDate(ts) {
         return new Date(ts).toLocaleString("hu-HU", {

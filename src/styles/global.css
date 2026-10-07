@@ -1,7 +1,7 @@
 @import "./typography.css";
 @import "./component-typography.css";
 
-/* Székely Gugel Global Styles */
+/* Lámsza Global Styles */
 :root {
   /* Brand Colors */
   --szekely-brown: #7a3c10;
@@ -2718,6 +2718,9 @@ footer {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-drag: none;
+  /* A double click on a button must not select its label (UI_BASELINE "css-btn"). */
+  -webkit-user-select: none;
+  user-select: none;
   box-sizing: border-box;
 }
 
