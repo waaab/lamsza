@@ -9,7 +9,7 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
 
 ## Production and accounts (owner only; agents never touch production)
 
-- **[network] owner: upgrade production Node 20.20.2 (end of life) to Node 24 LTS.**
+- **[network] owner: production upgrade: Node 20.20.2 (end of life) to Node 24 LTS, ports, and the admin app's internal API (R18).**
   A planned task with a backup and a rollback path. Every app already builds
   and tests on Node 24 (`VERSIONS.md`). After it, nothing else needs to change:
   CI and `.nvmrc` already say 24. While on the server, verify the production
@@ -18,9 +18,10 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   docs to what the server actually runs, and set lamsza's `SZOTAR_ORIGIN` to
   `http://127.0.0.1:<szotar port>` there (R13: server-to-server calls stay on
   the machine).
-- **[network] owner: production setup for the one admin app (R18)**, before or
-  with the deploy of the admin move. The internal admin API of Szótár and
-  Játszótér (`/internal/admin/`) is closed unless all of this holds, so do it in
+
+  **Also on this visit: production setup for the one admin app (R18)**, before
+  or with the deploy of the admin move. Szótár's and Játszótér's internal admin
+  API (`/internal/admin/`) stays closed unless all of this holds, so do it in
   this order and check each step on the server:
   1. **Tokens, never in git.** Generate two long random tokens (for example
      `openssl rand -hex 32`). Set `ADMIN_SERVICE_TOKEN` in Szótár's `.env` and
@@ -31,7 +32,7 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      "nincs beállítva".
   2. **Server-to-server on the machine.** Set `SZOTAR_ADMIN_URL` and
      `JATSZOTER_ADMIN_URL` in admin's `.env` to `http://127.0.0.1:<port>` of
-     each app's backend (the real ports, see the Node upgrade item). The apps
+     each app's backend (the real ports, checked above). The apps
      accept the internal API only from loopback.
   3. **nginx must not expose `/internal/`.** Every vhost (szotar, jatszoter,
      admin, lamsza) proxies only `location /api/` to a backend; nothing proxies
