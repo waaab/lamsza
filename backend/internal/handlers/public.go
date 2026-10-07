@@ -34,7 +34,6 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 	sqlQuery := ""
 
 	normalizedQ := utils.Slugify(q)
-	log.Printf("EntriesHandler: q=%q, normalizedQ=%q", q, normalizedQ)
 	if q != "" && normalizedQ != "" {
 		sqlQuery = `
 			SELECT 
@@ -126,9 +125,6 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		sqlQuery += " GROUP BY e.id, typ.name, ec.name, e.name, e.slug, s.id, s.name, s.slug, c.name, c.slug, s.type, s.name_ro, s.name_de, e.phone, e.address, e.notes, e.languages, e.url, e.verified, e.hours, e.delivery_hours, e.hours_enabled, e.delivery_enabled, e.social_links, gl.latitude, gl.longitude, e.photos, e.ratings_enabled ORDER BY is_direct_match DESC, btrim(e.name) ASC, e.id ASC"
 	}
 
-	log.Printf("EntriesHandler query: %s", sqlQuery)
-	log.Printf("EntriesHandler params: %v", params)
-
 	rows, err = db.DB.Query(sqlQuery, params...)
 	if err != nil {
 		log.Printf("EntriesHandler query error: %v", err)
@@ -192,7 +188,6 @@ func EntriesHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	json.NewEncoder(w).Encode(entries)
-	log.Printf("EntriesHandler found %d entries", len(entries))
 }
 
 func EntryDetailHandler(w http.ResponseWriter, r *http.Request) {

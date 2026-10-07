@@ -2,7 +2,7 @@
     import { onMount } from "svelte";
     import { get } from "svelte/store";
     import { page } from "$app/stores";
-    import { apiFetch } from "$lib/api";
+    import { apiFetch, canReachApi } from "$lib/api";
     import { auth } from "$lib/stores/auth";
     import { openLogin } from "$lib/openLogin.js";
     import FavoriteButton from "$lib/components/FavoriteButton.svelte";
@@ -78,7 +78,9 @@
 
     $: eventId = $page.params.id;
 
-    $: if (eventId) {
+    // Browser only: during SSR the fetch has no backend to reach (see
+    // canReachApi in $lib/api.js) and Vite warns about eager fetching.
+    $: if (eventId && canReachApi()) {
         loadEvent(eventId);
     }
 

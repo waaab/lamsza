@@ -80,8 +80,8 @@ func main() {
 	mux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandlePublicLocations))
 	mux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
 	// Media: public read from shared dirs; admin uploads live in lamsza-admin
-	mux.Handle("/api/media/entry-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/entry-images/", http.FileServer(http.Dir(handlers.EntryImagesDir()))).ServeHTTP))
-	mux.Handle("/api/media/event-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/event-images/", http.FileServer(http.Dir(handlers.EventImagesDir()))).ServeHTTP))
+	mux.Handle("/api/media/entry-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/entry-images/", middleware.NoDirListing(http.FileServer(http.Dir(handlers.EntryImagesDir())))).ServeHTTP))
+	mux.Handle("/api/media/event-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/event-images/", middleware.NoDirListing(http.FileServer(http.Dir(handlers.EventImagesDir())))).ServeHTTP))
 	mux.HandleFunc("/api/attractions", middleware.ApplyCORS(handlers.HandleAttractions))
 	mux.HandleFunc("/api/attraction-suggestions", middleware.ApplyCORS(handlers.HandleAttractionSuggestions))
 	mux.HandleFunc("/api/historical_seats", middleware.ApplyCORS(handlers.HandleHistoricalSeats))
@@ -113,6 +113,7 @@ func main() {
 	if config.AppConfig.Features.News {
 		mux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 		mux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
+		news.WarmNews()
 		log.Println("Module [News] enabled")
 	}
 

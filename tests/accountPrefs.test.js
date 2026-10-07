@@ -92,3 +92,16 @@ test("meToAuthState maps google fields", () => {
     assert.equal(state.displayName, "Panna");
     assert.equal(state.theme, null);
 });
+
+test("meToAuthState: browser prefs import only where the API reports prefs_imported_at", () => {
+    const lamszaNew = meToAuthState({ email: "a@b.c", prefs_imported_at: null });
+    assert.equal(lamszaNew.prefsImportSupported, true);
+    assert.equal(lamszaNew.prefsImportedAt, null);
+
+    const lamszaDone = meToAuthState({ email: "a@b.c", prefs_imported_at: "2026-10-01T00:00:00Z" });
+    assert.equal(lamszaDone.prefsImportSupported, true);
+
+    // lamsza-admin has no /api/account/import and does not send the field.
+    const admin = meToAuthState({ email: "a@b.c" });
+    assert.equal(admin.prefsImportSupported, false);
+});

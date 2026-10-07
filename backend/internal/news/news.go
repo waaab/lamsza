@@ -135,10 +135,23 @@ func refreshNews() {
 
 // ensureNews returns headlines for the news page, refreshing from the feeds when
 // the cache is cold or older than newsCacheTTL. Search does not call this.
+//
+// Only a cold cache makes the caller wait. A stale one is served as it is and
+// refreshed in the background: fetching every feed took up to 8s, and every
+// two minutes one visitor of /hirek used to pay for it.
 func ensureNews() []newsItem {
 	newsMu.Lock()
 	fresh := !newsCachedAt.IsZero() && time.Since(newsCachedAt) < newsCacheTTL
 	if fresh {
+		items := append([]newsItem(nil), newsItemsCached...)
+		newsMu.Unlock()
+		return items
+	}
+	if !newsCachedAt.IsZero() {
+		if !newsInflight {
+			newsInflight = true
+			go refreshNews()
+		}
 		items := append([]newsItem(nil), newsItemsCached...)
 		newsMu.Unlock()
 		return items
@@ -160,6 +173,12 @@ func ensureNews() []newsItem {
 	items := append([]newsItem(nil), newsItemsCached...)
 	newsMu.Unlock()
 	return items
+}
+
+// WarmNews fills the cache in the background at startup, so the first visitor
+// of /hirek does not wait for the feeds either.
+func WarmNews() {
+	go ensureNews()
 }
 
 func cachedNewsItems() []newsItem {
