@@ -28,9 +28,11 @@ Last updated: 2026-10-07 (network review; GA4 item added).
 
 ## Decisions
 
-- **[lamsza] owner: review branch `review/bog-32-seo-consent`** (local only, not
-  pushed): the parked BOG-32 SEO, structured data, sitemap and cookie-consent
-  work, rebuilt as one commit on its original base. Decide whether to rebase and
+- **[lamsza] owner: review branch `review/bog-32-seo-consent`** (pushed to origin
+  as a backup on 2026-10-07, not merged): the parked BOG-32 SEO, structured
+  data, sitemap and cookie-consent work, rebuilt as one commit on its original
+  base. It carries that base's old build-only workflow, so its CI run builds
+  but runs no tests. Decide whether to rebase and
   finish it or drop it. A rebase onto main conflicts only in `package.json`.
 - **[jatszoter] owner: Kaptár needs a bigger word list.** The 475-word Székely
   dictionary supports no board with 10 playable words (best: 5), so no boards
