@@ -9,6 +9,7 @@
         onClose = () => {},
         onSignedIn = () => {},
         policyHref = "/iranyelvek",
+        signIn = null,
     } = $props();
 
     function articleName(name) {
@@ -51,7 +52,7 @@
             <div class="signin-body">
                 {#if clientId}
                     {#key clientId}
-                        <GoogleSignIn {clientId} {onSignedIn} />
+                        <GoogleSignIn {clientId} {onSignedIn} {signIn} />
                     {/key}
                 {:else if configReady}
                     <p class="signin-note">A Google belépés nincs beállítva.</p>

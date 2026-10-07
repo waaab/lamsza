@@ -2,7 +2,12 @@
     import { onMount } from "svelte";
     import { getApiBase } from "$lib/api.js";
 
-    let { clientId = "", onSignedIn = () => {} } = $props();
+    /**
+     * signIn: optional. Given a Google credential, sign in with this app's own
+     * API (an app may need extra headers, e.g. Játszótér's anonymous id). Left
+     * out, the component POSTs to /api/auth/google itself.
+     */
+    let { clientId = "", onSignedIn = () => {}, signIn = null } = $props();
 
     let host = $state(null);
     let error = $state("");
@@ -72,6 +77,11 @@
         loading = true;
         error = "";
         try {
+            if (signIn) {
+                await signIn(response.credential);
+                await onSignedIn();
+                return;
+            }
             const res = await fetch(`${getApiBase()}/api/auth/google`, {
                 method: "POST",
                 credentials: "include",
