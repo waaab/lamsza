@@ -187,8 +187,8 @@ Where the gate is checked in a browser differs per app, because the **main app h
 | App | Admin UI |
 |---|---|
 | admin (`lamsza-admin`) | `http://localhost:5173/`, `/dictionary` (Szótár), `/games` (Játszótér): the network's one admin UI (WoW R18) |
-| szotar | none. `http://localhost:5175/admin` redirects to the admin app's `/dictionary` |
-| jatszoter | none. `http://localhost:5176/admin` redirects to the admin app's `/games` |
+| szotar | none. `http://localhost:5175/admin` shows the 404 error page |
+| jatszoter | none. `http://localhost:5176/admin` shows the 404 error page |
 | lamsza | **none.** `http://localhost:5174/admin` must 404 |
 
 An allowlisted account must reach the admin UI; a non-allowlisted one is sent on to

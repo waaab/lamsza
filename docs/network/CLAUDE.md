@@ -18,8 +18,8 @@ Never push to main without my explicit confirmation.
 |---|---|---|
 | `lamsza` | Main app (lamsza.com): startlap, directory, search. **Primary repo.** | Owns the `lamsza` DB schema (`backend/schema/`), the shared frontend modules, the network docs, rules and scripts. Frontend sits at the repo root, with no `frontend/` folder (deliberate, WoW §5). |
 | `lamsza-admin` | The network's one admin app (WoW R18): `/` main data, `/dictionary`, `/games` | Shares the `lamsza` DB and **runs no DDL**: schema changes go in `lamsza`. Needs public data? Call `lamsza` on :3001. Szótár and Játszótér data only through their internal admin APIs. |
-| `lamsza-szotar` | Székely dictionary (szotar.lamsza.com) | Own DB. Administered only from the admin app's `/dictionary` (WoW R18); its old `/admin` URLs redirect there. |
-| `lamsza-jatszoter` | Word games (jatszoter.lamsza.com) | Own DB. Administered only from the admin app's `/games` (WoW R18); its old `/admin` URLs redirect there. |
+| `lamsza-szotar` | Székely dictionary (szotar.lamsza.com) | Own DB. Administered only from the admin app's `/dictionary` (WoW R18); no admin pages or admin links of its own. |
+| `lamsza-jatszoter` | Word games (jatszoter.lamsza.com) | Own DB. Administered only from the admin app's `/games` (WoW R18); no admin pages or admin links of its own. |
 
 How they relate:
 - Admin writes the data that lamsza reads. A cross-app change goes contract-first:

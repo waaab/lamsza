@@ -54,13 +54,9 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      answers 401.
   6. **The old admin settings go:** remove `ADMIN_GOOGLE_EMAILS` from Szótár's
      `.env` and `ADMIN_EMAILS` from Játszótér's (neither app reads them any
-     more). Keep admin's `CORS_ALLOWED_ORIGINS=https://admin.lamsza.com`: the
-     sibling toolbars use `/api/auth/admin-status`, which admits the network's
-     sites on its own. `VITE_ADMIN_ORIGIN` is needed in Szótár's and
-     Játszótér's builds only if the admin app is not at
-     `https://admin.lamsza.com`. Check: `https://szotar.lamsza.com/admin` and
-     `https://jatszoter.lamsza.com/admin` land on the admin app's `/dictionary`
-     and `/games`.
+     more). Keep admin's `CORS_ALLOWED_ORIGINS=https://admin.lamsza.com`: no
+     public app calls the admin app. Check: `https://szotar.lamsza.com/admin`
+     and `https://jatszoter.lamsza.com/admin` show the 404 error page.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
