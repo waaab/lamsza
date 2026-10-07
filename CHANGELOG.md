@@ -13,6 +13,8 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- WAYS_OF_WORKING R19: "today" for all daily content is a Bucharest day, decided by the server. `backend/internal/clock` (Europe/Bucharest with the zone data compiled in, `Today()`, a replaceable `Now`) and `src/lib/bucharestTime.js` (Bucharest wall-clock times, the Bucharest day, the server's "now" from the API's `Date` header), with tests at midnight in summer and winter and on both clock-change days.
+- Two shared icons, `words` and `word-suggestions`: the rovás letter G (𐲍), its strokes traced from the `--font-rovas` glyph; the second adds a checkmark. Synced to every app.
 - WAYS_OF_WORKING R18: one admin app for the network (`/`, `/dictionary`, `/games`), reaching Szótár and Játszótér only through their internal admin APIs (loopback, a path outside `/api/`, a shared token). UI_BASELINE, the network CLAUDE.md and OPEN_ITEMS follow it.
 - `AppIcon` gains `external`, `inbox`, `rovasfejto` and `szokereso` for the admin sections' sidebars.
 - `tests/noEmdash.test.js`, shared with every app: `npm test` (and CI) fails on an em dash in code or UI text; Markdown is exempt (rule D5).
@@ -23,6 +25,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- Events follow Bucharest's day (R19): the list, its filters and the search hide an event at Bucharest midnight after its last day, not at UTC midnight (until 02:00-03:00 Bucharest time before), and the badges read event dates and times as Bucharest times with the server's clock, so a visitor in another time zone, or with a wrong clock, sees the same status. [public]
 - `.github/ci-status-issue.*` (identical in all four repos): the comments no longer claim the GitHub API is unreadable or that branch protection was adopted; no em dashes. The Cursor rule's Irányelvek link says `lamszaUrl()`, never lamsza.com in dev. OPEN_ITEMS gains Szótár's word↔mondás links and the letter-kicker decision.
 - An unknown entry, event or historical seat (`/bejegyzes/…`, `/esemenyek/…`, `/szekek/…`) shows the network's error page (404, not indexed) instead of an in-page message on a normal page. [public]
 - Dark mode: the search box's divider and the "Mégse" hover in dialogs have dark values; the system-dark setting gets the same search seam colour as the explicit dark theme. [public]

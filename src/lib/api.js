@@ -1,3 +1,4 @@
+import { noteServerDate } from "./bucharestTime.js";
 /**
  * API origin for fetches.
  * - In the browser, use same-origin paths (`/api/...`) so Vite’s dev proxy (see vite.config.js)
@@ -75,6 +76,7 @@ export async function apiFetch(endpoint, options = {}) {
 
     try {
         const response = await fetch(url, { credentials: "include", ...options });
+        if (!endpoint.startsWith("http")) noteServerDate(response.headers.get("date"));
         const text = await response.text();
         return parseApiPayload(response.ok, response.status, text);
     } catch (error) {

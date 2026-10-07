@@ -91,9 +91,9 @@ added to the OAuth client.
 
 ## Where shared conventions live
 
-- `lamsza/docs/network/WAYS_OF_WORKING.md`: the rules R1-R18 (tasks and tags, one agent
+- `lamsza/docs/network/WAYS_OF_WORKING.md`: the rules R1-R19 (tasks and tags, one agent
   per repo, "done" = committed, merged, pushed and closed out, CI, test data, docs,
-  changelogs, one admin app), repo layouts.
+  changelogs, one admin app, Bucharest "today"), repo layouts.
 - `lamsza/docs/network/OPEN_ITEMS.md`: the task list, including what only the owner does.
 - `lamsza/docs/network/SHARED_FRONTEND_MODULES.md`: the files lamsza shares with the other apps.
 - `lamsza/docs/AGENT_ENVIRONMENT_POLICY.md`: **localhost only, never touch production.**

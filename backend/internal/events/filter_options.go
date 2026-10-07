@@ -1,6 +1,7 @@
 package events
 
 import (
+	"backend/internal/clock"
 	"backend/internal/db"
 	"encoding/json"
 	"net/http"
@@ -41,6 +42,9 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var out filterOptionsResponse
+	// Upcoming = not ended before Bucharest's today (R19), whatever the
+	// database session's time zone.
+	today := clock.Today()
 
 	rows, err := db.DB.Query(`
 		SELECT DISTINCT et.slug
@@ -48,8 +52,8 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
 		JOIN catalog_event_types et ON e.event_type_id = et.id
-		WHERE e.end_date >= CURRENT_DATE
-		ORDER BY et.slug`)
+		WHERE e.end_date >= $1::date
+		ORDER BY et.slug`, today)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -73,8 +77,8 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 		FROM events e
 		JOIN catalog_event_types et ON e.event_type_id = et.id
 		JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
-		WHERE e.end_date >= CURRENT_DATE
-		ORDER BY et.slug, es.label_hu`)
+		WHERE e.end_date >= $1::date
+		ORDER BY et.slug, es.label_hu`, today)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -95,8 +99,8 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 		FROM events e
 		JOIN settlements s ON e.location_id = s.id
 		JOIN counties c ON s.county_id = c.id
-		WHERE e.end_date >= CURRENT_DATE
-		ORDER BY c.name, s.name`)
+		WHERE e.end_date >= $1::date
+		ORDER BY c.name, s.name`, today)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -121,15 +125,15 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 				GREATEST(0, (e.end_date::date - e.start_date::date)),
 				1
 			) AS gs(day_offset)
-			WHERE e.end_date >= CURRENT_DATE
+			WHERE e.end_date >= $1::date
 			UNION
 			SELECT to_char(esd.schedule_date, 'YYYY-MM') AS ym
 			FROM event_schedule_days esd
 			INNER JOIN events e ON e.id = esd.event_id
-			WHERE e.end_date >= CURRENT_DATE
+			WHERE e.end_date >= $1::date
 		) t
 		WHERE ym IS NOT NULL AND ym != ''
-		ORDER BY 1`)
+		ORDER BY 1`, today)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -155,15 +159,15 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 				GREATEST(0, (e.end_date::date - e.start_date::date)),
 				1
 			) AS gs(day_offset)
-			WHERE e.end_date >= CURRENT_DATE
+			WHERE e.end_date >= $1::date
 			UNION
 			SELECT to_char(esd.schedule_date, 'YYYY-MM-DD') AS d
 			FROM event_schedule_days esd
 			INNER JOIN events e ON e.id = esd.event_id
-			WHERE e.end_date >= CURRENT_DATE
+			WHERE e.end_date >= $1::date
 		) x
 		WHERE d IS NOT NULL AND d != ''
-		ORDER BY 1`)
+		ORDER BY 1`, today)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -184,8 +188,8 @@ func HandleEventFilterOptions(w http.ResponseWriter, r *http.Request) {
 		SELECT DISTINCT esd.event_id
 		FROM event_schedule_days esd
 		INNER JOIN events e ON e.id = esd.event_id
-		WHERE e.end_date >= CURRENT_DATE
-		ORDER BY 1`)
+		WHERE e.end_date >= $1::date
+		ORDER BY 1`, today)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

@@ -2,6 +2,7 @@ package search
 
 import (
 	"backend/internal/account"
+	"backend/internal/clock"
 	"backend/internal/config"
 	"backend/internal/db"
 	"backend/internal/models"
@@ -341,7 +342,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 				JOIN counties c ON s.county_id = c.id
 				JOIN catalog_event_types et ON e.event_type_id = et.id
 				LEFT JOIN catalog_event_subtypes es ON e.event_subtype_id = es.id
-				WHERE e.end_date >= CURRENT_DATE
+				WHERE e.end_date >= $2::date
 				  AND (
 					unaccent(LOWER(e.title)) ILIKE unaccent($1)
 					OR unaccent(LOWER(COALESCE(e.description,''))) ILIKE unaccent($1)
@@ -350,7 +351,7 @@ func HandleUnifiedSearch(w http.ResponseWriter, r *http.Request) {
 				  )
 				ORDER BY e.start_date ASC
 				LIMIT 15
-			`, pattern)
+			`, pattern, clock.Today())
 			if err != nil {
 				log.Printf("UnifiedSearch events error: %v", err)
 				return

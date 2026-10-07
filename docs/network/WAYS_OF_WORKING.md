@@ -503,6 +503,39 @@ How the admin app reaches another app's data, without touching its database:
 *Why:* three sign-ins, three admin lists and three admin UIs, and only one of
 them kept an audit trail.
 
+### R19 - "Today" is a Bucharest day, decided by the server
+
+"Today" for all daily content is computed server-side in Europe/Bucharest,
+explicitly, never from UTC or the visitor's clock. This covers the Napi Székely
+Mondás, the Napi Székely Szó, every Játszótér daily (and its leaderboards), the
+admin's "today" warnings and date defaults, and Lámsza's events (the list and
+the badges). Display dates are Bucharest calendar days. Decided by the owner on
+2026-10-07. Lámsza's "Dátum és idő" clock widget may keep the visitor's local
+time: it is a clock, not daily content.
+
+How each app holds it:
+
+- Every backend has one `internal/clock` package: the zone written once, the
+  zone data compiled in (`time/tzdata`, so nothing falls back to UTC), a
+  `Today()` and a replaceable `Now` for tests. No other code loads a zone.
+- SQL never uses `CURRENT_DATE`, `now()::date` or a date compared with a
+  timestamp: the database session runs in UTC. Pass the Bucharest date from
+  Go, or write `AT TIME ZONE 'Europe/Bucharest'` explicitly.
+- A frontend never computes "today" from the visitor's clock. It asks the
+  server, which answers with the day (the daily endpoints return `today`;
+  widgets send no date). Where an instant is needed (an event's "now"), it is
+  the server's, taken from the API's HTTP `Date` header
+  (`src/lib/bucharestTime.js` in Lámsza), and event dates and times are read as
+  Bucharest wall-clock times.
+- Every daily feature has tests at the edges: 22:30 UTC in summer (already the
+  next day in Bucharest), Bucharest midnight in winter, and both clock-change
+  days (2026-03-29 and 2026-10-25).
+
+*Why:* the apps disagreed: Szótár and Játszótér used Bucharest, Lámsza and the
+admin used Budapest or the visitor's clock, and several queries used the
+database's UTC date, so a day could change at 01:00, 02:00 or 03:00 Bucharest
+time depending on the page.
+
 ---
 
 ## 5. Repo layout — two shapes, both correct

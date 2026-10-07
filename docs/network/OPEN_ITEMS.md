@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; Mondások plan, simplified; admin move done).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; Mondások plan, simplified; admin move done; R19 time zone).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -112,15 +112,16 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      dump and delete there (to go into the production upgrade item).
   2. **[admin] `/dictionary` Mondások at full parity with the main admin's
      page:** add, edit, delete, search (text or ID), 10 rows a page, the
-     display date with "Mai nap", the "ma" badge and highlighted row, the
+     display date with "Mai nap", the "ma" badge and highlighted row (all
+     with Szótár's Bucharest `today`, R19, never the browser's date), the
      explanatory text, and the "no mondás today" warning in the tab and as a
      message on Vezérlőpult Szótár (with Megnyitás). Szótár's optional
      `meaning` stays.
   3. **[lamsza] The home page reads Szótár directly.** `MondasWidget.svelte`
-     changes only its script: it fetches
-     `szotarUrl('/api/proverbs?date=<visitor's local date>')` through
-     `networkOrigins.js` (localhost:5175, szotar.lamsza.test,
-     szotar.lamsza.com), without cookies, and reads `data.proverbs`. The
+     changes only its script: it fetches `szotarUrl('/api/proverbs/today')`
+     through `networkOrigins.js` (localhost:5175, szotar.lamsza.test,
+     szotar.lamsza.com), without cookies and without a date: Szótár decides
+     today in Europe/Bucharest (R19) and answers with that day's mondás. The
      template and CSS stay byte-identical, pinned by a test. Lámsza's CSP
      `connect-src` gets `https://szotar.lamsza.com` (plus the .test and
      localhost:5175 origins in non-production builds), checked in
@@ -131,7 +132,8 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      compared pixel by pixel, with a temporary mondás on a scratch database
      only.
   4. **Verification** on a throwaway stack: both home pages, Szótár's public
-     Mondások page and word pages on Szótár's data, every Mondások flow in
+     Mondások page (only mondások dated up to Bucharest today, owner's
+     decision) and word pages on Szótár's data, every Mondások flow in
      `/dictionary`, and the dev databases unchanged except for step 1.
   5. **Cleanup, last, once verified:** remove Lámsza's `/api/mondasok` and all
      its mondás code (`internal/mondasok` with the boot `Migrate()`,
@@ -142,6 +144,26 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      `/api/admin/mondasok`, `internal/mondasok`, `FEATURE_MONDASOK`, the audit
      resource, the dashboard count, the model, the tests); update WAYS_OF_WORKING
      R18, UI_BASELINE, ARCHITECTURE, the changelogs and this file.
+- **[network] R19: "today" is a Bucharest day, decided by the server.** The
+  owner's rule (WAYS_OF_WORKING R19) and the audit of 2026-10-07; one repo per
+  step, tests at the edge times in each:
+  - [lamsza] `internal/clock`; the events list, filters and search use
+    Bucharest's date; the event badges read Bucharest wall-clock times and the
+    server's "now" (`src/lib/bucharestTime.js`). The mondás goes to Szótár in
+    the Mondások plan above.
+  - [szotar] `internal/clock` for the daily word; `GET /api/proverbs/today`
+    (the widget sends no date); the public `/api/proverbs` and `/mondasok` list
+    only mondások dated up to today; the home page shows the server's date;
+    the internal admin API reports `today`.
+  - [jatszoter] `internal/clock` for every game; the Rovásfejtő daily counts
+    calendar days (it served yesterday's puzzle from 00:00 to 01:00 every summer
+    night); the leaderboards' "today" and "week" start at Bucharest midnight
+    (they started at 03:00 in summer); the Kaptár migrations stop creating or
+    enabling boards by the database's UTC date; the internal admin API reports
+    `today`.
+  - [admin] the date defaults and "today" in `/dictionary` and `/games` come
+    from Szótár's and Játszótér's `today` (the main admin's Mondások goes in
+    the Mondások cleanup).
 - **[lamsza] The browser extension (`extension/`, git-ignored, built by
   `npm run build:extension`) is not used.** Its March build calls
   `/api/admin/mondasok` on `localhost:3000` and no longer works. A future

@@ -1,5 +1,9 @@
+import { bucharestWallToMs, bucharestYMD, serverNowMs } from "./bucharestTime.js";
+
 /**
- * Event timing vs “now”, using the same clock as `#datetime` when present.
+ * Event timing vs “now” (lamsza WAYS_OF_WORKING R19): event dates and times are
+ * Bucharest wall-clock times, and “now” and “today” come from the server's
+ * clock in Bucharest, not from the visitor's zone or clock.
  *
  * @typedef {'scheduled' | 'upcoming' | 'ongoing' | 'ending_soon' | 'ended'} EventStatus
  * @typedef {{ start_date?: string, end_date?: string, start_time?: string, end_time?: string }} EventLike
@@ -26,35 +30,28 @@ function isMidnightTime(t) {
     return n === "00:00:00" || n.startsWith("00:00:");
 }
 
-/** Local instant ms from YYYY-MM-DD + time string. */
+/** Instant (ms) of a Bucharest date (YYYY-MM-DD) and wall-clock time. */
 function parseLocalInstantMs(dateStr, timeStr) {
     if (!dateStr || typeof dateStr !== "string") return null;
     const d = dateStr.trim().slice(0, 10);
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
     if (!m) return null;
-    const y = Number(m[1]);
-    const mo = Number(m[2]);
-    const day = Number(m[3]);
     const t = normalizeTimeStr(timeStr);
     const [hh, mm, ss] = t.split(":").map((x) => parseInt(x, 10));
-    const dt = new Date(y, mo - 1, day, hh || 0, mm || 0, ss || 0, 0);
-    return dt.getTime();
+    return bucharestWallToMs(Number(m[1]), Number(m[2]), Number(m[3]), hh || 0, mm || 0, ss || 0);
 }
 
-/** End of calendar day (local), inclusive. */
+/** End of a Bucharest calendar day, inclusive. */
 function endOfLocalDayMs(yyyyMmDd) {
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(yyyyMmDd.trim().slice(0, 10));
     if (!m) return null;
-    const y = Number(m[1]);
-    const mo = Number(m[2]);
-    const d = Number(m[3]);
-    return new Date(y, mo - 1, d, 23, 59, 59, 999).getTime();
+    return bucharestWallToMs(Number(m[1]), Number(m[2]), Number(m[3]), 23, 59, 59, 999);
 }
 
 /**
  * Resolves start/end instants. If the event spans multiple days and the stored
  * end time is exactly midnight, treat that as “through that whole last day”
- * (end = 23:59:59.999 local on end_date) - otherwise March 28 00:00 reads as
+ * (end = 23:59:59.999 Bucharest time on end_date) - otherwise March 28 00:00 reads as
  * the very start of March 28 and the event wrongly shows as ended by evening.
  *
  * @param {EventLike} ev
@@ -88,35 +85,22 @@ export function computeEventWindowMs(ev) {
 }
 
 /**
- * Prefer the homepage clock (`#datetime[data-now-ms]`) when available so badges
- * match the visible time.
+ * The server's current instant (R19): the visitor's clock, corrected by the
+ * Date header of the last API reply.
  * @returns {Date}
  */
 export function getReferenceNow() {
-    if (typeof document === "undefined") return new Date();
-    const el = document.getElementById("datetime");
-    if (el && el.dataset.nowMs) {
-        const n = parseInt(el.dataset.nowMs, 10);
-        if (!Number.isNaN(n)) return new Date(n);
-    }
-    return new Date();
+    return new Date(serverNowMs());
 }
 
-/**
- * Calendar “today” (YYYY-MM-DD) in the local timezone of {@link getReferenceNow},
- * so schedule chips like “Ma …” match the homepage clock.
- */
+/** Bucharest's calendar “today” (YYYY-MM-DD), for chips like “Ma …”. */
 export function referenceTodayYMD() {
-    const d = getReferenceNow();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return bucharestYMD(serverNowMs());
 }
 
 /**
  * Whether a single schedule activity is in progress at `now` on its day.
- * Uses end of local day when `ends_at` is missing.
+ * Uses the end of the Bucharest day when `ends_at` is missing.
  *
  * @param {{ starts_at?: string, ends_at?: string }} act
  * @param {string} scheduleDateKey YYYY-MM-DD

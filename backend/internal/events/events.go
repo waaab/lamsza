@@ -1,6 +1,7 @@
 package events
 
 import (
+	"backend/internal/clock"
 	"backend/internal/db"
 	"backend/internal/models"
 	"database/sql"
@@ -77,7 +78,11 @@ func HandleEvents(w http.ResponseWriter, r *http.Request) {
 	var args []interface{}
 	argIdx := 1
 
-	conditions = append(conditions, "e.end_date >= CURRENT_DATE")
+	// Hide events that ended before Bucharest's today (R19), not the
+	// database session's (UTC) date.
+	conditions = append(conditions, fmt.Sprintf("e.end_date >= $%d::date", argIdx))
+	args = append(args, clock.Today())
+	argIdx++
 
 	if organizer != "" {
 		conditions = append(conditions, fmt.Sprintf("e.organizer = $%d", argIdx))

@@ -307,6 +307,20 @@
             <path d="M9 3v18M15 3v18M3 9h18M3 15h18" opacity="0.45"></path>
             <path d="M6 6l12 12"></path>
         </svg>
+    {:else if name === "words"}
+        <!-- Words: the rovás letter G (𐲍, U+10C8D). Its strokes are the centrelines
+             of the --font-rovas glyph (Noto Sans Old Hungarian), traced, not drawn. -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.75 20.25 L12 3 L19.25 20.5"></path>
+            <path d="M15 10.75 L9.75 21"></path>
+        </svg>
+    {:else if name === "word-suggestions"}
+        <!-- Word suggestions from users: the words sign, smaller, with a checkmark -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 15 L7.5 2 L13 15"></path>
+            <path d="M9.75 8 L5.75 15.5"></path>
+            <path d="M13 18 L16 21 L22 15"></path>
+        </svg>
     {:else if name === "page_faq"}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"></circle>
