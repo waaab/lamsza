@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (network review).
+Last updated: 2026-10-07 (network review; GA4 item added).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -41,9 +41,15 @@ Last updated: 2026-10-07 (network review).
   `/admin/szokereso`.
 - **[jatszoter] `DifficultyPicker.svelte` is unused.** Wire it into the game
   shell or delete it.
-- **[network] visual consistency:** the Phase F inventory lists every difference
-  between the four apps; the owner picks a baseline per item, then it is
-  implemented.
+- **[network] owner: GA4 analytics, not started; nothing is implemented.**
+  Order: first review `review/bog-32-seo-consent` (above), because GA4 may load
+  only after cookie consent and that branch holds the consent work. Then decide:
+  one GA4 property with cross-subdomain measurement for lamsza.com and its
+  subdomains, or one property per app. When GA4 is integrated, the shared
+  `ErrorPage.svelte` (lamsza, synced to every app) must send a custom event,
+  e.g. `error_page` with `code`, `path`, `referrer` and `app`, on client-side
+  navigations too: an error page keeps the original URL, so without the event it
+  counts as a normal page view.
 
 ## Work
 
