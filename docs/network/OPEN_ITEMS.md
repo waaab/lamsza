@@ -93,8 +93,8 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   were seeded and most daily boards repeat. `cmd/seed-kaptar-boards` is ready
   for when the word list grows.
 - **[jatszoter] owner: Szókereső has had one published puzzle (2026-09-28).**
-  Its daily has been empty since; puzzles are published by hand in
-  `/admin/szokereso`.
+  Its daily has been empty since; puzzles are published by hand in the
+  admin app's `/games#szokereso`.
 - **[jatszoter] `DifficultyPicker.svelte` is unused.** Wire it into the game
   shell or delete it.
 - **[network] owner: GA4 analytics, not started; nothing is implemented.**

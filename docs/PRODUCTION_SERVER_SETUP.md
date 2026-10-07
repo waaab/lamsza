@@ -87,7 +87,7 @@ Point these to the droplet IP:
     Phase 2 (§1), but its whole UI is behind Google sign-in, so a missing origin
     means nobody can log in on day one. Registering an origin for a host that is
     not live yet costs nothing and breaks nothing.
-- [ ] Admin email allowlists decided for each app
+- [ ] Admin email list decided: admin's `ADMIN_GOOGLE_EMAILS` (the only one with admin rights) and lamsza's (§6.1)
 
 ### 3.4 External API keys
 
@@ -168,7 +168,7 @@ Each app needs its own `.env` on the server (never commit these).
 | `DATABASE_URL` | Yes | Postgres connection string |
 | `PORT` | Yes | `3010` |
 | `GOOGLE_CLIENT_ID` | Yes | Google OAuth |
-| `ADMIN_GOOGLE_EMAILS` | Yes | Comma-separated admin emails |
+| `ADMIN_SERVICE_TOKEN` | Yes | Opens the internal admin API to the admin app (WAYS_OF_WORKING R18). Long random secret, equal to admin's `SZOTAR_ADMIN_TOKEN` (§6.4). Unset turns the API off. Szótár has no admin list of its own. |
 
 Also needed for content: dictionary import source / dump for initial seed (`szotar_db1` import path).
 
@@ -181,11 +181,25 @@ Also needed for content: dictionary import source / dump for initial seed (`szot
 | `GOOGLE_CLIENT_ID` | Yes | Backend |
 | `VITE_GOOGLE_CLIENT_ID` | Yes (build-time) | Same value as `GOOGLE_CLIENT_ID` |
 | `SESSION_SECRET` | Yes | Long random prod secret |
-| `ADMIN_EMAILS` | Yes | Comma-separated admin emails |
+| `ADMIN_SERVICE_TOKEN` | Yes | Opens the internal admin API to the admin app (WAYS_OF_WORKING R18). Long random secret, equal to admin's `JATSZOTER_ADMIN_TOKEN` (§6.4). Unset turns the API off. Játszótér has no admin list of its own. |
 | `DICTIONARY_SOURCE` | Yes | `local` until szotar is live; then can switch |
 | `DICTIONARY_DATA_DIR` | If local | e.g. `data/dictionary` |
 | `SZOTAR_BASE_URL` | Yes when not local | e.g. `https://szotar.lamsza.com` or `http://127.0.0.1:3010` |
 | `APP_VERSION` | Optional | Display / config version |
+
+### 6.4 admin.lamsza.com (Phase 2)
+
+The full list, with comments, is `lamsza-admin/.env.example`. The ones that tie it to the other apps:
+
+| Variable | Required | Notes |
+|----------|----------|-------|
+| `ADMIN_GOOGLE_EMAILS` | Yes | Comma-separated admin emails: the network's one admin list (R18). Unset falls back to the owner's address. |
+| `SZOTAR_ADMIN_URL` | Yes | Szótár's backend, server-to-server: `http://127.0.0.1:<szotar port>` |
+| `SZOTAR_ADMIN_TOKEN` | Yes | Equal to Szótár's `ADMIN_SERVICE_TOKEN`. Unset turns `/dictionary` off (503). |
+| `JATSZOTER_ADMIN_URL` | Yes | Játszótér's backend, server-to-server: `http://127.0.0.1:<jatszoter port>` |
+| `JATSZOTER_ADMIN_TOKEN` | Yes | Equal to Játszótér's `ADMIN_SERVICE_TOKEN`. Unset turns `/games` off (503). |
+
+Generate each token with `openssl rand -hex 32`, one per pair. nginx must not proxy `/internal/` on any vhost; the steps are in `docs/network/OPEN_ITEMS.md`, the production upgrade item.
 
 **Important:** All `VITE_*` variables are baked in at **frontend build time**. Changing them requires a rebuild + redeploy of `dist/`.
 

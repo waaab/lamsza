@@ -49,6 +49,8 @@ the footer version read (WAYS_OF_WORKING R17).
 - `AppIcon` gains `list` and `add` (Szótár's Lista and Új szó toolbar buttons).
 
 ### Fixed
+- The events calendar (`/esemenyek`) opens on Bucharest's current year from the server's clock (R19), not the browser's: set again once the API's first reply has fixed the clock, unless a month or day filter is set.
+- Docs follow the admin move (R18): PRODUCTION_SERVER_SETUP §6 drops Szótár's and Játszótér's admin lists and adds `ADMIN_SERVICE_TOKEN` and admin's relay variables (§6.4); the LOCAL_DEV_CHECKS allowlist check lists only admin and lamsza; UI_BASELINE `tb-admin-link` says no app links to admin; the OPEN_ITEMS Szókereső item points to `/games#szokereso`.
 - The Lámsza button tooltip typo ("főódalra"). [public]
 
 ---

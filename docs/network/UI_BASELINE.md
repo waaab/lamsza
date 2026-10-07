@@ -54,7 +54,7 @@ reference; each item names its own.
 | Links to the sister apps (`tb-cross-links`) | Other | keep as is |
 | Profile / account button (`tb-profile`) | Lámsza's | Szótár is exempt for now: it has no account page, so no Fiók button. Owner's decision, 2026-10-07. |
 | Settings control (`tb-settings`) | Lámsza's | Szótár and Játszótér keep their theme dropdown (localStorage); Lámsza keeps its settings page. Clarified by the owner. |
-| Admin link in toolbar (`tb-admin-link`) | Other | keep as is |
+| Admin link in toolbar (`tb-admin-link`) | None | No user-facing app links to the admin app: no toolbar button, no edit link, no redirect. Admins open it by URL (WAYS_OF_WORKING R18). Owner's decision, 2026-10-07. |
 | App-only toolbar buttons (`tb-extra`) | Other | keep as is |
 | Toolbar while auth loads (`tb-skeleton`) | Lámsza's |  |
 | Back-to-top button (`tb-backtotop`) | Lámsza's | Back-to-top in every app, the admin app included. |

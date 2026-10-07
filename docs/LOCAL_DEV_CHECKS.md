@@ -154,29 +154,29 @@ not a code bug. Signing in is the owner's to do (R9); agents stop at the button.
 
 ## Check — Admin allowlists
 
-The variable name differs per app. Getting this wrong is the usual cause of "admin locked
-out of their own site":
+Only two apps keep an admin list, both named `ADMIN_GOOGLE_EMAILS`. Getting the admin one
+wrong is the usual cause of "admin locked out of their own site":
 
-| App | Variable |
-|---|---|
-| lamsza | `ADMIN_GOOGLE_EMAILS` |
-| szotar | `ADMIN_GOOGLE_EMAILS` |
-| admin | `ADMIN_GOOGLE_EMAILS` |
-| jatszoter | `ADMIN_EMAILS` |
+| App | Variable | What it decides |
+|---|---|---|
+| admin | `ADMIN_GOOGLE_EMAILS` | Who gets into the admin app, all three sections: the network's one admin list (WoW R18) |
+| lamsza | `ADMIN_GOOGLE_EMAILS` | Only the `is_admin` flag and the review-queue count in lamsza's `/api/auth/me`; it grants no admin rights |
 
-`.env` lives at the repo root in lamsza, szotar and jatszoter; admin reads both `.env` and
-`backend/.env`.
+Szótár and Játszótér have no admin list: they trust only the admin backend, through
+`ADMIN_SERVICE_TOKEN` (WoW R18). A leftover `ADMIN_GOOGLE_EMAILS` or `ADMIN_EMAILS` in
+their `.env` is read by nothing.
+
+`.env` lives at the repo root in lamsza; admin reads both `.env` and `backend/.env`.
 
 ```bash
-grep -H '^ADMIN' ~/projects/lamsza-network/{lamsza,lamsza-szotar,lamsza-jatszoter,lamsza-admin}/.env \
+grep -H '^ADMIN' ~/projects/lamsza-network/{lamsza,lamsza-admin}/.env \
   ~/projects/lamsza-network/lamsza-admin/backend/.env 2>/dev/null
 ```
 
 What you verify locally is the **gate logic**, not any particular email list:
 
 ```bash
-cd ~/projects/lamsza-network/lamsza-szotar && scripts/test-backend.sh ./internal/auth/...
-cd ~/projects/lamsza-network/lamsza-admin  && scripts/test-backend.sh ./internal/auth/...
+cd ~/projects/lamsza-network/lamsza-admin && scripts/test-backend.sh ./internal/auth/...
 ```
 
 **Expect:** pass. These cover allowlist matching (case-insensitivity, separators).

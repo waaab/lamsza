@@ -7,6 +7,7 @@
         formatMonthShortLikeCard,
         formatDateWithOptionalTime,
     } from "$lib/utils";
+    import { referenceTodayYMD } from "$lib/eventStatus";
     import { eventFeaturedImageUrl } from "$lib/eventImage.js";
     import { eventEntryPriceText } from "$lib/eventEntryPrice.js";
     import { apiFetch, getApiBase } from "$lib/api.js";
@@ -208,7 +209,11 @@
         return `${y}-${String(m).padStart(2, "0")}`;
     }
 
-    let calendarViewYear = new Date().getFullYear();
+    /** Bucharest's current year, from the server's clock (WAYS_OF_WORKING R19). */
+    const bucharestYear = () => Number(referenceTodayYMD().slice(0, 4));
+    let calendarViewYear = bucharestYear();
+    /** Whether the year was set again after the API's first reply set the server's clock. */
+    let calendarYearSynced = false;
 
     /**
      * YYYY-MM keys that have upcoming events (for enabling cells).
@@ -271,6 +276,10 @@
     $: scheduleEventIdsSet = new Set(filterOptions.schedule_event_ids || []);
 
     $: if (!filtersLoading && yearsWithEvents.length > 0) {
+        if (!calendarYearSynced) {
+            calendarYearSynced = true;
+            if (!filterMonthKey && !filterDayKey) calendarViewYear = bucharestYear();
+        }
         if (!yearsWithEvents.includes(calendarViewYear)) {
             calendarViewYear = yearsWithEvents[0];
         }
