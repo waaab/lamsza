@@ -50,87 +50,87 @@ func main() {
 
 	mux := http.DefaultServeMux
 
-	mux.HandleFunc("/api/health", middleware.ApplyCORS(health.HandleHealth))
+	mux.HandleFunc("/api/health", middleware.ApplyCORS(middleware.JSONByDefault(health.HandleHealth)))
 
-	mux.HandleFunc("/api/auth/google", middleware.ApplyCORS(auth.HandleGoogleLogin))
-	mux.HandleFunc("/api/auth/me", middleware.ApplyCORS(auth.HandleMe))
-	mux.HandleFunc("/api/auth/logout", middleware.ApplyCORS(auth.HandleLogout))
-	mux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(account.HandlePreferences))
-	mux.HandleFunc("/api/account/import", middleware.ApplyCORS(account.HandleImport))
-	mux.HandleFunc("/api/account/links", middleware.ApplyCORS(account.HandleLinks))
-	mux.HandleFunc("/api/account/history", middleware.ApplyCORS(account.HandleHistory))
-	mux.HandleFunc("/api/account/favorites", middleware.ApplyCORS(account.HandleFavorites))
-	mux.HandleFunc("/api/account/listings/catalog", middleware.ApplyCORS(account.HandleListingCatalog))
-	mux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(account.HandleClaimListing))
-	mux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(account.HandleListingMembers))
-	mux.HandleFunc("/api/account/listings", middleware.ApplyCORS(account.HandleListings))
-	mux.HandleFunc("/api/account/websites/lookup", middleware.ApplyCORS(account.HandleWebsiteLookup))
-	mux.HandleFunc("/api/account/websites", middleware.ApplyCORS(account.HandleAccountWebsites))
-	mux.HandleFunc("/api/websites", middleware.ApplyCORS(account.HandleWebsites))
+	mux.HandleFunc("/api/auth/google", middleware.ApplyCORS(middleware.JSONByDefault(auth.HandleGoogleLogin)))
+	mux.HandleFunc("/api/auth/me", middleware.ApplyCORS(middleware.JSONByDefault(auth.HandleMe)))
+	mux.HandleFunc("/api/auth/logout", middleware.ApplyCORS(middleware.JSONByDefault(auth.HandleLogout)))
+	mux.HandleFunc("/api/account/preferences", middleware.ApplyCORS(middleware.JSONByDefault(account.HandlePreferences)))
+	mux.HandleFunc("/api/account/import", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleImport)))
+	mux.HandleFunc("/api/account/links", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleLinks)))
+	mux.HandleFunc("/api/account/history", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleHistory)))
+	mux.HandleFunc("/api/account/favorites", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleFavorites)))
+	mux.HandleFunc("/api/account/listings/catalog", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleListingCatalog)))
+	mux.HandleFunc("/api/account/listings/claim", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleClaimListing)))
+	mux.HandleFunc("/api/account/listings/members", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleListingMembers)))
+	mux.HandleFunc("/api/account/listings", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleListings)))
+	mux.HandleFunc("/api/account/websites/lookup", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleWebsiteLookup)))
+	mux.HandleFunc("/api/account/websites", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleAccountWebsites)))
+	mux.HandleFunc("/api/websites", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleWebsites)))
 
 	// Core Module (Always Enabled)
-	mux.HandleFunc("/api/entries", middleware.ApplyCORS(handlers.EntriesHandler))
-	mux.HandleFunc("/api/directory", middleware.ApplyCORS(handlers.EntriesHandler))
-	mux.HandleFunc("/api/entry-categories", middleware.ApplyCORS(handlers.HandlePublicEntryCategories))
-	mux.HandleFunc("/api/entry", middleware.ApplyCORS(handlers.EntryDetailHandler))
-	mux.HandleFunc("/api/entry/related", middleware.ApplyCORS(handlers.HandleEntryRelated))
-	mux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(handlers.HandleEntryReviews))
-	mux.HandleFunc("/api/entry/suggestion-form", middleware.ApplyCORS(account.HandleSuggestionForm))
-	mux.HandleFunc("/api/entry/suggestions", middleware.ApplyCORS(account.HandleEntrySuggestions))
-	mux.HandleFunc("/api/locations", middleware.ApplyCORS(handlers.HandlePublicLocations))
-	mux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(handlers.HandlePublicSettlementLocationTypes))
+	mux.HandleFunc("/api/entries", middleware.ApplyCORS(middleware.JSONByDefault(handlers.EntriesHandler)))
+	mux.HandleFunc("/api/directory", middleware.ApplyCORS(middleware.JSONByDefault(handlers.EntriesHandler)))
+	mux.HandleFunc("/api/entry-categories", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandlePublicEntryCategories)))
+	mux.HandleFunc("/api/entry", middleware.ApplyCORS(middleware.JSONByDefault(handlers.EntryDetailHandler)))
+	mux.HandleFunc("/api/entry/related", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandleEntryRelated)))
+	mux.HandleFunc("/api/entry/reviews", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandleEntryReviews)))
+	mux.HandleFunc("/api/entry/suggestion-form", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleSuggestionForm)))
+	mux.HandleFunc("/api/entry/suggestions", middleware.ApplyCORS(middleware.JSONByDefault(account.HandleEntrySuggestions)))
+	mux.HandleFunc("/api/locations", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandlePublicLocations)))
+	mux.HandleFunc("/api/settlement_location_types", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandlePublicSettlementLocationTypes)))
 	// Media: public read from shared dirs; admin uploads live in lamsza-admin
 	mux.Handle("/api/media/entry-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/entry-images/", middleware.NoDirListing(http.FileServer(http.Dir(handlers.EntryImagesDir())))).ServeHTTP))
 	mux.Handle("/api/media/event-images/", middleware.ApplyCORS(http.StripPrefix("/api/media/event-images/", middleware.NoDirListing(http.FileServer(http.Dir(handlers.EventImagesDir())))).ServeHTTP))
-	mux.HandleFunc("/api/attractions", middleware.ApplyCORS(handlers.HandleAttractions))
-	mux.HandleFunc("/api/attraction-suggestions", middleware.ApplyCORS(handlers.HandleAttractionSuggestions))
-	mux.HandleFunc("/api/historical_seats", middleware.ApplyCORS(handlers.HandleHistoricalSeats))
-	mux.HandleFunc("/api/counties", middleware.ApplyCORS(handlers.HandleCounties))
+	mux.HandleFunc("/api/attractions", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandleAttractions)))
+	mux.HandleFunc("/api/attraction-suggestions", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandleAttractionSuggestions)))
+	mux.HandleFunc("/api/historical_seats", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandleHistoricalSeats)))
+	mux.HandleFunc("/api/counties", middleware.ApplyCORS(middleware.JSONByDefault(handlers.HandleCounties)))
 
 	// Public config (weather cache TTL, version)
-	mux.HandleFunc("/api/config/public", middleware.ApplyCORS(settings.HandlePublicConfig))
+	mux.HandleFunc("/api/config/public", middleware.ApplyCORS(middleware.JSONByDefault(settings.HandlePublicConfig)))
 
 	// Pages (public)
-	mux.HandleFunc("/api/pages", middleware.ApplyCORS(pages.HandlePublicPage))
-	mux.HandleFunc("/api/page_faq", middleware.ApplyCORS(pagefaq.HandlePublic))
+	mux.HandleFunc("/api/pages", middleware.ApplyCORS(middleware.JSONByDefault(pages.HandlePublicPage)))
+	mux.HandleFunc("/api/page_faq", middleware.ApplyCORS(middleware.JSONByDefault(pagefaq.HandlePublic)))
 
 	// Optional Modules
 	if config.AppConfig.Features.Weather {
-		mux.HandleFunc("/api/weather", middleware.ApplyCORS(weather.HandleWeather))
-		mux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
+		mux.HandleFunc("/api/weather", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandleWeather)))
+		mux.HandleFunc("/api/weather/county", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandleCountyWeather)))
 		log.Println("Module [Weather] enabled")
 	}
 
 	if config.AppConfig.Features.Events {
-		mux.HandleFunc("/api/events", middleware.ApplyCORS(events.HandleEvents))
-		mux.HandleFunc("/api/events/filter-options", middleware.ApplyCORS(events.HandleEventFilterOptions))
-		mux.HandleFunc("/api/events/detail", middleware.ApplyCORS(events.HandleEventDetail))
-		mux.HandleFunc("/api/venues", middleware.ApplyCORS(venues.HandlePublic))
-		mux.HandleFunc("/api/venue_types", middleware.ApplyCORS(venues.HandlePublicVenueTypes))
+		mux.HandleFunc("/api/events", middleware.ApplyCORS(middleware.JSONByDefault(events.HandleEvents)))
+		mux.HandleFunc("/api/events/filter-options", middleware.ApplyCORS(middleware.JSONByDefault(events.HandleEventFilterOptions)))
+		mux.HandleFunc("/api/events/detail", middleware.ApplyCORS(middleware.JSONByDefault(events.HandleEventDetail)))
+		mux.HandleFunc("/api/venues", middleware.ApplyCORS(middleware.JSONByDefault(venues.HandlePublic)))
+		mux.HandleFunc("/api/venue_types", middleware.ApplyCORS(middleware.JSONByDefault(venues.HandlePublicVenueTypes)))
 		log.Println("Module [Events] enabled")
 	}
 
 	if config.AppConfig.Features.News {
-		mux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
-		mux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
+		mux.HandleFunc("/api/news", middleware.ApplyCORS(middleware.JSONByDefault(news.HandleNews)))
+		mux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(middleware.JSONByDefault(news.HandlePublicNewsFeeds)))
 		news.WarmNews()
 		log.Println("Module [News] enabled")
 	}
 
 	if config.AppConfig.Features.Mondasok {
-		mux.HandleFunc("/api/mondasok", middleware.ApplyCORS(mondasok.HandlePublicMondasok))
+		mux.HandleFunc("/api/mondasok", middleware.ApplyCORS(middleware.JSONByDefault(mondasok.HandlePublicMondasok)))
 		log.Println("Module [Mondasok] enabled")
 	}
 
 	if config.AppConfig.Features.QuickLinks {
-		mux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
+		mux.HandleFunc("/api/quick_links", middleware.ApplyCORS(middleware.JSONByDefault(links.HandlePublicQuickLinks)))
 		log.Println("Module [QuickLinks] enabled")
 	}
 
 	if config.AppConfig.Features.Search {
-		mux.HandleFunc("/api/search", middleware.ApplyCORS(search.HandleUnifiedSearch))
-		mux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
-		mux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
+		mux.HandleFunc("/api/search", middleware.ApplyCORS(middleware.JSONByDefault(search.HandleUnifiedSearch)))
+		mux.HandleFunc("/api/proxy", middleware.ApplyCORS(middleware.JSONByDefault(search.ProxyHandler)))
+		mux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(middleware.JSONByDefault(search.HandleAutosuggest)))
 		log.Println("Module [Search] enabled")
 	}
 

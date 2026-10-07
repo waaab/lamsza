@@ -420,24 +420,5 @@
 {/if}
 
 <style>
-    .nav-btn--admin {
-        position: relative;
-    }
 
-    .nav-admin-badge {
-        position: absolute;
-        top: -0.35rem;
-        right: -0.35rem;
-        min-width: 1.1rem;
-        height: 1.1rem;
-        padding: 0 0.25rem;
-        border-radius: 999px;
-        background: var(--szekely-red, #c8102e);
-        color: #fff;
-        font-size: 0.65rem;
-        font-weight: 700;
-        line-height: 1.1rem;
-        text-align: center;
-        pointer-events: none;
-    }
 </style>

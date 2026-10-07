@@ -149,3 +149,25 @@ func TestWritesWithoutOriginStillWork(t *testing.T) {
 		t.Errorf("a POST without Origin got %d (handler hit: %v), want 200", rr.Code, hit)
 	}
 }
+
+func TestJSONByDefaultLabelsJSON(t *testing.T) {
+	h := JSONByDefault(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`[{"id":1}]`))
+	})
+	rr := httptest.NewRecorder()
+	h(rr, httptest.NewRequest(http.MethodGet, "/api/entries", nil))
+	if got := rr.Header().Get("Content-Type"); got != "application/json; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+}
+
+func TestJSONByDefaultLetsTheHandlerChoose(t *testing.T) {
+	h := JSONByDefault(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "Entry not found", http.StatusNotFound)
+	})
+	rr := httptest.NewRecorder()
+	h(rr, httptest.NewRequest(http.MethodGet, "/api/entry", nil))
+	if got := rr.Header().Get("Content-Type"); got != "text/plain; charset=utf-8" {
+		t.Fatalf("Content-Type = %q, want http.Error's text/plain", got)
+	}
+}

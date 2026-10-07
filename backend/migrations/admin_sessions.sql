@@ -1,4 +1,4 @@
--- admin_sessions — the lamsza-admin app's session store (BOG-45).
+-- admin_sessions - the lamsza-admin app's session store (BOG-45).
 --
 -- Separate from `sessions` on purpose. Both apps used to mint into `sessions`
 -- under one cookie name (`lamsza_session`), so a token handed out by the public
@@ -7,7 +7,7 @@
 --
 -- This file lives in the `lamsza` repo because this backend owns the schema of
 -- the shared `lamsza` database; the admin process runs no DDL at all. Nothing
--- in this repo reads the table — `lamsza-admin/backend/internal/auth` does.
+-- in this repo reads the table - `lamsza-admin/backend/internal/auth` does.
 --
 -- `auth.Migrate()` runs the same statements on boot; this is the explicit form.
 

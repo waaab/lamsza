@@ -14,7 +14,7 @@ import (
 // Until BOG-45 they also shared one cookie name and one `sessions` table, so a
 // token minted by either one was accepted by the other. They are two stores
 // now: `sessions` here, `admin_sessions` for admin. These tests hold the public
-// half of that boundary — the admin half lives in
+// half of that boundary - the admin half lives in
 // lamsza-admin/backend/internal/auth/session_boundary_test.go.
 //
 // This repo owns the DDL for both tables because it owns this schema; the admin

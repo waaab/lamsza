@@ -15,7 +15,9 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
   CI and `.nvmrc` already say 24. While on the server, verify the production
   ports: `PRODUCTION_SERVER_SETUP.md` (lamsza 3000, szotar 3010, jatszoter 3001)
   and `PRODUCTION_ENVIRONMENT_NOTES.md` (8081, 8082, 8083) disagree. Correct both
-  docs to what the server actually runs.
+  docs to what the server actually runs, and set lamsza's `SZOTAR_ORIGIN` to
+  `http://127.0.0.1:<szotar port>` there (R13: server-to-server calls stay on
+  the machine).
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.

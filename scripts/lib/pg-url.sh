@@ -8,7 +8,7 @@
 # other way round: the GitHub runner has the client and the database is a
 # service container reachable over TCP. One script has to work in both.
 
-# pg_url_parse <url> — exports PGUSER, PGPASSWORD, PGHOST, PGPORT, PGDATABASE.
+# pg_url_parse <url> - exports PGUSER, PGPASSWORD, PGHOST, PGPORT, PGDATABASE.
 pg_url_parse() {
 	local url=$1 rest creds hostpart
 
@@ -49,7 +49,7 @@ pg_url_parse() {
 	fi
 }
 
-# pg_pick_runner <container> <needed-binary>... — echoes "direct" or
+# pg_pick_runner <container> <needed-binary>... - echoes "direct" or
 # "docker:<container>", and fails if neither is usable. An explicit container
 # wins; otherwise the binaries this caller needs being on PATH wins; otherwise
 # fall back to the default container if it is running.
@@ -85,7 +85,7 @@ pg_pick_runner() {
 	return 2
 }
 
-# pg_run <runner> <binary> [args...] — stdin and stdout are passed through.
+# pg_run <runner> <binary> [args...] - stdin and stdout are passed through.
 #
 # In docker mode the connection is rewritten to the in-container socket:
 # PGHOST/PGPORT describe how the *host* reaches the database, and inside the

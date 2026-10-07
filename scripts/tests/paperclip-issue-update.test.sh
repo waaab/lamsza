@@ -33,7 +33,7 @@ make_repo() {
 }
 
 # Commit one file on a new branch off main and stay on that branch. The branch
-# is deliberately left unmerged — this is the BOG-17 / BOG-28 shape.
+# is deliberately left unmerged - this is the BOG-17 / BOG-28 shape.
 branch_with_commit() {
   local dir="$1" branch="$2"
   git -C "$dir" checkout -q -b "$branch"
@@ -64,7 +64,7 @@ run() {
     printf '  ok   %s (exit %s)\n' "$name" "$code"
   else
     FAIL=$((FAIL + 1))
-    printf '  FAIL %s — wanted exit %s, got %s\n' "$name" "$want" "$code"
+    printf '  FAIL %s - wanted exit %s, got %s\n' "$name" "$want" "$code"
     printf '%s\n' "$out" | sed 's/^/       | /'
   fi
   LAST_OUT="$out"
@@ -101,7 +101,7 @@ for s in in_progress in_review blocked cancelled todo backlog; do
   rm -rf "$R"
 done
 
-# 5. An untracked file is dirty too — this is the BOG-3..BOG-7 shape.
+# 5. An untracked file is dirty too - this is the BOG-3..BOG-7 shape.
 R="$(make_repo)"
 printf 'new\n' > "$R/newfile.txt"
 run 1 "untracked file + done" "$R" done

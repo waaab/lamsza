@@ -5,8 +5,8 @@ import { safeImageSrc, safeLinkHref } from "./markdown.js";
 /**
  * HTML sanitizer for the page bodies an admin writes (`pages.content`).
  *
- * The policy pages under `/iranyelvek/*` need real HTML — headings, lists,
- * tables, links — so we cannot escape it the way `markdown.js` does. Instead we
+ * The policy pages under `/iranyelvek/*` need real HTML - headings, lists,
+ * tables, links - so we cannot escape it the way `markdown.js` does. Instead we
  * rebuild it: the input is tokenized, every tag is checked against an
  * allowlist, and the output tag is written here from a fixed name plus the
  * attributes the allowlist accepts. Nothing from the input is copied into the
@@ -82,7 +82,7 @@ const ALLOWED = new Set([
 ]);
 
 /**
- * Tags whose contents are code, markup for another parser, or form state — not
+ * Tags whose contents are code, markup for another parser, or form state - not
  * prose. We drop the element and everything up to its closing tag.
  */
 const DROP_WITH_CONTENT = new Set([
@@ -121,7 +121,7 @@ const VOID_LIKE_DROP = new Set(["base", "frame", "input", "link", "meta"]);
 
 /**
  * Tags whose closing tag the HTML parser infers: a second `<li>` is a sibling
- * of the first, not a child. Each maps to the tags that stop the inference —
+ * of the first, not a child. Each maps to the tags that stop the inference -
  * the `<li>` of an inner list must not close the `<li>` of the outer one.
  */
 const IMPLIED_END = new Map([
@@ -158,7 +158,7 @@ const ESCAPES = {
 /**
  * A character reference the admin wrote on purpose, such as `&nbsp;` or
  * `&amp;`. We keep these as they are: a reference can only ever produce one
- * character, never a tag, so it is safe in text and in an attribute value — and
+ * character, never a tag, so it is safe in text and in an attribute value - and
  * re-escaping the `&` would show `&nbsp;` to the reader as five letters, and
  * would break a `?a=1&amp;b=2` link target.
  */
@@ -455,7 +455,7 @@ export function sanitizeHtml(input) {
         if (html === null) continue;
 
         // `<p>` after `<p>` is a sibling, not a child; the parser would close
-        // the first one, so we do too — unless a tag in between puts the two
+        // the first one, so we do too - unless a tag in between puts the two
         // in different lists, rows or sections.
         const barriers = IMPLIED_END.get(name);
         if (barriers) {

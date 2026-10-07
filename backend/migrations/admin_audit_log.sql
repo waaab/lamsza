@@ -1,4 +1,4 @@
--- admin_audit_log — the write trail for the lamsza-admin API (BOG-48).
+-- admin_audit_log - the write trail for the lamsza-admin API (BOG-48).
 --
 -- Nothing recorded which admin changed what. `lamsza-admin` is the only writer
 -- of the directory this site reads, so every mutating call on its API lands one
@@ -8,7 +8,7 @@
 -- This file lives in the `lamsza` repo because this backend owns the schema of
 -- the shared `lamsza` database; the admin process runs no DDL at all (BOG-39,
 -- held by `lamsza-admin/backend/boot_ddl_test.go`). Nothing in this repo reads
--- or writes the table — `lamsza-admin/backend/internal/audit` does.
+-- or writes the table - `lamsza-admin/backend/internal/audit` does.
 --
 -- `auth.migrateAdminAuditLog()` runs the same statements on boot; this is the
 -- explicit form.
@@ -19,7 +19,7 @@
 -- operator action against the database, not something a request can trigger.
 --
 -- RETENTION AND SIZE. No automatic retention: rows live until someone prunes
--- them. The app bounds the row, not the table — `payload`, `before_state` and
+-- them. The app bounds the row, not the table - `payload`, `before_state` and
 -- `after_state` are each capped at 16 KiB by the writer, which replaces an
 -- oversized value with {"_truncated":true,...}. A heavy admin day is a few
 -- thousand rows of a few KiB, so this grows by megabytes a year, not

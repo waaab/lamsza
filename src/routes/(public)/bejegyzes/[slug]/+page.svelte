@@ -28,9 +28,11 @@
     import { auth } from "$lib/stores/auth";
     import { normalizePhotos } from "$lib/entryPhotos.js";
 
+    /** From +page.js: an unknown slug never gets here, it is a 404. */
+    export let data;
+
     let entry = null;
     let loading = true;
-    let error = null;
     let nearby = [];
     let related = [];
     let historyItems = [];
@@ -249,68 +251,52 @@
 
     $: slug = $page.params.slug;
 
-    $: if (browser && slug) {
-        fetchEntry();
+    $: if (browser && data?.entry) {
+        showEntry(data.entry);
     }
 
+    /** Reload the entry after a claim or an edit, without leaving the page. */
     async function fetchEntry() {
-        const requested = slug;
-        const gen = ++fetchGen;
-        loading = true;
-        error = null;
         try {
-            const data = await apiFetch(
-                `/api/entry?slug=${encodeURIComponent(requested)}`,
+            const fresh = await apiFetch(`/api/entry?slug=${encodeURIComponent(slug)}`);
+            if (fresh?.name) await showEntry(fresh);
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    /** Show the entry +page.js loaded, then the reading history and links. */
+    async function showEntry(loaded) {
+        const gen = ++fetchGen;
+        entry = loaded;
+        loading = false;
+        await auth.init();
+        if (gen !== fetchGen) return;
+        await recordAccountHistory(
+            {
+                slug: loaded.slug,
+                name: loaded.name,
+                category: loaded.category,
+                location: loaded.location,
+                photo: normalizePhotos(loaded.photos)[0]?.url || "",
+            },
+            get(auth),
+        );
+        historyItems = historyForDisplay(readHistory(), loaded.slug);
+
+        nearby = [];
+        related = [];
+        try {
+            const rel = await apiFetch(
+                `/api/entry/related?slug=${encodeURIComponent(loaded.slug || data.slug)}`,
             );
             if (gen !== fetchGen) return;
-
-            if (!data || !data.name) {
-                error = "A bejegyzés nem található.";
-                entry = null;
-                nearby = [];
-                related = [];
-                historyItems = [];
-            } else {
-                entry = data;
-                loading = false;
-                await auth.init();
-                await recordAccountHistory(
-                    {
-                        slug: data.slug,
-                        name: data.name,
-                        category: data.category,
-                        location: data.location,
-                        photo: normalizePhotos(data.photos)[0]?.url || "",
-                    },
-                    get(auth),
-                );
-                historyItems = historyForDisplay(readHistory(), data.slug);
-
-                nearby = [];
-                related = [];
-                try {
-                    const rel = await apiFetch(
-                        `/api/entry/related?slug=${encodeURIComponent(data.slug || requested)}`,
-                    );
-                    if (gen !== fetchGen) return;
-                    nearby = Array.isArray(rel?.nearby) ? rel.nearby : [];
-                    related = Array.isArray(rel?.related) ? rel.related : [];
-                } catch {
-                    if (gen !== fetchGen) return;
-                    nearby = [];
-                    related = [];
-                }
-            }
-        } catch (err) {
+            nearby = Array.isArray(rel?.nearby) ? rel.nearby : [];
+            related = Array.isArray(rel?.related) ? rel.related : [];
+        } catch {
             if (gen !== fetchGen) return;
-            console.error(err);
-            error = "Hiba történt a szerver kapcsolat közben.";
-            entry = null;
             nearby = [];
             related = [];
-            historyItems = [];
-        } finally {
-            if (gen === fetchGen) loading = false;
         }
     }
 </script>
@@ -334,11 +320,6 @@
             </section>
         </article>
     </div>
-{:else if error}
-    <span class="info-box error">
-        <p>{error}</p>
-    </span>
-    <a href="/" class="btn back-to-home">Vissza a főoldalra</a>
 {:else if entry}
     <Breadcrumbs
         label={entry.name}
@@ -421,10 +402,6 @@
 {/if}
 
 <style>
-    .back-to-home {
-        margin-top: 1rem;
-        display: inline-block;
-    }
     .profile-detail {
         display: flex;
         flex-direction: column;

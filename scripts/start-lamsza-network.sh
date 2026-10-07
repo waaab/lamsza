@@ -56,7 +56,7 @@ mkdir -p "$STATE_DIR"
 # name|repo_relpath|frontend_relpath|backend_port|frontend_port
 #
 # lamsza's frontend_relpath is "." on purpose: that repo keeps its SvelteKit
-# frontend at the repo root and has no frontend/ folder. Accepted on BOG-23 —
+# frontend at the repo root and has no frontend/ folder. Accepted on BOG-23 -
 # see lamsza/docs/network/WAYS_OF_WORKING.md §5. Do not "normalise" it.
 APPS=(
 	"admin|lamsza-admin|frontend|3000|5173"
@@ -132,7 +132,7 @@ start_dbs() {
 	local row name rel fe bport fport root
 	for row in "${APPS[@]}"; do
 		IFS='|' read -r name rel fe bport fport <<<"$row"
-		# Admin shares main Lámsza Postgres — no own compose
+		# Admin shares main Lámsza Postgres - no own compose
 		[ "$name" = "admin" ] && continue
 		root="$(app_root "$rel")"
 		if [ -f "$root/docker-compose.yml" ] || [ -f "$root/compose.yml" ]; then
@@ -145,7 +145,7 @@ start_dbs() {
 # Never start a second copy of something that is already listening (BOG-56).
 # The two halves fail differently, and the quiet one is the dangerous one:
 # a duplicate backend dies on its own with "address already in use", but a
-# duplicate Vite dev server does not — with strictPort unset it moves to the
+# duplicate Vite dev server does not - with strictPort unset it moves to the
 # next free port and keeps running, and stop_all only kills the four fixed
 # frontend ports, so the stray survives "stop" and has to be hunted by hand.
 # Skipping also leaves the existing PID files alone instead of overwriting

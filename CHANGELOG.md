@@ -20,6 +20,12 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- An unknown entry, event or historical seat (`/bejegyzes/…`, `/esemenyek/…`, `/szekek/…`) shows the network's error page (404, not indexed) instead of an in-page message on a normal page. [public]
+- Dark mode: the search box's divider and the "Mégse" hover in dialogs have dark values; the system-dark setting gets the same search seam colour as the explicit dark theme. [public]
+- Every JSON API answers `application/json` (several were sniffed as `text/plain`); error lines stay plain text, as the frontend shows them.
+- Pages have one `<title>` (the static one in `app.html` is gone). The extension manifest says 1.3.0 with accents.
+- The server-side Szótár search goes to `http://127.0.0.1:3002` locally (R13); `SZOTAR_ORIGIN` sets it.
+- Shared `global.css` gains `--hover-bg` and dark `--thin-grey`; a dead `.admin-dialog p` rule left `component-typography.css`. Unused CSS removed; no em dash left in code comments (D5).
 - `LOCAL_DEV_CHECKS.md` no longer mints sessions for the owner in the dev database (it broke R9): the session-boundary check runs the two boundary suites on scratch databases. The sign-in, CI and restart notes match the code; recorded results and counts are gone (R10).
 - `scripts/sync-shared-frontend.sh` also serves lamsza-szotar and lamsza-jatszoter: a `consumers` map in `shared-frontend-modules.json` says which app gets which module, every app gets its own manifest, and `--check` also reports a stale app manifest. Szótár and Játszótér share the icons, the error page, the sign-in dialog and `global.css`.
 - `UI_BASELINE.md`: the close-button rule (`dlg-close-label`: "Bezárás" for a dialog that only shows content, "Mégse" only next to an action) and the shared error page (`err-page`).

@@ -27,7 +27,7 @@ export function initialPageHeader(slug) {
 /**
  * `content` is HTML an admin wrote, and the pages render it with `{@html}`.
  * Sanitizing it here, at the one place it enters the app, is what keeps every
- * caller safe — including pages added later, which do not have to remember.
+ * caller safe - including pages added later, which do not have to remember.
  *
  * @param {string} slug - `pages.slug` (pl. `szekek`, `home`, `iranyelvek/sutik`)
  * @returns {Promise<{ title: string, greeting: string, content?: string, slug?: string }>}

@@ -10,17 +10,7 @@
     <title>{data.seat?.name || "Szék"} - Lámsza Index</title>
 </svelte:head>
 
-{#if data.notFound || !data.seat}
-    <Breadcrumbs
-        label="Nem található"
-        parentLabel="Történelmi székek"
-        parentUrl="/szekek"
-    />
-    <h1 class="page-title">Az oldal nem található</h1>
-    <p class="greeting">
-        <a href="/szekek">Vissza a történelmi székek listájához</a>
-    </p>
-{:else}
+{#if data.seat}
     <Breadcrumbs
         label={data.seat.name}
         parentLabel="Történelmi székek"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# paperclip-issue-update.sh — the one way an agent writes a Paperclip issue status.
+# paperclip-issue-update.sh - the one way an agent writes a Paperclip issue status.
 #
 # UNUSED since Paperclip was switched off (WAYS_OF_WORKING R1-R4, item 13 of the
 # 2026-10-07 review). Kept on the owner's decision, with its test, in case the
@@ -12,8 +12,8 @@
 # branch. Nothing had shipped, and the work was later discarded. This script is
 # the choke point that makes that mistake loud instead of silent.
 #
-# BOG-38 widened it. BOG-17 and BOG-28 passed the first gate — their code was
-# committed — but it sat on a branch nobody merged, and the merge in turn sat on
+# BOG-38 widened it. BOG-17 and BOG-28 passed the first gate - their code was
+# committed - but it sat on a branch nobody merged, and the merge in turn sat on
 # a local main nobody pushed. "Done" has to mean the owner has the fix, so there
 # are three gates now: committed, merged into the base, and pushed to origin.
 #
@@ -120,7 +120,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Gate 1 — committed. Only "done" is gated: a task is allowed to sit dirty
+# Gate 1 - committed. Only "done" is gated: a task is allowed to sit dirty
 # while it is in progress, in review, blocked or cancelled.
 #
 # `git status --porcelain` already honours .gitignore, so ignored paths
@@ -135,15 +135,15 @@ if [ "$STATUS" = "done" ] && [ "$ALLOW_DIRTY" -eq 0 ]; then
       printf '  branch: %s\n\n' "$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '(detached)')"
       printf '%s\n' "$DIRTY" | sed 's/^/  /'
       printf '\nCommit the work, or move the task back. Do not mark it done.\n'
-      printf 'If none of this belongs to your task — a shared workspace, another\n'
-      printf 'run, or a task whose output is not code — pass --allow-dirty.\n\n'
+      printf 'If none of this belongs to your task - a shared workspace, another\n'
+      printf 'run, or a task whose output is not code - pass --allow-dirty.\n\n'
     } >&2
     exit 1
   fi
 fi
 
 # ---------------------------------------------------------------------------
-# Gate 2 — merged. BOG-17 and BOG-28 both passed gate 1 and still shipped
+# Gate 2 - merged. BOG-17 and BOG-28 both passed gate 1 and still shipped
 # nothing: the commits were real, on a branch nobody merged. HEAD has to be an
 # ancestor of the base branch before the task can call itself done.
 # ---------------------------------------------------------------------------
@@ -160,15 +160,15 @@ if [ "$STATUS" = "done" ] && [ "$ALLOW_UNMERGED" -eq 0 ] && [ -n "$BASE_REF" ]; 
         printf '%s\n' "$AHEAD" | sed 's/^/  /'
       fi
       printf '\nMerge the branch into `%s` (or land a rebased copy), then mark it done.\n' "$BASE_REF"
-      printf 'If the work is meant to stay on a branch — a snapshot, a spike, work\n'
-      printf 'another task owns — pass --allow-unmerged and say why in the comment.\n\n'
+      printf 'If the work is meant to stay on a branch - a snapshot, a spike, work\n'
+      printf 'another task owns - pass --allow-unmerged and say why in the comment.\n\n'
     } >&2
     exit 1
   fi
 fi
 
 # ---------------------------------------------------------------------------
-# Gate 3 — pushed. A merge into a local `main` nobody pushed is still invisible
+# Gate 3 - pushed. A merge into a local `main` nobody pushed is still invisible
 # to the owner. Only checked when the repo actually has the matching remote
 # branch; a local-only repo is not a failure.
 # ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ process.stdout.write(JSON.stringify(out));
 ')"
 
 if [ "$DRY_RUN" -eq 1 ]; then
-  printf 'dry run — would PATCH issue %s with:\n%s\n' "$ISSUE" "$PAYLOAD"
+  printf 'dry run - would PATCH issue %s with:\n%s\n' "$ISSUE" "$PAYLOAD"
   exit 0
 fi
 

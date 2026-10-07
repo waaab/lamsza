@@ -481,31 +481,5 @@
 {@render categoryFilterBar()}
 
 <style>
-    .index-tags-aside-skeleton {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 0.25rem 0 0.5rem;
-    }
 
-    .index-tags-aside-skeleton__row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-    }
-
-    .index-tags-aside-skeleton__chip {
-        display: inline-block;
-        height: 1.85rem;
-        border-radius: 999px;
-        min-width: 3.5rem;
-    }
-
-    .index-tags-aside-skeleton__row :nth-child(3n) {
-        min-width: 4.75rem;
-    }
-
-    .index-tags-aside-skeleton__row :nth-child(4n) {
-        min-width: 5.25rem;
-    }
 </style>

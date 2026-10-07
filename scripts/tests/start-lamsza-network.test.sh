@@ -8,7 +8,7 @@
 # including through the two symlinks the operator actually uses.
 #
 # Every case builds a throwaway tree of empty directories in a temp dir and
-# only ever runs "status", which reads TCP state and prints — it never starts
+# only ever runs "status", which reads TCP state and prints - it never starts
 # a backend, a frontend or a database.
 #
 #   scripts/tests/start-lamsza-network.test.sh
@@ -138,7 +138,7 @@ rm -rf "$T"
 #
 #   ss     reports a port as listening for every file in $LAMSZA_TEST_PORTS
 #   fuser  "frees" a port by deleting its file, optionally after
-#          $LAMSZA_TEST_KILL_DELAY seconds to model a slow shutdown — one
+#          $LAMSZA_TEST_KILL_DELAY seconds to model a slow shutdown - one
 #          file per port, so the eight concurrent kills cannot race
 #   go/npm record where they were invoked and exit, starting nothing
 #   pkill  does nothing
@@ -288,7 +288,7 @@ expect_launches "start launches all eight processes" 8
 expect_out "it reports what it started" "backend :3001 started"
 live_cleanup
 
-# 10. restart is unaffected — stop_all frees the ports before start_apps looks.
+# 10. restart is unaffected - stop_all frees the ports before start_apps looks.
 live_tree
 all_ports_open
 run_live 0 "restart against a live network" restart

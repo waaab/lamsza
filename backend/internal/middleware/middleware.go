@@ -59,3 +59,15 @@ func isWriteMethod(method string) bool {
 	}
 	return false
 }
+
+// JSONByDefault answers application/json unless the handler says otherwise.
+// Several handlers wrote JSON without a Content-Type, so Go sniffed it as
+// text/plain (verification review, 2026-10-07). A handler that sets its own
+// type, and http.Error's plain-text error line, still win: Header().Set
+// replaces this default.
+func JSONByDefault(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		next(w, r)
+	}
+}

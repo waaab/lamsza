@@ -147,7 +147,7 @@ func Migrate() {
 // migrateAdminSessions creates the admin app's session store.
 //
 // The table lives here because this backend owns the schema of the shared
-// `lamsza` database (see lamsza-admin/docs/ARCHITECTURE.md) — the admin process
+// `lamsza` database (see lamsza-admin/docs/ARCHITECTURE.md) - the admin process
 // runs no DDL. Nothing in this repo reads or writes it.
 //
 // It is a separate table on purpose. Until BOG-45 both apps minted into
@@ -179,7 +179,7 @@ func migrateAdminSessions() {
 //
 // Same reason the table above lives here: this backend owns the schema of the
 // shared `lamsza` database and the admin process runs no DDL. Nothing in this
-// repo reads or writes the table — `lamsza-admin/backend/internal/audit` does,
+// repo reads or writes the table - `lamsza-admin/backend/internal/audit` does,
 // through INSERT only.
 //
 // `backend/migrations/admin_audit_log.sql` is the explicit form of these

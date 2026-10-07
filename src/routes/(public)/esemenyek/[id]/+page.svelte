@@ -1,8 +1,6 @@
 <script>
     import { onMount } from "svelte";
     import { get } from "svelte/store";
-    import { page } from "$app/stores";
-    import { apiFetch, canReachApi } from "$lib/api";
     import { auth } from "$lib/stores/auth";
     import { openLogin } from "$lib/openLogin.js";
     import FavoriteButton from "$lib/components/FavoriteButton.svelte";
@@ -26,9 +24,10 @@
     import EventEntryPrice from "$lib/components/EventEntryPrice.svelte";
     import { kindLabel } from "$lib/venueKindLabels.js";
 
+    /** From +page.js: an unknown id never gets here, it is a 404. */
+    export let data;
+
     let event = null;
-    let loading = true;
-    let error = null;
     /** @type {{ type: string, id: number }[]} */
     let favoriteList = [];
 
@@ -76,25 +75,9 @@
     /** `null` = show all schedule days; otherwise YYYY-MM-DD */
     let scheduleFilterDay = /** @type {string | null} */ (null);
 
-    $: eventId = $page.params.id;
-
-    // Browser only: during SSR the fetch has no backend to reach (see
-    // canReachApi in $lib/api.js) and Vite warns about eager fetching.
-    $: if (eventId && canReachApi()) {
-        loadEvent(eventId);
-    }
-
-    async function loadEvent(id) {
+    $: if (data?.event) {
         scheduleFilterDay = null;
-        loading = true;
-        error = null;
-        try {
-            event = await apiFetch(`/api/events/detail?id=${id}`);
-        } catch (err) {
-            error = "Az esemény nem található.";
-        } finally {
-            loading = false;
-        }
+        event = data.event;
     }
 
     /** @param {string} dateStr */
@@ -291,7 +274,7 @@
 <PublicPageHero
     title={event ? event.title : "Esemény"}
     greeting=""
-    loading={loading}
+    loading={!event}
     breadcrumbLabel=""
     breadcrumbParentLabel="Index"
     breadcrumbParentUrl="/index"
@@ -304,11 +287,7 @@
         : " - Lámsza Index"}
 />
 
-{#if loading}
-    <span class="info-box"><p>esemény adatok betöltése...</p></span>
-{:else if error || !event}
-    <span class="info-box"><p>{error || "Az esemény nem található."}</p></span>
-{:else}
+{#if event}
 
     <article class="event-detail">
         <div class="event-detail-header">

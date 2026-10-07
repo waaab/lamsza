@@ -184,9 +184,6 @@
 </div>
 
 <style>
-    .capitalize {
-        text-transform: capitalize;
-    }
     .weather-error {
         color: var(--text-faint);
         margin: 0.5rem 0 0;

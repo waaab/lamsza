@@ -799,7 +799,6 @@
     {@render directoryBlock("websites")}
 {/if}
 
-
 <section class="index-stats-section">
     <h2 class="index-stats-section-title">Index statisztikák:</h2>
     <div class="index-stats-items">
@@ -955,31 +954,5 @@
     line-height: 1;
     margin: 1rem 0 0;
 }
-    .index-tags-aside-skeleton {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 0.25rem 0 0.5rem;
-    }
 
-    .index-tags-aside-skeleton__row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.4rem;
-    }
-
-    .index-tags-aside-skeleton__chip {
-        display: inline-block;
-        height: 1.85rem;
-        border-radius: 999px;
-        min-width: 3.5rem;
-    }
-
-    .index-tags-aside-skeleton__row :nth-child(3n) {
-        min-width: 4.75rem;
-    }
-
-    .index-tags-aside-skeleton__row :nth-child(4n) {
-        min-width: 5.25rem;
-    }
 </style>

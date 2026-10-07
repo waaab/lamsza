@@ -7,7 +7,7 @@ import {
     hasDisplayText,
 } from "../src/lib/displayValue.js";
 
-test("displayText: blank values become an em dash", () => {
+test("displayText: blank values become the placeholder", () => {
     assert.equal(displayText(null), EMPTY_PLACEHOLDER);
     assert.equal(displayText(undefined), EMPTY_PLACEHOLDER);
     assert.equal(displayText(""), EMPTY_PLACEHOLDER);
