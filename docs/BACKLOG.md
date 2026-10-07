@@ -2,7 +2,7 @@
 
 **Purpose:** Ordered, actionable steps after the settlements, counties, geo locations, and attractions work landed in code. Items are sequenced so dependencies run first; parallelizable items are noted.
 
-Accounts, favorites, the saved settlement, claimed listings, and directory websites shipped after this list. They are not tracked here. See `changelog.md` and `src/lib/publicChangelog.js`.
+Accounts, favorites, the saved settlement, claimed listings, and directory websites shipped after this list. They are not tracked here. See `CHANGELOG.md` and `src/lib/publicChangelog.js`.
 
 **Related docs:** [PLAN_SETTLEMENTS_LOCATIONS_ATTRACTIONS.md](PLAN_SETTLEMENTS_LOCATIONS_ATTRACTIONS.md), [SETTLEMENTS_AND_LOCATIONS.md](SETTLEMENTS_AND_LOCATIONS.md).
 

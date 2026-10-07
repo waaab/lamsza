@@ -10,6 +10,23 @@
  */
 export const PUBLIC_CHANGELOG = [
     {
+        version: "1.3.0",
+        date: "2026. október 7.",
+        items: [
+            "Új címtár: a bejegyzések főkategória és alkategória szerint böngészhetők, és egy vállalkozás település nélkül is felvehető.",
+            "A keresés a Székely szótár szavait is mutatja, külön szűrővel.",
+            "A keresési találatok egységes, tömör sorokban jelennek meg.",
+            "Bejegyzés átvétele, csatlakozás egy bejegyzéshez és módosítás javaslata. A bejegyzés oldalán címkék, közösségi linkek és rövidebb nézet; a nyitvatartás külön kapcsolható.",
+            "Látnivalóknál javaslat küldhető, és megjelennek a közeli látnivalók, a tevékenységek és a fotók forrása.",
+            "Adatvédelmi tájékoztató az Irányelvek között.",
+            "Közös lábléc és Belépés ablak a Lámsza hálózat minden oldalán.",
+            "Szélesebb űrlapablakok.",
+            "Gyorsabban betöltő Hírek oldal.",
+            "A megszűnt kategóriák címei hibaoldalt mutatnak üres lista helyett.",
+            "Biztonsági javítások.",
+        ],
+    },
+    {
         version: "1.2.0",
         date: "2026. szeptember 24.",
         items: [

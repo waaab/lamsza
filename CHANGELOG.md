@@ -1,24 +1,61 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to lamsza are recorded here, in English, for developers.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+Every notable change adds a line under `[Unreleased]` in the same commit. A line
+users would notice ends with `[public]`; at a release those lines are rewritten
+in plain Hungarian in `src/lib/publicChangelog.js`, which `/valtozasnaplo` and
+the footer version read (WAYS_OF_WORKING R17).
 
 ---
 
 ## [Unreleased]
 
-### Removed
-- The `/admin` route and the `/api/admin/*` routes. The admin UI is now the independent
-  [`waaab/lamsza-admin`](https://github.com/waaab/lamsza-admin) app — `localhost:5173`
-  locally, `admin.lamsza.com` in production. See `docs/ADMIN_EXTRACTION.md`. Entries in
-  older releases below that describe an admin panel in this app are historical; this app no
-  longer serves one.
-- The frontend modules that extraction orphaned: `EntryPhotosEditor.svelte`,
-  `EntryFields.svelte`, `Accordion.svelte`, `HuDateInput.svelte`, `src/lib/index.js`.
+---
+
+## [1.3.0] - 2026-10-07
+
+### Added
+- Directory catalog v2: browse by main category and subcategory, edit the tree in admin, file websites in a subcategory, list a business without a town. [public]
+- Szótár words in unified search, with a Szótár filter pill and result cards. [public]
+- Listing claims, joining a listing and suggesting changes; tags and social links on the profile; a short listing profile with hours switches. [public]
+- Attraction edit suggestions, nearby sights, activities and photo credits. [public]
+- The privacy policy page `/iranyelvek/adatvedelem`. [public]
+- The shared network footer and Belépés dialog. [public]
+- `/api/health`, which pings Postgres.
+- A runnable schema (`backend/schema/`, `scripts/db-bootstrap.sh`, `scripts/db-dump-schema.sh`); the directory and event catalogs ship in the reference dump; `backend/schema/schema_test.go` fails when boot DDL is missing from the dump.
+- CI runs the frontend and backend suites against a Postgres service, plus a `ci-status` job that keeps one "CI is red on main" issue.
+- `scripts/start-lamsza-network.sh` under version control, with a test.
+- `scripts/sync-shared-frontend.sh` and a hash manifest for the 17 modules shared with lamsza-admin; `scripts/sync-cursor-rules.sh` for the network rules.
+- `docs/network/`: ways of working (R1-R17), open items, runtime versions.
 
 ### Changed
-- Local ports renumbered for the four-app network: lamsza is backend `3001` / frontend
-  `5174`. See `docs/LOCAL_DEV_CHECKS.md` for the whole map.
+- The admin UI and API moved to the separate lamsza-admin app; local ports renumbered (lamsza: backend 3001, frontend 5174).
+- Search results are one compact row per hit. [public]
+- Form dialogs are about 70vw wide; notices stay narrow. [public]
+- The news page serves a stale cache at once and refreshes it in the background, and the cache is warmed at startup (no more 5-8 s waits). [public]
+- Request body limits, server timeouts and a database pool cap.
+- Go test suites run only against a `_test` scratch database (`npm run test:go`); an exported variable beats `.env`.
+- CI runs on `ubuntu-24.04` with Node from `.nvmrc` (24) and Go from `go.mod` (1.25.7).
+- The one-time browser preferences import runs only where the API reports `prefs_imported_at`.
+- `npm run build` refuses to build when no backend answers on 3001; prerender no longer calls the backend.
+
+### Fixed
+- Retired category URLs show the error page instead of an empty category. [public]
+- A tag-query error no longer panics the entry handler.
+- `/esemenyek/[id]` no longer fetches during server rendering.
+- Csíkszereda weather lookup.
+
+### Security
+- CORS answers only allowlisted origins; Markdown and admin-written page HTML are sanitized; a Content-Security-Policy is sent. [public]
+- The weather API key is no longer in the public bundle.
+- Media folders no longer list their files.
+- `EntriesHandler` no longer logs SQL and search queries.
+
+### Removed
+- The `/admin` route, the `/api/admin/*` routes and the frontend modules only they used (now in lamsza-admin).
+- `scripts/restart_all.sh` and `npm run restart` (they stopped the whole network and the shared database), committed binaries, March one-off scripts; old planning docs moved to `docs/history/`.
 
 ---
 
