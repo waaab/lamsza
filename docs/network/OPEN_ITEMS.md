@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -74,21 +74,6 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   repos** (GitHub, Settings > Actions > General). Approved on BOG-57; without it
   the `ci-status` job cannot open the "CI is red on main" issue (WAYS_OF_WORKING
   R7).
-- **[network] Consider least-privilege CI tokens (replaces the item above if
-  adopted).** Not decided yet.
-  - **Owner:** set every repo's default *Workflow permissions* to "Read
-    repository contents and packages permissions". Keep "Allow GitHub Actions
-    to create and approve pull requests" off.
-  - **Agent:** the `ci-status` job already declares `contents: read` and
-    `issues: write` in all four workflows. Add a top-level
-    `permissions: contents: read` so the other jobs stay read-only whatever
-    the repo default is.
-  - **Proof:** the "CI is red on main" issue must still open. `ci-status` only
-    runs on a push to `main`, so a failing test on a branch alone proves
-    nothing. Either let the job also run for that one test branch
-    (temporarily, reverted afterwards), or push a failing test to `main` and
-    revert it at once; the second needs the owner's OK. Then check that the
-    issue opened, and that it closed after the next green run.
 
 ## Decisions
 
@@ -171,6 +156,20 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
 - **[lamsza] Test claim and membership decisions** (planned in
   `docs/superpowers/plans/2026-09-27-listing-claim-membership.md`, never
   written): the `claim_pending` 409 and member accept/deny have no test.
+- **[network] Consider least-privilege CI tokens.** Switch the repos' default
+  workflow permissions to read-only and grant `issues: write` only to the
+  `ci-status` job in the workflow YAML, then prove the "CI is red on main"
+  issue still opens (for example with a deliberately failing test on a
+  branch). The "Allow GitHub Actions to create and approve pull requests"
+  checkbox stays off. Replaces the owner's "Read and write" item above if
+  adopted.
+  - The repo setting is the owner's (GitHub, Settings > Actions > General).
+  - `ci-status` already declares `contents: read` and `issues: write` in all
+    four workflows; add a top-level `permissions: contents: read` so the
+    other jobs stay read-only whatever the default is.
+  - `ci-status` only runs on a push to `main`, so for the branch test its
+    condition has to admit that branch for the test, and is reverted after.
+    Check that the issue opens, then closes after the next green run.
 
 ## UI backlog
 
@@ -198,3 +197,26 @@ follows `UI_BASELINE.md` when it is done.
   Lámsza's own toolbar (`src/routes/(public)/+layout.svelte`) still draws 11
   inline SVGs that `AppIcon` already has, and admin's `AdminPlusIcon` duplicates
   `AppIcon`'s `add`. Switch them to `AppIcon`.
+- **[szotar] The Mondások page follows the default page layout.** Align
+  `/mondasok` with the network's standard structure (title, lead line, main
+  area with content and sidebar), the same way the other Szótár list pages
+  and Lámsza's list pages are built. Today it is inside `SidebarLayout` but
+  has only a title: no lead line under it, and `page-lead` is used for the
+  "Elérted a lista végét." line at the bottom instead.
+
+## Feature ideas
+
+Ideas the owner wants kept, not scheduled. Each needs a plan before any work.
+
+- **[network] Reactions, starting with Mondások**, inspired by IMDb's reaction
+  bar: thumbs up and thumbs down with counts, and a smiley button that opens
+  a small set of emoji reactions with counts.
+  - Only signed-in users can react. Signed-out visitors see the counts, and
+    clicking opens the sign-in dialog.
+  - Our own SVG icons for thumbs up, thumbs down and the smiley, in the
+    shared icon set (`AppIcon`).
+  - One reusable shared component, so it can later be used for words, games
+    and other content across the network.
+  - To decide when planning: one or several reactions per user, toggling a
+    reaction off, the emoji set, and native emojis or our own SVGs (native
+    emojis look different on each OS).
