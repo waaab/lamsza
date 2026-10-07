@@ -171,8 +171,8 @@ grep -H '^ADMIN' ~/projects/lamsza-network/{lamsza,lamsza-szotar,lamsza-jatszote
 What you verify locally is the **gate logic**, not any particular email list:
 
 ```bash
-cd ~/projects/lamsza-network/lamsza-szotar/backend      && go test ./internal/auth/...
-cd ~/projects/lamsza-network/lamsza-admin/backend && go test ./internal/auth/...
+cd ~/projects/lamsza-network/lamsza-szotar && scripts/test-backend.sh ./internal/auth/...
+cd ~/projects/lamsza-network/lamsza-admin  && scripts/test-backend.sh ./internal/auth/...
 ```
 
 **Expect:** pass. These cover allowlist matching (case-insensitivity, separators).
@@ -363,18 +363,30 @@ cd ~/projects/lamsza-network/lamsza && npm test
 # backend/schema/, then runs every Go package against it
 cd ~/projects/lamsza-network/lamsza && npm run test:go
 
-# the other backends
+# the other three: frontend suite, then backend suite on a scratch database
 for d in lamsza-szotar lamsza-jatszoter lamsza-admin; do
-  (cd ~/projects/lamsza-network/$d/backend && go test ./...)
+  (cd ~/projects/lamsza-network/$d && npm test)
 done
 ```
 
-The lamsza Go suites read only `TEST_DATABASE_URL`, never `DATABASE_URL` or
-`.env`, and refuse a local database whose name does not end in `_test`
-(`backend/internal/db/testguard.go`). A plain `go test ./...` in `backend/`
-therefore fails the root package with "TEST_DATABASE_URL is not set" instead of
-writing to the dev database, which is what it used to do: 43 of the 46 users in
-the dev `lamsza` database on 2026-10-07 were `*@test.lamsza` fixtures.
+**No test suite touches a dev database.** In all four repos the Go suites read
+only `TEST_DATABASE_URL`, never `DATABASE_URL` or `.env`, and refuse a local
+database whose name does not end in `_test` (`backend/internal/db/testguard.go`).
+The scripts behind the commands above drop and recreate the scratch database on
+every run:
+
+| Repo | Command | Scratch database | Schema from |
+|---|---|---|---|
+| lamsza | `npm run test:go` (`scripts/test-go.sh`) | `lamsza_test` on `lamsza-db` | `backend/schema/` via `scripts/db-bootstrap.sh` |
+| admin | `npm run test:backend` (`scripts/test-backend.sh`) | `lamsza_admin_test` on `lamsza-db` | lamsza's `backend/schema/`, same script |
+| szotar | `npm run test:backend` (`scripts/test-backend.sh`) | `szotar_test` on `szotar-db` | the backend's own `db.Migrate()` |
+| jatszoter | `npm run test:backend` (`scripts/test-backend.sh`) | `jatszoter_test` on `jatszoter-db` | the backend's own `db.Migrate()` |
+
+Each script passes extra arguments to `go test`, e.g. `scripts/test-backend.sh
+./internal/auth/...`. A plain `go test ./...` in `backend/` fails the DB-bound
+packages with "TEST_DATABASE_URL is not set" (admin skips its two DB tests)
+instead of writing to dev data, which is what it used to do: on 2026-10-07, 43 of
+the 46 users in the dev `lamsza` database were `*@test.lamsza` fixtures.
 
 > `node --test tests/` (directory form) crashes with `MODULE_NOT_FOUND` on Node 24.
 > Use the glob `'tests/*.test.js'`.
@@ -403,22 +415,11 @@ CRUD tests in the same package; those tests went with the admin handlers they
 covered. The two frontend failures were fixed by their own task.
 
 > Three of these suites talk to Postgres, and since BOG-53 all three also run in
-> CI against a `postgres:16` service; nothing is excluded by name any more.
-> `npm run test:go` already runs lamsza the way CI does: an empty database built
-> from the committed schema.
->
-> **The szotar, jatszoter and admin backends still read `.env` in their tests,
-> so their DB-bound suites write to the dev databases.** Until each gets the
-> same guard, run them against a scratch database:
->
-> ```bash
-> # szotar and jatszoter: the backends migrate an empty database themselves
-> docker exec szotar-db psql -U szotar_user -d postgres -c 'CREATE DATABASE szotar_scratch'
-> cd ~/projects/lamsza-network/lamsza-szotar/backend && DATABASE_URL="postgres://szotar_user:szotar_password@localhost:5435/szotar_scratch?sslmode=disable" go test -count=1 ./...
-> ```
->
-> A suite that passes on your dev data and fails on an empty database is the
-> failure CI used to be blind to.
+> CI against a `postgres:16` service; nothing is excluded by name any more. CI
+> sets `TEST_DATABASE_URL` to that service database. The local scripts above run
+> the suites the way CI does: on an empty database built from the repo. A suite
+> that passes on your dev data and fails on an empty database is the failure CI
+> used to be blind to.
 
 `tests/networkOrigins.test.js` was failing against stale pre-renumber ports (5173/5174/5175)
 and is fixed. The remaining failures are tracked as their own task.
