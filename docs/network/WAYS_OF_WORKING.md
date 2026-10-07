@@ -78,7 +78,8 @@ schedule, its own owner, and almost no shared tasks. No app is there yet.
 
 The four repos sit side by side under `~/projects/lamsza-network/`. That folder
 is not a git repo; it holds the repos, the `start-lamsza-network.sh` symlink, a
-`CLAUDE.md` for the whole network, and a VS Code workspace file.
+`CLAUDE.md` symlink to the tracked `docs/network/CLAUDE.md` in this repo, and a
+VS Code workspace file.
 
 Until 2026-10-07 the repos sat directly under `~/projects`, and `szotar` and
 `jatszoter` had no `lamsza-` prefix. Paths in the task history still use those
