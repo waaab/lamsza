@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher).
+Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -177,6 +177,37 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   - `ci-status` only runs on a push to `main`, so for the branch test its
     condition has to admit that branch for the test, and is reverted after.
     Check that the issue opens, then closes after the next green run.
+
+## Tájszórejtvény (content and follow-ups)
+
+The game is being built (plan: `lamsza-jatszoter/docs/superpowers/plans/2026-10-07-tajszorejtveny.md`,
+decisions in its spec §16). These are the agreed tasks outside that plan.
+
+- **[jatszoter] owner: grow the proverb list toward about 230.** 28 puzzles a week need about 230
+  proverbs to avoid a repeat within 8 weeks; today there are 44 fallback proverbs (and Szótár's
+  mondások, which count too). Until then a reused proverb is allowed and counted (spec §16.2.10).
+- **[jatszoter] owner: mark more words as familiarity 1** in admin `/games` (word metadata). Könnyű uses
+  21 well-known words a week and 62-77 fit a grid, so each returns every 3-4 weeks (spec §16.2.11).
+- **[jatszoter] owner: grow the filler words** from 453 to several thousand, with plenty of 7-8 letter
+  words, not only short ones. Fewer empty cells and more variety (spec §16.2.3).
+- **[jatszoter] owner: review the word metadata** (familiarity, clue overrides, block list) and the 78
+  example sentences written for the concept; until one is marked reviewed it is not used (spec §16.2.7).
+- **[szotar] owner: fix the definition typos the concept found**, in admin `/dictionary`: katulya
+  "Dobpz", pityóka "Burgyona", laska "nyujtott", bikfic "fiu", igír "Igér", szakajtó "Szakitó", mihót
+  "Miota", nyiszitel "Vág,rossz", tanyitt "Tanit", cseszle "Szunyog", összegurucsálódik "Összegyürödik",
+  kalorifer "Fütőtest", garzon "Egszobás"; megcsemelettem is defined as "Kályha" (misaligned).
+- **[network] No email sender.** Tájszórejtvény's review reminders are in-app only (the admin
+  dashboard). Add a sender if the owner wants email.
+- **[jatszoter] Összesített ranglista with placement points per game** (100 × (players − rank + 1) /
+  players), with Hét/Hónap/Év/Összes tabs; it also fixes Szórejtő missing from the overall board and
+  Szókereső's all-time sum. Caveat accepted by the owner: a game with few players weighs the same as a
+  busy one. Tájszórejtvény joins the overall board only then.
+- **[jatszoter] Tájszórejtvény admin v1.1:** swap a single word (partial re-fill), push a report's fix
+  to Szótár, a spelling/consistency check on clues.
+- **[jatszoter] Move the other games' tile drawings** from `GameIcon.svelte` into the shared `AppIcon`
+  (UI_BASELINE ic-system); Tájszórejtvény's tile already uses `AppIcon`.
+- **[network] owner: decide a network text-size setting.** Tájszórejtvény brings a Játszótér-only
+  Betűméret (normál / nagyobb / legnagyobb); it could become a UI_BASELINE item for every app.
 
 ## UI backlog
 
