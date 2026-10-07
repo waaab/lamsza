@@ -186,6 +186,7 @@ Also needed for content: dictionary import source / dump for initial seed (`szot
 | `DICTIONARY_SOURCE` | Yes | `local` until szotar is live; then can switch |
 | `DICTIONARY_DATA_DIR` | If local | e.g. `data/dictionary` |
 | `SZOTAR_BASE_URL` | Yes when not local | e.g. `https://szotar.lamsza.com` or `http://127.0.0.1:3010` |
+| `SZOTAR_GAMES_TOKEN` | Yes, before Tájszórejtvény goes live | Equal to Szótár's `GAMES_SERVICE_TOKEN` (§6.2): Tájszórejtvény reads every mondás with its date from `SZOTAR_BASE_URL/internal/games/proverbs`. Unset: only the game's own proverb list is used. |
 | `APP_VERSION` | Optional | Display / config version |
 
 ### 6.4 admin.lamsza.com (Phase 2)
