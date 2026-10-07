@@ -7,11 +7,20 @@ on:
 # Two jobs, not one. When this was a single job a frontend failure marked the Go
 # steps "skipped", so the backend went unbuilt and untested for hours without the
 # summary saying so. Separate jobs always report separately.
+# Versions are pinned on purpose; the one place that records them is
+# lamsza/docs/network/VERSIONS.md.
+# - runs-on: ubuntu-24.04 is the OS of the production droplet (Ubuntu 24.04 LTS).
+#   Do not change it back to ubuntu-latest: that moves to a new Ubuntu on
+#   GitHub's schedule, not ours, and CI would stop matching production.
+# - Node comes from .nvmrc and Go from backend/go.mod. No version is written in
+#   this file, so the two can never disagree with the repo.
+# When the droplet is upgraded (Ubuntu, Node or Go), update the runs-on pin,
+# .nvmrc, go.mod and VERSIONS.md together, in the same change.
 jobs:
   frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The receiver below has no other gate, and it is the one script whose
       # failure is self-concealing: if ci-status-issue.sh breaks, the only symptom
@@ -23,11 +32,11 @@ jobs:
       - name: Test the CI status receiver
         run: bash .github/ci-status-issue.test.sh
 
-      # 22, not 20: the test suite uses the node:test runner features that
-      # landed after 20 and will not parse on it.
-      - uses: actions/setup-node@v4
+      # Node from .nvmrc (24 LTS). Not 20: `node --test "tests/*.test.js"` needs
+      # the test runner's glob support, which Node 20 lacks.
+      - uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -44,7 +53,7 @@ jobs:
         run: npm run build:no-preflight
 
   backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -74,11 +83,11 @@ jobs:
       # Here it is the throwaway service database above.
       TEST_DATABASE_URL: postgres://lamsza_user:lamsza_password@localhost:5433/lamsza?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
       # Same script and same committed schema a developer uses to create a
@@ -120,12 +129,12 @@ jobs:
       && github.ref == 'refs/heads/main'
       && (needs.frontend.result == 'failure' || needs.backend.result == 'failure'
       || (needs.frontend.result == 'success' && needs.backend.result == 'success'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Open, update or close the "CI is red on main" issue
         env:
           GH_TOKEN: ${{ github.token }}

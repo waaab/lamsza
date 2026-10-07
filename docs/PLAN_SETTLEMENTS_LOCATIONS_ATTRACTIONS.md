@@ -305,6 +305,6 @@ Based on [Wikipedia: Székelyföld történelmi székei](https://hu.wikipedia.or
 
 ## 12. Implementation status (March 2026)
 
-Foundation migration, attractions, county/settlement public pages, unified search (including látnivalók and székek), `/szekek` and `/szekek/{slug}` pages, settlement-side látnivalók list, admin Markdown for counties and historical seats, and doc updates are tracked in [BACKLOG.md](BACKLOG.md). Optional follow-ups (e.g. `attraction_settlements` junction, multi-provider weather) remain in that backlog or [weather-and-widgets-plan.md](../weather-and-widgets-plan.md).
+Foundation migration, attractions, county/settlement public pages, unified search (including látnivalók and székek), `/szekek` and `/szekek/{slug}` pages, settlement-side látnivalók list, admin Markdown for counties and historical seats, and doc updates are tracked in [BACKLOG.md](BACKLOG.md). Optional follow-ups (e.g. `attraction_settlements` junction, multi-provider weather) remain in that backlog or [weather-and-widgets-plan.md](history/weather-and-widgets-plan.md).
 
 *Next steps: see [BACKLOG.md](BACKLOG.md) (P6 and manual verification items).*

@@ -23,19 +23,18 @@ a `frontend/` folder here.
 - **Deployment**: Docker Compose
 
 ## Quick Start
-1. Configure your `.env` file (see `.env.example` if available).
-2. Use the standardized service management workflow:
+1. Configure your `.env` file in the repo root (`DATABASE_URL`, `PORT`, `GOOGLE_CLIENT_ID`, ...).
+2. Start the whole network (all four apps and their databases) from the parent folder:
    ```bash
-   npm run restart
+   ~/projects/lamsza-network/start-lamsza-network.sh start|stop|restart|status
    ```
-   *This will start the Database, Backend, and Frontend in separate manageable processes.*
+   `stop` stops the apps and leaves the databases running. Logs and PID files are in
+   `~/.cache/lamsza-network/`. Never kill other apps' Vite servers or run
+   `docker compose down` here: `lamsza-db` is shared with lamsza-admin.
 
 ## Development
-- **Start All**: `./scripts/restart_all.sh`
-- **Stop All**: `pkill -f vite && pkill -f "go run main.go" && docker compose down`
-- **View Logs**:
-  - `tail -f backend/server_backend.log`
-  - `tail -f server_frontend.log`
+- Tests: `npm test` (frontend) and `npm run test:go` (backend, on a scratch database);
+  see `docs/LOCAL_DEV_CHECKS.md`.
 
 ## Architecture
-See [architecture_overview.md](architecture_overview.md) for a detailed breakdown.
+See [docs/history/architecture_overview.md](docs/history/architecture_overview.md) for an older, partly outdated breakdown.

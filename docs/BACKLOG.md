@@ -94,9 +94,9 @@ Accounts, favorites, the saved settlement, claimed listings, and directory websi
 
 | Item | Source | Notes |
 |------|--------|--------|
-| Multi-provider weather, caching, admin defaults | `weather-and-widgets-plan.md` | Own design pass; env keys |
+| Multi-provider weather, caching, admin defaults | `docs/history/weather-and-widgets-plan.md` | Own design pass; env keys |
 | Shared icon module | `docs/icon-module-later.md` | Replace inline SVGs incrementally |
-| Google Sign-In / accounts | `project-brief.md` | v1.2 scope |
+| Google Sign-In / accounts | `docs/history/project-brief.md` | v1.2 scope |
 | TypeScript types for Location / API | SETTLEMENTS recommendations | Nice-to-have |
 
 ---

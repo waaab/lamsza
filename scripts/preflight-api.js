@@ -39,7 +39,7 @@ export function failureMessage(base, detail) {
         `  Build stopped: the backend did not answer at ${base}/api/health`,
         `  ${detail}`,
         "",
-        "  Start the Go backend on port 3001 (npm run restart), or point the",
+        "  Start the Go backend on port 3001 (~/projects/lamsza-network/start-lamsza-network.sh start), or point the",
         "  build at a live one with API_BASE_URL=https://... npm run build",
         "",
     ].join("\n");

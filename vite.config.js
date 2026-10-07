@@ -16,4 +16,3 @@ export default defineConfig({
 	}
 });
 
-console.log('Vite config loaded - allowedHosts:', ['.test', 'localhost', '127.0.0.1', '::1']);

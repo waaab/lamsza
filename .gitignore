@@ -32,7 +32,7 @@ backend/backend
 # Uploaded event images (served from /api/media/event-images/)
 backend/data/
 
-# Local dev: PID files and logs (scripts/restart_all.sh, etc.)
+# Local dev: PID files and logs left by older run scripts
 server.pid
 backend/server.pid
 *.log
