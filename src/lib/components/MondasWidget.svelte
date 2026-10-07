@@ -1,19 +1,20 @@
 <script>
     import { onMount } from "svelte";
-    import { apiFetch } from "$lib/api";
-    import { formatHuDateLongFromYMD, localCalendarISODate } from "$lib/utils";
+    import { formatHuDateLongFromYMD } from "$lib/utils";
+    import { szotarUrl } from "$lib/networkOrigins";
 
     /** @type {{ id: number, text: string, display_date: string }[]} */
     let quotes = [];
     let loading = true;
 
+    // The daily mondás lives in Szótár, its only store (OPEN_ITEMS, Mondások).
+    // Szótár decides today in Europe/Bucharest (WAYS_OF_WORKING R19), so no
+    // date is sent. A public read: no cookies go along.
     onMount(async () => {
         try {
-            const day = localCalendarISODate();
-            const data = await apiFetch(
-                `/api/mondasok?date=${encodeURIComponent(day)}`,
-            );
-            quotes = Array.isArray(data) ? data : [];
+            const res = await fetch(szotarUrl("/api/proverbs/today"), { credentials: "omit" });
+            const data = res.ok ? await res.json() : null;
+            quotes = data?.proverb ? [data.proverb] : [];
         } catch {
             quotes = [];
         } finally {

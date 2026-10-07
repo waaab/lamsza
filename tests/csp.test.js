@@ -55,3 +55,12 @@ test("the theme is set from an external file before the first paint", () => {
     assert.ok(appHtml.indexOf("theme-init.js") < appHtml.indexOf("%sveltekit.body%"));
     assert.match(read("../static/theme-init.js"), /localStorage\.getItem\('theme'\)/);
 });
+
+test("connect-src admits Szótár's API, which serves the daily mondás, and no wildcard", () => {
+    // OPEN_ITEMS, Mondások: Lámsza's home page reads /api/proverbs/today from Szótár.
+    const list = svelteConfig.match(/const szotarConnectOrigins = \[([\s\S]*?)\];/);
+    assert.ok(list, "szotarConnectOrigins is missing");
+    assert.match(list[1], /'https:\/\/szotar\.lamsza\.com'/);
+    assert.doesNotMatch(list[1], /\*/);
+    assert.match(svelteConfig, /'connect-src':\s*\[[^\]]*\.\.\.szotarConnectOrigins\]/);
+});

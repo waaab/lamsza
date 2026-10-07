@@ -57,6 +57,15 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
      more). Keep admin's `CORS_ALLOWED_ORIGINS=https://admin.lamsza.com`: no
      public app calls the admin app. Check: `https://szotar.lamsza.com/admin`
      and `https://jatszoter.lamsza.com/admin` show the 404 error page.
+  7. **Mondások move to Szótár (OPEN_ITEMS, Mondások).** Production's
+     mondások are test data too: `pg_dump` lamsza's `mondasok` and Szótár's
+     `proverbs` (keep the dumps off the server's repos), then delete every row
+     in both. Szótár's `CORS_ALLOWED_ORIGINS` must include
+     `https://lamsza.com` and `https://www.lamsza.com`: Lámsza's home page
+     reads the daily mondás from `https://szotar.lamsza.com/api/proverbs/today`
+     in the browser. Lámsza's production build needs no setting (its CSP
+     already lists `https://szotar.lamsza.com`). Drop lamsza's `mondasok`
+     table only after the cleanup step is deployed.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
@@ -105,7 +114,9 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 product
   mondás (lamsza's 8, Szótár's 2, and production's) is test data, so there is no
   migration and both start empty. Steps, one repo per step, tested on scratch
   databases first:
-  1. **Backup, then empty.** A quick `pg_dump` of lamsza's `mondasok` and
+  1. **Backup, then empty. Done on dev 2026-10-07** (8 + 2 rows; dumps in
+     `~/.cache/lamsza-network/backups/2026-10-07-mondasok/`, both proven to
+     restore). A quick `pg_dump` of lamsza's `mondasok` and
      Szótár's `proverbs` (kept outside the repos), then delete every row in
      both, on dev. Szótár's table keeps its one-per-day unique index on
      `display_date`. Production starts empty too: the owner runs the same

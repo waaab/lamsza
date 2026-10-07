@@ -1,6 +1,16 @@
 import adapter from '@sveltejs/adapter-static';
 
 /** @type {import('@sveltejs/kit').Config} */
+// Szótár's API: Lámsza's home page reads the daily mondás from it (OPEN_ITEMS,
+// Mondások). A production build lists only szotar.lamsza.com; a development
+// build adds the local hosts, and VITE_SZOTAR_ORIGIN when it is set in the
+// environment at build time (networkOrigins.js uses the same variable).
+const szotarConnectOrigins = [
+	'https://szotar.lamsza.com',
+	...(process.env.NODE_ENV === 'production' ? [] : ['https://szotar.lamsza.test', 'http://localhost:5175']),
+	...(process.env.VITE_SZOTAR_ORIGIN ? [process.env.VITE_SZOTAR_ORIGIN.trim().replace(/\/+$/, '')] : [])
+];
+
 const config = {
 	kit: {
 		appDir: 'app',
@@ -43,7 +53,7 @@ const config = {
 				// avatars, so the host cannot be listed one by one.
 				'img-src': ['self', 'data:', 'https:'],
 				'font-src': ['self', 'data:'],
-				'connect-src': ['self', 'https://accounts.google.com/gsi/'],
+				'connect-src': ['self', 'https://accounts.google.com/gsi/', ...szotarConnectOrigins],
 				'frame-src': ['self', 'https://accounts.google.com/gsi/'],
 				'manifest-src': ['self'],
 				'worker-src': ['self']

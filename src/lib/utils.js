@@ -123,18 +123,6 @@ export function formatHuDateLong(d) {
 }
 
 /**
- * Local calendar date as YYYY-MM-DD (matches what the user sees on `#datetime`).
- * @param {Date} [d]
- * @returns {string}
- */
-export function localCalendarISODate(d = new Date()) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-}
-
-/**
  * Format a YYYY-MM-DD string as Hungarian long date (local calendar day, same style as `formatHuDateLong`).
  * @param {string} iso
  * @returns {string}
