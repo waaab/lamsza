@@ -89,7 +89,7 @@ reference; each item names its own.
 | Sign-in dialog states (`dlg-signin-states`) | Játszótér's |  |
 | Confirm dialog (`dlg-confirm`) | Szótár's |  |
 | Notice / alert dialog (`dlg-notice`) | Lámsza's |  |
-| Content dialog shell (`dlg-content`) | Lámsza's |  |
+| Content dialog shell (`dlg-content`) | Lámsza's | On phones (up to 768px) the shell takes the screen's width (`calc(100vw - 1rem)`), not 70vw; the shell's own rule in `global.css` since 2026-10-07, asked for with Tájszórejtvény. |
 | Close-button wording (`dlg-close-label`) | Owner's rule | A dialog that only shows content (media, notices, help, info) closes with "Bezárás". "Mégse" is only for cancelling an action, in a dialog that asks for one (confirm, forms, sign-in), next to the action button. Added by the owner on 2026-10-07. |
 
 ## Settings and profile

@@ -185,10 +185,6 @@ follows `UI_BASELINE.md` when it is done.
   text if one fits Szótár, and remove the add icon from the toolbar. To decide
   when it is done: which pages carry it (the home page at least), and what a
   signed-out visitor sees (the button opening the sign-in dialog, or no button).
-- **[network] Content dialogs on phones.** The shared `.link-dialog` shell in
-  `global.css` is `min(70vw, 100vw - 2rem)` wide, about 273px on a 390px phone,
-  in every app. Admin already overrides it to the screen width on small screens
-  (`admin.css`); make that the shell's own small-screen rule in lamsza and sync.
 - **[szotar] The letter above the headword.** The word page shows the entry's
   first letter ("cs") as a small link above the headword. The 2026-10-05
   word-entry-polish plan says to remove it; it was never done. Owner to
