@@ -6,7 +6,7 @@ database in one command:
 | File | What it is |
 |---|---|
 | `001_schema.sql` | The whole current schema, structure only: 42 tables, the `locations` view, the `pg_slugify`/`sync_*` functions and their triggers, indexes, constraints, and the `pg_trgm` and `unaccent` extensions. |
-| `002_reference.sql` | The reference rows the app cannot work without: `counties`, `geo_locations`, `settlements`, `settlement_location_types`, `historical_seats`, `county_historical_seats`, `venue_types`, `weather_desc_translations`. |
+| `002_reference.sql` | The reference rows the app cannot work without: `counties`, `geo_locations`, `settlements`, `settlement_location_types`, `historical_seats`, `county_historical_seats`, `venue_types`, `weather_desc_translations`, and the directory and event catalogs `entry_types`, `entry_categories`, `catalog_event_types`, `catalog_event_subtypes`. The backend also seeds the catalogs on boot, but lamsza-admin runs no seeding, so a bootstrapped database needs them here. |
 
 ```bash
 scripts/db-bootstrap.sh                     # the local dev database

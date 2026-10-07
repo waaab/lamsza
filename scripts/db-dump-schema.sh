@@ -19,8 +19,10 @@
 #   002_reference.sql  the reference rows the app cannot work without:
 #                      counties, geo_locations, settlements,
 #                      settlement_location_types, historical_seats,
-#                      county_historical_seats, venue_types and
-#                      weather_desc_translations.
+#                      county_historical_seats, venue_types,
+#                      weather_desc_translations, and the directory and
+#                      event catalogs (entry_types, entry_categories,
+#                      catalog_event_types, catalog_event_subtypes).
 #
 # REFERENCE_TABLES below is deliberately an allowlist, not an exclusion list.
 # users, sessions, admin_sessions, site_settings, entries and everything else
@@ -46,6 +48,16 @@ REFERENCE_TABLES=(
 	county_historical_seats
 	venue_types
 	weather_desc_translations
+	# The directory and event catalogs. The backend seeds them on boot
+	# (MigrateDirectoryCatalog, events.Migrate), but lamsza-admin runs no DDL
+	# and no seeding, so without them a bootstrapped database has no
+	# categories, entry types or event types for admin to work with. Labels
+	# only, no personal data. Both seeds are idempotent: the directory seed
+	# runs only on empty tables, the event seed uses ON CONFLICT DO NOTHING.
+	entry_types
+	entry_categories
+	catalog_event_types
+	catalog_event_subtypes
 )
 
 url=${DATABASE_URL:-$DEFAULT_URL}
@@ -101,8 +113,11 @@ banner() {
 		"Allowlisted tables only; see scripts/db-dump-schema.sh for why."
 	# --column-inserts so the file survives a column being added or reordered,
 	# and so a reviewer can read the diff. 2>/dev/null drops pg_dump's warning
-	# about the self-referencing settlements.parent_id FK; the rows load fine
-	# because they arrive in one multi-row INSERT per table.
+	# about the self-referencing settlements.parent_id and
+	# entry_categories.parent_id FKs; the rows load fine because the foreign
+	# keys are checked at the end of each INSERT statement, and a table of up
+	# to 100 rows arrives in one statement. A larger self-referencing table
+	# would need its parents dumped first.
 	pg_run "$runner" pg_dump --data-only --no-owner --no-acl \
 		--column-inserts --rows-per-insert=100 \
 		"${REFERENCE_TABLES[@]/#/--table=public.}" 2>/dev/null
