@@ -56,17 +56,11 @@
             <path d="M2.3 14.2 3.8 19.4 5.3 16.2 6.8 19.4 8.3 14.2"></path>
         </svg>
     {:else if name === "mondasok"}
-        <!-- Hungarian „ - scaled to match visual weight of 24×24 stroke icons -->
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" overflow="visible" class="app-icon-quote">
-            <g transform="translate(12 17.5) scale(1.62) translate(-12 -17.5)">
-                <text
-                    x="12"
-                    y="18"
-                    text-anchor="middle"
-                    font-size="24"
-                    font-weight="800"
-                    font-family="Georgia, 'Times New Roman', Times, serif">„</text>
-            </g>
+        <!-- Google Material Symbols "format_quote", filled (the outlined one has holes).
+             The viewBox crops it 1.25x so it spans 2-22 like the stroke icons, centered.
+             fill/stroke sit on the path so app CSS that strokes every svg leaves it alone. -->
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="96 -864 768 768" class="app-icon-quote">
+            <path fill="currentColor" stroke="none" d="m228-240 92-160q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 23-5.5 42.5T458-480L320-240h-92Zm360 0 92-160q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 23-5.5 42.5T818-480L680-240h-92Z"></path>
         </svg>
     {:else if name === "quicklinks"}
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"

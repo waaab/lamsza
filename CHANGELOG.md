@@ -25,6 +25,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- The shared Mondások icon (`AppIcon` `mondasok`) is Google's filled `format_quote` (Material Symbols, without the outlined style's holes), centered and as wide as the other icons; it was a Georgia „ glyph drawn as `<text>` that sat low and small. Fill and stroke are on the path, so the apps need no CSS for it. Synced to every app.
 - Events follow Bucharest's day (R19): the list, its filters and the search hide an event at Bucharest midnight after its last day, not at UTC midnight (until 02:00-03:00 Bucharest time before), and the badges read event dates and times as Bucharest times with the server's clock, so a visitor in another time zone, or with a wrong clock, sees the same status. [public]
 - `.github/ci-status-issue.*` (identical in all four repos): the comments no longer claim the GitHub API is unreadable or that branch protection was adopted; no em dashes. The Cursor rule's Irányelvek link says `lamszaUrl()`, never lamsza.com in dev. OPEN_ITEMS gains Szótár's word↔mondás links and the letter-kicker decision.
 - An unknown entry, event or historical seat (`/bejegyzes/…`, `/esemenyek/…`, `/szekek/…`) shows the network's error page (404, not indexed) instead of an in-page message on a normal page. [public]
