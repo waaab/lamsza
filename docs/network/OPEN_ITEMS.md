@@ -69,6 +69,25 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
 - **[lamsza] [admin] test the `site_settings` contract.** Admin writes the
   `weather_provider_*` and `social_*_url` keys that lamsza reads; no test pins
   the key names on either side.
+- **[admin] Type-check errors, to work through gradually.** `npx svelte-check`
+  in `frontend/` reports 793 errors in 34 files (2026-10-07). They predate the
+  verification fixes: 786 were there before, and the 7 that the shared
+  `tests/noEmdash.test.js` adds are the same kind as the rest of the test files
+  (no Node type definitions, so `node:` imports do not resolve). Most are in
+  `src/routes/+page.svelte` (about 630). Start with the cheap, wide fix (Node
+  types for the tests), then the page; do not let the count grow.
+- **[lamsza] Catalog seeds burn sequence numbers on every backend start.** The
+  boot-time seeds insert with `ON CONFLICT DO NOTHING`, which takes a sequence
+  value even when the row already exists, so each start of the lamsza backend
+  moves `pages`, `page_faq_sections`, `historical_seats`,
+  `catalog_event_types`/`_subtypes`, `settlement_location_types` and `websites`
+  ahead (16, 16, 5, 5/16, 5 and 1 on 2026-10-07) with no row change. Seeds in
+  `internal/pages/pages.go`, `internal/pagefaq/pagefaq.go`,
+  `internal/events/migrate.go`, `internal/handlers/settlement_location_types.go`,
+  `internal/account/websites_migrate.go` and `internal/db/seed_historical_seats.go`. Make them
+  not burn IDs (insert only `WHERE NOT EXISTS`, or seed once from
+  `backend/schema/002_reference.sql`), with a test that a second boot leaves the
+  sequences where they were.
 - **[szotar] Word and mondás links** (moved from `lamsza-szotar/docs/tasks.md`).
   The word page shows Példamondat and "Székely mondás ezzel a szóval" per sense,
   and the first sense lists mondások whose text mentions the headword (a text
