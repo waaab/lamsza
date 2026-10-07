@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea).
+Last updated: 2026-10-07 (verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -203,6 +203,20 @@ follows `UI_BASELINE.md` when it is done.
   and Lámsza's list pages are built. Today it is inside `SidebarLayout` but
   has only a title: no lead line under it, and `page-lead` is used for the
   "Elérted a lista végét." line at the bottom instead.
+- **[lamsza] [szotar] [jatszoter] Apps launcher in the toolbar.** A new button
+  at the top right of the toolbar in every public app (Lámsza, Szótár,
+  Játszótér; not the admin app).
+  - The icon is our own nine-dot grid SVG in the shared icon set (`AppIcon`),
+    clearly different from the old admin icon.
+  - It opens a small panel with each network app's icon and name, the
+    current app highlighted, with links built from `networkOrigins.js`.
+  - The app list comes from one shared place, so a new app appears everywhere
+    automatically. `networkOrigins.js` is not in
+    `shared-frontend-modules.json` today (Szótár and Játszótér keep their own
+    copies), so the list and the origins likely join the shared modules.
+  - One shared component, keyboard accessible, works on phones.
+  - Check it against UI_BASELINE `tb-cross-links` (the sister-app links each
+    toolbar has today) when planning.
 
 ## Feature ideas
 
