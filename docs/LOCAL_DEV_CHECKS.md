@@ -379,6 +379,9 @@ four repos checked out, `scripts/sync-shared-frontend.sh --check` verifies them 
 one go, and `scripts/tests/sync-shared-frontend.test.sh` tests the script itself.
 The rule is `docs/network/SHARED_FRONTEND_MODULES.md`.
 
+Every frontend suite also runs `tests/noEmdash.test.js` (shared the same way): no em dash
+in code or UI text anywhere in the repo, Markdown exempt (`.cursor/rules/no-emdash.mdc`).
+
 > The lamsza, szotar and jatszoter Go suites also run in CI against a `postgres:16`
 > service (since BOG-53); CI sets `TEST_DATABASE_URL` to that service database.
 > Admin's CI has no Postgres service, so its DB-bound tests skip there and run only

@@ -69,6 +69,11 @@ Last updated: 2026-10-07 (verification review; GA4 item; UI backlog).
 - **[lamsza] [admin] test the `site_settings` contract.** Admin writes the
   `weather_provider_*` and `social_*_url` keys that lamsza reads; no test pins
   the key names on either side.
+- **[szotar] Word and mondás links** (moved from `lamsza-szotar/docs/tasks.md`).
+  The word page shows Példamondat and "Székely mondás ezzel a szóval" per sense,
+  and the first sense lists mondások whose text mentions the headword (a text
+  search on `/api/proverbs`). Still missing: explicit word↔mondás links stored
+  in the data, and navigation both ways (from a word in a mondás to its entry).
 - **[lamsza] two orphan images** in `backend/data/entry-images/`
   (`990e305eead49770.png`, `verify-manifesto.png`, 2026-09-22): untracked and
   referenced by no row. Delete them or find their owner.
@@ -100,6 +105,10 @@ follows `UI_BASELINE.md` when it is done.
   `global.css` is `min(70vw, 100vw - 2rem)` wide, about 273px on a 390px phone,
   in every app. Admin already overrides it to the screen width on small screens
   (`admin.css`); make that the shell's own small-screen rule in lamsza and sync.
+- **[szotar] The letter above the headword.** The word page shows the entry's
+  first letter ("cs") as a small link above the headword. The 2026-10-05
+  word-entry-polish plan says to remove it; it was never done. Owner to
+  confirm: remove it, or keep it and close the plan item.
 - **[lamsza] [admin] One icon system everywhere** (UI_BASELINE "ic-system").
   Lámsza's own toolbar (`src/routes/(public)/+layout.svelte`) still draws 11
   inline SVGs that `AppIcon` already has, and admin's `AdminPlusIcon` duplicates

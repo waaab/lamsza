@@ -13,6 +13,7 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- `tests/noEmdash.test.js`, shared with every app: `npm test` (and CI) fails on an em dash in code or UI text; Markdown is exempt (rule D5).
 - WAYS_OF_WORKING R13: server-to-server calls go to `http://127.0.0.1:<port>`, set by an env var (owner's decision).
 - `ErrorShell.svelte`: the network's one minimal error shell (the Lámsza button, a sub-app's own button, the shared `ErrorPage`), shared with every app. Lámsza's root error page uses it and looks the same.
 - One error page for the whole network (`ErrorPage.svelte`): a lantern illustration that follows the theme (`icons/ErrorLantern.svelte`), "Hoppácska!", the error code, and a plain Hungarian title and explanation for 400, 401, 403, 404, 408, 410, 429 and any other error, instead of SvelteKit's English "Not Found". Still noindex. [public]
@@ -20,6 +21,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- `.github/ci-status-issue.*` (identical in all four repos): the comments no longer claim the GitHub API is unreadable or that branch protection was adopted; no em dashes. The Cursor rule's Irányelvek link says `lamszaUrl()`, never lamsza.com in dev. OPEN_ITEMS gains Szótár's word↔mondás links and the letter-kicker decision.
 - An unknown entry, event or historical seat (`/bejegyzes/…`, `/esemenyek/…`, `/szekek/…`) shows the network's error page (404, not indexed) instead of an in-page message on a normal page. [public]
 - Dark mode: the search box's divider and the "Mégse" hover in dialogs have dark values; the system-dark setting gets the same search seam colour as the explicit dark theme. [public]
 - Every JSON API answers `application/json` (several were sniffed as `text/plain`); error lines stay plain text, as the frontend shows them.
