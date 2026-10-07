@@ -55,7 +55,7 @@ JSON
 #   ever merge. The gate here is "green", not "seen".
 #
 # strict: false — do not force a branch to be rebased onto the latest `main`
-#   before merging. WAYS_OF_WORKING §3 already runs one task per repo at a time,
+#   before merging. WAYS_OF_WORKING R4 already runs one agent per repo at a time,
 #   so `main` very rarely moves under an open branch, and strict:true would add
 #   a rebase-and-wait loop to every merge for that narrow window. Flip this to
 #   true if parallel work per repo ever becomes normal.

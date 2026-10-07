@@ -106,10 +106,8 @@ Migration also backfills `slug` and `county_slug` for existing rows and inserts 
 `backend/main.go` registers **no `/api/admin/*` route**; `HandlePublicLocations` rejects
 anything but `GET` with 405.
 
-**Note:** `backend/internal/handlers/admin_locations.go` still contains
-`HandleAdminLocations` and `HandleSetCountySeat` in this repo. They are unregistered dead
-code kept only because `backend/handlers_test.go` still mounts them on its own test mux.
-Changing location writes means changing `lamsza-admin`, not these.
+Changing location writes means changing `lamsza-admin`: `HandleAdminLocations` and
+`HandleSetCountySeat` exist only there (deleted from this repo on BOG-42).
 
 **Query params (GET):** Optional `?type=` and `?county_slug=` for server-side filtering.
 

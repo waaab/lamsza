@@ -69,8 +69,6 @@ docker ps --format '{{.Names}}\t{{.Status}}'     # lamsza-db, szotar-db, jatszot
 
 | Symptom | Cause |
 |---|---|
-| `rg: command not found`, every app reported `down` while it is actually up | the script uses `ripgrep` for its status check. The apps are fine; the *report* is wrong. Verify with the `ss` command above. |
-| `cd: …/projects/lamsza-network/lamsza-admin/backend: No such file or directory` | `$HOME` is not `/home/attila` in this shell. Run with `LAMSZA_PROJECTS_ROOT=/home/attila/projects/lamsza-network` |
 | a backend never appears | first run compiles Go and downloads modules — jatszoter pulls a large dependency tree. Give it a few minutes and read `${XDG_CACHE_HOME:-$HOME/.cache}/lamsza-network/<app>-backend.log` |
 
 ---
@@ -124,10 +122,9 @@ for p in 5173 5174 5175 5176; do probe http://127.0.0.1:$p/; done
 
 **Expect:** `200` everywhere.
 
-> **All four apps answer `/api/health`** since 2026-10-06. On lamsza and admin the route
-> pings Postgres and returns `503 {"ok":false,"db":"down"}` when the database does not
-> answer, so a process that is up with a dead DB reads as down. szotar and jatszoter return
-> a plain `{"ok":true}`.
+> **All four apps answer `/api/health` with `{"ok":true,"db":"up"}`.** The route pings
+> Postgres and returns `503 {"ok":false,"db":"down"}` when the database does not answer,
+> so a process that is up with a dead DB reads as down.
 
 ---
 
@@ -138,11 +135,11 @@ registered. What you **can** prove:
 
 ```bash
 curl -s http://127.0.0.1:3002/api/config/public | head -c 300   # szotar
-curl -s http://127.0.0.1:3003/api/config/public | head -c 300   # jatszoter
 ```
 
 **Expect:** the payload reports a Google client id is configured (non-empty), not an empty
-string. Then, in a browser at `http://localhost:5175` and `http://localhost:5176`, confirm
+string. jatszoter does not report one: it builds its client id into the frontend from
+`VITE_GOOGLE_CLIENT_ID`. Then, in a browser at `http://localhost:5175` and `http://localhost:5176`, confirm
 the **Google button renders**. A missing button means `VITE_GOOGLE_CLIENT_ID` was empty at
 build time — a code/config bug the agent fixes. A button that renders but fails at Google
 is an origin-registration problem in the Google console, not a code bug.
@@ -164,8 +161,12 @@ out of their own site":
 | admin | `ADMIN_GOOGLE_EMAILS` |
 | jatszoter | `ADMIN_EMAILS` |
 
+`.env` lives at the repo root in lamsza, szotar and jatszoter; admin reads both `.env` and
+`backend/.env`.
+
 ```bash
-grep -H '^ADMIN' ~/projects/lamsza-network/{lamsza,lamsza-szotar,lamsza-jatszoter,lamsza-admin}/backend/.env 2>/dev/null
+grep -H '^ADMIN' ~/projects/lamsza-network/{lamsza,lamsza-szotar,lamsza-jatszoter,lamsza-admin}/.env \
+  ~/projects/lamsza-network/lamsza-admin/backend/.env 2>/dev/null
 ```
 
 What you verify locally is the **gate logic**, not any particular email list:
@@ -287,7 +288,7 @@ curl -s http://127.0.0.1:3003/api/config/public
 **Verified 2026-10-06:** `{"dictionary":{"ok":true,"source":"http","word_count":475},"version":"0.1.0"}`
 — the live pair works locally, against Szótár on `:3002`.
 
-If `source` is `local` and you want the pair, set in `~/projects/lamsza-network/lamsza-jatszoter/backend/.env`:
+If `source` is `local` and you want the pair, set in `~/projects/lamsza-network/lamsza-jatszoter/.env`:
 
 ```
 DICTIONARY_SOURCE=http
@@ -305,8 +306,8 @@ Prove the apps come back cleanly after a full stop, and that no data lives only 
 
 ```bash
 # record the counts
-docker exec -i szotar-db    psql -U postgres -d szotar    -c 'select count(*) from words;'
-docker exec -i jatszoter-db psql -U postgres -d jatszoter -c 'select count(*) from users;'
+docker exec -i szotar-db    psql -U szotar_user -d szotar    -c 'select count(*) from words;'
+docker exec -i jatszoter-db psql -U jatszoter_user -d jatszoter -c 'select count(*) from users;'
 
 # full restart of apps and containers
 cd ~/projects/lamsza-network && ./start-lamsza-network.sh stop
@@ -314,8 +315,8 @@ docker compose -f ~/projects/lamsza-network/lamsza-szotar/docker-compose.yml res
 ./start-lamsza-network.sh start
 
 # same counts?
-docker exec -i szotar-db    psql -U postgres -d szotar    -c 'select count(*) from words;'
-docker exec -i jatszoter-db psql -U postgres -d jatszoter -c 'select count(*) from users;'
+docker exec -i szotar-db    psql -U szotar_user -d szotar    -c 'select count(*) from words;'
+docker exec -i jatszoter-db psql -U jatszoter_user -d jatszoter -c 'select count(*) from users;'
 ```
 
 **Expect:** identical counts, and every app back to `200` in Step 2 with no manual fixing.
@@ -335,16 +336,16 @@ day they need it.
 STAMP=$(date +%F-%H%M)
 mkdir -p /tmp/lamsza-backup-test
 
-docker exec -i szotar-db pg_dump -U postgres -Fc szotar > /tmp/lamsza-backup-test/szotar-$STAMP.dump
+docker exec -i szotar-db pg_dump -U szotar_user -Fc szotar > /tmp/lamsza-backup-test/szotar-$STAMP.dump
 ls -lh /tmp/lamsza-backup-test/
 
-docker exec -i szotar-db createdb -U postgres szotar_restore_test
-docker exec -i szotar-db pg_restore -U postgres -d szotar_restore_test < /tmp/lamsza-backup-test/szotar-$STAMP.dump
+docker exec -i szotar-db createdb -U szotar_user szotar_restore_test
+docker exec -i szotar-db pg_restore -U szotar_user -d szotar_restore_test < /tmp/lamsza-backup-test/szotar-$STAMP.dump
 
-docker exec -i szotar-db psql -U postgres -d szotar              -c 'select count(*) from words;'
-docker exec -i szotar-db psql -U postgres -d szotar_restore_test -c 'select count(*) from words;'
+docker exec -i szotar-db psql -U szotar_user -d szotar              -c 'select count(*) from words;'
+docker exec -i szotar-db psql -U szotar_user -d szotar_restore_test -c 'select count(*) from words;'
 
-docker exec -i szotar-db dropdb -U postgres szotar_restore_test
+docker exec -i szotar-db dropdb -U szotar_user szotar_restore_test
 ```
 
 **Expect:** a dump of real size (not a few hundred bytes), `pg_restore` with no errors, and
@@ -398,31 +399,12 @@ against the committed hash manifest, so a drifted module goes red in whichever r
 drifted. Do **not** keep the copies in step by hand — run the script. The rule is
 `docs/network/SHARED_FRONTEND_MODULES.md`.
 
-**Status 2026-10-06:**
-
-| Suite | Result |
-|---|---|
-| lamsza frontend | **151 / 153** — 2 failing: `entryHistory.test.js:45`, `searchResultCard.test.js:54` |
-| lamsza backend | **2 failing** in `directory_catalog_test.go` (123, 223) — both look like dirty-DB test isolation, not product bugs |
-| szotar backend | pass |
-| jatszoter backend | pass |
-| lamsza-admin backend | pass |
-
-**Update 2026-10-06, BOG-42:** the table above is stale. Measured on the BOG-42
-branch: lamsza frontend **197 / 197**, lamsza backend green. The two
-`directory_catalog_test.go` failures were dirty-DB isolation caused by the admin
-CRUD tests in the same package; those tests went with the admin handlers they
-covered. The two frontend failures were fixed by their own task.
-
 > Three of these suites talk to Postgres, and since BOG-53 all three also run in
 > CI against a `postgres:16` service; nothing is excluded by name any more. CI
 > sets `TEST_DATABASE_URL` to that service database. The local scripts above run
 > the suites the way CI does: on an empty database built from the repo. A suite
 > that passes on your dev data and fails on an empty database is the failure CI
 > used to be blind to.
-
-`tests/networkOrigins.test.js` was failing against stale pre-renumber ports (5173/5174/5175)
-and is fixed. The remaining failures are tracked as their own task.
 
 ---
 

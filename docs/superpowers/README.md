@@ -31,6 +31,5 @@ repo. They do not any more.
   `PUT /api/admin/county_seat`, that endpoint is served by `lamsza-admin` on `:3000`, not by
   this app on `:3001`.
 
-Some of the Go admin handlers (`backend/internal/handlers/admin_*.go`) are still present in
-this repo but unregistered — kept only because `backend/handlers_test.go` mounts them on its
-own test mux. Editing them changes nothing that this app serves.
+The Go admin handlers that used to live in this repo (`backend/internal/handlers/admin_*.go`)
+were deleted on BOG-42; they exist only in `lamsza-admin`.

@@ -6,7 +6,9 @@ drive four independent repos.
 Approved on BOG-14, 2026-10-06. R5 added on BOG-33, 2026-10-06. R7 added on
 BOG-54 and amended on BOG-57 (branch protection declined), 2026-10-06. Paperclip switched
 off and R5 made tool-independent, 2026-10-07. Pushing to `main` made subject to
-the owner's confirmation (R5, R7), 2026-10-07. This file
+the owner's confirmation (R5, R7), 2026-10-07. R1-R4 rewritten for work
+without a tracker, R5 check 4 and R8-R17 added after the network review,
+2026-10-07. This file
 is the source of truth. If a task comment and this
 file disagree, this file wins until it is changed here.
 
@@ -94,35 +96,53 @@ workspace, so every agent already has it.
 
 ---
 
-## 4. The seven rules
+## 4. The rules
 
-### R1 — Every issue names its app
+### R1 — Every task and every commit names its app
 
-Start the title with the app tag:
+Tasks live in **`docs/network/OPEN_ITEMS.md`** (Paperclip is switched off; there
+is no other tracker). Each item and each commit subject starts with the app tag:
 
 `[lamsza]` · `[admin]` · `[szotar]` · `[jatszoter]` · `[network]`
 
 Use `[network]` when the work crosses two or more apps.
 
-### R2 — One issue, one app, where it can be
+### R2 — One task, one app, where it can be
 
-If a change fits in one repo, keep it in one issue. One task then stays inside
-one workspace and one pull request.
+If a change fits in one repo, keep it in one task and one commit series. One
+task then stays inside one workspace.
 
-### R3 — Cross-app changes go contract-first: parent, then children
+### R3 — Cross-app changes go contract-first
 
 A `[network]` change follows a fixed order: **the data or API contract first
-(usually admin or the database), then the apps that read it.**
+(usually the lamsza schema or API), then the apps that read it.** Commit and
+verify the contract side before touching a consumer.
 
-- The parent issue owns the contract.
-- One child issue per consuming app, blocked on the parent.
-- No consumer starts before the contract lands.
+Two contracts are easy to miss:
 
-### R4 — One repo, one run at a time
+- **A schema change lands with its dump.** Run `scripts/db-dump-schema.sh` and
+  commit `backend/schema/` in the same commit as the code that changes the
+  schema. `backend/schema/schema_test.go` fails when boot DDL names a table or
+  column the dump lacks. *Why:* `admin_audit_log` was created on boot but never
+  dumped, so every bootstrapped database (CI, scratch, a new machine) had no
+  audit table for admin, and no suite noticed.
+- **A shared UI change is a contract too.** A change to lamsza's header, footer,
+  sign-in dialog, tokens or theme gets a follow-up in each app that copies it,
+  and the UI rule file (R11) changes in the same commit. *Why:* lamsza's
+  Adatvédelem footer link (2026-10-06) never reached szotar or jatszoter.
 
-Two runs editing the same repo at the same time cause conflicts. Before you
-start, check that no other run holds that app. Cross-app work is sequential by
-R3, not parallel.
+### R4 — One agent per repo at a time
+
+Two agents editing the same working tree cause conflicts. Parallel work in one
+repo needs separate worktrees, and each worktree is closed out by R5 check 4.
+At the start of a run, look before you edit:
+
+```bash
+git worktree list; git branch -a --no-merged main; git stash list; git status --short
+```
+
+Anything unexpected is reported, not silently worked around. Cross-app work is
+sequential by R3.
 
 ### R5 — A task is not done until its code is committed, merged and pushed
 
@@ -146,6 +166,13 @@ Check 3 needs a push, and pushing to `main` needs Attila's explicit confirmation
 (R7, `docs/AGENT_ENVIRONMENT_POLICY.md`). Until Attila confirms, the task is
 committed and merged but not done: report it as ready to push, with the commits.
 
+**Check 4, closed out.** After the merge, remove the worktree and delete the
+branch, locally and (with the push) on origin. Unfinished work is committed and
+pushed on its own branch, never left uncommitted in a worktree, and never kept
+in a stash. *Why:* the review on 2026-10-07 found 3,500 lines of tests
+uncommitted in a worktree, a finished branch pushed but never merged, a
+2,600-line stash, and about 50 merged branches nobody deleted.
+
 Skip a check only when it is genuinely wrong for the task — check 1 for a task
 that produced a brief, a decision or a review; check 2 for work meant to stay on
 a branch, such as a snapshot or a spike. Say which check you skipped and why.
@@ -156,8 +183,9 @@ BOG-17 and BOG-28 cleared check 1 and still shipped nothing, because the commits
 sat on a branch nobody merged.
 
 Until 2026-10-07 these checks were enforced by `scripts/paperclip-issue-update.sh`
-when it set a Paperclip issue to `done`. Paperclip is switched off and that
-script is no longer part of the workflow; the checks stand on their own.
+when it set a Paperclip issue to `done`. Paperclip is switched off; the script
+and its test stay in the repo, unused, by the owner's decision. The checks
+stand on their own.
 
 Why this rule exists: BOG-32 found four tasks (BOG-3, BOG-4, BOG-5, BOG-7)
 marked `done` while all of their code sat uncommitted on one feature branch.
@@ -170,12 +198,14 @@ These standards are network-wide:
 - **Local-only development.** `docs/AGENT_ENVIRONMENT_POLICY.md` in this repo is
   the standing rule for all four apps. Production is the owner's.
 - **Fixed ports**, as the start script defines them (§1).
-- **`/api/health` on every backend.** All four have it.
-- **A working `npm test` in every repo.** Not true yet — no repo defines a root
-  `test` script. Tracked per app: BOG-2 (lamsza), BOG-20 (admin), BOG-21
-  (szotar), BOG-22 (jatszoter).
+- **`/api/health` answers `{"ok":true,"db":"up"}`** on every backend, and 503
+  with `"db":"down"` when the database does not answer.
+- **`npm test` at the repo root runs that repo's suites.** In admin, szotar and
+  jatszoter it runs frontend and backend; in lamsza it runs the frontend, and
+  `npm run test:go` runs the backend.
+- **The same runtime versions,** recorded once in `docs/network/VERSIONS.md`.
 - **`docs/LOCAL_DEV_CHECKS.md` is the definition of "verified":** network up,
-  every API smoked, every suite run, output recorded.
+  the APIs you touched smoked, every suite run, output recorded.
 
 ### R7 — CI is a gate only if somebody reads it
 
@@ -188,10 +218,15 @@ status-check setting work across the network.
 
 | Repo | Workflow | Test jobs | `ci-status` |
 | --- | --- | --- | --- |
-| `waaab/lamsza` | `.github/workflows/build-test.yml` | on `main` | yes |
-| `waaab/lamsza-admin` | `.github/workflows/build.yml` | on `main` | yes |
-| `waaab/lamsza-szotar` | `.github/workflows/build-test.yml` | on `main` | yes |
-| `waaab/lamsza-jatszoter` | `.github/workflows/build-test.yml` | on `main` | yes |
+| `waaab/lamsza` | `.github/workflows/build-test.yml` | every push and pull request | yes |
+| `waaab/lamsza-admin` | `.github/workflows/build.yml` | every push and pull request | yes |
+| `waaab/lamsza-szotar` | `.github/workflows/build-test.yml` | every push and pull request | yes |
+| `waaab/lamsza-jatszoter` | `.github/workflows/build-test.yml` | every push and pull request | yes |
+
+Every job runs on `ubuntu-24.04`, the production droplet's OS, with Node from
+`.nvmrc` and Go from `backend/go.mod`; see `docs/network/VERSIONS.md`. The suites
+read only `TEST_DATABASE_URL` (R8), which each workflow sets to its service
+database.
 
 **Every backend job runs `go test -count=1 ./...`.** No workflow excludes a Go
 package by name any more — BOG-53 removed the last three exclusions. Three of
@@ -203,7 +238,7 @@ each builds its own schema from the repo:
 | `lamsza` | `scripts/db-bootstrap.sh` applies the committed `backend/schema/` — the same script and files that create a fresh local database |
 | `szotar` | the backend's own `db.Migrate()`, which the suites call |
 | `jatszoter` | the backend's own `db.Migrate()`, which the suites call |
-| `lamsza-admin` | no database-bound suite; no service needed |
+| `lamsza-admin` | no service: its DB-bound tests skip in CI and run locally on a scratch database built from lamsza's schema (`npm run test:backend`) |
 
 Do not add a CI-only copy of a schema. If CI needs something the repo cannot
 build, that is a gap in the bootstrap, and the bootstrap is what to fix.
@@ -331,14 +366,98 @@ a holding position — nothing is coming to replace it:
    empty schema CI builds.
 2. Never merge to `main` with a check you already know is red. A red local check
    is a blocker whether or not anything reports it.
-3. `npm run build` in `lamsza` only counts with the backend up on 3001. Without
-   it the prerender fails with `ECONNREFUSED`, the build still exits 0, and the
-   error states get baked into the pages.
+3. `npm run build` in `lamsza` runs `scripts/preflight-api.js` first, which
+   refuses to build (exit 1) when no backend answers on 3001; component fetches
+   are gated on `canReachApi()`, so `dist/` does not depend on the backend.
+   CI uses `npm run build:no-preflight`.
 
-**Open.** One thing: *Workflow permissions* is approved but not yet set to read
-and write in the four repos, which needs the owner console or a GitHub token —
-tracked on BOG-57. Branch protection is closed, not open: declined. Everything
-else in R7 is live.
+**Open.** *Workflow permissions* is approved but not yet set to read and write in
+the four repos, which needs the owner console or a GitHub token; it is listed in
+`docs/network/OPEN_ITEMS.md`. Branch protection is closed, not open: declined.
+Everything else in R7 is live.
+
+### R8 — Tests never touch dev data
+
+DB-bound Go tests read only `TEST_DATABASE_URL`, never `DATABASE_URL` or `.env`,
+and refuse a local database whose name does not end in `_test`
+(`backend/internal/db/testguard.go` in each repo). `npm run test:go` (lamsza) and
+`npm run test:backend` (the others) rebuild a scratch database first. An
+exported variable beats `.env` in every backend. *Why:* 43 of the 46 users in
+the dev `lamsza` database were test fixtures, a szotar test deleted whatever
+proverb sat on today+40, and the documented "scratch" recipe silently used the
+dev database because `.env` overrode it.
+
+### R9 — Never act as the owner on dev data
+
+Smoke tests are GET-only. Write paths are verified by tests on a scratch
+database or a throwaway server pointed at one, never through the dev API, and
+never with a hand-minted session for Attila's account. *Why:* 17 audit rows
+recorded agent probes as the owner's actions in an append-only log.
+
+### R10 — Docs move with code; one fact, one home
+
+- When a commit changes a script, port, route, env var or test command,
+  `git grep` all four repos for the old fact and fix it in the same change.
+- Docs give the command, not a result count; a status table is replaced, never
+  amended below.
+- A fact has one home and the rest link to it: ports in the start script and §1,
+  versions in `VERSIONS.md`, open work in `OPEN_ITEMS.md`.
+
+*Why:* R6's "no repo has npm test", LOCAL_DEV_CHECKS' status tables, admin's
+route count and szotar's "no database needed" were all wrong within hours of
+the code that changed them, and a port table existed in eight places.
+
+### R11 — Rule files have one canonical copy
+
+`.cursor/rules/*.mdc` live in this repo and are copied to the other three by
+`scripts/sync-cursor-rules.sh`, which also has `--check`. Never replace a rule
+file's content in a bulk edit. *Why:* a port renumber on 2026-10-06 replaced
+the UI-consistency rule in szotar and jatszoter with a port table, and admin
+never had the rules.
+
+### R12 — One launcher
+
+`start-lamsza-network.sh` starts and stops the apps; no repo has its own
+restart script. *Why:* lamsza's old `restart_all.sh` killed every Vite server on
+the machine and stopped the database admin shares.
+
+### R13 — Localhost-only covers code paths
+
+No dev code path calls a `*.lamsza.com` host; network origins come from
+`networkOrigins.js`, which resolves to localhost or `*.lamsza.test` in dev.
+*Why:* jatszoter fetched production's `/api/config/public` on every page load
+in dev.
+
+### R14 — A GET never creates data
+
+Except today's lazily created daily puzzle. *Why:* a GET for a future date
+created Kaptár dailies ahead of time, which also made "GET-only" smoke tests
+unsafe.
+
+### R15 — Plans record their outcome
+
+When a `docs/superpowers` plan is executed, tick its boxes or append an
+"Outcome" note saying what was done and what was skipped, and why. *Why:* none
+of about 580 plan checkboxes was ticked, and Kaptár Task 10 and Szórejtő
+Task 13 were dropped without a word.
+
+### R16 — Commits name their task and explain themselves
+
+A subject with the R1 tag, a body that says what changed and why, and the
+verification that was run. Never a snapshot commit that sweeps in ignored or
+generated files. *Why:* several commits had no body, one credited the wrong
+task, and a snapshot committed `server.pid`.
+
+### R17 — Changelogs
+
+Every repo has a `CHANGELOG.md` (Keep a Changelog, English). Every notable
+change adds a line under `## [Unreleased]` in the same commit; a line users
+would notice ends with `[public]`. At a release, `[Unreleased]` becomes
+`## [x.y.z] - date`, and the `[public]` lines are rewritten in plain Hungarian
+as a new entry in the app's `publicChangelog.js`, which the `/valtozasnaplo`
+page and the footer version read. Admin has no public page. *Why:* lamsza's
+changelog stopped at the admin extraction, szotar and jatszoter had none, and
+the public pages listed nothing from the last two weeks.
 
 ---
 
