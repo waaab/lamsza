@@ -256,6 +256,25 @@
         .wx-now {
             grid-template-columns: 1fr;
         }
+        /* Phones: the big symbol and temperature centred, the measurements
+           in two columns centred under them. */
+        .wx-now-main {
+            justify-content: center;
+        }
+        .wx-facts,
+        .wx-astro {
+            grid-template-columns: repeat(2, auto);
+            column-gap: 1.75rem;
+            width: fit-content;
+            max-width: 100%;
+            margin-inline: auto;
+        }
+    }
+    @media (max-width: 360px) {
+        .wx-facts,
+        .wx-astro {
+            grid-template-columns: auto;
+        }
     }
     .wx-now-main {
         display: flex;
@@ -313,6 +332,11 @@
     .wx-fact-value {
         font-weight: 600;
         color: var(--text-primary);
+    }
+    /* The shared .page-nav row does not wrap; on a phone its buttons ran off
+       the screen. */
+    .page-nav ul {
+        flex-wrap: wrap;
     }
     .wx-section {
         margin-top: 1.75rem;
