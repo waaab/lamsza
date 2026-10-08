@@ -73,6 +73,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - Open-Meteo as a weather source: its free API is for non-commercial use only, and the network will carry ads. The `weather_provider_default` setting is no longer read; `weather_provider_metno_enabled` joins the two fallback switches.
 
 ### Fixed
+- On a phone, the page navigation buttons (`.page-nav`: Székek, Megyék, Városok, Falvak, the weather page) wrap onto a second row instead of running off the screen. The weather icon no longer covers the widget's "Előrejelzés" link. [public]
 - The events calendar (`/esemenyek`) opens on Bucharest's current year from the server's clock (R19), not the browser's: set again once the API's first reply has fixed the clock, unless a month or day filter is set.
 - Docs follow the admin move (R18): PRODUCTION_SERVER_SETUP §6 drops Szótár's and Játszótér's admin lists and adds `ADMIN_SERVICE_TOKEN` and admin's relay variables (§6.4); the LOCAL_DEV_CHECKS allowlist check lists only admin and lamsza; UI_BASELINE `tb-admin-link` says no app links to admin; the OPEN_ITEMS Szókereső item points to `/games#szokereso`.
 - The Lámsza button tooltip typo ("főódalra"). [public]
