@@ -83,21 +83,7 @@
             class="btn nav-btn {$page.url.pathname === '/' ? 'active' : ''}"
             title="Vissza a főoldalra"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-            >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-            </svg>
+            <AppIcon name="home" size={16} />
             <span>Lámsza</span>
         </a>
         <a
@@ -107,24 +93,7 @@
                 : ''}"
             title="Index"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <line x1="10" x2="21" y1="6" y2="6" />
-                <line x1="10" x2="21" y1="12" y2="12" />
-                <line x1="10" x2="21" y1="18" y2="18" />
-                <path d="M4 6h1v4" />
-                <path d="M4 10h2" />
-                <path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" />
-            </svg>
+            <AppIcon name="entries" size={16} />
             <span>Indexelünk</span>
         </a>
         <a
@@ -134,76 +103,30 @@
                 : ''}"
             title="Hírek"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path
-                    d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a4 4 0 0 1-4-4V6"
-                /><path d="M18 14h-8" /><path d="M15 18h-5" /><path
-                    d="M10 6h8v4h-8V6Z"
-                /></svg
-            >
+            <AppIcon name="newsfeeds" size={16} />
             <span>Erdélyi Hírek</span>
         </a>
         <a
-        href="/esemenyek"
-        class="btn nav-btn {$page.url.pathname.startsWith('/esemenyek')
-            ? 'active'
-            : ''}"
-        title="Események"
-    >
-        <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+            href="/esemenyek"
+            class="btn nav-btn {$page.url.pathname.startsWith('/esemenyek')
+                ? 'active'
+                : ''}"
+            title="Események"
         >
-            <path d="M8 2v4" />
-            <path d="M16 2v4" />
-            <rect width="18" height="18" x="3" y="4" rx="2" />
-            <path d="M3 10h18" />
-        </svg>
-        <span>Kik verekettek?</span>
-    </a>
-    <a
-    href="/szekek"
-    class="btn nav-btn {$page.url.pathname === '/szekek' ||
-    $page.url.pathname.startsWith('/szekek/')
-        ? 'active'
-        : ''}"
-    title="Történelmi székek"
->
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-    >
-        <!-- Side-view chair: back + rear leg, seat, front leg -->
-        <line x1="6" y1="5" x2="6" y2="21" />
-        <line x1="6" y1="15" x2="19" y2="15" />
-        <line x1="19" y1="15" x2="19" y2="21" />
-    </svg>
-    <span>Székek</span>
-</a>
+            <AppIcon name="events" size={16} />
+            <span>Kik verekettek?</span>
+        </a>
+        <a
+            href="/szekek"
+            class="btn nav-btn {$page.url.pathname === '/szekek' ||
+            $page.url.pathname.startsWith('/szekek/')
+                ? 'active'
+                : ''}"
+            title="Történelmi székek"
+        >
+            <AppIcon name="szekek" size={16} />
+            <span>Székek</span>
+        </a>
         <a
             href="/megyek"
             class="btn nav-btn {$page.url.pathname === '/megyek' ||
@@ -212,19 +135,7 @@
                 : ''}"
             title="Székelyföldi Megyék"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
+            <AppIcon name="counties" size={16} />
             <span class="nav-btn-label">A megyétől</span>
             <span class="sr-only nav-btn-label-lang szekely-hungarian">Megyék</span>
         </a>
@@ -237,25 +148,7 @@
                 : ''}"
             title="Székelyföldi Városok"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <rect width="8" height="18" x="3" y="3" rx="2" />
-                <path d="M7 7h0" />
-                <path d="M7 11h0" />
-                <path d="M7 15h0" />
-                <rect width="8" height="12" x="13" y="9" rx="2" />
-                <path d="M17 13h0" />
-                <path d="M17 17h0" />
-            </svg>
+            <AppIcon name="varosok" size={16} />
             <span>Városiak</span>
         </a>
         <a
@@ -266,22 +159,7 @@
                 : ''}"
             title="Székelyföldi Falvak"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-            >
-                <path d="M3 20v-8l7-5 7 5v8"></path>
-                <path d="M7 20v-4h6v4"></path>
-                <path d="M17 20h4v-7l-4-3"></path>
-                <path d="M3 20h18"></path>
-            </svg>
+            <AppIcon name="falvak" size={16} />
             <span>Falusiak</span>
         </a>
     </div>
@@ -301,18 +179,7 @@
                 on:click={logout}
                 title="Kijelentkezés"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    ><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg
-                >
+                <AppIcon name="logout" size={16} />
                 <span class="sr-only">Kijelentkezés</span>
             </button>
         {:else}
@@ -322,18 +189,7 @@
                 title="Belépés"
                 on:click={openLogin}
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    ><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></svg
-                >
+                <AppIcon name="login" size={16} />
                 <span class="sr-only">Belépés</span>
             </button>
         {/if}
@@ -343,20 +199,7 @@
             class="btn nav-btn {$page.url.pathname === '/beallitasok' ? 'active' : ''}"
             title="Felhasználói beállítások"
         >
-            <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><circle cx="12" cy="12" r="3" /><path
-                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"
-                /></svg
-            >
+            <AppIcon name="settings" size={16} />
             <span class="sr-only">Felhasználói beállítások</span>
         </a>
     </div>

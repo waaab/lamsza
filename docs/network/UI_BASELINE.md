@@ -74,7 +74,7 @@ reference; each item names its own.
 
 | Item | Baseline | Note |
 |---|---|---|
-| Icon system (`ic-system`) | Admin's | One icon system for all four apps: the shared `AppIcon.svelte` (the admin set, which also has Játszótér). |
+| Icon system (`ic-system`) | Admin's | One icon system for all four apps: the shared `AppIcon.svelte` (the admin set, which also has Játszótér). Since 2026-10-08 no toolbar draws its own icons: Lámsza's inline toolbar icons and the admin app's `AdminPlusIcon` (now `AppIcon` "plus") moved into the set, pixel-identical. |
 | Játszótér icon (`ic-jatszoter`) | Játszótér's | Its cross-of-tiles drawing, at the set's stroke 2 like every other icon (not the original 1.75). Confirmed by the owner, 2026-10-07. |
 | Rendered icon sizes (`ic-sizes`) | Other | keep as is |
 | Settings gear attributes (`ic-gear`) | Lámsza's |  |
