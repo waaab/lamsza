@@ -5,9 +5,15 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos; UI batch: one icon system, apps launcher, Szótár add-word button done; Lámsza toolbar overflow noted).
+Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos; UI batch: one icon system, apps launcher, Szótár add-word button done; Lámsza toolbar overflow noted).
 
 ## Production and accounts (owner only; agents never touch production)
+
+- **[lamsza] owner: set `METNO_USER_AGENT` in lamsza's production `.env`**
+  before the weather section ships: the app name and a contact, e.g.
+  `lamsza.com weather (+https://lamsza.com; <contact email>)`. MET Norway's
+  terms require an identifying User-Agent with contact details and may block
+  requests without one. Locally the default (no email) is enough.
 
 - **[network] owner: production upgrade: Node 20.20.2 (end of life) to Node 24 LTS, ports, and the admin app's internal API (R18).**
   A planned task with a backup and a rollback path. Every app already builds
@@ -118,6 +124,18 @@ Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification
   counts as a normal page view.
 
 ## Work
+
+- **[network] Weather section `/idojaras` (branch `weather-section` in lamsza).**
+  Owner's decisions, 2026-10-09: a section inside lamsza, not a new app; only
+  sources free for commercial use (MET Norway, then WeatherAPI.com and
+  OpenWeatherMap; Open-Meteo dropped); archive from launch; animated SVGs for
+  every weather element. Backend done (cache worker, forecast, archive). Still
+  to do: the icons, the `/idojaras` pages, the widgets on the new data, and in
+  lamsza-admin the provider switches (MET instead of Open-Meteo, no default
+  provider) and latitude, longitude and elevation on the settlement form.
+- **[lamsza] owner: enter coordinates for the 27 settlements** once the admin
+  form has them. Until then the weather worker finds each settlement by name
+  (OpenWeatherMap's geocoder), which can land a village on a namesake.
 
 - **[lamsza] The browser extension (`extension/`, git-ignored, built by
   `npm run build:extension`) is not used.** Its March build calls

@@ -13,6 +13,14 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- Weather backend for the new `/idojaras` section: MET Norway (free for commercial use, CC BY 4.0) is the main source, WeatherAPI.com and OpenWeatherMap the fallbacks, used only when MET has been down for three hours. A background worker (`internal/weather/worker.go`) keeps each settlement's and attraction's forecast in `weather_forecast_cache`, honouring MET's `Expires` and `If-Modified-Since`, and stores today's sun and moon times; every route only reads (R14). New routes: `GET /api/weather/forecast` (now, 48 hours, about 9 days), `/api/weather/archive` (from launch day), `/api/weather/places`. One icon vocabulary, MET's symbol codes, for all three providers, with Hungarian text per code. New env `METNO_USER_AGENT`, `WEATHER_WORKER`.
+- Weather archive from launch day: `weather_obs_hourly` (MET's value for each hour) and `weather_daily_archive` (one row per settlement and Bucharest day, folded nightly). MET data only, so the series is one source.
+
+### Changed
+- `/api/weather` and `/api/weather/county` read the cache instead of calling providers per request; the county route's 15-second fan-out is gone. Both add `symbol` and `temp_max`, and `temp_min` is now today's low instead of the current temperature again (the widget's "6°C / 6°C"). [public]
+
+### Removed
+- Open-Meteo as a weather source: its free API is for non-commercial use only, and the network will carry ads. The `weather_provider_default` setting is no longer read; `weather_provider_metno_enabled` joins the two fallback switches.
 - One Fiók and one toolbar for the public apps (UI_BASELINE `tb-account-menu`, `acc-page`). The toolbar's right side is now two buttons: Belépés (signed out) or the profile button with the user's Google photo, which opens a menu with Fiók, Beállítások and Kijelentkezés; then the apps launcher. The Fiók page is built from shared parts (`AccountPage`, `AccountDetails`, `accountDetails.js`), synced to Szótár and Játszótér, with the same user details in every app. [public]
 - Internal account API, `GET /internal/account/profile?google_sub=` (`internal/accountapi`): Szótár's and Játszótér's backends read the user's display name by Google ID. Loopback only, no proxy headers, a Bearer token per caller (`ACCOUNT_SZOTAR_TOKEN`, `ACCOUNT_JATSZOTER_TOKEN`); no token means it is off. Route-by-route guard tests.
 - UI_BASELINE `ld-reserve-space`: content that arrives late never pushes what is on screen. OPEN_ITEMS: single sign-on as a feature idea; the account-token and nginx prerender steps for production.

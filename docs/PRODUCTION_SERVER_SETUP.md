@@ -148,8 +148,10 @@ Each app needs its own `.env` on the server (never commit these).
 | `PORT` | Yes | `3000` |
 | `GOOGLE_CLIENT_ID` | Yes | Google OAuth |
 | `ADMIN_GOOGLE_EMAILS` | Yes | Comma-separated admin emails |
-| `WEATHER_API_KEY` | Yes* | OpenWeather-style key |
-| `WEATHER_API_COM_KEY` | Optional | Alternate weather provider |
+| `METNO_USER_AGENT` | Yes | Identifies us to MET Norway, the main weather source: app name plus a contact (site or email), e.g. `lamsza.com weather (+https://lamsza.com; <contact email>)`. Their terms require it. Default `lamsza.com weather (+https://lamsza.com)` |
+| `WEATHER_API_KEY` | Optional | OpenWeatherMap key: second fallback, and the geocoder for settlements with no coordinates yet |
+| `WEATHER_API_COM_KEY` | Optional | WeatherAPI.com key: first fallback |
+| `WEATHER_WORKER` | Optional | Default `true`. The background refresh that fills the weather cache and archive; `false` on a throwaway server |
 | `API_BASE_URL` | Optional (build-time) | Backend URL for prerender only. Server-only name, never in the bundle. Default `http://127.0.0.1:3001` |
 | `FEATURE_WEATHER` | Optional | Default `true` |
 | `FEATURE_EVENTS` | Optional | Default `true` |

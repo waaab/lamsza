@@ -230,21 +230,27 @@ are `lamsza/backend/admin_session_boundary_test.go` and
 
 ## Check — Weather
 
-Both endpoints need a `slug`:
+The backend's weather worker fills the cache within a minute or two of a start
+(MET Norway first; WeatherAPI.com and OpenWeatherMap only when MET has been down
+for hours). Every route only reads that cache:
 
 ```bash
 curl -s 'http://127.0.0.1:3001/api/weather?slug=csikszereda' | head -c 300
 curl -s 'http://127.0.0.1:3001/api/weather/county?slug=hargita' | head -c 300
+curl -s 'http://127.0.0.1:3001/api/weather/forecast?slug=csikszereda' | head -c 300
+curl -s 'http://127.0.0.1:3001/api/weather/places' | head -c 300
 ```
 
-> `/api/weather` with **no** `slug` returns `400 Missing slug`. That is correct behaviour,
-> not a failure — pass a slug.
+> `/api/weather` with **no** `slug` returns `400`. A `503 weather not ready yet` right after
+> a start means the worker has not reached that place; wait a minute. It persisting means the
+> worker is failing: read `lamsza-backend.log` for `weather worker:` lines.
 
-**Expect:** both `200` with live data, e.g. `"source":"Open-Meteo"`, and a county array of
-towns.
+**Expect:** `200` with `"source":"MET Norway"`, a `temp_min` below `temp_max`, a county array of
+towns, and a forecast with at least 7 `daily` entries.
 
-Then open `http://localhost:5174` and confirm the widget **renders** that temperature.
-API data with a blank widget is a frontend bug.
+Then open `http://localhost:5174` and confirm the widget **renders** that temperature, and
+`http://localhost:5174/idojaras/csikszereda` shows the forecast. API data with a blank page is
+a frontend bug.
 
 ---
 

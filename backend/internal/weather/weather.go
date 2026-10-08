@@ -1,105 +1,101 @@
+// Package weather serves the site's weather: the widgets, the /idojaras
+// pages and the archive.
+//
+// Sources are free for commercial use, because the network will carry ads:
+// MET Norway first (CC BY 4.0), WeatherAPI.com and OpenWeatherMap as
+// fallbacks. Open-Meteo is not used: its free API is non-commercial only.
+// A background worker (worker.go) fills the cache and the archive; every
+// handler here only reads them.
 package weather
 
 import (
-	"backend/internal/config"
+	"backend/internal/clock"
 	"backend/internal/db"
+	"database/sql"
 	"encoding/json"
-	"fmt"
-	"io"
+	"errors"
 	"log"
+	"math"
 	"net/http"
-	"net/url"
 	"strconv"
-	"strings"
-	"sync"
 	"time"
 )
 
-const (
-	providerOpenMeteo      = "open_meteo"
-	providerWeatherAPICom  = "weatherapi_com"
-	providerOpenWeatherMap = "openweathermap"
-)
+// forecastDays is how many days the forecast route returns at most. MET
+// reaches about nine and a half days ahead.
+const forecastDays = 10
 
-// maxWeatherFanOut caps how many cities /api/weather/county fetches at the
-// same time. A county can hold many settlements, and with no cap each one
-// opens its own socket to the provider at once.
-const maxWeatherFanOut = 12
+// hourlyAhead is how far the hour-by-hour strip reaches.
+const hourlyAhead = 48 * time.Hour
 
-// weatherFanOutBudget stops cities that have not started yet. The cap above
-// makes the route run in waves, so without a budget the last wave could finish
-// after the server WriteTimeout. Budget plus the worst case for one city
-// (three providers, weatherClientTimeout each) stays under that timeout.
-const weatherFanOutBudget = 15 * time.Second
-
-// weatherClientTimeout: http.DefaultClient has no timeout, so a provider that
-// accepts the connection and never answers held a goroutine and a socket for
-// the life of the process. The route tries up to three providers in turn, so
-// keep this short.
-const weatherClientTimeout = 4 * time.Second
-
-var weatherClient = &http.Client{Timeout: weatherClientTimeout}
-
-func weatherHTTPGet(url string) (*http.Response, error) {
-	return weatherClient.Get(url)
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
 }
 
-// fallbackDescHU: if an API returns English, we show Hungarian (admin can extend via site_settings later)
-var fallbackDescHU = map[string]string{
-	"overcast": "borult", "partly cloudy": "részben felhős", "clear": "tiszta ég",
-	"cloudy": "felhős", "light rain": "enyhe eső", "moderate rain": "mérsékelt eső",
-	"heavy rain": "erős eső", "light snow": "enyhe hó", "snow": "hó", "fog": "köd",
-	"mist": "köd", "thunderstorm": "zivatar", "drizzle": "szitálás", "patchy rain": "helyenkénti eső",
-	"patchy snow": "helyenkénti hó", "freezing fog": "fagyos köd", "patchy light rain": "helyenkénti enyhe eső",
-	"light rain shower": "enyhe zápor", "moderate or heavy rain shower": "mérsékelt vagy erős zápor",
-	"torrential rain shower": "zúduló zápor", "light sleet": "enyhe ónos eső", "sleet": "ónos eső",
-	"light snow showers": "enyhe havas zápor", "blizzard": "hóvihar", "blowing snow": "havas szél",
-	"patchy light snow": "helyenkénti enyhe hó", "moderate snow": "mérsékelt hó",
-	"heavy snow": "erős hó", "thundery outbreaks": "zivataros kitörések",
-	"patchy freezing drizzle": "helyenkénti fagyos szitálás", "freezing drizzle": "fagyos szitálás",
-	"heavy freezing drizzle": "erős fagyos szitálás", "patchy sleet": "helyenkénti ónos eső",
-	"moderate or heavy sleet": "mérsékelt vagy erős ónos eső", "light drizzle": "enyhe szitálás",
-	"patchy rain possible": "helyenkénti eső lehetséges", "sunny": "napos",
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
 }
 
-// normalizeDesc for DB lookup and fallback map key
-func normalizeDesc(s string) string {
-	return strings.ToLower(strings.TrimSpace(s))
-}
-
-// translatedDesc returns the description in the requested language.
-// Order: (1) admin translation from DB, (2) if lang is "hu", default Hungarian fallback map, (3) original text.
-// Supports future multiple languages via lang (e.g. "hu", "ro", "de").
-func translatedDesc(source, lang string) string {
-	if source == "" {
-		return source
+// placeFromRequest finds the place a request names: ?slug= is a settlement,
+// else an attraction.
+func placeFromRequest(r *http.Request) (Place, int, string) {
+	slug := r.URL.Query().Get("slug")
+	if slug == "" {
+		return Place{}, http.StatusBadRequest, "missing slug"
 	}
-	key := normalizeDesc(source)
-	// 1. Admin-edited translation from DB
-	var translated string
-	err := db.DB.QueryRow(
-		"SELECT translated_text FROM weather_desc_translations WHERE source_text = $1 AND lang = $2",
-		key, lang,
-	).Scan(&translated)
-	if err == nil && translated != "" {
-		return translated
+	p, err := settlementBySlug(slug)
+	if err == nil {
+		return p, 0, ""
 	}
-	// 2. Default Hungarian when no admin translation
-	if lang == "hu" {
-		if hu, ok := fallbackDescHU[key]; ok {
-			return hu
-		}
+	if !errors.Is(err, sql.ErrNoRows) {
+		log.Printf("weather: settlement %q: %v", slug, err)
+		return Place{}, http.StatusInternalServerError, "lookup failed"
 	}
-	// 3. Original (e.g. API already returned Hungarian or unknown phrase)
-	return source
+	if p, err = attractionBySlug(slug); err == nil {
+		return p, 0, ""
+	}
+	return Place{}, http.StatusNotFound, "unknown place"
 }
 
-// UnifiedWeatherResponse is the single shape returned by GET /api/weather
+// cachedForecast returns a place's cached forecast, if it has one.
+func cachedForecast(p Place) (*cacheRow, bool) {
+	row, err := readCache(p.Kind, p.ID)
+	if err != nil || row.Forecast == nil || len(row.Forecast.Steps) == 0 {
+		return nil, false
+	}
+	return row, true
+}
+
+func r1(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	return fp(round1(*v))
+}
+
+func roundInt(v *float64) *int {
+	if v == nil {
+		return nil
+	}
+	i := int(math.Round(*v))
+	return &i
+}
+
+// ---- GET /api/weather (the widgets) ---------------------------------------
+
+// UnifiedWeatherResponse is what the home, county and attraction widgets and
+// the search answer read. Icon is the old OpenWeatherMap-style code the emoji
+// style uses; Symbol is the MET code the animated icons use.
 type UnifiedWeatherResponse struct {
+	Slug      string   `json:"slug,omitempty"`
 	Temp      int      `json:"temp"`
 	TempMin   *int     `json:"temp_min,omitempty"`
+	TempMax   *int     `json:"temp_max,omitempty"`
 	Desc      string   `json:"desc"`
 	Icon      string   `json:"icon"`
+	Symbol    string   `json:"symbol"`
 	Source    string   `json:"source"`
 	FetchedAt int64    `json:"fetched_at"`
 	Humidity  *int     `json:"humidity,omitempty"`
@@ -107,647 +103,397 @@ type UnifiedWeatherResponse struct {
 	PrecipMm  *float64 `json:"precip_mm,omitempty"`
 }
 
-// getProviderOrder returns provider IDs to try (default first if enabled, then other enabled)
-func getProviderOrder() []string {
-	defaultProv, _ := getSetting("weather_provider_default", "open_meteo")
-	enabled := map[string]bool{
-		providerOpenMeteo:      getSettingBool("weather_provider_open_meteo_enabled", true),
-		providerWeatherAPICom:  getSettingBool("weather_provider_weatherapi_enabled", true),
-		providerOpenWeatherMap: getSettingBool("weather_provider_openweathermap_enabled", true),
+// summarize turns a forecast into the widget's "now" plus today's range.
+func summarize(fc *Forecast, fetched time.Time, now time.Time, overrides map[string]string) (*UnifiedWeatherResponse, bool) {
+	cur, ok := CurrentStep(fc.Steps, now)
+	if !ok || cur.Temp == nil {
+		return nil, false
 	}
-	var order []string
-	if enabled[defaultProv] {
-		order = append(order, defaultProv)
+	out := &UnifiedWeatherResponse{
+		Temp:      int(math.Round(*cur.Temp)),
+		Desc:      describe(cur.Symbol, overrides),
+		Icon:      legacyIcon(cur.Symbol),
+		Symbol:    cur.Symbol,
+		Source:    providerDisplayName(fc.Source),
+		FetchedAt: fetched.Unix(),
+		Humidity:  roundInt(cur.Humidity),
+		WindKph:   r1(cur.WindKph),
+		PrecipMm:  r1(cur.PrecipMm),
 	}
-	for _, p := range []string{providerOpenMeteo, providerWeatherAPICom, providerOpenWeatherMap} {
-		if p != defaultProv && enabled[p] {
-			order = append(order, p)
+	today := now.In(clock.Zone).Format("2006-01-02")
+	for _, d := range BuildDays(fc.Steps, clock.Zone) {
+		if d.Date == today {
+			out.TempMin, out.TempMax = roundInt(d.TMin), roundInt(d.TMax)
+			break
 		}
 	}
-	if len(order) == 0 {
-		order = []string{providerOpenMeteo, providerWeatherAPICom, providerOpenWeatherMap}
-	}
-	return order
+	return out, true
 }
 
-func getSetting(key, defaultVal string) (string, error) {
-	var val string
-	err := db.DB.QueryRow("SELECT value FROM site_settings WHERE key = $1", key).Scan(&val)
-	if err != nil {
-		return defaultVal, err
-	}
-	return val, nil
-}
-
-func getSettingBool(key string, defaultVal bool) bool {
-	s, err := getSetting(key, "")
-	if err != nil || s == "" {
-		return defaultVal
-	}
-	return strings.ToLower(s) == "true" || s == "1"
-}
-
+// HandleWeather answers the widgets: ?slug= (a settlement or an attraction)
+// or ?lat=&lon= (any point; served live, never stored).
 func HandleWeather(w http.ResponseWriter, r *http.Request) {
-	slug := r.URL.Query().Get("slug")
-	latStr := r.URL.Query().Get("lat")
-	lonStr := r.URL.Query().Get("lon")
+	now := clock.Now()
+	overrides := loadDescOverrides("hu")
+	q := r.URL.Query()
 
-	// Direct coordinates (e.g. for attractions): same provider order as slug-based
-	if latStr != "" && lonStr != "" {
-		if lat, err := strconv.ParseFloat(latStr, 64); err == nil {
-			if lon, err := strconv.ParseFloat(lonStr, 64); err == nil {
-				if out, prov, err := fetchWeatherByCoords(lat, lon); err == nil && out != nil {
-					out.FetchedAt = time.Now().Unix()
-					out.Source = providerDisplayName(prov)
-					out.Desc = translatedDesc(out.Desc, "hu")
-					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(out)
-					return
-				}
-			}
+	if q.Get("slug") == "" && q.Get("lat") != "" && q.Get("lon") != "" {
+		lat, err1 := strconv.ParseFloat(q.Get("lat"), 64)
+		lon, err2 := strconv.ParseFloat(q.Get("lon"), 64)
+		if err1 != nil || err2 != nil || math.Abs(lat) > 90 || math.Abs(lon) > 180 {
+			writeError(w, http.StatusBadRequest, "bad coordinates")
+			return
 		}
-	}
-
-	if slug == "" {
-		http.Error(w, "Missing slug", http.StatusBadRequest)
+		fc, err := liveForecast(lat, lon)
+		if err != nil {
+			log.Printf("weather: live %v,%v: %v", lat, lon, err)
+			writeError(w, http.StatusBadGateway, "weather provider error")
+			return
+		}
+		if out, ok := summarize(fc, now, now, overrides); ok {
+			writeJSON(w, http.StatusOK, out)
+			return
+		}
+		writeError(w, http.StatusBadGateway, "weather provider error")
 		return
 	}
 
-	var name, nameRo string
-	var parentID *int
-	err := db.DB.QueryRow(
-		"SELECT name, COALESCE(name_ro, ''), parent_id FROM settlements WHERE slug = $1", slug,
-	).Scan(&name, &nameRo, &parentID)
-	if err != nil {
-		// Try attraction
-		var lat, lon float64
-		if err := db.DB.QueryRow(
-			"SELECT gl.latitude, gl.longitude FROM attractions a JOIN geo_locations gl ON a.location_id = gl.id WHERE a.slug = $1", slug,
-		).Scan(&lat, &lon); err == nil {
-			if out, prov, err := fetchWeatherByCoords(lat, lon); err == nil && out != nil {
-				out.FetchedAt = time.Now().Unix()
-				out.Source = providerDisplayName(prov)
-				out.Desc = translatedDesc(out.Desc, "hu")
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(out)
-				return
-			}
-		}
-		log.Println("Weather slug resolution error:", err)
-		name = strings.Title(strings.ReplaceAll(slug, "-", " "))
+	p, status, msg := placeFromRequest(r)
+	if status != 0 {
+		writeError(w, status, msg)
+		return
 	}
-
-	searchName := name
-	if nameRo != "" {
-		searchName = nameRo
+	row, ok := cachedForecast(p)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "weather not ready yet")
+		return
 	}
-
-	order := getProviderOrder()
-	now := time.Now().Unix()
-	var out *UnifiedWeatherResponse
-
-	for _, prov := range order {
-		switch prov {
-		case providerOpenMeteo:
-			out, err = fetchOpenMeteo(searchName)
-		case providerWeatherAPICom:
-			out, err = fetchWeatherAPICom(searchName, config.AppConfig.WeatherAPIComKey)
-		case providerOpenWeatherMap:
-			out, err = fetchOpenWeatherMap(searchName, config.AppConfig.WeatherAPIKey)
-		default:
-			continue
-		}
-		if err == nil && out != nil {
-			out.FetchedAt = now
-			out.Source = providerDisplayName(prov)
-			out.Desc = translatedDesc(out.Desc, "hu")
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(out)
-			return
-		}
+	out, ok := summarize(row.Forecast, *row.FetchedAt, now, overrides)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "weather not ready yet")
+		return
 	}
-
-	// Parent fallback (only for same provider logic - use first provider again with parent name)
-	if parentID != nil && out == nil {
-		var parentName, parentNameRo string
-		perr := db.DB.QueryRow(
-			"SELECT name, COALESCE(name_ro, '') FROM settlements WHERE id = $1", *parentID,
-		).Scan(&parentName, &parentNameRo)
-		if perr == nil {
-			parentSearch := parentName
-			if parentNameRo != "" {
-				parentSearch = parentNameRo
-			}
-			log.Printf("Weather: trying parent %q", parentSearch)
-			for _, prov := range order {
-				switch prov {
-				case providerOpenMeteo:
-					out, err = fetchOpenMeteo(parentSearch)
-				case providerWeatherAPICom:
-					out, err = fetchWeatherAPICom(parentSearch, config.AppConfig.WeatherAPIComKey)
-				case providerOpenWeatherMap:
-					out, err = fetchOpenWeatherMap(parentSearch, config.AppConfig.WeatherAPIKey)
-				default:
-					continue
-				}
-				if err == nil && out != nil {
-					out.FetchedAt = now
-					out.Source = providerDisplayName(prov)
-					out.Desc = translatedDesc(out.Desc, "hu")
-					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(out)
-					return
-				}
-			}
-		}
-	}
-
-	http.Error(w, "Weather provider error", http.StatusInternalServerError)
+	out.Slug = p.Slug
+	writeJSON(w, http.StatusOK, out)
 }
 
-func providerDisplayName(id string) string {
-	switch id {
-	case providerOpenMeteo:
-		return "Open-Meteo"
-	case providerWeatherAPICom:
-		return "WeatherAPI.com"
-	case providerOpenWeatherMap:
-		return "OpenWeatherMap"
-	}
-	return id
-}
-
-// fetchWeatherByCoords tries each enabled provider in order (same policy as slug-based requests).
-func fetchWeatherByCoords(lat, lon float64) (*UnifiedWeatherResponse, string, error) {
-	order := getProviderOrder()
+// liveForecast asks the providers directly, for a point the worker does not
+// keep. Nothing is stored.
+func liveForecast(lat, lon float64) (*Forecast, error) {
 	var lastErr error
-	for _, prov := range order {
-		var out *UnifiedWeatherResponse
+	for _, prov := range providerOrder() {
+		var fc *Forecast
 		var err error
 		switch prov {
-		case providerOpenMeteo:
-			out, err = fetchOpenMeteoByCoords(lat, lon)
+		case providerMETNo:
+			var res *metnoResult
+			if res, err = fetchMETNo(lat, lon, nil, ""); err == nil {
+				fc = res.Forecast
+			}
 		case providerWeatherAPICom:
-			out, err = fetchWeatherAPIComByCoords(lat, lon, config.AppConfig.WeatherAPIComKey)
+			fc, err = fetchWeatherAPICom(lat, lon)
 		case providerOpenWeatherMap:
-			out, err = fetchOpenWeatherMapByCoords(lat, lon, config.AppConfig.WeatherAPIKey)
-		default:
-			continue
+			fc, err = fetchOpenWeatherMap(lat, lon)
 		}
-		if err == nil && out != nil {
-			return out, prov, nil
+		if err == nil && fc != nil {
+			return fc, nil
 		}
-		if err != nil {
+		if err != nil && !errors.Is(err, errNoKey) {
 			lastErr = err
 		}
 	}
-	if lastErr != nil {
-		return nil, "", lastErr
-	}
-	return nil, "", fmt.Errorf("all weather providers failed for coordinates")
-}
-
-// fetchOpenMeteoByCoords fetches weather directly by coordinates (no geocoding)
-func fetchOpenMeteoByCoords(lat, lon float64) (*UnifiedWeatherResponse, error) {
-	forecastURL := "https://api.open-meteo.com/v1/forecast?latitude=" + strconv.FormatFloat(lat, 'f', -1, 64) +
-		"&longitude=" + strconv.FormatFloat(lon, 'f', -1, 64) +
-		"&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m,precipitation"
-	resp, err := weatherHTTPGet(forecastURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("open-meteo forecast: HTTP %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	var fm struct {
-		Current struct {
-			Temperature float64 `json:"temperature_2m"`
-			WeatherCode int     `json:"weather_code"`
-			Humidity    float64 `json:"relative_humidity_2m"`
-			WindSpeed   float64 `json:"wind_speed_10m"`
-			Precip      float64 `json:"precipitation"`
-		} `json:"current"`
-	}
-	if err := json.Unmarshal(body, &fm); err != nil {
-		return nil, err
-	}
-	temp := int(fm.Current.Temperature)
-	icon := wmoToOwmIcon(fm.Current.WeatherCode)
-	desc := wmoToDesc(fm.Current.WeatherCode)
-	humidity := int(fm.Current.Humidity)
-	windKph := fm.Current.WindSpeed
-	precipMm := fm.Current.Precip
-	return &UnifiedWeatherResponse{
-		Temp: temp, TempMin: &temp, Desc: desc, Icon: icon,
-		Humidity: &humidity, WindKph: &windKph, PrecipMm: &precipMm,
-	}, nil
-}
-
-// geocodeNameVariants lists Open-Meteo search strings. The geocoder stores
-// Miercurea Ciuc as "Miercurea-Ciuc", so a spaced Romanian name returns no hit.
-func geocodeNameVariants(city string) []string {
-	city = strings.TrimSpace(city)
-	if city == "" {
-		return nil
-	}
-	variants := []string{city}
-	hyphenated := strings.Join(strings.Fields(city), "-")
-	if hyphenated != city {
-		variants = append(variants, hyphenated)
-	}
-	return variants
-}
-
-func isNoGeocodeResults(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "no results")
-}
-
-// Open-Meteo: geocode then current weather
-func fetchOpenMeteo(city string) (*UnifiedWeatherResponse, error) {
-	names := geocodeNameVariants(city)
-	if len(names) == 0 {
-		return nil, fmt.Errorf("open-meteo geocode: no results")
-	}
-	var lastErr error
-	for _, name := range names {
-		out, err := fetchOpenMeteoByName(name)
-		if err == nil {
-			return out, nil
-		}
-		lastErr = err
-		if !isNoGeocodeResults(err) {
-			return nil, err
-		}
+	if lastErr == nil {
+		lastErr = errors.New("no provider answered")
 	}
 	return nil, lastErr
 }
 
-func fetchOpenMeteoByName(city string) (*UnifiedWeatherResponse, error) {
-	geoURL := "https://geocoding-api.open-meteo.com/v1/search?name=" + url.QueryEscape(city) + "&count=1"
-	resp, err := weatherHTTPGet(geoURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("open-meteo geocode: HTTP %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	var geo struct {
-		Results []struct {
-			Latitude  float64 `json:"latitude"`
-			Longitude float64 `json:"longitude"`
-		} `json:"results"`
-	}
-	if err := json.Unmarshal(body, &geo); err != nil {
-		return nil, err
-	}
-	if len(geo.Results) == 0 {
-		return nil, fmt.Errorf("open-meteo geocode: no results")
-	}
-	lat := geo.Results[0].Latitude
-	lon := geo.Results[0].Longitude
-
-	return fetchOpenMeteoByCoords(lat, lon)
-}
-
-func wmoToOwmIcon(code int) string {
-	switch {
-	case code == 0:
-		return "01d"
-	case code == 1:
-		return "02d"
-	case code == 2:
-		return "03d"
-	case code == 3:
-		return "04d"
-	case code == 45 || code == 48:
-		return "50d"
-	case code >= 51 && code <= 67:
-		return "10d"
-	case code >= 71 && code <= 77:
-		return "13d"
-	case code >= 80 && code <= 82:
-		return "09d"
-	case code >= 85 && code <= 86:
-		return "13d"
-	case code >= 95 && code <= 99:
-		return "11d"
-	default:
-		return "02d"
-	}
-}
-
-func wmoToDesc(code int) string {
-	switch {
-	case code == 0:
-		return "tiszta ég"
-	case code == 1:
-		return "majdnem derült"
-	case code == 2:
-		return "részben felhős"
-	case code == 3:
-		return "borult"
-	case code == 45 || code == 48:
-		return "köd"
-	case code >= 51 && code <= 67:
-		return "eső"
-	case code >= 71 && code <= 77:
-		return "hó"
-	case code >= 80 && code <= 82:
-		return "zápor"
-	case code >= 85 && code <= 86:
-		return "havas zápor"
-	case code >= 95 && code <= 99:
-		return "zivatar"
-	default:
-		return "részben felhős"
-	}
-}
-
-// WeatherAPI.com
-func fetchWeatherAPICom(city, apiKey string) (*UnifiedWeatherResponse, error) {
-	if apiKey == "" {
-		return nil, nil
-	}
-	u := "https://api.weatherapi.com/v1/current.json?key=" + url.QueryEscape(apiKey) + "&q=" + url.QueryEscape(city) + "&lang=hu"
-	resp, err := weatherHTTPGet(u)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("weatherapi.com: HTTP %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return parseWeatherAPIComCurrentJSON(body)
-}
-
-func fetchWeatherAPIComByCoords(lat, lon float64, apiKey string) (*UnifiedWeatherResponse, error) {
-	if apiKey == "" {
-		return nil, nil
-	}
-	q := strconv.FormatFloat(lat, 'f', -1, 64) + "," + strconv.FormatFloat(lon, 'f', -1, 64)
-	u := "https://api.weatherapi.com/v1/current.json?key=" + url.QueryEscape(apiKey) + "&q=" + url.QueryEscape(q) + "&lang=hu"
-	resp, err := weatherHTTPGet(u)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("weatherapi.com: HTTP %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return parseWeatherAPIComCurrentJSON(body)
-}
-
-func parseWeatherAPIComCurrentJSON(body []byte) (*UnifiedWeatherResponse, error) {
-	var wa struct {
-		Current struct {
-			TempC     float64 `json:"temp_c"`
-			Humidity  int     `json:"humidity"`
-			WindKph   float64 `json:"wind_kph"`
-			PrecipMm  float64 `json:"precip_mm"`
-			Condition struct {
-				Text string `json:"text"`
-				Code int    `json:"code"`
-			} `json:"condition"`
-		} `json:"current"`
-	}
-	if err := json.Unmarshal(body, &wa); err != nil {
-		return nil, err
-	}
-	temp := int(wa.Current.TempC)
-	icon := weatherapiCodeToOwm(wa.Current.Condition.Code)
-	humidity := wa.Current.Humidity
-	windKph := wa.Current.WindKph
-	precipMm := wa.Current.PrecipMm
-	return &UnifiedWeatherResponse{
-		Temp:     temp,
-		TempMin:  &temp,
-		Desc:     wa.Current.Condition.Text,
-		Icon:     icon,
-		Humidity: &humidity,
-		WindKph:  &windKph,
-		PrecipMm: &precipMm,
-	}, nil
-}
-
-func weatherapiCodeToOwm(code int) string {
-	// WeatherAPI.com condition codes -> OWM icon
-	if code == 1000 {
-		return "01d"
-	}
-	if code >= 1003 && code <= 1009 {
-		return "04d"
-	}
-	if code >= 1063 && code <= 1183 {
-		return "10d"
-	}
-	if code >= 1195 && code <= 1282 {
-		return "11d"
-	}
-	if code >= 1066 && code <= 1252 {
-		return "13d"
-	}
-	if code == 1135 || code == 1147 {
-		return "50d"
-	}
-	return "02d"
-}
-
-// OpenWeatherMap (existing)
-func fetchOpenWeatherMap(city, apiKey string) (*UnifiedWeatherResponse, error) {
-	if apiKey == "" {
-		return nil, nil
-	}
-	weatherURL := "https://api.openweathermap.org/data/2.5/weather?q=" +
-		url.QueryEscape(city) + ",RO&appid=" + apiKey + "&units=metric&lang=hu"
-	resp, err := weatherHTTPGet(weatherURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openweathermap: HTTP %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return parseOpenWeatherMapCurrentJSON(body)
-}
-
-func fetchOpenWeatherMapByCoords(lat, lon float64, apiKey string) (*UnifiedWeatherResponse, error) {
-	if apiKey == "" {
-		return nil, nil
-	}
-	weatherURL := "https://api.openweathermap.org/data/2.5/weather?lat=" +
-		strconv.FormatFloat(lat, 'f', -1, 64) + "&lon=" + strconv.FormatFloat(lon, 'f', -1, 64) +
-		"&appid=" + url.QueryEscape(apiKey) + "&units=metric&lang=hu"
-	resp, err := weatherHTTPGet(weatherURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("openweathermap: HTTP %d", resp.StatusCode)
-	}
-	body, _ := io.ReadAll(resp.Body)
-	return parseOpenWeatherMapCurrentJSON(body)
-}
-
-func parseOpenWeatherMapCurrentJSON(body []byte) (*UnifiedWeatherResponse, error) {
-	var owm struct {
-		Main struct {
-			Temp     float64 `json:"temp"`
-			TempMin  float64 `json:"temp_min"`
-			Humidity int     `json:"humidity"`
-		} `json:"main"`
-		Wind struct {
-			Speed float64 `json:"speed"`
-		} `json:"wind"`
-		Rain *struct {
-			OneH float64 `json:"1h"`
-		} `json:"rain"`
-		Weather []struct {
-			Description string `json:"description"`
-			Icon        string `json:"icon"`
-		} `json:"weather"`
-	}
-	if err := json.Unmarshal(body, &owm); err != nil || len(owm.Weather) == 0 {
-		return nil, err
-	}
-	temp := int(owm.Main.Temp)
-	tmin := int(owm.Main.TempMin)
-	humidity := owm.Main.Humidity
-	windKph := owm.Wind.Speed * 3.6
-	var precipMm float64
-	if owm.Rain != nil {
-		precipMm = owm.Rain.OneH
-	}
-	return &UnifiedWeatherResponse{
-		Temp:     temp,
-		TempMin:  &tmin,
-		Desc:     owm.Weather[0].Description,
-		Icon:     owm.Weather[0].Icon,
-		Humidity: &humidity,
-		WindKph:  &windKph,
-		PrecipMm: &precipMm,
-	}, nil
-}
+// ---- GET /api/weather/county ----------------------------------------------
 
 type cityWeather struct {
 	City         string  `json:"city"`
 	Slug         string  `json:"slug"`
 	Temp         float64 `json:"temp"`
-	TempMin      float64 `json:"temp_min"`
+	TempMin      *int    `json:"temp_min,omitempty"`
+	TempMax      *int    `json:"temp_max,omitempty"`
 	Desc         string  `json:"desc"`
 	Icon         string  `json:"icon"`
+	Symbol       string  `json:"symbol"`
 	IsCountySeat bool    `json:"is_county_seat"`
 	Source       string  `json:"source,omitempty"`
 }
 
-// HandleCountyWeather returns weather for all major cities in a county (multi-provider, first success per city)
+// HandleCountyWeather returns the cached weather of a county's towns.
 func HandleCountyWeather(w http.ResponseWriter, r *http.Request) {
 	countySlug := r.URL.Query().Get("slug")
 	if countySlug == "" {
-		http.Error(w, "Missing slug", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "missing slug")
+		return
+	}
+	rows, err := db.DB.Query(placeSettlementSelect+`
+		WHERE c.slug = $1 AND s.type IN ('város', 'municípium')
+		ORDER BY s.name`, countySlug)
+	if err != nil {
+		log.Printf("weather county %q: %v", countySlug, err)
+		writeError(w, http.StatusInternalServerError, "lookup failed")
+		return
+	}
+	var places []Place
+	for rows.Next() {
+		if p, err := scanSettlement(rows); err == nil {
+			places = append(places, p)
+		}
+	}
+	rows.Close()
+
+	now := clock.Now()
+	overrides := loadDescOverrides("hu")
+	results := []cityWeather{}
+	for _, p := range places {
+		row, ok := cachedForecast(p)
+		if !ok {
+			continue
+		}
+		s, ok := summarize(row.Forecast, *row.FetchedAt, now, overrides)
+		if !ok {
+			continue
+		}
+		results = append(results, cityWeather{
+			City: p.Name, Slug: p.Slug, Temp: float64(s.Temp), TempMin: s.TempMin, TempMax: s.TempMax,
+			Desc: s.Desc, Icon: s.Icon, Symbol: s.Symbol, IsCountySeat: p.CountySeat, Source: s.Source,
+		})
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+// ---- GET /api/weather/forecast --------------------------------------------
+
+type placeOut struct {
+	Kind        string   `json:"kind"`
+	Slug        string   `json:"slug"`
+	Name        string   `json:"name"`
+	NameRo      string   `json:"name_ro,omitempty"`
+	County      string   `json:"county,omitempty"`
+	CountySlug  string   `json:"county_slug,omitempty"`
+	Type        string   `json:"type,omitempty"`
+	Latitude    *float64 `json:"lat,omitempty"`
+	Longitude   *float64 `json:"lon,omitempty"`
+	Elevation   *int     `json:"elevation,omitempty"`
+	CoordSource string   `json:"coord_source,omitempty"`
+}
+
+func toPlaceOut(p Place, row *cacheRow) placeOut {
+	out := placeOut{Kind: p.Kind, Slug: p.Slug, Name: p.Name, NameRo: p.NameRo, County: p.County,
+		CountySlug: p.CountySlug, Type: p.Type, Elevation: p.Elevation}
+	if row != nil {
+		lat, lon := row.Latitude, row.Longitude
+		out.Latitude, out.Longitude, out.CoordSource = &lat, &lon, row.CoordSource
+	}
+	return out
+}
+
+type stepOut struct {
+	Step
+	Desc string `json:"desc"`
+}
+
+type dayOut struct {
+	Day
+	Desc string `json:"desc"`
+}
+
+type forecastOut struct {
+	Place      placeOut  `json:"place"`
+	Source     string    `json:"source"`
+	SourceName string    `json:"source_name"`
+	FetchedAt  time.Time `json:"fetched_at"`
+	// Stale: the providers have not answered for a while; the page says so.
+	Stale   bool      `json:"stale"`
+	Current stepOut   `json:"current"`
+	Hourly  []stepOut `json:"hourly"`
+	Daily   []dayOut  `json:"daily"`
+	Astro   *Astro    `json:"astro"`
+}
+
+// HandleForecast returns a place's forecast: now, the next 48 hours and
+// the days ahead, with today's sun and moon.
+func HandleForecast(w http.ResponseWriter, r *http.Request) {
+	p, status, msg := placeFromRequest(r)
+	if status != 0 {
+		writeError(w, status, msg)
+		return
+	}
+	row, ok := cachedForecast(p)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "weather not ready yet")
+		return
+	}
+	now := clock.Now()
+	overrides := loadDescOverrides("hu")
+	fc := row.Forecast
+
+	cur, _ := CurrentStep(fc.Steps, now)
+	out := forecastOut{
+		Place:      toPlaceOut(p, row),
+		Source:     fc.Source,
+		SourceName: providerDisplayName(fc.Source),
+		FetchedAt:  row.FetchedAt.UTC(),
+		Stale:      row.ExpiresAt != nil && now.After(row.ExpiresAt.Add(staleGrace)),
+		Current:    stepOut{Step: cur, Desc: describe(cur.Symbol, overrides)},
+		Hourly:     []stepOut{},
+		Daily:      []dayOut{},
+	}
+	from := now.UTC().Truncate(time.Hour)
+	for _, s := range StepsBetween(fc.Steps, from, from.Add(hourlyAhead)) {
+		out.Hourly = append(out.Hourly, stepOut{Step: s, Desc: describe(s.Symbol, overrides)})
+	}
+	today := now.In(clock.Zone).Format("2006-01-02")
+	for _, d := range BuildDays(fc.Steps, clock.Zone) {
+		if d.Date < today || len(out.Daily) >= forecastDays {
+			continue
+		}
+		out.Daily = append(out.Daily, dayOut{Day: d, Desc: describe(d.Symbol, overrides)})
+	}
+	if a, err := readAstro(p.Kind, p.ID, today); err == nil {
+		out.Astro = a
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ---- GET /api/weather/archive ---------------------------------------------
+
+type archiveOut struct {
+	Place placeOut `json:"place"`
+	// Since is the first archived day: the archive starts on launch day.
+	Since *string   `json:"since"`
+	From  string    `json:"from"`
+	To    string    `json:"to"`
+	Days  []dayOut  `json:"days"`
+	Hours []stepOut `json:"hours,omitempty"`
+}
+
+// maxArchiveDays caps one request.
+const maxArchiveDays = 366
+
+// HandleArchive returns a settlement's archived days: ?slug=&days=30 (the
+// last N days, today excluded), or ?slug=&date=YYYY-MM-DD for that day's
+// hourly readings.
+func HandleArchive(w http.ResponseWriter, r *http.Request) {
+	p, status, msg := placeFromRequest(r)
+	if status != 0 {
+		writeError(w, status, msg)
+		return
+	}
+	if p.Kind != placeSettlement {
+		writeError(w, http.StatusNotFound, "only settlements have an archive")
+		return
+	}
+	overrides := loadDescOverrides("hu")
+	row, _ := readCache(p.Kind, p.ID)
+	out := archiveOut{Place: toPlaceOut(p, row), Days: []dayOut{}}
+
+	var since sql.NullString
+	if err := db.DB.QueryRow(`SELECT to_char(MIN(day), 'YYYY-MM-DD') FROM weather_daily_archive WHERE settlement_id = $1`,
+		p.ID).Scan(&since); err == nil && since.Valid {
+		out.Since = &since.String
+	}
+
+	q := r.URL.Query()
+	if date := q.Get("date"); date != "" {
+		from, to, err := dayBounds(date)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "bad date")
+			return
+		}
+		obs, err := readObs(p.ID, from, to)
+		if err != nil {
+			log.Printf("weather archive %s %s: %v", p.Slug, date, err)
+			writeError(w, http.StatusInternalServerError, "lookup failed")
+			return
+		}
+		out.From, out.To = date, date
+		for _, s := range obs {
+			out.Hours = append(out.Hours, stepOut{Step: s, Desc: describe(s.Symbol, overrides)})
+		}
+		days, err := readDailyArchive(p.ID, date, date)
+		if err == nil {
+			for _, d := range days {
+				out.Days = append(out.Days, dayOut{Day: d, Desc: describe(d.Symbol, overrides)})
+			}
+		}
+		writeJSON(w, http.StatusOK, out)
 		return
 	}
 
-	rows, err := db.DB.Query(
-		`SELECT s.slug, s.name, COALESCE(s.name_ro, ''), COALESCE(s.is_county_seat, false) FROM settlements s
-		 JOIN counties c ON s.county_id = c.id
-		 WHERE c.slug = $1 AND s.type IN ('város', 'municípium')
-		 ORDER BY s.name`, countySlug,
-	)
+	n := 30
+	if s := q.Get("days"); s != "" {
+		v, err := strconv.Atoi(s)
+		if err != nil || v < 1 {
+			writeError(w, http.StatusBadRequest, "bad days")
+			return
+		}
+		n = min(v, maxArchiveDays)
+	}
+	today := clock.Now().In(clock.Zone)
+	out.To = today.AddDate(0, 0, -1).Format("2006-01-02")
+	out.From = today.AddDate(0, 0, -n).Format("2006-01-02")
+	days, err := readDailyArchive(p.ID, out.From, out.To)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Printf("weather archive %s: %v", p.Slug, err)
+		writeError(w, http.StatusInternalServerError, "lookup failed")
+		return
+	}
+	for _, d := range days {
+		out.Days = append(out.Days, dayOut{Day: d, Desc: describe(d.Symbol, overrides)})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// ---- GET /api/weather/places ----------------------------------------------
+
+type placeListItem struct {
+	Slug       string `json:"slug"`
+	Name       string `json:"name"`
+	County     string `json:"county"`
+	CountySlug string `json:"county_slug"`
+	Type       string `json:"type"`
+	CountySeat bool   `json:"is_county_seat"`
+	Ready      bool   `json:"ready"`
+}
+
+// HandlePlaces lists the settlements for the /idojaras picker; Ready says
+// whether the worker has a forecast for it yet.
+func HandlePlaces(w http.ResponseWriter, r *http.Request) {
+	rows, err := db.DB.Query(`
+		SELECT s.slug, s.name, c.name, c.slug, s.type, COALESCE(s.is_county_seat, false),
+		       (wc.payload IS NOT NULL)
+		FROM settlements s
+		JOIN counties c ON c.id = s.county_id
+		LEFT JOIN weather_forecast_cache wc ON wc.place_kind = 'settlement' AND wc.place_id = s.id
+		ORDER BY c.name, s.name`)
+	if err != nil {
+		log.Printf("weather places: %v", err)
+		writeError(w, http.StatusInternalServerError, "lookup failed")
 		return
 	}
 	defer rows.Close()
-
-	type locInfo struct {
-		slug, name, nameRo string
-		isCountySeat       bool
-	}
-	var cities []locInfo
+	out := []placeListItem{}
 	for rows.Next() {
-		var l locInfo
-		if err := rows.Scan(&l.slug, &l.name, &l.nameRo, &l.isCountySeat); err == nil {
-			cities = append(cities, l)
+		var it placeListItem
+		if err := rows.Scan(&it.Slug, &it.Name, &it.County, &it.CountySlug, &it.Type, &it.CountySeat, &it.Ready); err == nil {
+			out = append(out, it)
 		}
 	}
-
-	if len(cities) == 0 {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("[]"))
-		return
-	}
-
-	order := getProviderOrder()
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var results []cityWeather
-	slots := make(chan struct{}, maxWeatherFanOut)
-	deadline := time.Now().Add(weatherFanOutBudget)
-
-	for _, city := range cities {
-		wg.Add(1)
-		go func(c locInfo) {
-			defer wg.Done()
-			slots <- struct{}{}
-			defer func() { <-slots }()
-			if time.Now().After(deadline) {
-				return
-			}
-			searchName := c.name
-			if c.nameRo != "" {
-				searchName = c.nameRo
-			}
-			var out *UnifiedWeatherResponse
-			var err error
-			for _, prov := range order {
-				switch prov {
-				case providerOpenMeteo:
-					out, err = fetchOpenMeteo(searchName)
-				case providerWeatherAPICom:
-					out, err = fetchWeatherAPICom(searchName, config.AppConfig.WeatherAPIComKey)
-				case providerOpenWeatherMap:
-					out, err = fetchOpenWeatherMap(searchName, config.AppConfig.WeatherAPIKey)
-				default:
-					continue
-				}
-				if err == nil && out != nil {
-					mu.Lock()
-					results = append(results, cityWeather{
-						City:         c.name,
-						Slug:         c.slug,
-						Temp:         float64(out.Temp),
-						TempMin:      float64(out.Temp),
-						Desc:         translatedDesc(out.Desc, "hu"),
-						Icon:         out.Icon,
-						IsCountySeat: c.isCountySeat,
-						Source:       providerDisplayName(prov),
-					})
-					mu.Unlock()
-					return
-				}
-			}
-		}(city)
-	}
-	wg.Wait()
-
-	if results == nil {
-		results = []cityWeather{}
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	writeJSON(w, http.StatusOK, out)
 }
 
-// MigrateWeatherTranslations creates the weather_desc_translations table (multi-language support).
+// ---- admin translations table ---------------------------------------------
+
+// MigrateWeatherTranslations creates the weather_desc_translations table.
+// Since the move to MET Norway its source_text is a base symbol code
+// ("partlycloudy", "lightrainshowers"): the admin's own Hungarian wording
+// for that weather. Older rows keyed by an English provider phrase are
+// ignored.
 func MigrateWeatherTranslations() {
 	_, err := db.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS weather_desc_translations (
@@ -763,12 +509,4 @@ func MigrateWeatherTranslations() {
 		return
 	}
 	log.Println("Weather translations table ready")
-}
-
-// WeatherTranslation row for admin API
-type WeatherTranslation struct {
-	ID             int    `json:"id"`
-	SourceText     string `json:"source_text"`
-	Lang           string `json:"lang"`
-	TranslatedText string `json:"translated_text"`
 }

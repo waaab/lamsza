@@ -1350,6 +1350,38 @@ ALTER SEQUENCE public.venues_id_seq OWNED BY public.venues.id;
 
 
 --
+-- Name: weather_astro_daily; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.weather_astro_daily (
+    place_kind character varying(20) NOT NULL,
+    place_id integer NOT NULL,
+    day date NOT NULL,
+    sunrise timestamp with time zone,
+    sunset timestamp with time zone,
+    moonrise timestamp with time zone,
+    moonset timestamp with time zone,
+    moon_phase double precision
+);
+
+
+--
+-- Name: weather_daily_archive; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.weather_daily_archive (
+    settlement_id integer NOT NULL,
+    day date NOT NULL,
+    symbol character varying(60) NOT NULL,
+    tmin double precision,
+    tmax double precision,
+    precip_mm double precision DEFAULT 0 NOT NULL,
+    wind_max_kph double precision,
+    hours integer NOT NULL
+);
+
+
+--
 -- Name: weather_desc_translations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1379,6 +1411,43 @@ CREATE SEQUENCE public.weather_desc_translations_id_seq
 --
 
 ALTER SEQUENCE public.weather_desc_translations_id_seq OWNED BY public.weather_desc_translations.id;
+
+
+--
+-- Name: weather_forecast_cache; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.weather_forecast_cache (
+    place_kind character varying(20) NOT NULL,
+    place_id integer NOT NULL,
+    latitude double precision NOT NULL,
+    longitude double precision NOT NULL,
+    coord_source character varying(20) NOT NULL,
+    source character varying(30),
+    fetched_at timestamp with time zone,
+    expires_at timestamp with time zone,
+    last_modified text,
+    payload jsonb
+);
+
+
+--
+-- Name: weather_obs_hourly; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.weather_obs_hourly (
+    settlement_id integer NOT NULL,
+    observed_at timestamp with time zone NOT NULL,
+    symbol character varying(60) NOT NULL,
+    temp double precision,
+    feels double precision,
+    precip_mm double precision,
+    wind_kph double precision,
+    wind_dir double precision,
+    humidity double precision,
+    pressure_hpa double precision,
+    cloud_pct double precision
+);
 
 
 --
@@ -2140,6 +2209,22 @@ ALTER TABLE ONLY public.venues
 
 
 --
+-- Name: weather_astro_daily weather_astro_daily_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_astro_daily
+    ADD CONSTRAINT weather_astro_daily_pkey PRIMARY KEY (place_kind, place_id, day);
+
+
+--
+-- Name: weather_daily_archive weather_daily_archive_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_daily_archive
+    ADD CONSTRAINT weather_daily_archive_pkey PRIMARY KEY (settlement_id, day);
+
+
+--
 -- Name: weather_desc_translations weather_desc_translations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2153,6 +2238,22 @@ ALTER TABLE ONLY public.weather_desc_translations
 
 ALTER TABLE ONLY public.weather_desc_translations
     ADD CONSTRAINT weather_desc_translations_source_text_lang_key UNIQUE (source_text, lang);
+
+
+--
+-- Name: weather_forecast_cache weather_forecast_cache_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_forecast_cache
+    ADD CONSTRAINT weather_forecast_cache_pkey PRIMARY KEY (place_kind, place_id);
+
+
+--
+-- Name: weather_obs_hourly weather_obs_hourly_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_obs_hourly
+    ADD CONSTRAINT weather_obs_hourly_pkey PRIMARY KEY (settlement_id, observed_at);
 
 
 --
@@ -2697,6 +2798,22 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.venues
     ADD CONSTRAINT venues_settlement_id_fkey FOREIGN KEY (settlement_id) REFERENCES public.settlements(id) ON DELETE CASCADE;
+
+
+--
+-- Name: weather_daily_archive weather_daily_archive_settlement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_daily_archive
+    ADD CONSTRAINT weather_daily_archive_settlement_id_fkey FOREIGN KEY (settlement_id) REFERENCES public.settlements(id) ON DELETE CASCADE;
+
+
+--
+-- Name: weather_obs_hourly weather_obs_hourly_settlement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.weather_obs_hourly
+    ADD CONSTRAINT weather_obs_hourly_settlement_id_fkey FOREIGN KEY (settlement_id) REFERENCES public.settlements(id) ON DELETE CASCADE;
 
 
 --

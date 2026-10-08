@@ -8,12 +8,19 @@ import (
 )
 
 type Config struct {
-	DatabaseURL       string
-	DBMaxOpenConns    int
-	DBMaxIdleConns    int
-	Port              string
-	WeatherAPIKey     string
-	WeatherAPIComKey  string
+	DatabaseURL      string
+	DBMaxOpenConns   int
+	DBMaxIdleConns   int
+	Port             string
+	WeatherAPIKey    string
+	WeatherAPIComKey string
+	// METNoUserAgent identifies us to MET Norway, the main weather source.
+	// Their terms require an application name and a contact (a site or an
+	// email); a request without one may be blocked.
+	METNoUserAgent string
+	// WeatherWorker runs the background refresh that fills the weather cache
+	// and archive. Off for a throwaway server that must not call providers.
+	WeatherWorker     bool
 	GoogleClientID    string
 	AdminGoogleEmails []string
 	SzotarOrigin      string
@@ -63,6 +70,8 @@ func Load() {
 	AppConfig.Port = getEnv("PORT", "3001")
 	AppConfig.WeatherAPIKey = getEnv("WEATHER_API_KEY", "")
 	AppConfig.WeatherAPIComKey = getEnv("WEATHER_API_COM_KEY", "")
+	AppConfig.METNoUserAgent = strings.TrimSpace(getEnv("METNO_USER_AGENT", "lamsza.com weather (+https://lamsza.com)"))
+	AppConfig.WeatherWorker = getBoolEnv("WEATHER_WORKER", true)
 
 	AppConfig.GoogleClientID = getEnv("GOOGLE_CLIENT_ID", "")
 	AppConfig.AdminGoogleEmails = parseEmailList(getEnv("ADMIN_GOOGLE_EMAILS", "attila.bogozi@gmail.com"))

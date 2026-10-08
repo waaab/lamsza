@@ -2,6 +2,7 @@ package main
 
 import (
 	"backend/internal/accountapi"
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -30,6 +31,7 @@ func main() {
 	db.SeedHistoricalSeatsContent()
 	settings.MigrateSiteSettings()
 	weather.MigrateWeatherTranslations()
+	weather.MigrateWeather()
 	pages.MigratePages()
 	pagefaq.Migrate()
 	handlers.MigrateEntryVerified()
@@ -100,6 +102,14 @@ func main() {
 	if config.AppConfig.Features.Weather {
 		mux.HandleFunc("/api/weather", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandleWeather)))
 		mux.HandleFunc("/api/weather/county", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandleCountyWeather)))
+		mux.HandleFunc("/api/weather/forecast", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandleForecast)))
+		mux.HandleFunc("/api/weather/archive", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandleArchive)))
+		mux.HandleFunc("/api/weather/places", middleware.ApplyCORS(middleware.JSONByDefault(weather.HandlePlaces)))
+		// The worker is the only code that calls the providers on a schedule
+		// and writes the weather tables; the routes above only read them.
+		if config.AppConfig.WeatherWorker {
+			weather.StartWorker(context.Background())
+		}
 		log.Println("Module [Weather] enabled")
 	}
 
@@ -151,8 +161,8 @@ func main() {
 // forever (slowloris).
 //
 // WriteTimeout starts when the request headers are read, so it has to be
-// longer than the slowest handler. The slowest are /api/proxy (15s client
-// timeout) and /api/weather/county (fan-out budget plus one city).
+// longer than the slowest handler. The slowest is /api/proxy (15s client
+// timeout).
 func newServer(addr string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:              addr,
