@@ -6,6 +6,7 @@
     import EntryCard from "$lib/components/EntryCard.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
+    import { sourceHrefByName } from "$lib/weatherSymbols.js";
     import Markdown from "$lib/components/Markdown.svelte";
     import CrestShieldPlaceholder from "$lib/components/CrestShieldPlaceholder.svelte";
     import { getApiBase } from "$lib/api.js";
@@ -282,12 +283,12 @@
                 <div class="weather-left">
                     <div class="county-weather-flex">
                         {#each countyWeather as cw}
-                            <a href="/{town}-megye/{cw.slug}" class="card sm">
+                            <a href="/idojaras/{cw.slug}" class="card sm">
                                 <span class="cw-name">{cw.city}</span>
                                 <span class="cw-temp-row">
                                     <span class="cw-temp">{Math.round(cw.temp)}°C</span>
-                                    <span class="cw-temp-min">/ {Math.round(cw.temp_min)}°C</span>
-                                    <span class="cw-icon" aria-hidden="true"><WeatherIcon code={cw.icon} style={weatherIconStyle} /></span>
+                                    <span class="cw-temp-min">/ {cw.temp_min != null ? Math.round(cw.temp_min) : "--"}°C</span>
+                                    <span class="cw-icon" aria-hidden="true"><WeatherIcon code={cw.icon} symbol={cw.symbol} style={weatherIconStyle} /></span>
                                 </span>
                                 <span class="cw-desc capitalize">{cw.desc}</span>
                             </a>
@@ -306,7 +307,9 @@
             {#if weatherUpdatedAt}
                 <small class="weather-source">Utoljára frissítve: {weatherUpdatedAt.toLocaleTimeString("hu-HU", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}</small>
             {/if}
-            <small class="weather-source" title="Forrás: OpenWeatherMap">OpenWeatherMap</small>
+            {#each [...new Set(countyWeather.map((cw) => cw.source).filter(Boolean))] as src (src)}
+                <small class="weather-source">Forrás: {#if sourceHrefByName(src)}<a href={sourceHrefByName(src)} target="_blank" rel="noopener noreferrer">{src}</a>{:else}{src}{/if}</small>
+            {/each}
         </div>
     </div>
 </div>

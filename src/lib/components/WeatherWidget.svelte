@@ -4,6 +4,7 @@
     import { formatTime } from "$lib/utils";
     import WeatherIcon from "$lib/components/WeatherIcon.svelte";
     import { weatherDescPlaceholder, weatherSourcePlaceholder } from "$lib/weatherDescPlaceholder.js";
+    import { sourceHrefByName } from "$lib/weatherSymbols.js";
 
     export let settlementSlug = "csikszereda";
     /** When set, fetch weather by coordinates (e.g. for attractions) */
@@ -58,8 +59,10 @@
                         weatherData = {
                             temp: data.temp,
                             tempMin: data.temp_min,
+                            tempMax: data.temp_max ?? null,
                             desc: data.desc ?? "",
                             icon: data.icon ?? "02d",
+                            symbol: data.symbol ?? "",
                             source: data.source ?? "",
                             timestamp: data.timestamp,
                             humidity: data.humidity ?? null,
@@ -84,8 +87,10 @@
             weatherData = {
                 temp: data.temp ?? Math.round(data.main?.temp ?? 0),
                 tempMin: data.temp_min != null ? data.temp_min : (data.main?.temp_min != null ? Math.round(data.main.temp_min) : null),
+                tempMax: data.temp_max ?? null,
                 desc: data.desc ?? data.weather?.[0]?.description ?? "",
                 icon: data.icon ?? data.weather?.[0]?.icon ?? "02d",
+                symbol: data.symbol ?? "",
                 source: data.source ?? "",
                 timestamp: ts,
                 humidity: data.humidity ?? null,
@@ -99,8 +104,10 @@
                     JSON.stringify({
                         temp: weatherData.temp,
                         temp_min: weatherData.tempMin,
+                        temp_max: weatherData.tempMax,
                         desc: weatherData.desc,
                         icon: weatherData.icon,
+                        symbol: weatherData.symbol,
                         source: weatherData.source,
                         timestamp: weatherData.timestamp,
                         humidity: weatherData.humidity,
@@ -172,14 +179,17 @@
                 </span>
             {:else if weatherData}
                 <span class="weather-icon">
-                    <WeatherIcon code={weatherData.icon} style={weatherIconStyle} />
+                    <WeatherIcon code={weatherData.icon} symbol={weatherData.symbol} style={weatherIconStyle} />
                 </span>
             {/if}
         </div>
     </div>
     <div class="weather-footer">
         <small class="weather-timestamp">Utoljára frissítve: <span class="weather-timestamp-value">{weatherData ? formatTime(weatherData.timestamp) : '00:00'}</span></small>
-        <small class="weather-source">Forrás: <span class="weather-source-value">{weatherData?.source ? weatherData.source : weatherSourcePlaceholder}</span></small>
+        <small class="weather-source">Forrás: <span class="weather-source-value">{#if weatherData?.source && sourceHrefByName(weatherData.source)}<a href={sourceHrefByName(weatherData.source)} target="_blank" rel="noopener noreferrer">{weatherData.source}</a>{:else}{weatherData?.source ? weatherData.source : weatherSourcePlaceholder}{/if}</span></small>
+        {#if settlementSlug && !(lat != null && lon != null)}
+            <a class="weather-more" href="/idojaras/{settlementSlug}">Előrejelzés &rsaquo;</a>
+        {/if}
     </div>
 </div>
 
@@ -199,6 +209,14 @@
     }
     .weather-detail {
         color: var(--text-faint);
+        white-space: nowrap;
+    }
+    .weather-source-value a {
+        color: inherit;
+    }
+    .weather-more {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
         white-space: nowrap;
     }
 

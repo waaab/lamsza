@@ -13,6 +13,7 @@
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { auth } from "$lib/stores/auth";
     import { weatherIconEmoji } from "$lib/utils";
+    import { symbolEmoji } from "$lib/weatherSymbols.js";
 
     const dispatch = createEventDispatcher();
 
@@ -201,7 +202,7 @@
                     weather: {
                         temp: weather.temp,
                         desc: weather.desc || "",
-                        emoji: weatherIconEmoji(weather.icon),
+                        emoji: weather.symbol ? symbolEmoji(weather.symbol) : weatherIconEmoji(weather.icon),
                     },
                 }));
             })

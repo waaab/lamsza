@@ -19,7 +19,7 @@ export function relativeTime(ts) {
 /**
  * Maps OpenWeatherMap icon codes to emojis (day and night variants).
  * OWM uses 9 condition codes (01–04, 09, 10, 11, 13, 50) × "d" (day) / "n" (night) = 18 codes.
- * WeatherAPI.com and Open-Meteo only return "d" codes; we use local time to show night emoji when appropriate.
+ * Replies cached before the MET Norway move may carry only a "d" code; local time picks the night emoji then.
  * @param {string} code - OWM icon code (e.g. "01d", "02n")
  * @param {Date} [now] - Optional time for day/night; defaults to current local time
  * @returns {string}

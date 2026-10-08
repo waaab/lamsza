@@ -12,6 +12,10 @@ export const PAGE_HEADER_FALLBACK = /** @type {Record<string, { title: string, g
         title: "Friss hírek erdélyi forrásból",
         greeting: "Helyi hírcsatornák legfrissebb hírei időrendben.",
     },
+    idojaras: {
+        title: "Időjárás",
+        greeting: "Előrejelzés egy hétre és időjárás-archívum a székelyföldi településekre.",
+    },
     megyek: {
         title: "Székelyföldi Megyék",
         greeting: "Válassz megyét a települések és tartalmak böngészéséhez.",

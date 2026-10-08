@@ -363,6 +363,25 @@ func TestHandlersReadOnlyTheCache(t *testing.T) {
 		t.Fatalf("first day %v", first)
 	}
 
+	rr = httptest.NewRecorder()
+	HandlePlaces(rr, httptest.NewRequest(http.MethodGet, "/api/weather/places", nil))
+	var places []map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &places); err != nil || len(places) == 0 {
+		t.Fatalf("places: %v %s", err, rr.Body)
+	}
+	var withNow int
+	for _, pl := range places {
+		if pl["now"] != nil {
+			withNow++
+			if pl["slug"] != "csikszereda" {
+				t.Fatalf("%v has weather although only csikszereda was refreshed", pl["slug"])
+			}
+		}
+	}
+	if withNow != 1 {
+		t.Fatalf("%d places with weather, want 1", withNow)
+	}
+
 	rr, _ = get(t, HandleArchive, "/api/weather/archive?slug=csikszereda&days=7")
 	if rr.Code != http.StatusOK {
 		t.Fatalf("archive: %d", rr.Code)

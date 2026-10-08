@@ -83,6 +83,7 @@ reference; each item names its own.
 | Settings gear attributes (`ic-gear`) | Lámsza's |  |
 | aria-hidden on the magnifier (`ic-aria`) | Lámsza's |  |
 | Mondások quote icon class (`ic-quote`) | Lámsza's |  |
+| Weather icons (`wx-icons`) | New | Lámsza only. Animated inline SVG for every weather element: `icons/weather/WeatherSymbol.svelte` draws all 41 MET Norway symbol codes, day and night, from a few shared parts (sun, moon, one or two clouds, rain, sleet, snow, lightning, fog); `WeatherGlyph.svelte` draws the measurements and shows their value (thermometer level, wind direction, humidity, pressure needle, UV colour, rain gauge, sun and moon rise and set, day length, moon phase). Theme tokens only (sun --warm-light, rain --szekely-blue, clouds from --text-muted), no colours of their own; CSS motion only, still under prefers-reduced-motion; fixed reserved size. The widgets use them when the admin's icon style is "svg"; the emoji style stays. Review page: `/idojaras/ikonok` (noindex). Accepted by the owner, 2026-10-09. |
 
 ## Dialogs
 

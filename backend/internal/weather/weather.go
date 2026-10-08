@@ -458,31 +458,40 @@ type placeListItem struct {
 	CountySlug string `json:"county_slug"`
 	Type       string `json:"type"`
 	CountySeat bool   `json:"is_county_seat"`
-	Ready      bool   `json:"ready"`
+	// Now is the widget summary, nil until the worker has a forecast.
+	Now *UnifiedWeatherResponse `json:"now"`
 }
 
-// HandlePlaces lists the settlements for the /idojaras picker; Ready says
-// whether the worker has a forecast for it yet.
+// HandlePlaces lists every settlement for the /idojaras overview and picker,
+// each with its current weather from the cache.
 func HandlePlaces(w http.ResponseWriter, r *http.Request) {
-	rows, err := db.DB.Query(`
-		SELECT s.slug, s.name, c.name, c.slug, s.type, COALESCE(s.is_county_seat, false),
-		       (wc.payload IS NOT NULL)
-		FROM settlements s
-		JOIN counties c ON c.id = s.county_id
-		LEFT JOIN weather_forecast_cache wc ON wc.place_kind = 'settlement' AND wc.place_id = s.id
-		ORDER BY c.name, s.name`)
+	rows, err := db.DB.Query(placeSettlementSelect + ` ORDER BY c.name, s.name`)
 	if err != nil {
 		log.Printf("weather places: %v", err)
 		writeError(w, http.StatusInternalServerError, "lookup failed")
 		return
 	}
-	defer rows.Close()
-	out := []placeListItem{}
+	var places []Place
 	for rows.Next() {
-		var it placeListItem
-		if err := rows.Scan(&it.Slug, &it.Name, &it.County, &it.CountySlug, &it.Type, &it.CountySeat, &it.Ready); err == nil {
-			out = append(out, it)
+		if p, err := scanSettlement(rows); err == nil {
+			places = append(places, p)
 		}
+	}
+	rows.Close()
+
+	now := clock.Now()
+	overrides := loadDescOverrides("hu")
+	out := []placeListItem{}
+	for _, p := range places {
+		it := placeListItem{Slug: p.Slug, Name: p.Name, County: p.County, CountySlug: p.CountySlug,
+			Type: p.Type, CountySeat: p.CountySeat}
+		if row, ok := cachedForecast(p); ok {
+			if s, ok := summarize(row.Forecast, *row.FetchedAt, now, overrides); ok {
+				s.Slug = p.Slug
+				it.Now = s
+			}
+		}
+		out = append(out, it)
 	}
 	writeJSON(w, http.StatusOK, out)
 }
