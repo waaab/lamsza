@@ -47,6 +47,10 @@
     const cur = $derived(data?.current ?? null);
     const days = $derived(data?.daily ?? []);
     const hours = $derived(data?.hourly ?? []);
+    // The strip's warmest and coldest hour, for its title.
+    const hourTemps = $derived(hours.map((/** @type {any} */ h) => h.temp).filter((/** @type {any} */ v) => v != null));
+    const hoursMax = $derived(hourTemps.length ? Math.max(...hourTemps) : null);
+    const hoursMin = $derived(hourTemps.length ? Math.min(...hourTemps) : null);
     const astro = $derived(data?.astro ?? null);
     const place = $derived(data?.place ?? null);
     const title = $derived(place ? `${place.name} időjárása` : "Időjárás");
@@ -184,7 +188,12 @@
     {/if}
 
     <section class="wx-section">
-        <h3 class="widget-title">A következő 48 óra</h3>
+        <h3 class="widget-title">
+            A következő 48 órában{#if hoursMax != null}
+                <span class="wx-range" aria-label="legmagasabb {deg(hoursMax)}, legalacsonyabb {deg(hoursMin)}">
+                    <span class="wx-range-max">{deg(hoursMax)}</span> / <span class="wx-range-min">{deg(hoursMin)}</span>
+                </span>{/if}
+        </h3>
         <HourlyStrip {hours} />
     </section>
 
@@ -337,6 +346,17 @@
        the screen. */
     .page-nav ul {
         flex-wrap: wrap;
+    }
+    .wx-range {
+        margin-left: 0.4em;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+    }
+    .wx-range-max {
+        color: color-mix(in srgb, var(--warm-light) 75%, var(--text-primary));
+    }
+    .wx-range-min {
+        color: var(--szekely-blue);
     }
     .wx-section {
         margin-top: 1.75rem;
