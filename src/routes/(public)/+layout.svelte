@@ -11,6 +11,7 @@
     import SignInDialog from "$lib/components/SignInDialog.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import AppsLauncher from "$lib/components/AppsLauncher.svelte";
+    import AccountMenu from "$lib/components/AccountMenu.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
     import { APP_VERSION } from "$lib/publicChangelog.js";
 
@@ -165,44 +166,14 @@
         </a>
     </div>
     <div class="nav">
-        {#if $auth.loggedIn}
-            <a
-                href="/fiok"
-                class="btn nav-btn {$page.url.pathname === '/fiok' ? 'active' : ''}"
-                title="Fiók"
-            >
-                <AppIcon name="profile" size={16} />
-                <span class="sr-only">Fiók</span>
-            </a>
-            <button
-                type="button"
-                class="btn nav-btn"
-                on:click={logout}
-                title="Kijelentkezés"
-            >
-                <AppIcon name="logout" size={16} />
-                <span class="sr-only">Kijelentkezés</span>
-            </button>
-        {:else}
-            <button
-                type="button"
-                class="btn nav-btn"
-                title="Belépés"
-                on:click={openLogin}
-            >
-                <AppIcon name="login" size={16} />
-                <span class="sr-only">Belépés</span>
-            </button>
-        {/if}
-
-        <a
-            href="/beallitasok"
-            class="btn nav-btn {$page.url.pathname === '/beallitasok' ? 'active' : ''}"
-            title="Felhasználói beállítások"
-        >
-            <AppIcon name="settings" size={16} />
-            <span class="sr-only">Felhasználói beállítások</span>
-        </a>
+        <AccountMenu
+            account={$auth.loggedIn
+                ? { name: $auth.user, displayName: $auth.displayName, email: $auth.email, picture: $auth.picture }
+                : null}
+            onLogin={openLogin}
+            onLogout={logout}
+            active={$page.url.pathname === "/fiok" || $page.url.pathname === "/beallitasok"}
+        />
         <AppsLauncher current="lamsza" hostname={$page.url.hostname} />
     </div>
 </header>

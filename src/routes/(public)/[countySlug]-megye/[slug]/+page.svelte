@@ -706,12 +706,34 @@
         {/if}
     {/if}
 {:else if loading}
-    <p class="greeting">...</p>
+    <!-- Title and lead placeholders over a screen's height, so the footer
+         stays below the fold and nothing visible moves when the page arrives
+         (UI_BASELINE "ld-reserve-space"). -->
+    <div class="location-loading" aria-busy="true">
+        <div class="skeleton location-loading__title"></div>
+        <div class="skeleton location-loading__lead"></div>
+    </div>
 {:else}
     <p class="greeting">A keresett oldal nem található.</p>
 {/if}
 
 <style>
+    .location-loading {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding-top: 2.5rem;
+    }
+    .location-loading__title {
+        height: 2.5rem;
+        width: min(60%, 24rem);
+    }
+    .location-loading__lead {
+        height: 1.2rem;
+        width: min(80%, 32rem);
+    }
+
     .more-info {
         display: flex;
         flex-direction: column;

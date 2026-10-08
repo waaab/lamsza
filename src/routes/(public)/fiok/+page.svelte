@@ -4,6 +4,8 @@
     import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import AccountPage from "$lib/components/AccountPage.svelte";
+    import AccountDetails from "$lib/components/AccountDetails.svelte";
     import { userAccountTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
     import { removeFavorite } from "$lib/favorites.js";
@@ -20,21 +22,8 @@
         linkjeim: "Linkjeim",
     };
 
-    function hasField(value) {
-        if (value == null) return false;
-        if (typeof value === "string") return value.trim() !== "";
-        return true;
-    }
-
-    /** @param {string | null | undefined} iso */
-    function formatTimestamp(iso) {
-        if (!iso) return "";
-        const d = new Date(iso);
-        if (Number.isNaN(d.getTime())) return String(iso);
-        return d.toLocaleString("hu-HU");
-    }
-
     let activeTab = $state(userAccountTabIds[0]);
+    let authReady = $state(false);
     let confirmOpen = $state(false);
     let confirmMessage = $state("");
     /** @type {((accepted: boolean) => void) | null} */
@@ -560,6 +549,7 @@
 
         void (async () => {
             await auth.init();
+            authReady = true;
             if (!get(auth).loggedIn) {
                 openLogin();
             }
@@ -580,94 +570,49 @@
         documentTitleSuffix=" – Lámsza"
     />
 
-    {#if !$auth.loggedIn}
-        <div class="info-box profile-login-prompt">
-            <p>Jelentkezz be a fiókodhoz</p>
-            <button type="button" class="btn" onclick={openLogin}>Belépés</button>
-        </div>
-    {:else}
-        <nav class="header-tabs profile-tabs" aria-label="Fiók">
-            {#each userAccountTabIds as tabId (tabId)}
-                <button
-                    type="button"
-                    class="btn"
-                    class:active={activeTab === tabId}
-                    onclick={() => (activeTab = tabId)}
-                >
-                    {TAB_LABELS[tabId]}
-                </button>
-            {/each}
-        </nav>
-
-        {#if activeTab === "fiok"}
-            <div class="profile-settings">
-                <h3>Megjelenített név</h3>
-                <p class="profile-hint">
-                    Rövid név a kezdőlap üdvözlésében. Üresen a Google-fiók neve marad. Legfeljebb 24 karakter.
-                </p>
-                <label for="display_name">Név</label>
-                <input
-                    id="display_name"
-                    class="profile-location-select"
-                    type="text"
-                    maxlength="24"
-                    bind:value={displayName}
-                    autocomplete="nickname"
-                />
-                {#if displayNameError}
-                    <p class="profile-error">{displayNameError}</p>
-                {/if}
-                {#if displayNameOk}
-                    <p class="profile-ok">{displayNameOk}</p>
-                {/if}
-                <button
-                    type="button"
-                    class="btn profile-save"
-                    disabled={displayNameSaving}
-                    onclick={saveDisplayName}
-                >
-                    {displayNameSaving ? "Mentés…" : "Mentés"}
-                </button>
-            </div>
-            <dl class="profile-fields">
-                {#if hasField($auth.picture)}
-                    <dt>Fénykép</dt>
-                    <dd><img src={$auth.picture} alt="" class="profile-photo" /></dd>
-                {/if}
-                {#if hasField($auth.givenName)}
-                    <dt>Keresztnév</dt>
-                    <dd>{$auth.givenName}</dd>
-                {/if}
-                {#if hasField($auth.familyName)}
-                    <dt>Vezetéknév</dt>
-                    <dd>{$auth.familyName}</dd>
-                {/if}
-                {#if hasField($auth.user)}
-                    <dt>Név</dt>
-                    <dd>{$auth.user}</dd>
-                {/if}
-                {#if hasField($auth.email)}
-                    <dt>E-mail</dt>
-                    <dd>{$auth.email}</dd>
-                {/if}
-                {#if hasField($auth.locale)}
-                    <dt>Nyelv</dt>
-                    <dd>{$auth.locale}</dd>
-                {/if}
-                {#if hasField($auth.googleSub)}
-                    <dt>Google azonosító</dt>
-                    <dd>{$auth.googleSub}</dd>
-                {/if}
-                {#if hasField($auth.lastLoginAt)}
-                    <dt>Utolsó belépés</dt>
-                    <dd>{formatTimestamp($auth.lastLoginAt)}</dd>
-                {/if}
-                {#if hasField($auth.createdAt)}
-                    <dt>Fiók létrehozva</dt>
-                    <dd>{formatTimestamp($auth.createdAt)}</dd>
-                {/if}
-            </dl>
-        {:else if activeTab === "adatlapjaim"}
+    <AccountPage
+        tabs={userAccountTabIds.map((id) => ({ id, label: TAB_LABELS[id] }))}
+        signedIn={$auth.loggedIn}
+        ready={authReady}
+        onSignIn={openLogin}
+        bind:active={activeTab}
+    >
+        {#snippet tab(id)}
+        {#if id === "fiok"}
+            <AccountDetails account={{ ...$auth, name: $auth.user }}>
+                {#snippet before()}
+                <div class="profile-settings">
+                    <h3>Megjelenített név</h3>
+                    <p class="profile-hint">
+                        A Lámsza, a Szótár és a Játszótér is ezt a nevet mutatja, a Játszótér ranglistáin is. Üresen a Google-fiók neve marad. Legfeljebb 24 karakter.
+                    </p>
+                    <label for="display_name">Név</label>
+                    <input
+                        id="display_name"
+                        class="profile-location-select"
+                        type="text"
+                        maxlength="24"
+                        bind:value={displayName}
+                        autocomplete="nickname"
+                    />
+                    {#if displayNameError}
+                        <p class="profile-error">{displayNameError}</p>
+                    {/if}
+                    {#if displayNameOk}
+                        <p class="profile-ok">{displayNameOk}</p>
+                    {/if}
+                    <button
+                        type="button"
+                        class="btn profile-save"
+                        disabled={displayNameSaving}
+                        onclick={saveDisplayName}
+                    >
+                        {displayNameSaving ? "Mentés…" : "Mentés"}
+                    </button>
+                </div>
+                {/snippet}
+            </AccountDetails>
+        {:else if id === "adatlapjaim"}
             <div class="profile-listings">
                 {#if listingsError}
                     <p class="profile-error">{listingsError}</p>
@@ -833,7 +778,7 @@
                     </section>
                 {/if}
             </div>
-        {:else if activeTab === "weboldalaim"}
+        {:else if id === "weboldalaim"}
             <div class="profile-listings">
                 {#if websitesError}
                     <p class="profile-error">{websitesError}</p>
@@ -854,9 +799,9 @@
                     </ul>
                 {/if}
             </div>
-        {:else if activeTab === "kereses"}
+        {:else if id === "kereses"}
             <p class="profile-empty">A keresési előzmények még nincsenek bekötve.</p>
-        {:else if activeTab === "bongeszes"}
+        {:else if id === "bongeszes"}
             <div class="profile-history">
                 {#if historyError}
                     <p class="profile-error">{historyError}</p>
@@ -891,7 +836,7 @@
                     </ul>
                 {/if}
             </div>
-        {:else if activeTab === "kedvencek"}
+        {:else if id === "kedvencek"}
             <div class="profile-favorites">
                 {#if favoritesError}
                     <p class="profile-error">{favoritesError}</p>
@@ -987,7 +932,7 @@
                     {/if}
                 {/if}
             </div>
-        {:else if activeTab === "linkjeim"}
+        {:else if id === "linkjeim"}
             <div class="profile-links">
                 {#if linksError}
                     <p class="profile-error">{linksError}</p>
@@ -1047,7 +992,8 @@
                 {/if}
             </div>
         {/if}
-    {/if}
+        {/snippet}
+    </AccountPage>
 </section>
 
 {#if linkDialogOpen}
@@ -1132,35 +1078,6 @@
         display: flex;
         flex-direction: column;
         gap: 1rem;
-    }
-    .profile-login-prompt {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-    .profile-tabs {
-        flex-wrap: wrap;
-    }
-    .profile-fields {
-        display: grid;
-        grid-template-columns: minmax(8rem, 12rem) 1fr;
-        gap: 0.5rem 1rem;
-        margin: 0;
-    }
-    .profile-fields dt {
-        margin: 0;
-        font-weight: 600;
-        color: var(--text-muted, #666);
-    }
-    .profile-fields dd {
-        margin: 0;
-    }
-    .profile-photo {
-        width: 4rem;
-        height: 4rem;
-        border-radius: 50%;
-        object-fit: cover;
     }
     .profile-settings {
         display: flex;

@@ -74,6 +74,18 @@ Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification
      `/internal/`. Check on the server: `curl -s 127.0.0.1:<szotar
      port>/internal/games/proverbs` without the token answers 401, and
      `https://szotar.lamsza.com/internal/games/proverbs` never returns JSON.
+  9. **The account API (Fiók, display name), with the account release.** Generate two more tokens:
+     Lámsza's `ACCOUNT_SZOTAR_TOKEN` = Szótár's `LAMSZA_ACCOUNT_TOKEN`, and Lámsza's
+     `ACCOUNT_JATSZOTER_TOKEN` = Játszótér's `LAMSZA_ACCOUNT_TOKEN`; set `LAMSZA_ACCOUNT_URL` in both to
+     `http://127.0.0.1:<lamsza port>` (`PRODUCTION_SERVER_SETUP.md` §6). The same nginx rule covers it:
+     nothing proxies `/internal/`. Check on the server: `curl -s 127.0.0.1:<lamsza port>/internal/account/profile?google_sub=x`
+     without a token answers 401, and `https://lamsza.com/internal/account/profile` never returns JSON.
+- **[network] owner: nginx must serve the prerendered pages.** The Szótár and Játszótér vhosts in
+  `PRODUCTION_ENVIRONMENT_NOTES.md` use `index app.html` and `try_files $uri $uri/ /app.html`, so a
+  prerendered page (`/lista` → `lista.html`, `/` → `index.html`) is never served: every page starts from the
+  empty shell. Use `index index.html` and `try_files $uri $uri.html $uri/ /app.html` (Lámsza's staged vhost
+  already has `$uri.html`, but also `index app.html`). Check: `curl -s https://szotar.lamsza.com/lista` contains
+  the page title, not only the shell.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
@@ -231,6 +243,13 @@ follows `UI_BASELINE.md` when it is done.
 ## Feature ideas
 
 Ideas the owner wants kept, not scheduled. Each needs a plan before any work.
+
+- **[network] Single sign-on across *.lamsza.com.** Today each app has its own Google OAuth client and its own
+  sign-in; users are matched across apps by Google ID, Lámsza's display name is copied over the internal
+  account API, and each app stores its own theme (UI_BASELINE `acc-page`, `set-theme-store`). One sign-in for
+  the whole network (a shared session on `.lamsza.com`, or one auth service) would make that copying and the
+  per-app theme unnecessary. Needs a plan: cookie domain and SameSite, the four OAuth clients, the admin app's
+  separate session, CSRF.
 
 - **[network] Reactions, starting with Mondások**, inspired by IMDb's reaction
   bar: thumbs up and thumbs down with counts, and a smiley button that opens

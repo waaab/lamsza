@@ -227,7 +227,7 @@
 {#if loading}
     <div class="header-tabs chips">
         <span class="header-tabs-label" aria-label="Kiemelt kategóriák">Kiemelt kategóriák:</span>
-        <span class="btn btn--loading">Szűrők betöltése…</span>
+        <span class="btn btn-md btn--loading">Szűrők betöltése…</span>
     </div>
 {:else}
     <ChipScrollRow label="Kiemelt kategóriák:">

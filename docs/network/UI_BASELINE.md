@@ -52,14 +52,15 @@ reference; each item names its own.
 | Own-app home button (`tb-own-home`) | Other | keep as is |
 | Left-side sections (`tb-left-items`) | Other | keep as is |
 | Links to the sister apps (`tb-cross-links`) | Other | keep as is |
-| Profile / account button (`tb-profile`) | Lámsza's | Szótár is exempt for now: it has no account page, so no Fiók button. Owner's decision, 2026-10-07. |
-| Settings control (`tb-settings`) | Lámsza's | Szótár and Játszótér keep their theme dropdown (localStorage); Lámsza keeps its settings page. Clarified by the owner. |
+| Profile / account button (`tb-profile`) | Lámsza's | Fiók is the default in every public app: Lámsza, Szótár and Játszótér each have a `/fiok` page, reached from the account menu (`tb-account-menu`). This replaces Szótár's exemption of 2026-10-07. Owner's decision, 2026-10-08. |
+| Settings control (`tb-settings`) | Lámsza's | A Beállítások page in every public app (`/beallitasok`), reached from the account menu; no settings button or theme dropdown in the toolbar. This replaces "Szótár and Játszótér keep their theme dropdown". Owner's decision, 2026-10-08. |
 | Admin link in toolbar (`tb-admin-link`) | None | No user-facing app links to the admin app: no toolbar button, no edit link, no redirect. Admins open it by URL (WAYS_OF_WORKING R18). Owner's decision, 2026-10-07. |
 | App-only toolbar buttons (`tb-extra`) | Other | keep as is |
-| Toolbar while auth loads (`tb-skeleton`) | Lámsza's |  |
+| Toolbar while auth loads (`tb-skeleton`) | Lámsza's | Belépés shows until the session is known; the profile button then takes its place at the same size. |
 | Back-to-top button (`tb-backtotop`) | Lámsza's | Back-to-top in every app, the admin app included. |
 | Responsive behaviour (`tb-responsive`) | Lámsza's | Lámsza's toolbar rules for the apps with a toolbar; the admin app gets basic small-screen rules for its own shell. |
 | Apps launcher (`tb-apps-launcher`) | New | A nine-dot button (`AppIcon` "apps") as the last button on the right of the toolbar in Lámsza, Szótár and Játszótér, not in the admin app. It opens a small panel (the settings dropdown's look) with each public app's icon and name, the current app highlighted. One shared component, `AppsLauncher.svelte`, and one app list, `networkApps.js` (links from `networkOrigins.js`), both synced from lamsza. Keyboard: Enter or Space opens it and focuses the first app, Escape closes it and returns focus to the button, tabbing out or a click outside closes it. It adds to `tb-cross-links`, which stay as they are. Owner's request, 2026-10-08. |
+| Account menu (`tb-account-menu`) | New | The right of the toolbar in Lámsza, Szótár and Játszótér holds only two buttons. Signed out: Belépés, then the apps launcher. Signed in: the profile button (the user's Google photo, or the profile icon), then the apps launcher. The profile button opens a menu in the dropdown look: the shown name and email, then Fiók, Beállítások, Kijelentkezés. One shared component, `AccountMenu.svelte`; keyboard as the launcher (Enter or Space opens it on the first item, Escape closes it and returns focus, tabbing out or a click outside closes it). Owner's decision, 2026-10-08. |
 | Add button in the title row (`pg-title-add`) | Lámsza's | A page's main "new item" button sits at the far right of the title row as a `btn btn-lg` with a short helper text under it, the way Lámsza's Index places "Új Bejegyzés"; not in the toolbar. Szótár's "Új szó" follows it on its word-list pages (home, /lista, /betu, /betu/<letter>, /szofaj/<type>, /kereses). Everyone sees the button; signed out it opens the sign-in dialog and then the form. On phones it wraps under the title. Owner's decision, 2026-10-08. |
 
 ## Footer
@@ -98,10 +99,11 @@ reference; each item names its own.
 
 | Item | Baseline | Note |
 |---|---|---|
-| Theme choice UI (`set-theme-ui`) | Other | keep as is |
-| Theme storage (`set-theme-store`) | Lámsza's | Account storage stays in Lámsza and Admin only; Szótár and Játszótér keep localStorage. Clarified by the owner. |
+| Theme choice UI (`set-theme-ui`) | Lámsza's | Only a signed-in user chooses a theme, on the Téma tab of the app's Beállítások page. The theme dropdown leaves the toolbar in Szótár and Játszótér. Owner's decision, 2026-10-08. |
+| Theme storage (`set-theme-store`) | Lámsza's | Signed in: the choice is saved in that app's own account (`users.theme` in Lámsza, Szótár and Játszótér) and cached in `localStorage` so the page paints in it. Signed out: the device's theme (`prefers-color-scheme`); signing out, or a session the server no longer knows, clears the saved one. Stored per app, not shared, until single sign-on (OPEN_ITEMS). Owner's decision, 2026-10-08; replaces "Szótár and Játszótér keep localStorage". |
 | Theme-init script (`set-theme-init`) | Lámsza's |  |
-| Profile page (`set-profile`) | (no pick) | keep as is |
+| Profile page (`set-profile`) | (no pick) | See `acc-page`. |
+| Fiók page (`acc-page`) | New | One Fiók page in every public app, built from the shared `AccountPage.svelte` and `AccountDetails.svelte`. Its first tab, "Fiók", shows the same details everywhere (photo, Megjelenített név, names, email, Google-azonosító, last sign-in, account created); the app's own tabs follow (Lámsza: its current tabs; Szótár: Szójavaslataim; Játszótér: Eredményeim). The display name belongs to Lámsza, which is the only place to edit it; Szótár and Játszótér copy it by Google ID through Lámsza's internal account API at sign-in and when Fiók opens, and fall back to Google's name. Each app keeps its own Google sign-in. Owner's decision, 2026-10-08. |
 
 ## Error pages
 
@@ -116,6 +118,7 @@ reference; each item names its own.
 |---|---|---|
 | Google button component (`si-button`) | Lámsza's |  |
 | Loading wording (`si-loading`) | Lámsza's |  |
+| Async content reserves its space (`ld-reserve-space`) | New | Content that arrives after the page appears never pushes what is already on screen. Either the page fetches in its `+page.js` `load`, so title, badge, lead and list render together, or it shows a placeholder of the final size in the existing style (Szótár's dimmed rows, the global `.skeleton`) until the content arrives; a placeholder that may differ in size reserves at least a screen's height so the next block starts below the fold. Checked with the layout-shift measurement on a slowed API (target: no shift at all; under 0.01 per page). Owner's decision, 2026-10-08. |
 | Error wording (`si-errors`) | Játszótér's |  |
 | Google client id source (`si-clientid`) | Lámsza's |  |
 

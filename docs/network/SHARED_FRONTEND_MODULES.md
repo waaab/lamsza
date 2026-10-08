@@ -78,8 +78,8 @@ The lists live in `shared-frontend-modules.json`. Today:
 
 | Consumer | Share |
 |---|---|
-| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/components/AppsLauncher.svelte`, `src/lib/{networkOrigins,networkApps}.js` (unused there: the admin app has no launcher), `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js` and `tests/networkApps.test.js` |
-| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog,AppsLauncher}.svelte`, `src/lib/{networkOrigins,networkApps}.js`, `src/styles/global.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js` and `tests/networkApps.test.js` |
+| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/components/{AppsLauncher,AccountMenu,AccountPage,AccountDetails,ThemeSettings}.svelte`, `src/lib/{networkOrigins,networkApps,accountDetails}.js` (unused there: the admin app has no launcher, account menu or Fiók page), `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js`, `tests/networkApps.test.js` and `tests/accountDetails.test.js` |
+| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog,AppsLauncher,AccountMenu,AccountPage,AccountDetails,ThemeSettings}.svelte`, `src/lib/{networkOrigins,networkApps,accountDetails}.js`, `src/styles/global.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js`, `tests/networkApps.test.js` and `tests/accountDetails.test.js` |
 
 `AppIcon`, the dialogs, `SignInDialog` and the three stylesheets joined on 2026-10-07,
 when the owner chose one icon system, one set of dialogs and one base stylesheet for the
@@ -89,6 +89,8 @@ together with Szótár and Játszótér, for the one network error page.
 for the apps launcher (UI_BASELINE "tb-apps-launcher"); `networkOrigins.js` already had the same
 logic in all three public apps, so one copy replaces three. Each app keeps its own
 `tests/networkOrigins.test.js`.
+`AccountMenu`, `AccountPage`, `AccountDetails`, `ThemeSettings`, `accountDetails.js` and its test joined the same
+day for the shared account menu, Fiók page and Téma panel (UI_BASELINE `tb-account-menu`, `acc-page`).
 
 Deliberately **not** shared, because the apps legitimately differ:
 

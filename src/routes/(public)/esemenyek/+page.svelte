@@ -571,7 +571,12 @@
 <div class="header-tabs">
     <span class="header-tabs-label" aria-label="Szűrés településre">Szűrés településre:</span>
     {#if filtersLoading}
-        <span class="btn btn--loading">Szűrők betöltése…</span>
+        <!-- The two filter buttons' shape, so the row wraps the same way and
+             nothing below moves when they arrive (UI_BASELINE "ld-reserve-space"). -->
+        <div class="header-tabs-filters-row" aria-busy="true">
+            <span class="btn btn--loading"><span class="btn-icon btn-icon--placeholder" aria-hidden="true"></span><span class="btn-label">Összes település</span></span>
+            <span class="btn btn--loading"><span class="btn-icon btn-icon--placeholder" aria-hidden="true"></span><span class="btn-label">Minden típus</span></span>
+        </div>
     {:else}
     <div class="header-tabs-filters-row">
         <div class="dropdown">
@@ -1512,6 +1517,11 @@
         opacity: 0.75;
         cursor: default;
         justify-content: center;
+    }
+
+    .btn-icon--placeholder {
+        width: 18px;
+        height: 18px;
     }
 
     .btn-icon {

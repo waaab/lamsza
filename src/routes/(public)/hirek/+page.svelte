@@ -209,11 +209,12 @@
     }
 
     onMount(async () => {
-        pageHeader = await loadPageMeta("hirek");
-        pageHeaderLoading = false;
-
+        // Open or closed from the first frame, before any fetch.
         const isMobile = window.innerWidth < 768;
         sourcesOpen = !isMobile;
+
+        pageHeader = await loadPageMeta("hirek");
+        pageHeaderLoading = false;
 
         const NEWS_CACHE_KEY = "hirek_cache";
         const NEWS_TTL = 30 * 60 * 1000;
@@ -300,7 +301,7 @@
 {#if loading}
     <div class="header-tabs chips">
         <span class="header-tabs-label" aria-label="Leggyakoribb témák">Leggyakoribb témák:</span>
-        <span class="btn btn--loading">Szűrők betöltése…</span>
+        <span class="btn btn-md btn--loading">Szűrők betöltése…</span>
     </div>
 {:else if allNewsItems.length > 0}
     <ChipScrollRow label="Leggyakoribb témák:">
@@ -564,6 +565,10 @@
                 </button>
             </div>
             {#if loading}
+                <!-- Only while the box is open: on phones it starts closed, and
+                     loader rows there would collapse when the news arrives,
+                     pulling the list up (UI_BASELINE "ld-reserve-space"). -->
+                {#if sourcesOpen}
                 <ul class="sidebar-sources">
                     {#each Array(5) as _}
                         <div class="sidebar-source-item sidebar-loader-item">
@@ -575,6 +580,7 @@
                 <small class="news-cache-timestamp" style="opacity:0.5">
                     &#128336; Utoljára frissítve: ...
                 </small>
+                {/if}
             {:else if sourcesOpen}
                 {#if sources.length > 0}
                     <ul class="sidebar-sources">
