@@ -12,8 +12,8 @@
     import WeatherGlyph from "$lib/icons/weather/WeatherGlyph.svelte";
     import WeatherCredit from "$lib/components/WeatherCredit.svelte";
     import { compassHU, uvLevel, moonPhaseName } from "$lib/weatherSymbols.js";
-    import { dragScroll } from "$lib/dragScroll.js";
-    import { deg, fmtClock, dayName, monthDay, duration, hourLabel } from "$lib/weatherFormat.js";
+    import { deg, fmtClock, dayName, monthDay, duration } from "$lib/weatherFormat.js";
+    import HourlyStrip from "$lib/components/HourlyStrip.svelte";
 
     /** @type {any} */
     let data = $state(null);
@@ -167,26 +167,25 @@
         </ul>
     </section>
 
+    {#if astro}
+        <section class="wx-section">
+            <h3 class="widget-title">Nap és Hold ma</h3>
+            <ul class="wx-astro">
+                <li><WeatherGlyph kind="sunrise" size={36} /><span class="wx-fact-label">Napkelte</span><span class="wx-fact-value">{fmtClock(astro.sunrise) || "-"}</span></li>
+                <li><WeatherGlyph kind="sunset" size={36} /><span class="wx-fact-label">Napnyugta</span><span class="wx-fact-value">{fmtClock(astro.sunset) || "-"}</span></li>
+                <li><WeatherGlyph kind="daylength" size={36} /><span class="wx-fact-label">Nappal hossza</span><span class="wx-fact-value">{duration(astro.sunrise, astro.sunset) || "-"}</span></li>
+                <li><WeatherGlyph kind="moonrise" size={36} /><span class="wx-fact-label">Holdkelte</span><span class="wx-fact-value">{fmtClock(astro.moonrise) || "-"}</span></li>
+                <li><WeatherGlyph kind="moonset" size={36} /><span class="wx-fact-label">Holdnyugta</span><span class="wx-fact-value">{fmtClock(astro.moonset) || "-"}</span></li>
+                {#if astro.moon_phase != null}
+                    <li><WeatherGlyph kind="moonphase" value={astro.moon_phase} size={36} /><span class="wx-fact-label">Holdfázis</span><span class="wx-fact-value">{moonPhaseName(astro.moon_phase)}</span></li>
+                {/if}
+            </ul>
+        </section>
+    {/if}
+
     <section class="wx-section">
         <h3 class="widget-title">A következő 48 óra</h3>
-        <div class="wx-hours" role="list" {@attach dragScroll}>
-            {#each hours as h (h.time)}
-                <div class="wx-hour" role="listitem">
-                    <span class="wx-hour-time">{hourLabel(h.time)}</span>
-                    <WeatherSymbol symbol={h.symbol} size={40} animated={false} label={h.desc} />
-                    <span class="wx-hour-temp">{deg(h.temp)}</span>
-                    <span class="wx-hour-rain" class:wx-dim={!h.precip_mm}>
-                        {h.precip_mm ? `${h.precip_mm} mm` : "·"}
-                    </span>
-                    {#if h.wind_kph != null}
-                        <span class="wx-hour-wind" title="Szél: {compassHU(h.wind_dir)}">
-                            <span class="wx-arrow" style="transform: rotate({((h.wind_dir ?? 0) + 180) % 360}deg)" aria-hidden="true">↑</span>
-                            {Math.round(h.wind_kph)}
-                        </span>
-                    {/if}
-                </div>
-            {/each}
-        </div>
+        <HourlyStrip {hours} />
     </section>
 
     <section class="wx-section">
@@ -224,22 +223,6 @@
             {/each}
         </ul>
     </section>
-
-    {#if astro}
-        <section class="wx-section">
-            <h3 class="widget-title">Nap és Hold ma</h3>
-            <ul class="wx-astro">
-                <li><WeatherGlyph kind="sunrise" size={36} /><span class="wx-fact-label">Napkelte</span><span class="wx-fact-value">{fmtClock(astro.sunrise) || "-"}</span></li>
-                <li><WeatherGlyph kind="sunset" size={36} /><span class="wx-fact-label">Napnyugta</span><span class="wx-fact-value">{fmtClock(astro.sunset) || "-"}</span></li>
-                <li><WeatherGlyph kind="daylength" size={36} /><span class="wx-fact-label">Nappal hossza</span><span class="wx-fact-value">{duration(astro.sunrise, astro.sunset) || "-"}</span></li>
-                <li><WeatherGlyph kind="moonrise" size={36} /><span class="wx-fact-label">Holdkelte</span><span class="wx-fact-value">{fmtClock(astro.moonrise) || "-"}</span></li>
-                <li><WeatherGlyph kind="moonset" size={36} /><span class="wx-fact-label">Holdnyugta</span><span class="wx-fact-value">{fmtClock(astro.moonset) || "-"}</span></li>
-                {#if astro.moon_phase != null}
-                    <li><WeatherGlyph kind="moonphase" value={astro.moon_phase} size={36} /><span class="wx-fact-label">Holdfázis</span><span class="wx-fact-value">{moonPhaseName(astro.moon_phase)}</span></li>
-                {/if}
-            </ul>
-        </section>
-    {/if}
 
     <nav class="page-nav">
         <h4 class="page-nav-title">Oldal navigáció</h4>
@@ -333,61 +316,6 @@
     }
     .wx-section {
         margin-top: 1.75rem;
-    }
-    .wx-hours {
-        display: flex;
-        gap: 0.25rem;
-        overflow-x: auto;
-        padding: 0.5rem 0 0.75rem;
-        scroll-snap-type: x proximity;
-        overscroll-behavior-x: contain;
-        scrollbar-width: thin;
-    }
-    /* Mouse drag (lib/dragScroll.js); touch swipes natively. */
-    .wx-hours:global(.drag-scroll) {
-        cursor: grab;
-    }
-    .wx-hours:global(.is-dragging) {
-        cursor: grabbing;
-        scroll-snap-type: none;
-        user-select: none;
-    }
-    .wx-hour {
-        flex: 0 0 3.6rem;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.2rem;
-        padding: 0.4rem 0.2rem;
-        border-radius: 10px;
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        scroll-snap-align: start;
-        font-size: 0.85rem;
-    }
-    .wx-hour-time {
-        color: var(--text-faint);
-    }
-    .wx-hour-temp {
-        font-weight: 600;
-    }
-    .wx-hour-rain {
-        color: var(--szekely-blue);
-        font-size: 0.75rem;
-    }
-    .wx-dim {
-        color: var(--text-faintest);
-    }
-    .wx-hour-wind {
-        color: var(--text-faint);
-        font-size: 0.75rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.1rem;
-    }
-    .wx-arrow {
-        display: inline-block;
-        line-height: 1;
     }
     .wx-days {
         list-style: none;
