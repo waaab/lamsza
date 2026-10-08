@@ -274,6 +274,34 @@ SZOTAR_BASE_URL=http://127.0.0.1:3002
 
 ---
 
+## Check — Tájszórejtvény (Játszótér)
+
+The game reads Szótár's mondások server to server, so it never repeats the daily mondás within 14 days. That
+needs one token pair, the same value on both sides. Without it, Játszótér uses its own proverb list and says
+nothing else is wrong:
+
+| App | Variable | |
+|---|---|---|
+| szotar | `GAMES_SERVICE_TOKEN` | opens `GET /internal/games/proverbs` (loopback, no proxy headers, Bearer); empty → 404 |
+| jatszoter | `SZOTAR_GAMES_TOKEN` | the same value; the base URL is `SZOTAR_BASE_URL` |
+
+Smokes, GET only (WoW R9). The game row ships switched off, so until it is on (admin `/games`, Tájszórejtvény,
+"Bekapcsolás"):
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3003/api/games/tajszorejtveny/week        # 404 while off
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3003/internal/admin/stats               # 401: no token
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3002/internal/games/proverbs            # 401 with the token set, 404 without
+```
+
+When it is on, `week` answers 200 with `today` (Bucharest), the week's days and which are playable; `daily/<today>`
+200 once the week's puzzles exist; `daily/<a future day>` 404. Next week's puzzles are made on Wednesday at
+22:00 and go live on Monday at 0:00; the admin's `/games` tab shows them and has "Generálás most". Writes (play,
+reports, admin actions) are verified with the Go suites or a throwaway backend on a scratch database, never
+against the dev data.
+
+---
+
 ## Check — Restart and data persistence
 
 Prove the apps come back cleanly after a full stop, and that no data lives only in memory.
