@@ -419,7 +419,7 @@
             <WeatherWidget settlementSlug={place.slug} />
         {/each}
         {#each attractionWeatherPlaces as place (`${place.slug}-${place.lat}-${place.lon}`)}
-            <WeatherWidget lat={place.lat} lon={place.lon} />
+            <WeatherWidget lat={place.lat} lon={place.lon} forecastSlug={place.slug} />
         {/each}
     </div>
 </section>

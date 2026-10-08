@@ -277,6 +277,7 @@
             settlementSlug={attractionData.latitude && attractionData.longitude ? undefined : town}
             lat={attractionData.latitude}
             lon={attractionData.longitude}
+            forecastSlug={attractionData.latitude && attractionData.longitude ? $page.params.slug : undefined}
             advanced={true}
         />
     </div>

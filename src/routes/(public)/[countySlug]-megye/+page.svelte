@@ -260,7 +260,7 @@
     <!-- Weather = 3rd grid element (same card structure as homepage) -->
     <div id="idojaras" class="weather-card complex widget">
         <div class="widget-header">
-            <h3 class="widget-title">Időjárás a megyében</h3>
+            <h3 class="widget-title">Időjárás a megyében<span class="type-label">&nbsp;·&nbsp;</span><a href="/idojaras">Előrejelzés &rsaquo;</a></h3>
         </div>
         <div class="widget-content">
             {#if weatherLoading}

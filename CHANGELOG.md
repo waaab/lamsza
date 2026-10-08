@@ -36,6 +36,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- Weather widgets: the forecast link sits in the widget title ("Időjárás · Előrejelzés ›", as the events widget does); attraction widgets link to the attraction's own forecast (`/idojaras/<látnivaló>`, which now reads "Látnivaló" and has no archive link). The 48-hour strip drags with the mouse (`lib/dragScroll.js`); touch swipes natively. [public]
 - The home, settlement and county weather widgets link to the forecast, credit the real source with a link (the county box always said "OpenWeatherMap"), and show the animated icon or the matching emoji for the MET symbol. [public]
 - `/api/weather` and `/api/weather/county` read the cache instead of calling providers per request; the county route's 15-second fan-out is gone. Both add `symbol` and `temp_max`, and `temp_min` is now today's low instead of the current temperature again (the widget's "6°C / 6°C"). [public]
 - Home page hero: the title is larger (`--text-hero` up to 7rem) with -8px letter spacing, the greeting under it is muted and pulled up (-30px), and the search box has 3rem above and below. [public]

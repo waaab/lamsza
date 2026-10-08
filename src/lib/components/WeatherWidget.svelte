@@ -12,6 +12,13 @@
     export let lon = undefined;
     /** When true, show precipitation, humidity, wind in .weather-details */
     export let advanced = false;
+    /** Whose /idojaras page the title links to: the settlement by default, an
+     *  attraction's own slug when the widget shows it by coordinates. */
+    export let forecastSlug = undefined;
+
+    $: forecastHref = forecastSlug || (lat != null && lon != null ? "" : settlementSlug)
+        ? `/idojaras/${encodeURIComponent(forecastSlug || settlementSlug)}`
+        : "";
 
     const DEFAULT_TTL_MS = 15 * 60 * 1000;
 
@@ -133,7 +140,7 @@
 
 <div id="idojaras" class="weather-card {advanced ? 'complex' : 'simple'} widget">
     <div class="widget-header">
-        <h3 class="widget-title">Időjárás</h3>
+        <h3 class="widget-title">Időjárás{#if forecastHref}<span class="type-label">&nbsp;·&nbsp;</span><a href={forecastHref}>Előrejelzés &rsaquo;</a>{/if}</h3>
     </div>
     <div class="widget-content">
         <div class="weather-left">
@@ -187,9 +194,6 @@
     <div class="weather-footer">
         <small class="weather-timestamp">Utoljára frissítve: <span class="weather-timestamp-value">{weatherData ? formatTime(weatherData.timestamp) : '00:00'}</span></small>
         <small class="weather-source">Forrás: <span class="weather-source-value">{#if weatherData?.source && sourceHrefByName(weatherData.source)}<a href={sourceHrefByName(weatherData.source)} target="_blank" rel="noopener noreferrer">{weatherData.source}</a>{:else}{weatherData?.source ? weatherData.source : weatherSourcePlaceholder}{/if}</span></small>
-        {#if settlementSlug && !(lat != null && lon != null)}
-            <a class="weather-more" href="/idojaras/{settlementSlug}">Előrejelzés &rsaquo;</a>
-        {/if}
     </div>
 </div>
 
@@ -213,11 +217,6 @@
     }
     .weather-source-value a {
         color: inherit;
-    }
-    .weather-more {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-        white-space: nowrap;
     }
 
     .widget-content{

@@ -12,6 +12,7 @@
     import WeatherGlyph from "$lib/icons/weather/WeatherGlyph.svelte";
     import WeatherCredit from "$lib/components/WeatherCredit.svelte";
     import { compassHU, uvLevel, moonPhaseName } from "$lib/weatherSymbols.js";
+    import { dragScroll } from "$lib/dragScroll.js";
     import { deg, fmtClock, dayName, monthDay, duration, hourLabel } from "$lib/weatherFormat.js";
 
     /** @type {any} */
@@ -64,7 +65,7 @@
 
 <PublicPageHero
     {title}
-    greeting={place ? `${place.county} megye · ${place.type}` : ""}
+    greeting={place?.county ? `${place.county} megye · ${place.type}` : place?.kind === "attraction" ? "Látnivaló" : ""}
     breadcrumbLabel={place?.name ?? "…"}
     breadcrumbParentLabel="Időjárás"
     breadcrumbParentUrl="/idojaras"
@@ -168,7 +169,7 @@
 
     <section class="wx-section">
         <h3 class="widget-title">A következő 48 óra</h3>
-        <div class="wx-hours" role="list">
+        <div class="wx-hours" role="list" {@attach dragScroll}>
             {#each hours as h (h.time)}
                 <div class="wx-hour" role="listitem">
                     <span class="wx-hour-time">{hourLabel(h.time)}</span>
@@ -243,7 +244,9 @@
     <nav class="page-nav">
         <h4 class="page-nav-title">Oldal navigáció</h4>
         <ul>
-            <li><a class="btn nav-btn" href="/idojaras/{slug}/archivum">Időjárás-archívum</a></li>
+            {#if place?.kind === "settlement"}
+                <li><a class="btn nav-btn" href="/idojaras/{slug}/archivum">Időjárás-archívum</a></li>
+            {/if}
             {#if place?.county_slug}
                 <li><a class="btn nav-btn" href="/{place.county_slug}-megye/{slug}">{place.name} oldala</a></li>
             {/if}
@@ -337,6 +340,17 @@
         overflow-x: auto;
         padding: 0.5rem 0 0.75rem;
         scroll-snap-type: x proximity;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+    }
+    /* Mouse drag (lib/dragScroll.js); touch swipes natively. */
+    .wx-hours:global(.drag-scroll) {
+        cursor: grab;
+    }
+    .wx-hours:global(.is-dragging) {
+        cursor: grabbing;
+        scroll-snap-type: none;
+        user-select: none;
     }
     .wx-hour {
         flex: 0 0 3.6rem;
