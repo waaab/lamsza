@@ -2702,22 +2702,9 @@ footer {
 }
 
 /* Account menu (UI_BASELINE "tb-account-menu"; AccountMenu.svelte): the
-   profile button and its menu, in the settings dropdown's look. The photo
-   button keeps the size of the icon buttons beside it. */
+   profile button and its menu, in the settings dropdown's look. */
 .account-menu {
   position: relative;
-}
-
-.account-menu-button--photo {
-  padding: 0.25rem 0.5rem;
-}
-
-.account-menu-photo {
-  display: block;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
 }
 
 .account-menu-panel {
@@ -2769,6 +2756,8 @@ footer {
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  /* Padding inside the width, so the highlight stays inside the panel. */
+  box-sizing: border-box;
   width: 100%;
   padding: 0.7rem 0.75rem;
   border: none;

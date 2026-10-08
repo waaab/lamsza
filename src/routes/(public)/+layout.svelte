@@ -168,7 +168,7 @@
     <div class="nav">
         <AccountMenu
             account={$auth.loggedIn
-                ? { name: $auth.user, displayName: $auth.displayName, email: $auth.email, picture: $auth.picture }
+                ? { name: $auth.user, displayName: $auth.displayName, email: $auth.email }
                 : null}
             onLogin={openLogin}
             onLogout={logout}
