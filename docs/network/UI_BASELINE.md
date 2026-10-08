@@ -60,6 +60,7 @@ reference; each item names its own.
 | Back-to-top button (`tb-backtotop`) | Lámsza's | Back-to-top in every app, the admin app included. |
 | Responsive behaviour (`tb-responsive`) | Lámsza's | Lámsza's toolbar rules for the apps with a toolbar; the admin app gets basic small-screen rules for its own shell. |
 | Apps launcher (`tb-apps-launcher`) | New | A nine-dot button (`AppIcon` "apps") as the last button on the right of the toolbar in Lámsza, Szótár and Játszótér, not in the admin app. It opens a small panel (the settings dropdown's look) with each public app's icon and name, the current app highlighted. One shared component, `AppsLauncher.svelte`, and one app list, `networkApps.js` (links from `networkOrigins.js`), both synced from lamsza. Keyboard: Enter or Space opens it and focuses the first app, Escape closes it and returns focus to the button, tabbing out or a click outside closes it. It adds to `tb-cross-links`, which stay as they are. Owner's request, 2026-10-08. |
+| Add button in the title row (`pg-title-add`) | Lámsza's | A page's main "new item" button sits at the far right of the title row as a `btn btn-lg` with a short helper text under it, the way Lámsza's Index places "Új Bejegyzés"; not in the toolbar. Szótár's "Új szó" follows it on its word-list pages (home, /lista, /betu, /betu/<letter>, /szofaj/<type>, /kereses). Everyone sees the button; signed out it opens the sign-in dialog and then the form. On phones it wraps under the title. Owner's decision, 2026-10-08. |
 
 ## Footer
 

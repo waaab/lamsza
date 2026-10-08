@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos).
+Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos; UI batch: one icon system, apps launcher, Szótár add-word button done; Lámsza toolbar overflow noted).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -212,43 +212,21 @@ go-live checklist is at the end of the plan). These are the agreed tasks outside
 UI changes the owner has asked for but not scheduled yet. Not implemented; each
 follows `UI_BASELINE.md` when it is done.
 
-- **[szotar] The add-word button moves from the toolbar to the page title row.**
-  Today it is a "+" icon in the top toolbar ("Új szó", signed-in visitors only,
-  opens the word dialog). Move it to the far right of the page title row, the
-  way Lámsza's Index puts "Új Bejegyzés" there (`index-heading__add` in
-  `src/routes/(public)/index/+page.svelte`: a `btn btn-primary btn-lg` with a
-  short helper text under it, from `src/lib/indexCreateCopy.js`). Add a helper
-  text if one fits Szótár, and remove the add icon from the toolbar. To decide
-  when it is done: which pages carry it (the home page at least), and what a
-  signed-out visitor sees (the button opening the sign-in dialog, or no button).
 - **[szotar] The letter above the headword.** The word page shows the entry's
   first letter ("cs") as a small link above the headword. The 2026-10-05
-  word-entry-polish plan says to remove it; it was never done. Owner to
-  confirm: remove it, or keep it and close the plan item.
-- **[lamsza] [admin] One icon system everywhere** (UI_BASELINE "ic-system").
-  Lámsza's own toolbar (`src/routes/(public)/+layout.svelte`) still draws 11
-  inline SVGs that `AppIcon` already has, and admin's `AdminPlusIcon` duplicates
-  `AppIcon`'s `add`. Switch them to `AppIcon`.
+  word-entry-polish plan says to remove it; it was never done. Owner,
+  2026-10-08: remove it (on hold until the owner schedules it).
+- **[lamsza] The toolbar does not fit between 391 and about 1225 px.** The
+  labels hide only at 768px and below and the row never wraps, so Fiók,
+  Kijelentkezés and Beállítások are cut off on phones, tablets and small
+  laptops; with the apps launcher the signed-in limit is 1280px. Owner,
+  2026-10-08: keep it as it is for now; the toolbar changes before go-live.
 - **[szotar] The Mondások page follows the default page layout.** Align
   `/mondasok` with the network's standard structure (title, lead line, main
   area with content and sidebar), the same way the other Szótár list pages
   and Lámsza's list pages are built. Today it is inside `SidebarLayout` but
   has only a title: no lead line under it, and `page-lead` is used for the
   "Elérted a lista végét." line at the bottom instead.
-- **[lamsza] [szotar] [jatszoter] Apps launcher in the toolbar.** A new button
-  at the top right of the toolbar in every public app (Lámsza, Szótár,
-  Játszótér; not the admin app).
-  - The icon is our own nine-dot grid SVG in the shared icon set (`AppIcon`),
-    clearly different from the old admin icon.
-  - It opens a small panel with each network app's icon and name, the
-    current app highlighted, with links built from `networkOrigins.js`.
-  - The app list comes from one shared place, so a new app appears everywhere
-    automatically. `networkOrigins.js` is not in
-    `shared-frontend-modules.json` today (Szótár and Játszótér keep their own
-    copies), so the list and the origins likely join the shared modules.
-  - One shared component, keyboard accessible, works on phones.
-  - Check it against UI_BASELINE `tb-cross-links` (the sister-app links each
-    toolbar has today) when planning.
 
 ## Feature ideas
 
