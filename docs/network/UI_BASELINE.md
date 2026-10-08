@@ -59,6 +59,7 @@ reference; each item names its own.
 | Toolbar while auth loads (`tb-skeleton`) | Lámsza's |  |
 | Back-to-top button (`tb-backtotop`) | Lámsza's | Back-to-top in every app, the admin app included. |
 | Responsive behaviour (`tb-responsive`) | Lámsza's | Lámsza's toolbar rules for the apps with a toolbar; the admin app gets basic small-screen rules for its own shell. |
+| Apps launcher (`tb-apps-launcher`) | New | A nine-dot button (`AppIcon` "apps") as the last button on the right of the toolbar in Lámsza, Szótár and Játszótér, not in the admin app. It opens a small panel (the settings dropdown's look) with each public app's icon and name, the current app highlighted. One shared component, `AppsLauncher.svelte`, and one app list, `networkApps.js` (links from `networkOrigins.js`), both synced from lamsza. Keyboard: Enter or Space opens it and focuses the first app, Escape closes it and returns focus to the button, tabbing out or a click outside closes it. It adds to `tb-cross-links`, which stay as they are. Owner's request, 2026-10-08. |
 
 ## Footer
 

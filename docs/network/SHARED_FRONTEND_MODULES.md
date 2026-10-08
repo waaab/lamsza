@@ -78,13 +78,17 @@ The lists live in `shared-frontend-modules.json`. Today:
 
 | Consumer | Share |
 |---|---|
-| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css`, `tests/sharedFrontendModules.test.js` and `tests/noEmdash.test.js` |
-| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog}.svelte`, `src/styles/global.css`, `tests/sharedFrontendModules.test.js` and `tests/noEmdash.test.js` |
+| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/components/AppsLauncher.svelte`, `src/lib/{networkOrigins,networkApps}.js` (unused there: the admin app has no launcher), `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js` and `tests/networkApps.test.js` |
+| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog,AppsLauncher}.svelte`, `src/lib/{networkOrigins,networkApps}.js`, `src/styles/global.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js` and `tests/networkApps.test.js` |
 
 `AppIcon`, the dialogs, `SignInDialog` and the three stylesheets joined on 2026-10-07,
 when the owner chose one icon system, one set of dialogs and one base stylesheet for the
 network (`docs/network/UI_BASELINE.md`). `ErrorPage`, `ErrorShell` and `ErrorLantern` joined the same day,
 together with Szótár and Játszótér, for the one network error page.
+`AppsLauncher`, `networkApps.js`, `networkOrigins.js` and the `networkApps` test joined on 2026-10-08
+for the apps launcher (UI_BASELINE "tb-apps-launcher"); `networkOrigins.js` already had the same
+logic in all three public apps, so one copy replaces three. Each app keeps its own
+`tests/networkOrigins.test.js`.
 
 Deliberately **not** shared, because the apps legitimately differ:
 
@@ -92,8 +96,8 @@ Deliberately **not** shared, because the apps legitimately differ:
   Svelte files only import `getApiBase` from it, which every app has.
 - `typography.css` and `component-typography.css` in Szótár and Játszótér: the
   owner chose "keep each app's own" (UI_BASELINE "typo-files").
-- `theme.js`, `networkOrigins.js` and `openLogin.js` in Szótár and Játszótér: their
-  content differs per app (Lámsza's theme store saves to the account, for one).
+- `theme.js` and `openLogin.js` in Szótár and Játszótér: their content differs per
+  app (Lámsza's theme store saves to the account, for one).
 - Szótár's and Játszótér's confirm dialog (`AppDialog.svelte`, the baseline look
   that Lámsza's `ConfirmDialog` copies, driven by a store).
 

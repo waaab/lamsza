@@ -10,6 +10,7 @@
     import { apiFetch } from "$lib/api.js";
     import SignInDialog from "$lib/components/SignInDialog.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
+    import AppsLauncher from "$lib/components/AppsLauncher.svelte";
     import { openLogin, listenForOpenLogin } from "$lib/openLogin.js";
     import { APP_VERSION } from "$lib/publicChangelog.js";
 
@@ -202,6 +203,7 @@
             <AppIcon name="settings" size={16} />
             <span class="sr-only">Felhasználói beállítások</span>
         </a>
+        <AppsLauncher current="lamsza" hostname={$page.url.hostname} />
     </div>
 </header>
 

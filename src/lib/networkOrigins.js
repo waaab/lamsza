@@ -62,8 +62,8 @@ export function joinOriginPath(origin, path = '') {
  *
  * Must stay a static switch. A computed lookup (`import.meta.env[key]`) cannot be
  * replaced at build time, so Vite inlines the whole env object into the client
- * bundle - that leaked every `VITE_*` value, including an API key, to any visitor.
- * One `import.meta.env.VITE_X` per key keeps the replacement static.
+ * bundle - that puts every `VITE_*` value in reach of any visitor. One
+ * `import.meta.env.VITE_X` per key keeps the replacement static.
  *
  * @param {string} key
  */

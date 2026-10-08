@@ -13,6 +13,7 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- Apps launcher: a nine-dot button at the right end of the toolbar opens a small panel with Lámsza, Szótár and Játszótér, the current app highlighted; keyboard accessible (UI_BASELINE "tb-apps-launcher"). Shared with Szótár and Játszótér with its app list (`networkApps.js`) and `networkOrigins.js`, and a new shared icon, `apps` (nine dots). [public]
 - Shared icon `rosette`: the Székely six-petal rosette, for Tájszórejtvény's decorative grid cells. Synced to every app.
 - Nine shared icons for Tájszórejtvény and the game tools, synced to every app: `tajszorejtveny` (an arrow-word grid), `zoom_in`, `zoom_out`, `flag`, `text_size`, and `keyboard`, `sound_on`, `sound_off`, `help`, moved from Játszótér's own drawings (same geometry).
 - The shared content-dialog shell (`.link-dialog`) takes the screen's width on phones (up to 768px) instead of 70vw, in every app; UI_BASELINE "dlg-content" records it and the OPEN_ITEMS UI-backlog item is closed. [public]
