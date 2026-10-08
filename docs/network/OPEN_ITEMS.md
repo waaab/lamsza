@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher).
+Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -77,10 +77,6 @@ Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
-- **[network] owner: set *Workflow permissions* to "Read and write" in all four
-  repos** (GitHub, Settings > Actions > General). Approved on BOG-57; without it
-  the `ci-status` job cannot open the "CI is red on main" issue (WAYS_OF_WORKING
-  R7).
 
 ## Decisions
 
@@ -168,8 +164,8 @@ Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification
   `ci-status` job in the workflow YAML, then prove the "CI is red on main"
   issue still opens (for example with a deliberately failing test on a
   branch). The "Allow GitHub Actions to create and approve pull requests"
-  checkbox stays off. Replaces the owner's "Read and write" item above if
-  adopted.
+  checkbox stays off. Today every repo is set to "Read and write" (owner,
+  2026-10-08).
   - The repo setting is the owner's (GitHub, Settings > Actions > General).
   - `ci-status` already declares `contents: read` and `issues: write` in all
     four workflows; add a top-level `permissions: contents: read` so the
@@ -180,8 +176,9 @@ Last updated: 2026-10-08 (Tájszórejtvény content and follow-ups; verification
 
 ## Tájszórejtvény (content and follow-ups)
 
-The game is being built (plan: `lamsza-jatszoter/docs/superpowers/plans/2026-10-07-tajszorejtveny.md`,
-decisions in its spec §16). These are the agreed tasks outside that plan.
+The game is built and pushed, and stays switched off until go-live (plan:
+`lamsza-jatszoter/docs/superpowers/plans/2026-10-07-tajszorejtveny.md`, decisions in its spec §16; the owner's
+go-live checklist is at the end of the plan). These are the agreed tasks outside that plan.
 
 - **[jatszoter] owner: grow the proverb list toward about 230.** 28 puzzles a week need about 230
   proverbs to avoid a repeat within 8 weeks; today there are 44 fallback proverbs (and Szótár's

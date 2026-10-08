@@ -315,9 +315,9 @@ Use the same call for `lamsza-admin`. For the two private repos it returns
   cannot write must leave the job red, never look quiet.
 
   **Attila approved setting it to *Read and write permissions* in all four
-  repos, on BOG-57, 2026-10-06.** No repo content needs to change. It was not
-  applied in that run: the setting is owner-console or token work and this
-  machine has neither, so it is still pending on BOG-57.
+  repos, on BOG-57, 2026-10-06, and it is set in all four (confirmed
+  2026-10-08).** No repo content needed to change. "Allow GitHub Actions to
+  create and approve pull requests" stays off.
 
 - **The job has been seen running; its write path has not.** On 2026-10-06 the
   `ci-status` job ran and passed on both public repos (`lamsza` run
@@ -372,10 +372,8 @@ a holding position — nothing is coming to replace it:
    are gated on `canReachApi()`, so `dist/` does not depend on the backend.
    CI uses `npm run build:no-preflight`.
 
-**Open.** *Workflow permissions* is approved but not yet set to read and write in
-the four repos, which needs the owner console or a GitHub token; it is listed in
-`docs/network/OPEN_ITEMS.md`. Branch protection is closed, not open: declined.
-Everything else in R7 is live.
+*Workflow permissions* is set to read and write in all four repos (2026-10-08).
+Branch protection is closed, not open: declined. Everything in R7 is live.
 
 ### R8 — Tests never touch dev data
 
