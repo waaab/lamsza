@@ -12,6 +12,22 @@ is a symlink to it. Edit it in the lamsza repo.
 
 Never push to main without my explicit confirmation.
 
+## Process lanes (WoW R20)
+
+Pick the lightest lane that fits and say which one at the start. A prompt that
+starts with `quick:` forces the quick lane.
+
+- **Quick** (CSS, text, a single component; no data, no auth): no plan, only the
+  affected tests, one before/after screenshot, commit, ask before push. No review
+  page; docs only if behaviour changes.
+- **Normal** (a feature within one app): a short plan, the app's tests,
+  screenshots of what changed, a changelog line.
+- **Full** (data, migrations, auth, security, cross-app contracts, shared sync
+  changes): the full process as before: approved plan, every affected suite on
+  scratch DBs, proofs, review page, docs and changelogs.
+
+If a quick task turns out to touch data or security, stop and tell me.
+
 ## The four repos
 
 | Repo | What it is | Notes |

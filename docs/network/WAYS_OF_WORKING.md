@@ -8,7 +8,7 @@ BOG-54 and amended on BOG-57 (branch protection declined), 2026-10-06. Paperclip
 off and R5 made tool-independent, 2026-10-07. Pushing to `main` made subject to
 the owner's confirmation (R5, R7), 2026-10-07. R1-R4 rewritten for work
 without a tracker, R5 check 4 and R8-R17 added after the network review,
-2026-10-07. This file
+2026-10-07. R20 (process lanes) added on 2026-10-09. This file
 is the source of truth. If a task comment and this
 file disagree, this file wins until it is changed here.
 
@@ -537,6 +537,25 @@ How each app holds it:
 admin used Budapest or the visitor's clock, and several queries used the
 database's UTC date, so a day could change at 01:00, 02:00 or 03:00 Bucharest
 time depending on the page.
+
+### R20 - Process lanes: the lightest process that fits
+
+Every task runs in one of three lanes. Pick the lightest lane that fits, and say
+which one at the start of the task. The owner can force the quick lane by
+starting a prompt with `quick:`.
+
+| Lane | When | What it takes |
+|---|---|---|
+| **Quick** | CSS, text, a single component; no data, no auth | No plan. Only the affected tests. One before/after screenshot. Commit, then ask before pushing. No review page; docs only if behaviour changes. |
+| **Normal** | A feature within one app | A short plan. The app's tests. Screenshots of what changed. A changelog line (R17). |
+| **Full** | Data, migrations, auth, security, cross-app contracts (R3), shared module or rule sync changes (R11) | The full process: a plan the owner approves before building, every affected suite on scratch databases (R8), before/after proofs, a review page (light, dark, phone width) before the commit, docs and changelogs in the same commit. |
+
+In every lane, pushing to `main` waits for the owner's confirmation (R5), and
+R8, R9 and R13 still hold. If a quick task turns out to touch data or security,
+stop and tell the owner before going on.
+
+*Why:* every change got the full process, so a one-line CSS fix cost as much
+as a schema change.
 
 ---
 
