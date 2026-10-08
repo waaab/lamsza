@@ -1,7 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import ChipScrollRow from "$lib/components/ChipScrollRow.svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { apiFetch } from "$lib/api.js";
 
@@ -288,7 +288,7 @@
     />
 </svelte:head>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}

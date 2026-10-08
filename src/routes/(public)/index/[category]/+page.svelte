@@ -6,7 +6,7 @@
     import EntryCard from "$lib/components/EntryCard.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import ChipScrollRow from "$lib/components/ChipScrollRow.svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
     import {
         entryMatchesAsideFilters,
@@ -214,7 +214,7 @@
     }
 </script>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}

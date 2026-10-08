@@ -3,7 +3,7 @@
     (UI_BASELINE "wx-icons"). Not linked from the site; noindex.
 -->
 <script>
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import WeatherSymbol from "$lib/icons/weather/WeatherSymbol.svelte";
     import WeatherGlyph from "$lib/icons/weather/WeatherGlyph.svelte";
     import { SYMBOL_BASES, symbolEmoji, moonPhaseName } from "$lib/weatherSymbols.js";
@@ -42,7 +42,7 @@
     <meta name="robots" content="noindex" />
 </svelte:head>
 
-<PublicPageHero
+<PageHeader
     title="Időjárás-ikonok"
     greeting="A teljes készlet: a MET Norway 41 időjárás-kódja nappal és éjjel, és a mért értékek rajzai."
     breadcrumbLabel="Ikonok"

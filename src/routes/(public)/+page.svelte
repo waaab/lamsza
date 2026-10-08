@@ -10,7 +10,7 @@
     import NewsWidget from "$lib/components/NewsWidget.svelte";
     import DirectoryCategories from "$lib/components/DirectoryCategories.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import Hero from "$lib/components/Hero.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import {
@@ -47,6 +47,12 @@
 
     let pageHeader = initialPageHeader("home");
     let pageHeaderLoading = false;
+
+    // The hero greets a signed-in visitor by name.
+    $: heroTitle =
+        $auth.loggedIn && ($auth.displayName || $auth.user)
+            ? `Szerussz, ${$auth.displayName || $auth.user}!`
+            : pageHeader.title || (pageHeaderLoading ? "…" : "");
 
     $: quicklinkLayoutWide = isWideQuicklinkLayout(slotCount);
     $: skeletonCount = promotedLoading
@@ -279,16 +285,12 @@
     });
 </script>
 
+<svelte:head>
+    <title>{heroTitle} - Lámsza</title>
+</svelte:head>
+
 <section id="home main" class="home-main">
-    <PublicPageHero
-        title={pageHeader.title}
-        greeting={pageHeader.greeting}
-        loading={pageHeaderLoading}
-        titleOverride={$auth.loggedIn && ($auth.displayName || $auth.user)
-            ? `Szerussz, ${$auth.displayName || $auth.user}!`
-            : null}
-        showBreadcrumbs={false}
-    />
+    <Hero title={heroTitle} greeting={pageHeaderLoading ? "…" : pageHeader.greeting} />
 
     <SearchEngine />
 </section>

@@ -11,7 +11,7 @@
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
     import ChipScrollRow from "$lib/components/ChipScrollRow.svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import WebsiteCard from "$lib/components/WebsiteCard.svelte";
     import ClaimStatusFilter from "$lib/components/ClaimStatusFilter.svelte";
     import IndexTagAside from "$lib/components/IndexTagAside.svelte";
@@ -364,7 +364,7 @@
     });
 </script>
 
-<PublicPageHero
+<PageHeader
     title="Index"
     greeting={indexGreeting}
     showGreeting={false}
@@ -425,7 +425,7 @@
             </div>
         {/if}
     </div>
-</PublicPageHero>
+</PageHeader>
 
 {#if addWebsiteOpen}
     <AddWebsiteForm onClose={() => (addWebsiteOpen = false)} />

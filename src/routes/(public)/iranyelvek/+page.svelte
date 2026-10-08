@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     // loadPageMeta runs the admin-written `content` through sanitizeHtml, so
     // the {@html} below cannot carry a script or an event handler. Never read
     // the pages API directly here: that would bypass the sanitizer.
@@ -24,7 +24,7 @@
 </script>
 
 <section class="page-section">
-    <PublicPageHero
+    <PageHeader
         title={page?.title ?? fb.title}
         greeting={page?.greeting ?? fb.greeting}
         loading={false}

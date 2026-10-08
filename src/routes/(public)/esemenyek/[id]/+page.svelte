@@ -11,7 +11,7 @@
         loadFavoriteList,
         removeFavorite,
     } from "$lib/favorites.js";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import EventDateBadge from "$lib/components/EventDateBadge.svelte";
     import {
         getReferenceNow,
@@ -271,7 +271,7 @@
     <title>{event ? event.title : "Esemény"} - Na Lámsza!</title>
 </svelte:head>
 
-<PublicPageHero
+<PageHeader
     title={event ? event.title : "Esemény"}
     greeting=""
     loading={!event}
@@ -307,7 +307,7 @@
                 {/if}
             </div>
             <h1 class="page-title">{event.title}</h1>
-            <div class="event-detail-hero">
+            <div class="event-detail-media">
                 <img
                     class="featured-img"
                     src={eventFeaturedImageUrl(event)}
@@ -559,7 +559,7 @@
         text-decoration: underline;
     }
 
-    .event-detail-hero {
+    .event-detail-media {
         margin: 1rem 0;
         border-radius: 12px;
         overflow: hidden;

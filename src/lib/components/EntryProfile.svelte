@@ -260,7 +260,7 @@
         aria-busy="true"
         aria-label="Bejegyzés betöltése"
     >
-        <header class="entry-profile__hero">
+        <header class="entry-profile__header">
             <div class="skeleton entry-profile__skel-badge"></div>
             <div class="skeleton skeleton-text entry-profile__skel-title"></div>
             <div class="skeleton skeleton-text entry-profile__skel-line"></div>
@@ -317,7 +317,7 @@
     </article>
 {:else}
 <article class="entry-profile">
-    <header class="entry-profile__hero">
+    <header class="entry-profile__header">
         {#if loggedIn}
             <div class="entry-profile__favorite">
                 <FavoriteButton
@@ -687,7 +687,7 @@
     .entry-profile {
         color: var(--text-primary);
     }
-    .entry-profile__hero {
+    .entry-profile__header {
         position: relative;
         margin-bottom: 1.5rem;
     }

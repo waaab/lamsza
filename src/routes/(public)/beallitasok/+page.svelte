@@ -3,7 +3,7 @@
     import { get } from "svelte/store";
     import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import { userSettingsTabIds } from "$lib/accountPrefs.js";
     import { apiFetch } from "$lib/api.js";
     import { openLogin } from "$lib/openLogin.js";
@@ -244,7 +244,7 @@
 </script>
 
 <section class="page-section profile-page">
-    <PublicPageHero
+    <PageHeader
         title="Felhasználói beállítások"
         greeting="Fiókod és beállításaid"
         loading={false}

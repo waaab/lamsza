@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
 
     let pageHeader = initialPageHeader("terkep");
@@ -12,7 +12,7 @@
     });
 </script>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}

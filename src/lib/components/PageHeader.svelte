@@ -7,8 +7,6 @@
     export let greeting = "";
     /** Ha igaz, a `pages` meta (cím / bevezető) még töltődik - a bevezető helyén „…”. */
     export let loading = false;
-    /** Pl. kezdőlap bejelentkezett üdv - felülírja a `title`-t megjelenítésben és a böngésző címben. */
-    export let titleOverride = /** @type {string | null} */ (null);
 
     export let showBreadcrumbs = true;
     export let showTitle = true;
@@ -21,10 +19,7 @@
     export let breadcrumbExtraUrl = "";
     export let documentTitleSuffix = " - Lámsza";
 
-    $: displayTitle =
-        titleOverride != null && String(titleOverride).trim() !== ""
-            ? String(titleOverride).trim()
-            : title;
+    $: displayTitle = title;
     $: crumb = breadcrumbLabel.trim() || displayTitle;
     $: displayGreeting = loading ? "…" : (greeting != null ? String(greeting) : "");
 </script>

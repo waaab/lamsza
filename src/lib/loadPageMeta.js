@@ -10,7 +10,7 @@ function nonEmptyOrFallback(s, fallback) {
 }
 
 /**
- * Instant defaults for the hero (same keys as `pages.slug` in admin).
+ * Instant defaults for the page header (same keys as `pages.slug` in admin).
  * Use as initial state so the title/greeting are not "…" before the API responds.
  *
  * @param {string} slug - `pages.slug` (e.g. `index`, `home`, `iranyelvek/sutik`)

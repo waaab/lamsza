@@ -6,7 +6,7 @@
 <script>
     import { page } from "$app/stores";
     import { apiCall, canReachApi } from "$lib/api";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import WeatherSymbol from "$lib/icons/weather/WeatherSymbol.svelte";
     import WeatherCredit from "$lib/components/WeatherCredit.svelte";
     import { deg, dayName, monthDay, hourLabel } from "$lib/weatherFormat.js";
@@ -104,7 +104,7 @@
     });
 </script>
 
-<PublicPageHero
+<PageHeader
     title={place ? `${place.name}: időjárás-archívum` : "Időjárás-archívum"}
     greeting={data?.since ? `Az archívum ${formatHuDateLongFromYMD(data.since)} óta gyűlik, naponta egy sorral.` : "Az archívum az indulás napjától gyűlik."}
     breadcrumbLabel="Archívum"

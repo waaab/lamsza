@@ -3,7 +3,7 @@
     import { get } from "svelte/store";
     import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
     import ListingFormDialog from "$lib/components/ListingFormDialog.svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import AccountPage from "$lib/components/AccountPage.svelte";
     import AccountDetails from "$lib/components/AccountDetails.svelte";
     import { userAccountTabIds } from "$lib/accountPrefs.js";
@@ -562,7 +562,7 @@
 </script>
 
 <section class="page-section profile-page">
-    <PublicPageHero
+    <PageHeader
         title="Fiók"
         greeting="A fiókod"
         loading={false}

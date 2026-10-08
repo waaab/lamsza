@@ -1,7 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import { apiFetch } from "$lib/api";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
 
     let pageHeader = initialPageHeader("szekek");
@@ -26,7 +26,7 @@
     });
 </script>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}

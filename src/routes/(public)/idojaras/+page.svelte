@@ -5,7 +5,7 @@
 <script>
     import { onMount } from "svelte";
     import { apiFetch, canReachApi } from "$lib/api";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import WeatherSymbol from "$lib/icons/weather/WeatherSymbol.svelte";
     import WeatherCredit from "$lib/components/WeatherCredit.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
@@ -53,7 +53,7 @@
     });
 </script>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     breadcrumbLabel="Időjárás"

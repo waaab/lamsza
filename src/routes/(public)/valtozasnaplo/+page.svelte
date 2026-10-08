@@ -1,6 +1,6 @@
 <script>
     import { onMount } from "svelte";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { PUBLIC_CHANGELOG } from "$lib/publicChangelog.js";
 
@@ -20,7 +20,7 @@
     />
 </svelte:head>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}

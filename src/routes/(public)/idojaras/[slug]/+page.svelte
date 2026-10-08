@@ -7,7 +7,7 @@
 <script>
     import { page } from "$app/stores";
     import { apiCall, canReachApi } from "$lib/api";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import WeatherSymbol from "$lib/icons/weather/WeatherSymbol.svelte";
     import WeatherGlyph from "$lib/icons/weather/WeatherGlyph.svelte";
     import WeatherCredit from "$lib/components/WeatherCredit.svelte";
@@ -63,7 +63,7 @@
     const uv = $derived(uvLevel(cur?.uv));
 </script>
 
-<PublicPageHero
+<PageHeader
     {title}
     greeting={place?.county ? `${place.county} megye · ${place.type}` : place?.kind === "attraction" ? "Látnivaló" : ""}
     breadcrumbLabel={place?.name ?? "…"}

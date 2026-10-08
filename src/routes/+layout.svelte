@@ -1,5 +1,6 @@
 <script>
   import "../styles/global.css";
+  import "../styles/lamsza.css";
   import { onMount } from "svelte";
   import { theme, applyTheme } from "$lib/stores/theme";
 

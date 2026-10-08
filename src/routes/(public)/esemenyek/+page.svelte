@@ -11,7 +11,7 @@
     import { eventFeaturedImageUrl } from "$lib/eventImage.js";
     import { eventEntryPriceText } from "$lib/eventEntryPrice.js";
     import { apiFetch, getApiBase } from "$lib/api.js";
-    import PublicPageHero from "$lib/components/PublicPageHero.svelte";
+    import PageHeader from "$lib/components/PageHeader.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
     import { kindLabel } from "$lib/venueKindLabels.js";
 
@@ -560,7 +560,7 @@
             : EVENT_TYPE_LABELS[filterType] || filterType;
 </script>
 
-<PublicPageHero
+<PageHeader
     title={pageHeader.title}
     greeting={pageHeader.greeting}
     loading={pageHeaderLoading}

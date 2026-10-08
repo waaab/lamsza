@@ -78,8 +78,8 @@ The lists live in `shared-frontend-modules.json`. Today:
 
 | Consumer | Share |
 |---|---|
-| `lamsza-admin` | Everything: `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/components/{AppsLauncher,AccountMenu,AccountPage,AccountDetails,ThemeSettings}.svelte`, `src/lib/{networkOrigins,networkApps,accountDetails}.js` (unused there: the admin app has no launcher, account menu or Fiók page), `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js`, `tests/networkApps.test.js` and `tests/accountDetails.test.js` |
-| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog,AppsLauncher,AccountMenu,AccountPage,AccountDetails,ThemeSettings}.svelte`, `src/lib/{networkOrigins,networkApps,accountDetails}.js`, `src/styles/global.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js`, `tests/networkApps.test.js` and `tests/accountDetails.test.js` |
+| `lamsza-admin` | What it imports (narrowed on 2026-10-09 from "everything"): `src/lib/accountPrefs.js`, `entryHistory.js`, `entryHours.js`, `entryPhotos.js`, `entryPublicExtras.js`, `entryType.js`, `eventImage.js`, `quickLinksDisplay.js`, `scheduleActivityTypes.js`, `websiteDomain.js`, `src/lib/stores/{auth,theme}.js`, `src/lib/components/{CategoryMultiSelect,EntryHoursEditor,GoogleSignIn,HuTimeInput}.svelte`, `src/lib/components/{ConfirmDialog,NoticeDialog,SignInDialog,ErrorPage,ErrorShell}.svelte`, `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/styles/{global,typography,component-typography}.css`, `tests/sharedFrontendModules.test.js` and `tests/noEmdash.test.js` |
+| `lamsza-szotar`, `lamsza-jatszoter` | `src/lib/icons/{AppIcon,ErrorLantern}.svelte`, `src/lib/components/{ErrorPage,ErrorShell,GoogleSignIn,SignInDialog,AppsLauncher,AccountMenu,AccountPage,AccountDetails,ThemeSettings,Hero}.svelte`, `src/lib/{networkOrigins,networkApps,accountDetails}.js`, `src/styles/global.css`, `tests/sharedFrontendModules.test.js`, `tests/noEmdash.test.js`, `tests/networkApps.test.js` and `tests/accountDetails.test.js` |
 
 `AppIcon`, the dialogs, `SignInDialog` and the three stylesheets joined on 2026-10-07,
 when the owner chose one icon system, one set of dialogs and one base stylesheet for the
@@ -91,6 +91,17 @@ logic in all three public apps, so one copy replaces three. Each app keeps its o
 `tests/networkOrigins.test.js`.
 `AccountMenu`, `AccountPage`, `AccountDetails`, `ThemeSettings`, `accountDetails.js` and its test joined the same
 day for the shared account menu, Fiók page and Téma panel (UI_BASELINE `tb-account-menu`, `acc-page`).
+
+`global.css` holds only what more than one app uses (2026-10-09): tokens, base elements, buttons,
+the toolbar, launcher and account menu, dialogs, the error page, the list layout, info boxes,
+skeletons and the hero (`Hero.svelte`, UI_BASELINE "hero"). Rules whose every class is used only
+in Lámsza (its home page search and discover, widgets, link cards, index tags, crests…) live in
+`src/styles/lamsza.css`, Lámsza's own file, loaded right after `global.css` and not synced. The
+exception: a rule stays in `global.css` when moving it after the shared rules would change which
+rule wins. A new
+rule goes in `global.css` only when another app uses it; otherwise in the app's own stylesheet.
+About 60 classes in `global.css` are used by no app; they stay until a separate clean-up checks
+for class names built in code.
 
 Deliberately **not** shared, because the apps legitimately differ:
 
