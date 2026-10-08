@@ -32,6 +32,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- Home page hero: the title is larger (`--text-hero` up to 7rem) with -8px letter spacing, the greeting under it is muted and pulled up (-30px), and the search box has 3rem above and below. [public]
 - Signed out, the site follows the device's theme: signing out, or a session the server no longer knows, clears the saved theme (`clearAccountTheme` in the shared theme store). Choosing a theme stays on Beállítások, for signed-in users. [public]
 - The Fiók tab shows the same rows as the other apps: Nyelv is gone, Megjelenített név is listed, dates are on Bucharest's clock. The display-name hint says that Szótár and Játszótér show the name too. [public]
 - No more jumping while pages load (layout shift measured on a slowed API, before → after, phone width where worse): the settlement and attraction page reserves a screen's height with a title and lead placeholder (0.357 → 0.009); the "Szűrők betöltése…" placeholder is exactly as tall as the chips (`.btn-md`, button line-height) on /hirek, /index and the category pages; /hirek opens or closes its sources box before fetching (0.144 → 0); /esemenyek shows its two filter buttons' shape while loading (0.023 → 0.002). [public]
