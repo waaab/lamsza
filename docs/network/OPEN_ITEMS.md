@@ -208,6 +208,7 @@ decisions in its spec §16). These are the agreed tasks outside that plan.
   (UI_BASELINE ic-system); Tájszórejtvény's tile already uses `AppIcon`.
 - **[network] owner: decide a network text-size setting.** Tájszórejtvény brings a Játszótér-only
   Betűméret (normál / nagyobb / legnagyobb); it could become a UI_BASELINE item for every app.
+  Owner, 2026-10-08: it stays game-local for now; decide after real players have tried it.
 
 ## UI backlog
 
