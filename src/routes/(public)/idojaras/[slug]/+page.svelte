@@ -342,11 +342,6 @@
         font-weight: 600;
         color: var(--text-primary);
     }
-    /* The shared .page-nav row does not wrap; on a phone its buttons ran off
-       the screen. */
-    .page-nav ul {
-        flex-wrap: wrap;
-    }
     .wx-range {
         margin-left: 0.4em;
         letter-spacing: 0.02em;
