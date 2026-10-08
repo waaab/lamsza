@@ -129,14 +129,15 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
   Owner's decisions, 2026-10-09: a section inside lamsza, not a new app; only
   sources free for commercial use (MET Norway, then WeatherAPI.com and
   OpenWeatherMap; Open-Meteo dropped); archive from launch; animated SVGs for
-  every weather element. Done on the branch: backend (cache worker, forecast,
-  archive), the icons (accepted by the owner), the `/idojaras` pages and the
-  widgets. Still to do: a browser check of the pages on the running network
-  after the merge, and in lamsza-admin the provider switches (MET instead of
-  Open-Meteo, no default provider) and latitude, longitude and elevation on the
-  settlement form.
-- **[lamsza] owner: enter coordinates for the 27 settlements** once the admin
-  form has them. Until then the weather worker finds each settlement by name
+  every weather element. Done on branches, not merged: lamsza `weather-section`
+  (backend, icons accepted by the owner, `/idojaras` pages, widgets) and
+  lamsza-admin `weather-settings` (settlement coordinates saved on edit, MET
+  Norway provider switches). Still to do: merge (lamsza first, R3) once the
+  main checkouts' uncommitted hero/PageHeader work is committed, rename
+  `PublicPageHero` to `PageHeader` in the four new `/idojaras` pages if that
+  rename lands first, then a browser check on the running network.
+- **[lamsza] owner: enter coordinates for the 27 settlements** in the admin
+  app's settlement form ("46.3593, 25.8017"), once `weather-settings` is merged. Until then the weather worker finds each settlement by name
   (OpenWeatherMap's geocoder), which can land a village on a namesake.
 
 - **[lamsza] The browser extension (`extension/`, git-ignored, built by
