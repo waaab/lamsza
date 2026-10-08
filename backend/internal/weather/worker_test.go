@@ -358,6 +358,11 @@ func TestHandlersReadOnlyTheCache(t *testing.T) {
 	if len(daily) < 7 || len(hourly) < 40 || fc["astro"] == nil || fc["source_name"] != "MET Norway" {
 		t.Fatalf("forecast: %d days, %d hours, astro %v", len(daily), len(hourly), fc["astro"])
 	}
+	for _, d := range daily[1:] {
+		if h := d.(map[string]any)["hours"].(float64); h < minDayHours {
+			t.Fatalf("a %v-hour day is listed: %v", h, d)
+		}
+	}
 	first := daily[0].(map[string]any)
 	if first["date"] != "2026-10-09" || first["desc"] == "" {
 		t.Fatalf("first day %v", first)

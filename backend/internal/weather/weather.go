@@ -25,6 +25,9 @@ import (
 // reaches about nine and a half days ahead.
 const forecastDays = 10
 
+// minDayHours is the least coverage a future day needs to be listed.
+const minDayHours = 18
+
 // hourlyAhead is how far the hour-by-hour strip reaches.
 const hourlyAhead = 48 * time.Hour
 
@@ -350,6 +353,11 @@ func HandleForecast(w http.ResponseWriter, r *http.Request) {
 	today := now.In(clock.Zone).Format("2006-01-02")
 	for _, d := range BuildDays(fc.Steps, clock.Zone) {
 		if d.Date < today || len(out.Daily) >= forecastDays {
+			continue
+		}
+		// The forecast's last day can hold only a few hours (MET ends at
+		// 00 UTC): its range would mislead. Today is shown however short.
+		if d.Date != today && d.Hours < minDayHours {
 			continue
 		}
 		out.Daily = append(out.Daily, dayOut{Day: d, Desc: describe(d.Symbol, overrides)})
