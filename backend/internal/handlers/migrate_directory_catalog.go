@@ -58,6 +58,11 @@ func MigrateDirectoryCatalog() {
 	schemaStmts := []string{
 		`ALTER TABLE entry_categories ADD COLUMN IF NOT EXISTS parent_id INTEGER REFERENCES entry_categories(id)`,
 		`ALTER TABLE entry_categories ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`,
+		// The home page's category chips, chosen in admin: NULL is not
+		// featured, 1-6 is the chip's place. The range and the unique index
+		// keep it to six chips with one category per place.
+		`ALTER TABLE entry_categories ADD COLUMN IF NOT EXISTS featured_order INTEGER CHECK (featured_order BETWEEN 1 AND 6)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS entry_categories_featured_order ON entry_categories (featured_order) WHERE featured_order IS NOT NULL`,
 		`ALTER TABLE websites ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES entry_categories(id)`,
 		`CREATE TABLE IF NOT EXISTS entry_category_links (
 			entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,

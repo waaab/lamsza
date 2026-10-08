@@ -273,7 +273,7 @@ func HandlePublicEntryCategories(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	rows, err := db.DB.Query(`SELECT id, name, slug, parent_id, sort_order FROM entry_categories ORDER BY COALESCE(parent_id, id), sort_order, id`)
+	rows, err := db.DB.Query(`SELECT id, name, slug, parent_id, sort_order, featured_order FROM entry_categories ORDER BY COALESCE(parent_id, id), sort_order, id`)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -285,18 +285,25 @@ func HandlePublicEntryCategories(w http.ResponseWriter, r *http.Request) {
 		Slug      string `json:"slug"`
 		ParentID  *int   `json:"parent_id"`
 		SortOrder int    `json:"sort_order"`
+		// FeaturedOrder is the home page chip's place (1-6), null when the
+		// category is not a chip.
+		FeaturedOrder *int `json:"featured_order"`
 	}
 	res := []publicCategory{}
 	for rows.Next() {
 		var item publicCategory
-		var parentID sql.NullInt64
-		if err := rows.Scan(&item.ID, &item.Name, &item.Slug, &parentID, &item.SortOrder); err != nil {
+		var parentID, featured sql.NullInt64
+		if err := rows.Scan(&item.ID, &item.Name, &item.Slug, &parentID, &item.SortOrder, &featured); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if parentID.Valid {
 			v := int(parentID.Int64)
 			item.ParentID = &v
+		}
+		if featured.Valid {
+			v := int(featured.Int64)
+			item.FeaturedOrder = &v
 		}
 		res = append(res, item)
 	}

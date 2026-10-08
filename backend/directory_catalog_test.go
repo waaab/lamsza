@@ -411,3 +411,47 @@ func TestPublicEntryCategories(t *testing.T) {
 	// internal/directory has the unit coverage. What matters here is that the
 	// public catalog still exposes the shelf/leaf shape above.
 }
+
+func TestPublicEntryCategoriesFeaturedOrder(t *testing.T) {
+	handlers.MigrateDirectoryCatalog()
+	reset := func() {
+		if _, err := db.DB.Exec(`UPDATE entry_categories SET featured_order = NULL WHERE featured_order IS NOT NULL`); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reset()
+	defer reset()
+	// 1 is Étkezés, 39 is Bútor (a subcategory may be a chip too).
+	if _, err := db.DB.Exec(`UPDATE entry_categories SET featured_order = CASE id WHEN 1 THEN 2 WHEN 39 THEN 1 END WHERE id IN (1, 39)`); err != nil {
+		t.Fatal(err)
+	}
+
+	rr := doAnonRequest(t, "GET", "/api/entry-categories", nil)
+	if rr.Code != 200 {
+		t.Fatalf("public categories: %d %s", rr.Code, rr.Body.String())
+	}
+	var rows []struct {
+		ID            int  `json:"id"`
+		FeaturedOrder *int `json:"featured_order"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &rows); err != nil {
+		t.Fatal(err)
+	}
+	got := map[int]int{}
+	for _, row := range rows {
+		if row.FeaturedOrder != nil {
+			got[row.ID] = *row.FeaturedOrder
+		}
+	}
+	if len(got) != 2 || got[39] != 1 || got[1] != 2 {
+		t.Fatalf("featured_order: got %v, want map[1:2 39:1]", got)
+	}
+
+	// The schema keeps it to six places, one category each.
+	if _, err := db.DB.Exec(`UPDATE entry_categories SET featured_order = 7 WHERE id = 2`); err == nil {
+		t.Fatal("featured_order 7 accepted, want the range check to refuse it")
+	}
+	if _, err := db.DB.Exec(`UPDATE entry_categories SET featured_order = 1 WHERE id = 2`); err == nil {
+		t.Fatal("a second category on place 1 accepted, want the unique index to refuse it")
+	}
+}

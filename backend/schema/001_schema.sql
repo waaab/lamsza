@@ -500,7 +500,9 @@ CREATE TABLE public.entry_categories (
     name character varying(100) NOT NULL,
     slug character varying(120),
     parent_id integer,
-    sort_order integer DEFAULT 0 NOT NULL
+    sort_order integer DEFAULT 0 NOT NULL,
+    featured_order integer,
+    CONSTRAINT entry_categories_featured_order_check CHECK (((featured_order >= 1) AND (featured_order <= 6)))
 );
 
 
@@ -2285,6 +2287,13 @@ ALTER TABLE ONLY public.websites
 --
 
 CREATE UNIQUE INDEX attraction_suggestions_one_open ON public.attraction_suggestions USING btree (attraction_id) WHERE (status = 'open'::text);
+
+
+--
+-- Name: entry_categories_featured_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX entry_categories_featured_order ON public.entry_categories USING btree (featured_order) WHERE (featured_order IS NOT NULL);
 
 
 --
