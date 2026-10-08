@@ -158,6 +158,8 @@ Each app needs its own `.env` on the server (never commit these).
 | `FEATURE_SEARCH` | Optional | Default `true` |
 | `DATA_API` | Optional | Default `true` |
 | `SZOTAR_ORIGIN` | Optional | Szótár's backend for the server-side word search, no trailing slash. Server-to-server, so `http://127.0.0.1:<szotar port>` (WAYS_OF_WORKING R13): locally `http://127.0.0.1:3002`; on the server, Szótár's backend port there (to verify, `OPEN_ITEMS.md`). Unset skips dictionary hits in `/api/search`. |
+| `ACCOUNT_SZOTAR_TOKEN` | Yes, with the account release | Opens the internal account API (`/internal/account/profile`, the user's display name by Google ID) to Szótár's backend. Long random secret, equal to Szótár's `LAMSZA_ACCOUNT_TOKEN` (§6.2). Unset (with the next one unset too) turns the API off. |
+| `ACCOUNT_JATSZOTER_TOKEN` | Yes, with the account release | The same for Játszótér's backend; equal to Játszótér's `LAMSZA_ACCOUNT_TOKEN` (§6.3), a different value from Szótár's. |
 | `DB_MAX_OPEN_CONNS` | Optional | Default `25`. Pool cap. The `lamsza` database is shared with admin and Postgres allows 100 connections in total, so keep lamsza plus admin under that. |
 | `DB_MAX_IDLE_CONNS` | Optional | Default `10`. Must not be above `DB_MAX_OPEN_CONNS`; the code lowers it if it is. |
 
@@ -169,6 +171,8 @@ Each app needs its own `.env` on the server (never commit these).
 | `PORT` | Yes | `3010` |
 | `GOOGLE_CLIENT_ID` | Yes | Google OAuth |
 | `ADMIN_SERVICE_TOKEN` | Yes | Opens the internal admin API to the admin app (WAYS_OF_WORKING R18). Long random secret, equal to admin's `SZOTAR_ADMIN_TOKEN` (§6.4). Unset turns the API off. Szótár has no admin list of its own. |
+| `LAMSZA_ACCOUNT_URL` | Yes, with the account release | Lámsza's backend, server to server: `http://127.0.0.1:<lamsza port>` (WAYS_OF_WORKING R13). |
+| `LAMSZA_ACCOUNT_TOKEN` | Yes, with the account release | Equal to Lámsza's `ACCOUNT_SZOTAR_TOKEN` (§6.1). Szótár copies the user's display name from Lámsza at sign-in and on Fiók. Unset: Google's name is shown. |
 | `GAMES_SERVICE_TOKEN` | Yes, before Tájszórejtvény goes live | Opens `/internal/games/` (the full mondás list, future days included) to Játszótér's backend. Long random secret, equal to Játszótér's `SZOTAR_GAMES_TOKEN`; a different value from `ADMIN_SERVICE_TOKEN`. Unset turns it off, and Tájszórejtvény uses only its own proverb list. |
 
 Also needed for content: dictionary import source / dump for initial seed (`szotar_db1` import path).
@@ -187,6 +191,8 @@ Also needed for content: dictionary import source / dump for initial seed (`szot
 | `DICTIONARY_DATA_DIR` | If local | e.g. `data/dictionary` |
 | `SZOTAR_BASE_URL` | Yes when not local | e.g. `https://szotar.lamsza.com` or `http://127.0.0.1:3010` |
 | `SZOTAR_GAMES_TOKEN` | Yes, before Tájszórejtvény goes live | Equal to Szótár's `GAMES_SERVICE_TOKEN` (§6.2): Tájszórejtvény reads every mondás with its date from `SZOTAR_BASE_URL/internal/games/proverbs`. Unset: only the game's own proverb list is used. |
+| `LAMSZA_ACCOUNT_URL` | Yes, with the account release | Lámsza's backend, server to server: `http://127.0.0.1:<lamsza port>` (WAYS_OF_WORKING R13). |
+| `LAMSZA_ACCOUNT_TOKEN` | Yes, with the account release | Equal to Lámsza's `ACCOUNT_JATSZOTER_TOKEN` (§6.1). Játszótér copies the user's display name from Lámsza at sign-in and on Fiók, and the leaderboards show it. Unset: Google's name is shown. |
 | `APP_VERSION` | Optional | Display / config version |
 
 ### 6.4 admin.lamsza.com (Phase 2)

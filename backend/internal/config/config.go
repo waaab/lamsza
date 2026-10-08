@@ -17,6 +17,11 @@ type Config struct {
 	GoogleClientID    string
 	AdminGoogleEmails []string
 	SzotarOrigin      string
+	// AccountSzotarToken and AccountJatszoterToken open the internal account
+	// API (/internal/account/) to Szótár's and Játszótér's backends, one
+	// secret per app pair (WAYS_OF_WORKING R18). None set: the API is off.
+	AccountSzotarToken    string
+	AccountJatszoterToken string
 	// AllowedOrigins lists the exact browser origins that may read this API
 	// cross-origin. Never reflect an unknown Origin back: with
 	// Access-Control-Allow-Credentials that hands any site the signed-in reply.
@@ -62,6 +67,8 @@ func Load() {
 	AppConfig.GoogleClientID = getEnv("GOOGLE_CLIENT_ID", "")
 	AppConfig.AdminGoogleEmails = parseEmailList(getEnv("ADMIN_GOOGLE_EMAILS", "attila.bogozi@gmail.com"))
 	AppConfig.SzotarOrigin = strings.TrimRight(getEnv("SZOTAR_ORIGIN", ""), "/")
+	AppConfig.AccountSzotarToken = strings.TrimSpace(getEnv("ACCOUNT_SZOTAR_TOKEN", ""))
+	AppConfig.AccountJatszoterToken = strings.TrimSpace(getEnv("ACCOUNT_JATSZOTER_TOKEN", ""))
 	AppConfig.AllowedOrigins = parseOriginList(getEnv("CORS_ALLOWED_ORIGINS", ""))
 	ReloadAllowedOrigins()
 

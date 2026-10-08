@@ -1,6 +1,7 @@
 package main
 
 import (
+	"backend/internal/accountapi"
 	"log"
 	"net/http"
 	"time"
@@ -50,6 +51,9 @@ func main() {
 
 	mux.HandleFunc("/api/health", middleware.ApplyCORS(middleware.JSONByDefault(health.HandleHealth)))
 
+	// Internal account API for Szótár and Játszótér (loopback, token; never
+	// proxied by nginx, which only forwards /api/).
+	mux.HandleFunc(accountapi.Prefix, accountapi.Guard(accountapi.HandleProfile))
 	mux.HandleFunc("/api/auth/google", middleware.ApplyCORS(middleware.JSONByDefault(auth.HandleGoogleLogin)))
 	mux.HandleFunc("/api/auth/me", middleware.ApplyCORS(middleware.JSONByDefault(auth.HandleMe)))
 	mux.HandleFunc("/api/auth/logout", middleware.ApplyCORS(middleware.JSONByDefault(auth.HandleLogout)))

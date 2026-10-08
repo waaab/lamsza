@@ -274,6 +274,26 @@ SZOTAR_BASE_URL=http://127.0.0.1:3002
 
 ---
 
+## Check — the account API (display name)
+
+Szótár and Játszótér copy the user's display name ("Megjelenített név") from Lámsza by Google ID, server to
+server, at sign-in and when their Fiók page opens. That needs one token pair per app, the same value on both
+sides. Without it, the apps show Google's name and log that the lookup is off:
+
+| App | Variable | |
+|---|---|---|
+| lamsza | `ACCOUNT_SZOTAR_TOKEN`, `ACCOUNT_JATSZOTER_TOKEN` | open `GET /internal/account/profile?google_sub=` (loopback, no proxy headers, Bearer); both empty → 404 |
+| szotar | `LAMSZA_ACCOUNT_URL=http://127.0.0.1:3001`, `LAMSZA_ACCOUNT_TOKEN` | the Szótár value |
+| jatszoter | `LAMSZA_ACCOUNT_URL=http://127.0.0.1:3001`, `LAMSZA_ACCOUNT_TOKEN` | the Játszótér value |
+
+Smoke, GET only (WoW R9):
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3001/internal/account/profile?google_sub=x   # 401 with tokens set, 404 without
+```
+
+---
+
 ## Check — Tájszórejtvény (Játszótér)
 
 The game reads Szótár's mondások server to server, so it never repeats the daily mondás within 14 days. That
