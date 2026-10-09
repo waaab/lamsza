@@ -322,7 +322,12 @@ CREATE TABLE public.attractions (
     content text,
     activities text DEFAULT ''::text NOT NULL,
     featured_image_copyright text DEFAULT ''::text NOT NULL,
-    prohibitions text DEFAULT ''::text NOT NULL
+    prohibitions text DEFAULT ''::text NOT NULL,
+    elevation_m numeric(7,1),
+    area_km2 numeric(10,3),
+    depth_m numeric(7,1),
+    CONSTRAINT attractions_area_km2_check CHECK ((area_km2 >= (0)::numeric)),
+    CONSTRAINT attractions_depth_m_check CHECK ((depth_m >= (0)::numeric))
 );
 
 

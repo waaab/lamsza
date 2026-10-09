@@ -17,25 +17,29 @@ type AttractionImage struct {
 }
 
 type Attraction struct {
-	ID                     int                     `json:"id"`
-	CountyID               int                     `json:"county_id"`
-	CountySlug             string                  `json:"county_slug"`
-	CountyName             string                  `json:"county_name"`
-	Name                   string                  `json:"name"`
-	NameRo                 string                  `json:"name_ro"`
-	NameDe                 string                  `json:"name_de"`
-	Slug                   string                  `json:"slug"`
-	Description            string                  `json:"description"`
-	Latitude               float64                 `json:"latitude,omitempty"`
-	Longitude              float64                 `json:"longitude,omitempty"`
-	FeaturedImage          string                  `json:"featured_image,omitempty"`
-	FeaturedImageCopyright string                  `json:"featured_image_copyright,omitempty"`
-	Content                string                  `json:"content,omitempty"`
-	Activities             []string                `json:"activities,omitempty"`
-	Prohibitions           []string                `json:"prohibitions,omitempty"`
-	Images                 []AttractionImage       `json:"images,omitempty"`
-	SuggestionPending      bool                    `json:"suggestion_pending"`
-	Contributors           []AttractionContributor `json:"contributors"`
+	ID                     int      `json:"id"`
+	CountyID               int      `json:"county_id"`
+	CountySlug             string   `json:"county_slug"`
+	CountyName             string   `json:"county_name"`
+	Name                   string   `json:"name"`
+	NameRo                 string   `json:"name_ro"`
+	NameDe                 string   `json:"name_de"`
+	Slug                   string   `json:"slug"`
+	Description            string   `json:"description"`
+	Latitude               float64  `json:"latitude,omitempty"`
+	Longitude              float64  `json:"longitude,omitempty"`
+	FeaturedImage          string   `json:"featured_image,omitempty"`
+	FeaturedImageCopyright string   `json:"featured_image_copyright,omitempty"`
+	Content                string   `json:"content,omitempty"`
+	Activities             []string `json:"activities,omitempty"`
+	Prohibitions           []string `json:"prohibitions,omitempty"`
+	// The attraction's facts, shown as tiles; nil (absent in JSON) when not set.
+	ElevationM        *float64                `json:"elevation_m,omitempty"`
+	AreaKm2           *float64                `json:"area_km2,omitempty"`
+	DepthM            *float64                `json:"depth_m,omitempty"`
+	Images            []AttractionImage       `json:"images,omitempty"`
+	SuggestionPending bool                    `json:"suggestion_pending"`
+	Contributors      []AttractionContributor `json:"contributors"`
 }
 
 type HistoricalSeat struct {
@@ -73,21 +77,25 @@ func HandleAttractions(w http.ResponseWriter, r *http.Request) {
 		// Single attraction detail
 		var a Attraction
 		var activitiesText, prohibitionsText string
+		// No geo_locations row (an attraction without coordinates) gives NULLs.
+		var lat, lon sql.NullFloat64
 		err := db.DB.QueryRow(`
 			SELECT a.id, a.county_id, c.slug, c.name, a.name, COALESCE(a.name_ro,''), COALESCE(a.name_de,''),
 				a.slug, COALESCE(a.description,''), COALESCE(a.featured_image,''), COALESCE(a.featured_image_copyright,''),
 				COALESCE(a.content,''), COALESCE(a.activities,''), COALESCE(a.prohibitions,''),
-				gl.latitude, gl.longitude
+				gl.latitude, gl.longitude, a.elevation_m, a.area_km2, a.depth_m
 			FROM attractions a
 			JOIN counties c ON a.county_id = c.id
 			LEFT JOIN geo_locations gl ON a.location_id = gl.id
 			WHERE LOWER(a.slug) = $1 AND LOWER(c.slug) = $2
 		`, slug, countySlug).Scan(&a.ID, &a.CountyID, &a.CountySlug, &a.CountyName, &a.Name, &a.NameRo, &a.NameDe,
-			&a.Slug, &a.Description, &a.FeaturedImage, &a.FeaturedImageCopyright, &a.Content, &activitiesText, &prohibitionsText, &a.Latitude, &a.Longitude)
+			&a.Slug, &a.Description, &a.FeaturedImage, &a.FeaturedImageCopyright, &a.Content, &activitiesText, &prohibitionsText, &lat, &lon,
+			&a.ElevationM, &a.AreaKm2, &a.DepthM)
 		if err != nil {
 			http.Error(w, "Not found", http.StatusNotFound)
 			return
 		}
+		a.Latitude, a.Longitude = lat.Float64, lon.Float64
 		a.Activities = splitActivities(activitiesText)
 		a.Prohibitions = splitActivities(prohibitionsText)
 		a.Images = loadAttractionImages(a.ID)
@@ -123,8 +131,10 @@ func HandleAttractions(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var a Attraction
 		var activitiesText, prohibitionsText string
+		var lat, lon sql.NullFloat64
 		if err := rows.Scan(&a.ID, &a.CountyID, &a.CountySlug, &a.CountyName, &a.Name, &a.NameRo, &a.NameDe,
-			&a.Slug, &a.Description, &a.FeaturedImage, &a.FeaturedImageCopyright, &a.Content, &activitiesText, &prohibitionsText, &a.Latitude, &a.Longitude); err == nil {
+			&a.Slug, &a.Description, &a.FeaturedImage, &a.FeaturedImageCopyright, &a.Content, &activitiesText, &prohibitionsText, &lat, &lon); err == nil {
+			a.Latitude, a.Longitude = lat.Float64, lon.Float64
 			a.Activities = splitActivities(activitiesText)
 			a.Prohibitions = splitActivities(prohibitionsText)
 			list = append(list, a)
@@ -211,6 +221,10 @@ func MigrateAttractions() {
 		`ALTER TABLE attractions ADD COLUMN IF NOT EXISTS prohibitions TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE attractions ADD COLUMN IF NOT EXISTS featured_image_copyright TEXT NOT NULL DEFAULT ''`,
 		`ALTER TABLE attraction_images ADD COLUMN IF NOT EXISTS copyright TEXT NOT NULL DEFAULT ''`,
+		// The attraction's facts for the page's tiles (UI_BASELINE "szf-pages"); NULL = not shown.
+		`ALTER TABLE attractions ADD COLUMN IF NOT EXISTS elevation_m NUMERIC(7,1)`,
+		`ALTER TABLE attractions ADD COLUMN IF NOT EXISTS area_km2 NUMERIC(10,3) CHECK (area_km2 >= 0)`,
+		`ALTER TABLE attractions ADD COLUMN IF NOT EXISTS depth_m NUMERIC(7,1) CHECK (depth_m >= 0)`,
 		`CREATE TABLE IF NOT EXISTS attraction_suggestions (
 			id SERIAL PRIMARY KEY,
 			attraction_id INT NOT NULL REFERENCES attractions(id) ON DELETE CASCADE,

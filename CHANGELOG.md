@@ -13,6 +13,7 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- Attraction facts for the page's tiles: `attractions.elevation_m`, `area_km2`, `depth_m` (optional numbers; area and depth not negative), set in the admin app. `/api/attractions?county_slug=&slug=` returns them when set.
 - Featured categories for the home page's chips: `entry_categories.featured_order` (NULL, or the chip's place 1-6; a range check and a unique index keep it to six chips, one category per place), chosen in the admin app. `/api/entry-categories` returns it.
 - Weather section `/idojaras`: every settlement's weather now, by county; `/idojaras/<település>` with the weather now (feels-like, wind and direction, humidity, rain, pressure, UV, clouds, dew point), the next 48 hours, about 9 days ahead, and today's sunrise, sunset, day length, moonrise, moonset and moon phase; `/idojaras/<település>/archivum` with the archived days from launch, a temperature and rain chart, and each day's hours. Every view credits its source as the licence asks. [public]
 - Animated weather icons (UI_BASELINE `wx-icons`): `WeatherSymbol` draws all 41 MET Norway codes day and night, `WeatherGlyph` the measurements with their values; theme tokens only, still under reduced motion. The widgets use them with the "svg" icon style. Review page `/idojaras/ikonok` (noindex). [public]
@@ -83,6 +84,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - Open-Meteo as a weather source: its free API is for non-commercial use only, and the network will carry ads. The `weather_provider_default` setting is no longer read; `weather_provider_metno_enabled` joins the two fallback switches.
 
 ### Fixed
+- An attraction without coordinates could not be opened (its detail answered 404) and was left out of the attraction lists: the missing location's NULL latitude and longitude broke the scan. [public]
 - On a phone, the page navigation buttons (`.page-nav`: Székek, Megyék, Városok, Falvak, the weather page) wrap onto a second row instead of running off the screen. The weather icon no longer covers the widget's "Előrejelzés" link. [public]
 - The events calendar (`/esemenyek`) opens on Bucharest's current year from the server's clock (R19), not the browser's: set again once the API's first reply has fixed the clock, unless a month or day filter is set.
 - Docs follow the admin move (R18): PRODUCTION_SERVER_SETUP §6 drops Szótár's and Játszótér's admin lists and adds `ADMIN_SERVICE_TOKEN` and admin's relay variables (§6.4); the LOCAL_DEV_CHECKS allowlist check lists only admin and lamsza; UI_BASELINE `tb-admin-link` says no app links to admin; the OPEN_ITEMS Szókereső item points to `/games#szokereso`.

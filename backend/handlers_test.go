@@ -86,6 +86,7 @@ func init() {
 	testMux.HandleFunc("/api/news", middleware.ApplyCORS(news.HandleNews))
 	testMux.HandleFunc("/api/news/feeds", middleware.ApplyCORS(news.HandlePublicNewsFeeds))
 	testMux.HandleFunc("/api/weather/county", middleware.ApplyCORS(weather.HandleCountyWeather))
+	testMux.HandleFunc("/api/attractions", middleware.ApplyCORS(handlers.HandleAttractions))
 	testMux.HandleFunc("/api/quick_links", middleware.ApplyCORS(links.HandlePublicQuickLinks))
 	testMux.HandleFunc("/api/proxy", middleware.ApplyCORS(search.ProxyHandler))
 	testMux.HandleFunc("/api/autosuggest", middleware.ApplyCORS(search.HandleAutosuggest))
