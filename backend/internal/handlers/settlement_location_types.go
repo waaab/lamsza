@@ -22,12 +22,16 @@ CREATE TABLE IF NOT EXISTS settlement_location_types (
 		return
 	}
 	_, err = db.DB.Exec(`
-INSERT INTO settlement_location_types (slug, label_hu, sort_order) VALUES
+INSERT INTO settlement_location_types (slug, label_hu, sort_order)
+SELECT v.slug, v.label_hu, v.sort_order FROM (VALUES
 	('municípium', 'Municípium', 0),
 	('város', 'Város', 1),
 	('község', 'Község', 2),
 	('falu', 'Falu', 3),
 	('megye', 'Megye', 4)
+) AS v(slug, label_hu, sort_order)
+-- Only the missing rows: ON CONFLICT alone takes a sequence value per boot.
+WHERE NOT EXISTS (SELECT 1 FROM settlement_location_types t WHERE t.slug = v.slug)
 ON CONFLICT (slug) DO NOTHING`)
 	if err != nil {
 		log.Printf("MigrateSettlementLocationTypes (seed): %v", err)

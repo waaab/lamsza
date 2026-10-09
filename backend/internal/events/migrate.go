@@ -43,55 +43,52 @@ CREATE TABLE IF NOT EXISTS catalog_event_subtypes (
 	}
 
 	_, err = db.DB.Exec(`
-INSERT INTO catalog_event_types (slug, label_hu, sort_order) VALUES
+INSERT INTO catalog_event_types (slug, label_hu, sort_order)
+SELECT v.slug, v.label_hu, v.sort_order FROM (VALUES
 	('cultural', 'Kulturális', 1),
 	('sports', 'Sport', 2),
 	('festival', 'Fesztivál', 3),
 	('religious', 'Vallási', 4),
 	('other', 'Egyéb', 5)
+) AS v(slug, label_hu, sort_order)
+-- Only the missing rows: ON CONFLICT alone takes a sequence value per boot.
+WHERE NOT EXISTS (SELECT 1 FROM catalog_event_types t WHERE t.slug = v.slug)
 ON CONFLICT (slug) DO NOTHING`)
 	if err != nil {
 		log.Printf("events.Migrate (seed types): %v", err)
 	}
 
-	// Sub-types (examples per type)
-	seedSub := []string{
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'hockey', 'Jégkorong', 1 FROM catalog_event_types t WHERE t.slug = 'sports'
-		 ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'football', 'Futball', 2 FROM catalog_event_types t WHERE t.slug = 'sports' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'golf', 'Golf', 3 FROM catalog_event_types t WHERE t.slug = 'sports' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'tennis', 'Tenisz', 4 FROM catalog_event_types t WHERE t.slug = 'sports' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'handball', 'Kézilabda', 5 FROM catalog_event_types t WHERE t.slug = 'sports' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'concert', 'Koncert', 1 FROM catalog_event_types t WHERE t.slug = 'cultural' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'theatre', 'Színház', 2 FROM catalog_event_types t WHERE t.slug = 'cultural' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'exhibition', 'Kiállítás', 3 FROM catalog_event_types t WHERE t.slug = 'cultural' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'cinema', 'Mozi', 4 FROM catalog_event_types t WHERE t.slug = 'cultural' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'music', 'Zene', 1 FROM catalog_event_types t WHERE t.slug = 'festival' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'folk', 'Népi', 2 FROM catalog_event_types t WHERE t.slug = 'festival' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'wine', 'Bor', 3 FROM catalog_event_types t WHERE t.slug = 'festival' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'mass', 'Mise', 1 FROM catalog_event_types t WHERE t.slug = 'religious' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'pilgrimage', 'Zarándoklat', 2 FROM catalog_event_types t WHERE t.slug = 'religious' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'community', 'Közösségi', 1 FROM catalog_event_types t WHERE t.slug = 'other' ON CONFLICT (event_type_id, slug) DO NOTHING`,
-		`INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-		 SELECT t.id, 'charity', 'Jótékonysági', 2 FROM catalog_event_types t WHERE t.slug = 'other' ON CONFLICT (event_type_id, slug) DO NOTHING`,
+	// Sub-types (examples per type), inserted only when missing: ON CONFLICT
+	// alone would take a sequence value on every boot for each existing row.
+	seedSub := []struct {
+		typeSlug, slug, label string
+		order                 int
+	}{
+		{"sports", "hockey", "Jégkorong", 1},
+		{"sports", "football", "Futball", 2},
+		{"sports", "golf", "Golf", 3},
+		{"sports", "tennis", "Tenisz", 4},
+		{"sports", "handball", "Kézilabda", 5},
+		{"cultural", "concert", "Koncert", 1},
+		{"cultural", "theatre", "Színház", 2},
+		{"cultural", "exhibition", "Kiállítás", 3},
+		{"cultural", "cinema", "Mozi", 4},
+		{"festival", "music", "Zene", 1},
+		{"festival", "folk", "Népi", 2},
+		{"festival", "wine", "Bor", 3},
+		{"religious", "mass", "Mise", 1},
+		{"religious", "pilgrimage", "Zarándoklat", 2},
+		{"other", "community", "Közösségi", 1},
+		{"other", "charity", "Jótékonysági", 2},
 	}
-	for _, q := range seedSub {
-		if _, e := db.DB.Exec(q); e != nil {
+	for _, st := range seedSub {
+		if _, e := db.DB.Exec(`
+			INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
+			SELECT t.id, $2, $3, $4::int FROM catalog_event_types t
+			WHERE t.slug = $1
+			  AND NOT EXISTS (SELECT 1 FROM catalog_event_subtypes s WHERE s.event_type_id = t.id AND s.slug = $2)
+			ON CONFLICT (event_type_id, slug) DO NOTHING`,
+			st.typeSlug, st.slug, st.label, st.order); e != nil {
 			log.Printf("events.Migrate (seed subtype): %v", e)
 		}
 	}

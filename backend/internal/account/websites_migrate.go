@@ -44,8 +44,9 @@ func MigrateWebsites() {
 		description := websiteDescription(notes)
 		_, _ = db.DB.Exec(`
 			INSERT INTO websites (domain_key, submitted_host, title, description, status, entry_id)
-			VALUES ($1, $1, $2, $3, 'approved', $4)
-			ON CONFLICT (domain_key) DO NOTHING
+			SELECT $1, $1, $2, $3, 'approved', $4::int
+			WHERE NOT EXISTS (SELECT 1 FROM websites WHERE domain_key = $1)
+			ON CONFLICT (domain_key) DO NOTHING -- only when missing: no sequence value per boot
 		`, domainKey, title, description, id)
 	}
 }

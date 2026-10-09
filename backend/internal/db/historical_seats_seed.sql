@@ -1,5 +1,7 @@
 -- First install inserts the five székek. Existing rows (including admin edits) are left alone.
-INSERT INTO historical_seats (name, name_ro, slug, content) VALUES
+-- Only the missing rows: ON CONFLICT alone would take a sequence value on every boot.
+INSERT INTO historical_seats (name, name_ro, slug, content)
+SELECT v.name, v.name_ro, v.slug, v.content FROM (VALUES
 (
     'Csíkszék',
     'Ținutul Ciuc',
@@ -72,4 +74,6 @@ Ma Románia **Kolozs** és **Fehér** megyéinek határán felel meg; a székely
 
 Ez a szék nem esik egybe a mai három székelyföldi megyével (Hargita, Kovászna, Maros), de a Lámsza a teljes székely szék-hagyományt szeretné bemutatni.$$
 )
+) AS v(name, name_ro, slug, content)
+WHERE NOT EXISTS (SELECT 1 FROM historical_seats h WHERE h.slug = v.slug)
 ON CONFLICT (slug) DO NOTHING;

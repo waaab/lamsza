@@ -167,8 +167,9 @@ func seedAllSections() {
 		}
 		_, _ = db.DB.Exec(`
 			INSERT INTO page_faq_sections (section_key, label_hu, faq_title, faq_items, disclaimer_markdown)
-			VALUES ($1, $2, $3, $4::jsonb, $5)
-			ON CONFLICT (section_key) DO NOTHING`,
+			SELECT $1, $2, $3, $4::jsonb, $5
+			WHERE NOT EXISTS (SELECT 1 FROM page_faq_sections WHERE section_key = $1)
+			ON CONFLICT (section_key) DO NOTHING`, // only when missing: no sequence value per boot
 			s.key, s.label, s.title, raw, s.disc,
 		)
 	}
