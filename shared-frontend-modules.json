@@ -128,7 +128,7 @@
     "tests/accountDetails.test.js": "sha256:fbf528ef1bcf4a13fe535f65fe6fdb54ff2db6cb2258c1f8f3eb47c9292a91ea",
     "src/lib/components/ThemeSettings.svelte": "sha256:b89af2d56662e6aa5b671d3e15148f2dc0b860ca7516dc095992a30e42acd31b",
     "src/lib/components/Hero.svelte": "sha256:fc464f9b8aa0fd3578e16da84c4a8aeb8577d49fe9592841fb6e30e68b671a57",
-    "src/lib/games/catalog.js": "sha256:8ca39788c54ae2573475d15c70c601ddcd696610c72d3b9d4472d75138297573",
+    "src/lib/games/catalog.js": "sha256:8e00ff379de047fc94e79c825fe40afae468d98e3f9c3d42cdd6e8ca5a20707d",
     "src/lib/games/GameIcon.svelte": "sha256:1f699e30db353a420d05228968cf7e08ce8a9f3ec9312acc8c72f91d8f6b04d6",
     "src/lib/games/GameCard.svelte": "sha256:411285a9e8155159544f995af482e39d874b7383aa455bd0fb011f7193e36fe2",
     "src/lib/games/GameScene.svelte": "sha256:e7da41b31304af115d1b8bbf663d418963e5edc47b1acf9a8577dcccecc483e5",
