@@ -13,13 +13,14 @@
      *   </Hero>
      *
      * `accent`: the title's second part, in the network red (UI_BASELINE
-     * "hero"). The greeting is pulled up under the title; when the title has
+     * "hero"); a separate word, or with `joined` the end of the same word
+     * ("Játszó" + "tér"). The greeting is pulled up under the title; when the title has
      * a letter that reaches below the line (g, j, p, q, y, J, Q), it is pulled
      * up less, so it never crosses that letter.
      */
 
-    /** @type {{ title: string, accent?: string, greeting?: string, art?: import("svelte").Snippet, children?: import("svelte").Snippet }} */
-    let { title, accent = "", greeting = "", art, children } = $props();
+    /** @type {{ title: string, accent?: string, joined?: boolean, greeting?: string, art?: import("svelte").Snippet, children?: import("svelte").Snippet }} */
+    let { title, accent = "", joined = false, greeting = "", art, children } = $props();
 
     const descends = $derived(/[gjpqyJQ]/.test(`${title}${accent}`));
 </script>
@@ -28,7 +29,7 @@
     {#if art}
         <div class="hero-art" aria-hidden="true">{@render art()}</div>
     {/if}
-    <h1 class="page-title hero-title">{accent ? `${title} ` : title}{#if accent}<span class="hero-accent">{accent}</span>{/if}</h1>
+    <h1 class="page-title hero-title">{accent && !joined ? `${title} ` : title}{#if accent}<span class="hero-accent" class:hero-accent--joined={joined}>{accent}</span>{/if}</h1>
     {#if greeting}
         <h2 class="greeting hero-greeting">{greeting}</h2>
     {/if}
