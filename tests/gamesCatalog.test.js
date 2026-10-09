@@ -5,7 +5,7 @@ import { featuredGames, LISTED_GAMES } from "../src/lib/games/catalog.js";
 test("featuredGames keeps enabled games in the server's order, with the catalog's look", () => {
     const answer = {
         games: [
-            { slug: "kaptar", enabled: true, sort_order: 2, title_hu: "Kaptár!" },
+            { slug: "kaptar", enabled: true, sort_order: 2, title_hu: "Kaptár!", description_hu: "Más szöveg." },
             { slug: "rovasfejto", enabled: true, sort_order: 1 },
             { slug: "szorejto", enabled: false, sort_order: 0 },
             { slug: "ismeretlen", enabled: true, sort_order: 3 },
@@ -14,7 +14,9 @@ test("featuredGames keeps enabled games in the server's order, with the catalog'
     };
     const list = featuredGames(answer, 2);
     assert.deepEqual(list?.map((g) => g.slug), ["rovasfejto", "kaptar"]);
-    assert.equal(list?.[1].title_hu, "Kaptár!");
+    // The card's text is the catalog's, as before the answer arrived.
+    assert.equal(list?.[1].title_hu, "Kaptár");
+    assert.equal(list?.[1].description_hu, LISTED_GAMES.find((g) => g.slug === "kaptar")?.description_hu);
     assert.match(list?.[0].color ?? "", /^#/);
 });
 

@@ -82,8 +82,10 @@ export function gameBySlug(slug) {
 
 /**
  * The games a home page shows from Játszótér's `/api/games` answer: the
- * enabled ones in its order, each with the catalog's colour and icon and the
- * server's title and description where it has them, at most `count`. A game
+ * enabled ones in its order, at most `count`, each as the catalog has it
+ * (colour, title and line). The catalog is the one source of a game's card
+ * text, the same as on its game page, so a card reads the same while the
+ * page loads and after (owner, 2026-10-09). A game
  * the catalog does not know is left out (it would have no icon). Null when
  * the answer lists none, so the caller keeps LISTED_GAMES.
  *
@@ -97,7 +99,7 @@ export function featuredGames(answer, count) {
 		.sort((/** @type {any} */ a, /** @type {any} */ b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
 		.map((/** @type {any} */ g) => {
 			const meta = gameBySlug(g.slug);
-			return meta ? { ...meta, title_hu: g.title_hu || meta.title_hu, description_hu: g.description_hu || meta.description_hu } : null;
+			return meta ? { ...meta } : null;
 		})
 		.filter((/** @type {any} */ g) => g !== null)
 		.slice(0, count);
