@@ -2,22 +2,30 @@
     import { onMount } from "svelte";
     import { apiFetch } from "$lib/api";
     import PageHeader from "$lib/components/PageHeader.svelte";
+    import HexMap from "$lib/components/szekelyfold/HexMap.svelte";
+    import RegionNav from "$lib/components/szekelyfold/RegionNav.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+    import { COUNTY_ORDER, inRegionOrder } from "$lib/szekelyfold.js";
 
-    let pageHeader = initialPageHeader("megyek");
-    let pageHeaderLoading = false;
+    let pageHeader = $state(initialPageHeader("megyek"));
 
-    let locations = [];
-    let loading = true;
+    /** @type {Array<{ name: string, href: string, color: string, sub: string }>} */
+    let counties = $state([]);
+    let loading = $state(true);
 
     onMount(async () => {
         pageHeader = await loadPageMeta("megyek");
-        pageHeaderLoading = false;
         try {
-            const all = await apiFetch("/api/locations?type=megye");
-            locations = all.sort((a, b) => a.name.localeCompare(b.name));
+            const rows = await apiFetch("/api/locations?type=megye");
+            counties = inRegionOrder(Array.isArray(rows) ? rows : [], COUNTY_ORDER).map((c) => ({
+                name: c.name,
+                href: `/${c.slug}-megye`,
+                color: c.color,
+                sub: "megye",
+            }));
         } catch (e) {
             console.error(e);
+            counties = [];
         } finally {
             loading = false;
         }
@@ -25,38 +33,18 @@
 </script>
 
 <PageHeader
+    landscape
     title={pageHeader.title}
     greeting={pageHeader.greeting}
-    loading={pageHeaderLoading}
     breadcrumbLabel="Székelyföldi Megyék"
     documentTitleSuffix=" - Lámsza Index"
 />
 
-<div class="page-inner">
-    {#if loading}
-        <div class="info-box"><p>Betöltés…</p></div>
-    {:else if locations.length === 0}
+<div class="region-top">
+    {#if !loading && counties.length === 0}
         <div class="info-box"><p>Nincs megjeleníthető adat.</p></div>
     {:else}
-        {#each locations as loc}
-            <a href="/{loc.slug}-megye" class="card sm county">
-                <span class="location-name">{loc.name}</span>
-                <span class="location-county">{loc.type}</span>
-            </a>
-        {/each}
+        <HexMap items={counties} label="Székelyföldi megyék (sematikus ábra)" placeholders={COUNTY_ORDER.length} />
     {/if}
+    <RegionNav current="megyek" />
 </div>
-<nav class="page-nav">
-    <h4 class="page-nav-title">Oldal navigáció</h4>
-    <ul>
-        <li><a class="btn nav-btn" href="/szekek">Történelmi székek</a></li>
-        <li><a class="btn nav-btn" href="/varosok">Székelyföldi városok</a></li>
-        <li><a class="btn nav-btn" href="/falvak">Székelyföldi falvak</a></li>
-    </ul>
-</nav>
-
-<style>
-    .location-county {
-        color: var(--text-faint);
-    }
-</style>

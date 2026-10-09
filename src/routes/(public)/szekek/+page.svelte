@@ -2,21 +2,26 @@
     import { onMount } from "svelte";
     import { apiFetch } from "$lib/api";
     import PageHeader from "$lib/components/PageHeader.svelte";
+    import HexMap from "$lib/components/szekelyfold/HexMap.svelte";
+    import RegionNav from "$lib/components/szekelyfold/RegionNav.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
+    import { SEAT_ORDER, inRegionOrder } from "$lib/szekelyfold.js";
 
-    let pageHeader = initialPageHeader("szekek");
-    let pageHeaderLoading = false;
+    let pageHeader = $state(initialPageHeader("szekek"));
 
-    let seats = [];
-    let loading = true;
+    /** @type {Array<{ name: string, href: string, color: string }>} */
+    let seats = $state([]);
+    let loading = $state(true);
 
     onMount(async () => {
         pageHeader = await loadPageMeta("szekek");
-        pageHeaderLoading = false;
         try {
-            seats = await apiFetch("/api/historical_seats");
-            if (!Array.isArray(seats)) seats = [];
-            seats = seats.sort((a, b) => a.name.localeCompare(b.name));
+            const rows = await apiFetch("/api/historical_seats");
+            seats = inRegionOrder(Array.isArray(rows) ? rows : [], SEAT_ORDER).map((s) => ({
+                name: s.name,
+                href: `/szekek/${s.slug}`,
+                color: s.color,
+            }));
         } catch (e) {
             console.error(e);
             seats = [];
@@ -27,31 +32,18 @@
 </script>
 
 <PageHeader
+    landscape
     title={pageHeader.title}
     greeting={pageHeader.greeting}
-    loading={pageHeaderLoading}
     breadcrumbLabel="Történelmi székek"
     documentTitleSuffix=" - Lámsza Index"
 />
 
-<div class="page-inner">
-    {#if loading}
-        <div class="info-box"><p>Betöltés…</p></div>
-    {:else if seats.length === 0}
+<div class="region-top">
+    {#if !loading && seats.length === 0}
         <div class="info-box"><p>Nincs megjeleníthető adat.</p></div>
     {:else}
-        {#each seats as seat}
-            <a href="/szekek/{seat.slug}" class="card sm seat">
-                <span class="seat-name">{seat.name}</span>
-            </a>
-        {/each}
+        <HexMap items={seats} label="Székelyföld történelmi székei (sematikus ábra)" placeholders={SEAT_ORDER.length} />
     {/if}
+    <RegionNav current="szekek" />
 </div>
-<nav class="page-nav">
-    <h4 class="page-nav-title">Oldal navigáció</h4>
-    <ul>
-        <li><a class="btn nav-btn" href="/megyek">Székelyföldi megyék</a></li>
-        <li><a class="btn nav-btn" href="/varosok">Székelyföldi városok</a></li>
-        <li><a class="btn nav-btn" href="/falvak">Székelyföldi falvak</a></li>
-    </ul>
-</nav>

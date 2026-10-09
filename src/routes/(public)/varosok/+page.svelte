@@ -2,24 +2,25 @@
     import { onMount } from "svelte";
     import { apiFetch } from "$lib/api";
     import PageHeader from "$lib/components/PageHeader.svelte";
+    import RegionNav from "$lib/components/szekelyfold/RegionNav.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
 
-    let pageHeader = initialPageHeader("varosok");
-    let pageHeaderLoading = false;
+    /** Placeholder tiles while the list loads (UI_BASELINE "ld-reserve-space"). */
+    const PLACEHOLDERS = 12;
 
-    let locations = [];
-    let loading = true;
+    let pageHeader = $state(initialPageHeader("varosok"));
+
+    /** @type {Array<{ name: string, slug: string, county_slug: string, type: string }>} */
+    let towns = $state([]);
+    let loading = $state(true);
 
     onMount(async () => {
         pageHeader = await loadPageMeta("varosok");
-        pageHeaderLoading = false;
         try {
             const all = await apiFetch("/api/locations");
-            locations = all
-                .filter((l) =>
-                    ["város", "municípium"].includes(l.type?.toLowerCase() ?? ""),
-                )
-                .sort((a, b) => a.name.localeCompare(b.name));
+            towns = (Array.isArray(all) ? all : [])
+                .filter((l) => ["város", "municípium"].includes(l.type?.toLowerCase() ?? ""))
+                .sort((a, b) => a.name.localeCompare(b.name, "hu"));
         } catch (e) {
             console.error(e);
         } finally {
@@ -29,41 +30,32 @@
 </script>
 
 <PageHeader
+    landscape
     title={pageHeader.title}
     greeting={pageHeader.greeting}
-    loading={pageHeaderLoading}
     breadcrumbLabel="Székelyföldi Városok"
     documentTitleSuffix=" - Lámsza Index"
 />
 
-<div class="page-inner">
-    {#if loading}
-        <div class="info-box"><p>Betöltés…</p></div>
-    {:else if locations.length === 0}
-        <div class="info-box"><p>Nincs megjeleníthető adat.</p></div>
-    {:else}
-        {#each locations as loc}
-            <a
-                href="/{loc.county_slug}-megye/{loc.slug}"
-                class="card sm location"
-            >
-                <span class="location-name">{loc.name}</span>
-                <span class="location-type">{loc.type}</span>
-            </a>
+{#if loading}
+    <ul class="region-tiles" aria-busy="true">
+        {#each { length: PLACEHOLDERS } as _, i (i)}
+            <li aria-hidden="true"><span class="card region-tile region-tile--placeholder"><span>&nbsp;</span></span></li>
         {/each}
-    {/if}
-</div>
-<nav class="page-nav">
-    <h4 class="page-nav-title">Oldal navigáció</h4>
-    <ul>
-        <li><a class="btn nav-btn" href="/megyek">Székelyföldi megyék</a></li>
-        <li><a class="btn nav-btn" href="/szekek">Történelmi székek</a></li>
-        <li><a class="btn nav-btn" href="/falvak">Székelyföldi falvak</a></li>
     </ul>
-</nav>
+{:else if towns.length === 0}
+    <div class="info-box"><p>Nincs megjeleníthető adat.</p></div>
+{:else}
+    <ul class="region-tiles">
+        {#each towns as t (t.slug)}
+            <li>
+                <a class="card region-tile" href="/{t.county_slug}-megye/{t.slug}">
+                    <span>{t.name}</span>
+                    <span class="region-tile__tag" class:region-tile__tag--strong={t.type?.toLowerCase() === "municípium"}>{t.type}</span>
+                </a>
+            </li>
+        {/each}
+    </ul>
+{/if}
 
-<style>
-    .location-type {
-        color: var(--text-faint);
-    }
-</style>
+<RegionNav current="varosok" row />
