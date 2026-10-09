@@ -63,3 +63,27 @@ export const LISTED_GAMES = GAMES.filter((game) => !game.prelaunch);
 export function gameBySlug(slug) {
 	return GAMES.find((game) => game.slug === slug);
 }
+
+/**
+ * The games a home page shows from Játszótér's `/api/games` answer: the
+ * enabled ones in its order, each with the catalog's colour and icon and the
+ * server's title and description where it has them, at most `count`. A game
+ * the catalog does not know is left out (it would have no icon). Null when
+ * the answer lists none, so the caller keeps LISTED_GAMES.
+ *
+ * @param {unknown} answer `/api/games` JSON
+ * @param {number} count
+ */
+export function featuredGames(answer, count) {
+	const rows = Array.isArray(/** @type {any} */ (answer)?.games) ? /** @type {any} */ (answer).games : [];
+	const list = rows
+		.filter((/** @type {any} */ g) => g?.enabled)
+		.sort((/** @type {any} */ a, /** @type {any} */ b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+		.map((/** @type {any} */ g) => {
+			const meta = gameBySlug(g.slug);
+			return meta ? { ...meta, title_hu: g.title_hu || meta.title_hu, description_hu: g.description_hu || meta.description_hu } : null;
+		})
+		.filter((/** @type {any} */ g) => g !== null)
+		.slice(0, count);
+	return list.length ? list : null;
+}

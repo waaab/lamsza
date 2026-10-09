@@ -1,7 +1,7 @@
 <script>
     import { onMount } from "svelte";
     import GameIcon from "$lib/games/GameIcon.svelte";
-    import { GAMES, LISTED_GAMES } from "$lib/games/catalog.js";
+    import { LISTED_GAMES, featuredGames } from "$lib/games/catalog.js";
     import { jatszoterUrl } from "$lib/networkOrigins.js";
 
     /**
@@ -20,18 +20,7 @@
         try {
             const res = await fetch(jatszoterUrl("/api/games"), { credentials: "omit" });
             if (!res.ok) return;
-            const data = await res.json();
-            const enabled = (Array.isArray(data?.games) ? data.games : [])
-                .filter((g) => g.enabled)
-                .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-            const list = enabled
-                .map((g) => {
-                    const meta = GAMES.find((m) => m.slug === g.slug);
-                    return meta ? { ...meta, title_hu: g.title_hu || meta.title_hu, description_hu: g.description_hu || meta.description_hu } : null;
-                })
-                .filter((g) => g !== null)
-                .slice(0, COUNT);
-            if (list.length) games = list;
+            games = featuredGames(await res.json(), COUNT) ?? games;
         } catch {
             // Keep the listed games.
         }

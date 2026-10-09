@@ -53,7 +53,9 @@
       "src/lib/components/AccountMenu.svelte",
       "tests/accountDetails.test.js",
       "src/lib/components/ThemeSettings.svelte",
-      "src/lib/components/Hero.svelte"
+      "src/lib/components/Hero.svelte",
+      "src/lib/games/catalog.js",
+      "src/lib/games/GameIcon.svelte"
     ],
     "lamsza-jatszoter": [
       "src/lib/icons/AppIcon.svelte",
@@ -102,7 +104,7 @@
     "src/lib/components/ConfirmDialog.svelte": "sha256:b8f88b5406d552bf3d1e8028d0bc9fb72f8dc6e878f6a4c850b9eb6310ffee46",
     "src/lib/components/NoticeDialog.svelte": "sha256:926daefc0e3e027dcbf58fce50ace8b09bf33a05eda16d6e6e45cf9fb43e2a6e",
     "src/lib/components/SignInDialog.svelte": "sha256:aeebd68cd9ca5b1f8b362deae68275dc7f6e8e9a5318def3f9f2c24b0aaa6d33",
-    "src/styles/global.css": "sha256:bdb1d76f32d9192ae78df44f8d5f72261056788cab29094561362329a9005e76",
+    "src/styles/global.css": "sha256:e9f4e4066555726b0454e5da6327e551301c29a83b67d68e7c62743a200ea82a",
     "src/styles/typography.css": "sha256:58111dbce56e757922352b4269994a24f4ec619f218253f7af988ede3486c3fa",
     "src/styles/component-typography.css": "sha256:8f88b3227ae4e3c0b43423a96e2fce8ecc519bb2f58dab23ee1e33da4f44baef",
     "src/lib/icons/ErrorLantern.svelte": "sha256:79a4741e5c51b7aac56a985628e4b2767a1965cb1adae71bec0bafe194de661f",
@@ -119,8 +121,8 @@
     "src/lib/components/AccountMenu.svelte": "sha256:7dc000204f428c57a5cd7d7c2517b669ef7c9d80c2810034099a82807757998e",
     "tests/accountDetails.test.js": "sha256:fbf528ef1bcf4a13fe535f65fe6fdb54ff2db6cb2258c1f8f3eb47c9292a91ea",
     "src/lib/components/ThemeSettings.svelte": "sha256:b89af2d56662e6aa5b671d3e15148f2dc0b860ca7516dc095992a30e42acd31b",
-    "src/lib/components/Hero.svelte": "sha256:826391f03da9894beed0198cffcc372a62df40d81f323ec4317966ca80977fe7",
-    "src/lib/games/catalog.js": "sha256:df7d927454656ec41c9f257723478e9d809cff4a63209bb484e2822d438573dc",
+    "src/lib/components/Hero.svelte": "sha256:17cffb7b7a662e92209779b17463bc9ad77e69423f642f6de1eec87bca8f3b80",
+    "src/lib/games/catalog.js": "sha256:7cf1908709952ba21911cec56808b475e5a15ea7e829e805000de73084e1aa51",
     "src/lib/games/GameIcon.svelte": "sha256:1f699e30db353a420d05228968cf7e08ce8a9f3ec9312acc8c72f91d8f6b04d6"
   }
 }
