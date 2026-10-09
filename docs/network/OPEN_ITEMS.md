@@ -92,6 +92,14 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
   empty shell. Use `index index.html` and `try_files $uri $uri.html $uri/ /app.html` (Lámsza's staged vhost
   already has `$uri.html`, but also `index app.html`). Check: `curl -s https://szotar.lamsza.com/lista` contains
   the page title, not only the shell.
+- **[szotar] owner: nginx must set `X-Real-IP` on the Szótár vhost, or the per-IP rate limit
+  does not work.** Szótár limits `POST /api/suggestions` (10 a minute) and `/api/auth/google` (20 a
+  minute) per client IP (`lamsza-szotar/backend/internal/ratelimit`). Behind nginx every request comes
+  from 127.0.0.1, so the backend takes the client from `X-Real-IP`; without the header, every visitor
+  shares one bucket and a few busy minutes lock everyone out of sign-in. Keep
+  `proxy_set_header X-Real-IP $remote_addr;` in the Szótár `location /api/` block, as
+  `PRODUCTION_ENVIRONMENT_NOTES.md` shows. Check on the server: the vhost has that line, and 11 quick
+  suggestion POSTs from one machine answer 429 on the 11th while another machine still gets through.
 - **[network] owner: apply the 13 pending system updates on the droplet**
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
