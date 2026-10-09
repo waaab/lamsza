@@ -4,7 +4,6 @@ import (
 	"backend/internal/db"
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -48,29 +47,7 @@ func ProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, parsed.String(), nil)
-	if err != nil {
-		http.Error(w, "invalid url", http.StatusBadRequest)
-		return
-	}
-	req.Header.Set("User-Agent", "LamszaProxy/1.2")
-	req.Header.Set("Accept", "*/*")
-
-	resp, err := proxyClient.Do(req)
-	if err != nil {
-		http.Error(w, "upstream failed", http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		w.Header().Set("Content-Type", ct)
-	}
-	if cc := resp.Header.Get("Cache-Control"); cc != "" {
-		w.Header().Set("Cache-Control", cc)
-	}
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, io.LimitReader(resp.Body, proxyMaxBytes))
+	serveProxied(w, r, parsed.String(), proxyClient.Do)
 }
 
 func parsePublicProxyURL(raw string) (*url.URL, error) {
