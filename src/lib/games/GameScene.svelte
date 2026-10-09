@@ -1,5 +1,5 @@
 <!--
-	A game's animated scene on its card (UI_BASELINE "game-look"; owner,
+	A game's animated scene on its card and its starter (UI_BASELINE "game-look"; owner,
 	2026-10-09, after words.com's game thumbnails): a small looping scene in
 	white on the game's colour that acts out how the game is played. Tiles
 	flip, honeycomb cells pop, a highlight finds a word, letters drop into
@@ -8,8 +8,10 @@
 
 	CSS motion only, one 6 s loop; each piece starts at its own delay (--d).
 	When the visitor prefers reduced motion the finished scene simply stands.
-	Shared from lamsza to Játszótér and Szótár with GameCard.svelte. The
-	static GameIcon stays for small places (game pages, menus).
+	GameCard keeps it still until the card is hovered or focused; the game
+	page's starter (Játszótér's GameShell) lets it loop. Shared from lamsza
+	to Játszótér and Szótár. The static GameIcon stays for small places
+	(menus).
 -->
 <script>
 	let { slug, size = 160 } = $props();

@@ -7,8 +7,10 @@
 	 * game's colour and icon, its name and line. Shared from lamsza to
 	 * Játszótér and Szótár, so Lámsza's home, Szótár's home and Játszótér's
 	 * lists draw one card. Its art is the game's animated scene (GameScene,
-	 * after words.com's thumbnails; owner, 2026-10-09): only the scene moves,
-	 * the card never does. On hover or focus a round play button fades in.
+	 * after words.com's thumbnails; owner, 2026-10-09): at rest it shows the
+	 * finished scene, and only on hover or keyboard focus does it play, from
+	 * the start (owner, 2026-10-09). Only the scene moves, the card never
+	 * does; a round play button fades in.
 	 *
 	 * `href`: where it leads; Játszótér's own game page by default, the
 	 * caller passes Játszótér's full address from the other apps.
@@ -59,6 +61,12 @@
 		padding: 0 0.75rem;
 		box-sizing: border-box;
 		line-height: 0;
+	}
+
+	/* The scene stands finished until the card is hovered or focused; then
+	   its loop starts from the beginning. */
+	.game-poster:not(:hover):not(:focus-visible) .game-poster-scene :global(*) {
+		animation: none;
 	}
 
 	.game-poster-play {
