@@ -57,7 +57,8 @@
       "src/lib/games/catalog.js",
       "src/lib/games/GameIcon.svelte",
       "src/lib/games/GameCard.svelte",
-      "src/lib/games/GameScene.svelte"
+      "src/lib/games/GameScene.svelte",
+      "src/lib/games/StartButton.svelte"
     ],
     "lamsza-jatszoter": [
       "src/lib/icons/AppIcon.svelte",
@@ -83,7 +84,8 @@
       "src/lib/games/catalog.js",
       "src/lib/games/GameIcon.svelte",
       "src/lib/games/GameCard.svelte",
-      "src/lib/games/GameScene.svelte"
+      "src/lib/games/GameScene.svelte",
+      "src/lib/games/StartButton.svelte"
     ]
   },
   "modules": {
@@ -129,6 +131,7 @@
     "src/lib/games/catalog.js": "sha256:bcfe005d75ef7c0a7b16f88a25edc16844c5fb54acf102f3be09041ddf73203a",
     "src/lib/games/GameIcon.svelte": "sha256:1f699e30db353a420d05228968cf7e08ce8a9f3ec9312acc8c72f91d8f6b04d6",
     "src/lib/games/GameCard.svelte": "sha256:225bea81d68e908708082cb967cf04c4b24e93a31f4ec913eb2ba6dd1e1a0a43",
-    "src/lib/games/GameScene.svelte": "sha256:e7da41b31304af115d1b8bbf663d418963e5edc47b1acf9a8577dcccecc483e5"
+    "src/lib/games/GameScene.svelte": "sha256:e7da41b31304af115d1b8bbf663d418963e5edc47b1acf9a8577dcccecc483e5",
+    "src/lib/games/StartButton.svelte": "sha256:0"
   }
 }

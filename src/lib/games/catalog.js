@@ -103,3 +103,19 @@ export function featuredGames(answer, count) {
 		.slice(0, count);
 	return list.length ? list : null;
 }
+
+/**
+ * Lámsza's "Játszótér · Mai kihívások": the games from Játszótér's
+ * `/api/games` answer that have a daily challenge today (`daily_today`), in
+ * its order, as featuredGames gives them. A Játszótér that does not send the
+ * field yet lists every game. An empty list when no game has one today; null
+ * when the answer lists no games, so the caller keeps LISTED_GAMES.
+ *
+ * @param {unknown} answer `/api/games` JSON
+ */
+export function todaysChallenges(answer) {
+	const rows = /** @type {any} */ (answer)?.games;
+	if (!Array.isArray(rows) || !rows.some((/** @type {any} */ g) => g?.enabled)) return null;
+	const today = rows.filter((/** @type {any} */ g) => g?.daily_today !== false);
+	return featuredGames({ games: today }, Infinity) ?? [];
+}
