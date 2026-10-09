@@ -131,7 +131,7 @@
     "src/lib/games/catalog.js": "sha256:8e00ff379de047fc94e79c825fe40afae468d98e3f9c3d42cdd6e8ca5a20707d",
     "src/lib/games/GameIcon.svelte": "sha256:1f699e30db353a420d05228968cf7e08ce8a9f3ec9312acc8c72f91d8f6b04d6",
     "src/lib/games/GameCard.svelte": "sha256:411285a9e8155159544f995af482e39d874b7383aa455bd0fb011f7193e36fe2",
-    "src/lib/games/GameScene.svelte": "sha256:e7da41b31304af115d1b8bbf663d418963e5edc47b1acf9a8577dcccecc483e5",
+    "src/lib/games/GameScene.svelte": "sha256:cc01de1daa93df259781c37a3e69cfec4846c3e69cb0646cc253af29ba309578",
     "src/lib/games/StartButton.svelte": "sha256:d7458991f0109a08f4f8008c5d9355492d34185da63b4d852d617c5e7a77ba9a"
   }
 }

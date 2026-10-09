@@ -2,7 +2,7 @@
 	A game's animated scene on its card and its starter (UI_BASELINE "game-look"; owner,
 	2026-10-09, after words.com's game thumbnails): a small looping scene in
 	white on the game's colour that acts out how the game is played. Tiles
-	flip, honeycomb cells pop, a highlight finds a word, letters drop into
+	flip, honeycomb cells pop, a word is dragged out of a letter grid, letters drop into
 	their blanks, rovás signs get their reading, an arrow-word fills in. Only
 	the scene moves; the card stays still.
 
@@ -37,11 +37,15 @@
 		return { letter, x: 80 + HEX_STEP * Math.cos(a), y: 50 + HEX_STEP * Math.sin(a) };
 	});
 
-	// Szókereső: a 6 × 4 letter grid; KACOR hides in the second row.
+	// Szókereső: a 6 × 4 letter grid of cells, as in the game; KACOR hides in the
+	// second row. Its cells turn amber one by one as if dragged (the game's live
+	// selection), then all turn found together: white with the game's colour
+	// for the letter, the card's white-on-colour version of the game's found cells.
 	const GRID = ['TÉLÓSZ', 'MKACOR', 'ÁBLEÍV', 'GYÚPÖN'];
 	const CELL = 18;
 	const GX = 80 - (6 * CELL) / 2;
 	const GY = 50 - (4 * CELL) / 2;
+	const KACOR_ROW = 1;
 
 	// Rovásfejtő: the five signs of "lámsza" (GameIcon's outlines, 24-unit),
 	// drawn 5.5x and mirrored as rovás runs right to left.
@@ -92,17 +96,22 @@
 	{:else if slug === 'szokereso'}
 		{#each GRID as row, r (r)}
 			{#each Array.from(row) as letter, c (c)}
-				<text
-					class="gs-letter gs-small"
-					class:gs-dim={!(r === 1 && c >= 1)}
-					class:gs-found={r === 1 && c >= 1}
-					style="--d: {(0.4 + (c - 1) * 0.18).toFixed(2)}s"
-					x={GX + c * CELL + CELL / 2}
-					y={GY + r * CELL + CELL / 2 + 4}>{letter}</text
-				>
+				{@const x = GX + c * CELL}
+				{@const y = GY + r * CELL}
+				<rect class="gs-cell" x={x + 1} y={y + 1} width={CELL - 2} height={CELL - 2} rx="3" />
+				<text class="gs-letter gs-small" x={x + CELL / 2} y={y + CELL / 2 + 4}>{letter}</text>
+				{#if r === KACOR_ROW && c >= 1}
+					<g class="gs-trace" style="--d: {(0.6 + (c - 1) * 0.28).toFixed(2)}s">
+						<rect class="gs-trace-fill" x={x + 1} y={y + 1} width={CELL - 2} height={CELL - 2} rx="3" />
+						<text class="gs-letter gs-small gs-on-trace" x={x + CELL / 2} y={y + CELL / 2 + 4}>{letter}</text>
+					</g>
+					<g class="gs-hit">
+						<rect class="gs-solid" x={x + 1} y={y + 1} width={CELL - 2} height={CELL - 2} rx="3" />
+						<text class="gs-letter gs-small gs-on-solid" x={x + CELL / 2} y={y + CELL / 2 + 4}>{letter}</text>
+					</g>
+				{/if}
 			{/each}
 		{/each}
-		<rect class="gs-capsule gs-grow" style="--d: 0.25s" x={GX + CELL + 1} y={GY + CELL + 1} width={CELL * 5 - 2} height={CELL - 2} rx="8" />
 	{:else if slug === 'akasztofa'}
 		{#each KALAN as letter, i (i)}
 			<line class="gs-line" x1={rowX(5, i) + 2} y1="66" x2={rowX(5, i) + TILE - 2} y2="66" />
@@ -188,14 +197,21 @@
 		stroke-linejoin: round;
 	}
 
-	.gs-dim {
+	/* Szókereső's grid cells, its amber live selection (the game's --warm-light
+	   with dark letters) and its found cells (gs-solid). */
+	.gs-cell {
+		fill: none;
+		stroke: var(--gs-ink);
+		stroke-width: 1;
 		opacity: 0.45;
 	}
 
-	.gs-capsule {
-		fill: rgba(255, 255, 255, 0.18);
-		stroke: var(--gs-ink);
-		stroke-width: 1.8;
+	.gs-trace-fill {
+		fill: var(--warm-light, #f2b44f);
+	}
+
+	.gs-on-trace {
+		fill: #1f1f1f;
 	}
 
 	.gs-glyph {
@@ -207,16 +223,12 @@
 	.gs-flip,
 	.gs-pop,
 	.gs-pulse,
-	.gs-grow,
+	.gs-trace,
+	.gs-hit,
 	.gs-drop,
-	.gs-rise,
-	.gs-found {
+	.gs-rise {
 		transform-box: fill-box;
 		transform-origin: center;
-	}
-
-	.gs-grow {
-		transform-origin: left center;
 	}
 
 	@media (prefers-reduced-motion: no-preference) {
@@ -229,11 +241,11 @@
 		.gs-pulse {
 			animation: gs-pulse 3s ease-in-out infinite;
 		}
-		.gs-grow {
-			animation: gs-grow 6s ease-out var(--d, 0s) infinite both;
+		.gs-trace {
+			animation: gs-trace 6s ease-out var(--d, 0s) infinite both;
 		}
-		.gs-found {
-			animation: gs-found 6s ease-out var(--d, 0s) infinite both;
+		.gs-hit {
+			animation: gs-hit 6s ease-out infinite both;
 		}
 		.gs-drop {
 			animation: gs-drop 6s cubic-bezier(0.3, 1.3, 0.5, 1) var(--d, 0s) infinite both;
@@ -285,37 +297,46 @@
 		}
 	}
 
-	@keyframes gs-grow {
+	/* A KACOR cell turns amber at its --d (0.6 s to 1.72 s) and stays amber for
+	   2.5 s, under the found cell from 2.2 s; gone before the found cells go. */
+	@keyframes gs-trace {
 		0% {
-			transform: scaleX(0);
+			transform: scale(0.7);
 			opacity: 0;
 		}
-		4% {
+		3%,
+		42% {
+			transform: scale(1);
 			opacity: 1;
 		}
-		22%,
-		78% {
-			transform: scaleX(1);
-			opacity: 1;
-		}
-		86%,
+		43%,
 		100% {
-			transform: scaleX(1);
+			transform: scale(1);
 			opacity: 0;
 		}
 	}
 
-	@keyframes gs-found {
-		0% {
-			opacity: 0.45;
+	/* The drag ends at 2.1 s: the five cells turn found together, a small pop,
+	   until 5.2 s; then the grid stands plain until the next loop. */
+	@keyframes gs-hit {
+		0%,
+		35% {
+			transform: scale(1);
+			opacity: 0;
 		}
-		8%,
-		76% {
+		38% {
+			transform: scale(1.12);
 			opacity: 1;
 		}
-		86%,
+		42%,
+		86% {
+			transform: scale(1);
+			opacity: 1;
+		}
+		91%,
 		100% {
-			opacity: 0.45;
+			transform: scale(1);
+			opacity: 0;
 		}
 	}
 
