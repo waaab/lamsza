@@ -83,6 +83,7 @@ reference; each item names its own.
 | Settings gear attributes (`ic-gear`) | Lámsza's |  |
 | aria-hidden on the magnifier (`ic-aria`) | Lámsza's |  |
 | Mondások quote icon class (`ic-quote`) | Lámsza's |  |
+| Create buttons (`btn-create-plus`) | New | Every "create new" button in every app shows the shared `AppIcon` "plus" before its text: Lámsza's "Új Weboldal", "Új Bejegyzés", "Új link", the forms' "Hozzáadás" and the quick links' "Új" card; Szótár's "Új szó", "Új szó javaslása", "Új jelentés"; the admin app's "Új jelentés", "Új feladvány", "Új nap", "Hozzáadás". The admin app's "Új …" create panels keep the plus after their text, where it also marks the panel as one that opens. Owner's decision, 2026-10-09. |
 | Weather icons (`wx-icons`) | New | Lámsza only. Animated inline SVG for every weather element: `icons/weather/WeatherSymbol.svelte` draws all 41 MET Norway symbol codes, day and night, from a few shared parts (sun, moon, one or two clouds, rain, sleet, snow, lightning, fog); `WeatherGlyph.svelte` draws the measurements and shows their value (thermometer level, wind direction, humidity, pressure needle, UV colour, rain gauge, sun and moon rise and set, day length, moon phase). Theme tokens only (sun --warm-light, rain --szekely-blue, clouds from --text-muted), no colours of their own; CSS motion only, still under prefers-reduced-motion; fixed reserved size. The widgets use them when the admin's icon style is "svg"; the emoji style stays. Review page: `/idojaras/ikonok` (noindex). Accepted by the owner, 2026-10-09. |
 
 ## Dialogs

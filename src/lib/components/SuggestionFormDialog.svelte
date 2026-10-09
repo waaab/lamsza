@@ -1,4 +1,5 @@
 <script>
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import { onMount } from "svelte";
     import { SvelteSet } from "svelte/reactivity";
     import EntryHoursEditor from "$lib/components/EntryHoursEditor.svelte";
@@ -256,7 +257,7 @@
                             </button>
                         </div>
                     {/each}
-                    <button type="button" class="btn btn-xs" onclick={addSocialLink}>Hozzáadás</button>
+                    <button type="button" class="btn btn-xs" onclick={addSocialLink}><AppIcon name="plus" size={14} />Hozzáadás</button>
                 </fieldset>
 
                 <fieldset class="link-dialog-choices">

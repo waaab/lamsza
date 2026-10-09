@@ -329,7 +329,7 @@
                         aria-label="Új gyorslink hozzáadása"
                     >
                         <span class="link-card-icon link-card-icon-add">
-                            <span class="link-card-add-plus">+</span>
+                            <AppIcon name="plus" size={22} class="link-card-add-plus" />
                         </span>
                         <span class="link-card-title">Új</span>
                     </button>

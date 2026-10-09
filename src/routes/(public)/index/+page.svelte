@@ -411,7 +411,7 @@
                     type="button"
                     class="btn btn-primary btn-lg"
                     on:click={() => (addWebsiteOpen = true)}
-                >{WEBSITE_CREATE_TITLE}</button>
+                ><AppIcon name="plus" size={18} />{WEBSITE_CREATE_TITLE}</button>
                 <p>{WEBSITE_CREATE_NOTE}</p>
             </div>
         {:else}
@@ -420,7 +420,7 @@
                     type="button"
                     class="btn btn-primary btn-lg"
                     on:click={openCreateListing}
-                >{LISTING_CREATE_TITLE}</button>
+                ><AppIcon name="plus" size={18} />{LISTING_CREATE_TITLE}</button>
                 <p>{LISTING_CREATE_NOTE}</p>
             </div>
         {/if}

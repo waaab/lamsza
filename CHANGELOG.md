@@ -41,6 +41,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- Every "create new" button shows the shared plus icon before its text (UI_BASELINE `btn-create-plus`): Index "Új Weboldal" and "Új Bejegyzés", Fiók "Új link", the forms' "Hozzáadás", and the home quick links' "Új" card, whose typed "+" is now the icon. [public]
 - Settlement and attraction pages: the header shows the place's current weather (the weather pages' animated symbols) where the red sun was, so every place has its own; the weather card shows now, wind, humidity, rain, UV, sunrise and sunset and the next three days (`PlaceWeatherCard`, one forecast request shared with the header). The four Székelyföld list pages keep the sun. [public]
 - The page area is at least a screen tall, so the footer always starts below the fold and the late FAQ / Megjegyzés block no longer pushes a visible footer (layout shift about 0.02 to 0 on short pages). [public]
 - Settlement and attraction pages in the redesign's look (UI_BASELINE `szf-pages`): the landscape header with the ♡ button, the overview, coat of arms and weather as cards, places as chips. An attraction shows its elevation, area and depth as tiles when set, its activities and prohibitions as ✓ and ✕ chips, and its description once (no longer repeated under the photos). The sun and ridges are now `LandscapeBackdrop`, shared by `PageHeader`. [public]

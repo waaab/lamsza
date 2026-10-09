@@ -1,4 +1,5 @@
 <script>
+    import AppIcon from "$lib/icons/AppIcon.svelte";
     import { onMount } from "svelte";
     import { get } from "svelte/store";
     import ConfirmDialog from "$lib/components/ConfirmDialog.svelte";
@@ -940,7 +941,7 @@
                 {#if linksOk}
                     <p class="profile-ok">{linksOk}</p>
                 {/if}
-                <button type="button" class="btn" onclick={openAddLink}>Új link</button>
+                <button type="button" class="btn" onclick={openAddLink}><AppIcon name="plus" size={16} />Új link</button>
                 {#if linksLoading}
                     <p>Betöltés…</p>
                 {:else if accountLinks.length === 0}

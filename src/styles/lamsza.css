@@ -382,10 +382,9 @@
   background: rgba(92, 107, 192, 0.2);
 }
 
+/* The quick links' "Új" card: the shared plus icon (was a typed "+"). */
 .link-card-add-plus {
-  font-size: var(--text-xl);
-  font-weight: 300;
-  line-height: 1;
+  color: var(--text-secondary);
 }
 
 .link-card-edit {

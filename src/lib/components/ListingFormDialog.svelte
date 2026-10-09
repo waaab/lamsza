@@ -686,7 +686,7 @@
                                 </button>
                             </div>
                         {/each}
-                        <button type="button" class="btn btn-xs" onclick={addSocialLink}>Hozzáadás</button>
+                        <button type="button" class="btn btn-xs" onclick={addSocialLink}><AppIcon name="plus" size={14} />Hozzáadás</button>
                     </fieldset>
                 {/if}
 
