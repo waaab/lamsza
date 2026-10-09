@@ -13,6 +13,7 @@ the footer version read (WAYS_OF_WORKING R17).
 ## [Unreleased]
 
 ### Added
+- Tests: `TestSiteSettingsSeedsTheAdminKeys` pins the `site_settings` keys lamsza-admin writes (its `TestSiteSettingsKeysAreReadByLamsza` checks the other side); `TestOwnerDecidesMemberRequests` covers the owner's accept and deny of member requests and their refusals (planned in the listing claim and membership plan, never written).
 - Attraction facts for the page's tiles: `attractions.elevation_m`, `area_km2`, `depth_m` (optional numbers; area and depth not negative), set in the admin app. `/api/attractions?county_slug=&slug=` returns them when set.
 - Featured categories for the home page's chips: `entry_categories.featured_order` (NULL, or the chip's place 1-6; a range check and a unique index keep it to six chips, one category per place), chosen in the admin app. `/api/entry-categories` returns it.
 - Weather section `/idojaras`: every settlement's weather now, by county; `/idojaras/<település>` with the weather now (feels-like, wind and direction, humidity, rain, pressure, UV, clouds, dew point), the next 48 hours, about 9 days ahead, and today's sunrise, sunset, day length, moonrise, moonset and moon phase; `/idojaras/<település>/archivum` with the archived days from launch, a temperature and rain chart, and each day's hours. Every view credits its source as the licence asks. [public]
