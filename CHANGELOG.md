@@ -41,6 +41,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- One game card for the whole network (UI_BASELINE `game-look`): `src/lib/games/GameCard.svelte`, Játszótér's card, is now shared to Játszótér and Szótár. On hover the icon hops and grows instead of the card lifting. The home page's "Játszótér · Mai kihívások" shows every enabled game as that card (no longer four, in a card of its own). The catalog marks the games played with Szótár's Székely words (`szekely_words`, `playsWithSzekelyWords`), and Tájszórejtvény is released, so the loading cards include it. [public]
 - Every "create new" button shows the shared plus icon before its text (UI_BASELINE `btn-create-plus`): Index "Új Weboldal" and "Új Bejegyzés", Fiók "Új link", the forms' "Hozzáadás", and the home quick links' "Új" card, whose typed "+" is now the icon. [public]
 - Settlement and attraction pages: the header shows the place's current weather (the weather pages' animated symbols) where the red sun was, so every place has its own; the weather card shows now, wind, humidity, rain, UV, sunrise and sunset and the next three days (`PlaceWeatherCard`, one forecast request shared with the header). The four Székelyföld list pages keep the sun. [public]
 - The page area is at least a screen tall, so the footer always starts below the fold and the late FAQ / Megjegyzés block no longer pushes a visible footer (layout shift about 0.02 to 0 on short pages). [public]

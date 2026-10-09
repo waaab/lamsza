@@ -1,6 +1,9 @@
 /** Fixed game titles and greetings. Seeded in SQL; not edited in admin.
  * `color` is a placeholder until each game gets its own color.
  * `category` is the game kind: word, geo, picture. One per game.
+ * `szekely_words`: the game is played with Szótár's Székely words (its words
+ * come from the dictionary); Szótár's home lists only these. Rovásfejtő is
+ * played with Székely proverbs in rovás, not dictionary words.
  * `prelaunch` marks a game whose row ships switched off: lists draw it only
  * once the server says it is enabled (LISTED_GAMES). Drop the flag at the
  * game's release.
@@ -19,6 +22,7 @@ export const GAMES = [
 		title_hu: 'Kaptár',
 		description_hu: 'Hány szót találsz ma?',
 		category: 'word',
+		szekely_words: true,
 		color: '#d4a017'
 	},
 	{
@@ -26,6 +30,7 @@ export const GAMES = [
 		title_hu: 'Szórejtő',
 		description_hu: 'Találd meg a székely szót hat próbálkozásból!',
 		category: 'word',
+		szekely_words: true,
 		color: '#2f7d6d'
 	},
 	{
@@ -33,6 +38,7 @@ export const GAMES = [
 		title_hu: 'Szókereső',
 		description_hu: 'Keresd meg a hét székely szót a rácsban.',
 		category: 'word',
+		szekely_words: true,
 		color: '#3a6fbf'
 	},
 	{
@@ -40,6 +46,7 @@ export const GAMES = [
 		title_hu: 'Akasztófa',
 		description_hu: 'Találd ki a székely szót betűnként.',
 		category: 'word',
+		szekely_words: true,
 		color: '#7a4ea3'
 	},
 	{
@@ -47,8 +54,8 @@ export const GAMES = [
 		title_hu: 'Tájszórejtvény',
 		description_hu: 'Fejtsd meg a székely rejtvényt, és tanulj meg közben néhány tájszót!',
 		category: 'word',
-		color: '#a4473b',
-		prelaunch: true
+		szekely_words: true,
+		color: '#a4473b'
 	}
 ];
 
@@ -58,6 +65,15 @@ export const GAMES = [
  * for a moment and then disappears; the server's list adds it once enabled.
  */
 export const LISTED_GAMES = GAMES.filter((game) => !game.prelaunch);
+
+/**
+ * Whether a game is played with Szótár's Székely words (catalog
+ * `szekely_words`); a game the catalog does not know is not.
+ * @param {{ slug?: string, szekely_words?: boolean }} game
+ */
+export function playsWithSzekelyWords(game) {
+	return Boolean(game?.szekely_words ?? gameBySlug(String(game?.slug ?? ''))?.szekely_words);
+}
 
 /** @param {string} slug */
 export function gameBySlug(slug) {
