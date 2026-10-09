@@ -15,7 +15,6 @@
     } from "$lib/favorites.js";
     import Breadcrumbs from "$lib/components/Breadcrumbs.svelte";
     import EntryCard from "$lib/components/EntryCard.svelte";
-    import WeatherWidget from "$lib/components/WeatherWidget.svelte";
     import NewsWidget from "$lib/components/NewsWidget.svelte";
     import EventsWidget from "$lib/components/EventsWidget.svelte";
     import { apiFetch, getApiBase } from "$lib/api";
@@ -27,6 +26,7 @@
     import AttractionSuggestionDialog from "$lib/components/AttractionSuggestionDialog.svelte";
     import NoticeDialog from "$lib/components/NoticeDialog.svelte";
     import LandscapeBackdrop from "$lib/components/LandscapeBackdrop.svelte";
+    import PlaceWeatherCard from "$lib/components/PlaceWeatherCard.svelte";
     import { attractionFacts } from "$lib/attractionFacts.js";
 
     let settlementData = null;
@@ -141,6 +141,8 @@
     $: pageTitle = settlementData?.name || attractionData?.name || town;
     $: isAttraction = !!attractionData;
     $: attractionStats = attractionFacts(attractionData);
+    /** The crest URL that failed to load (then the default shield shows). */
+    let crestFailedFor = "";
     $: attractionActivities = Array.isArray(attractionData?.activities)
         ? attractionData.activities.map((item) => String(item ?? "").trim()).filter(Boolean)
         : [];
@@ -228,7 +230,7 @@
 
 {#if attractionData}
   <header class="page-header page-landscape page-landscape--action">
-    <LandscapeBackdrop />
+    <LandscapeBackdrop place={$page.params.slug} />
     <Breadcrumbs
         label={attractionData.name}
         parentLabel={attractionData.county_name}
@@ -286,13 +288,7 @@
             {/if}
         </div>
 
-        <WeatherWidget
-            settlementSlug={attractionData.latitude && attractionData.longitude ? undefined : town}
-            lat={attractionData.latitude}
-            lon={attractionData.longitude}
-            forecastSlug={attractionData.latitude && attractionData.longitude ? $page.params.slug : undefined}
-            advanced={true}
-        />
+        <PlaceWeatherCard slug={$page.params.slug} />
     </div>
 
     {#if attractionSlides.length}
@@ -445,7 +441,7 @@
     {/if}
 {:else if settlementData}
   <header class="page-header page-landscape page-landscape--action">
-    <LandscapeBackdrop />
+    <LandscapeBackdrop place={town} />
     <Breadcrumbs
         label={settlementData.name}
         settlementType={settlementData.type}
@@ -498,11 +494,14 @@
                 <h3 class="widget-title">{settlementData.name} címere</h3>
             </div>
             <div class="crest-container">
-                {#if hasCrestUrl(settlementData.crest)}
+                {#if hasCrestUrl(settlementData.crest) && crestFailedFor !== settlementData.crest}
+                    <!-- A crest the host refuses or that fails to load gives way
+                         to the default shield, never a broken image. -->
                     <img
                         src={`${getApiBase()}/api/proxy?url=${encodeURIComponent(settlementData.crest)}`}
                         alt="{settlementData.name} címere"
                         class="crest-img"
+                        on:error={() => (crestFailedFor = settlementData.crest)}
                     />
                 {:else}
                     <CrestShieldPlaceholder
@@ -512,7 +511,7 @@
             </div>
         </div>
 
-        <WeatherWidget settlementSlug={town} advanced={true} />
+        <PlaceWeatherCard slug={town} />
     </div>
 
     <EventsWidget settlementSlug={town} locationName={settlementData.name} />
@@ -760,20 +759,15 @@
         gap: 1rem;
     }
     .widgets-box--panels > :global(.widget) {
+        /* Its own stacking context, so a child with a negative z-index stays
+           above the card's background instead of vanishing behind it. */
+        isolation: isolate;
         min-width: 0;
         margin: 0;
         padding: 1.25rem;
         border: 1px solid var(--border-color);
         border-radius: 12px;
         background: var(--card-bg);
-    }
-    /* The weather card fills its cell like the others (lamsza.css pins it to
-       the top right of the plain widgets box). */
-    .widgets-box.widgets-box--panels > :global(.weather-card.simple),
-    .widgets-box.widgets-box--panels > :global(.weather-card.complex) {
-        align-self: stretch;
-        justify-self: stretch;
-        align-items: stretch;
     }
     .widgets-box--attraction {
         grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);

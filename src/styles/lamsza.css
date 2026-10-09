@@ -834,6 +834,24 @@
   opacity: 0.9;
 }
 
+/* On a settlement's or attraction's page the place's current weather takes
+   the sun's spot (LandscapeBackdrop `place`). Its slot keeps the size while
+   the forecast loads. */
+.page-landscape__weather {
+  position: absolute;
+  z-index: -1;
+  top: 1.25rem;
+  right: 6%;
+  width: clamp(5rem, 14vw, 9.5rem);
+  aspect-ratio: 1;
+}
+
+.page-landscape__weather svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .page-landscape__sun::after {
   content: "";
   position: absolute;
@@ -868,6 +886,7 @@
 
 /* A page with a button at the right of its title (the ♡ on settlement and
    attraction pages): the sun sits left of it. */
+.page-landscape--action .page-landscape__weather,
 .page-landscape--action .page-landscape__sun {
   right: calc(6% + 4.5rem);
 }
@@ -881,9 +900,18 @@
     padding-bottom: 5.5rem;
   }
 
-  /* No room beside a full-width title: the ridges alone. */
+  /* No room beside a full-width title: the ridges alone, or the place's
+     weather small, above the ridges where no text runs. */
   .page-landscape__sun {
     display: none;
+  }
+
+  .page-landscape__weather,
+  .page-landscape--action .page-landscape__weather {
+    top: auto;
+    bottom: 4.6rem;
+    right: 0.25rem;
+    width: 3.75rem;
   }
 
   .page-landscape__ridge {
