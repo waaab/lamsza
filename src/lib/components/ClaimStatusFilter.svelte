@@ -9,7 +9,7 @@
 </script>
 
 <div class="index-tags-aside__section">
-    <h5 class="index-tags-aside__heading">Állapot</h5>
+    <h3 class="aside_heading">Állapot</h3>
     {#if loading}
         <div class="index-tags-aside-skeleton__row" aria-hidden="true">
             <span class="skeleton index-tags-aside-skeleton__chip"></span>

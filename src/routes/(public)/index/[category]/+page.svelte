@@ -463,7 +463,7 @@
     <aside class="sidebar index-tags-sidebar" aria-label="Címkék">
         <div class="sidebar-box">
             <div class="sidebar-header">
-                <h4 class="sidebar-heading">Szolgáltatások</h4>
+                <h2 class="aside_heading">Szolgáltatások</h2>
             </div>
             {#if error}
                 <p class="index-tags-aside__empty">Nem sikerült betölteni a címkéket.</p>

@@ -40,7 +40,7 @@
         {loading}
     />
     <div class="index-tags-aside__section">
-        <h5 class="index-tags-aside__heading">Típus</h5>
+        <h3 class="aside_heading">Típus</h3>
         {#if loading}
             <div class="index-tags-aside-skeleton__row" aria-hidden="true">
                 {#each Array(3) as _, i (i)}
@@ -67,7 +67,7 @@
         {/if}
     </div>
     <div class="index-tags-aside__section">
-        <h5 class="index-tags-aside__heading">Címkék</h5>
+        <h3 class="aside_heading">Címkék</h3>
         {#if loading}
             <div class="index-tags-aside-skeleton__row" aria-hidden="true">
                 {#each Array(6) as _, i (i)}

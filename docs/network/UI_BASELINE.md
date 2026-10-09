@@ -32,7 +32,7 @@ reference; each item names its own.
 | .info-box p padding and variants (`css-infobox`) | Lámsza's |  |
 | .search-input right padding (`css-search`) | Lámsza's |  |
 | .page-title layout (`css-page-title`) | Keep each app's own |  |
-| .sidebar-heading case (`css-sidebar-heading`) | Lámsza's |  |
+| Sidebar heading (`css-sidebar-heading`) | Lámsza's | One class, `.aside_heading` in the shared `global.css`, on every sidebar heading in every app, box titles and the headings inside a box alike: small (`--text-sm`), semi-bold, uppercase, 0.04em letter-spacing, `--text-muted` (the look of Lámsza's former `.index-tags-aside__heading`). The element follows the outline, not the look: a sidebar block's title is `h2`, a heading inside a block `h3`, so no level is skipped. Szótár's `.dict-aside` headings and Játszótér's `GameSidePanel` use it too; the `.widget-title` family (widget cards, RegionNav's "Oldal navigáció") is not a sidebar heading. Owner's decision, 2026-10-09. |
 
 ## Typography
 

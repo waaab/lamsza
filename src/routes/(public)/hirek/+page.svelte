@@ -554,7 +554,7 @@
     <aside class="sidebar">
         <div class="sidebar-box">
             <div class="sidebar-header">
-                <h4 class="sidebar-heading">Erdélyi hírforrások</h4>
+                <h2 class="aside_heading">Erdélyi hírforrások</h2>
                 <button
                     class="sidebar-toggle-btn"
                     class:open={sourcesOpen}

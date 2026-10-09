@@ -641,7 +641,7 @@
 
                 {#if showPlaceLinks}
                     <div class="index-tags-aside__section">
-                        <h5 class="index-tags-aside__heading">Helyszín</h5>
+                        <h2 class="aside_heading">Helyszín</h2>
                         <ul class="index-tag-cloud">
                             {#if countyHref && countyName !== EMPTY_PLACEHOLDER}
                                 <li class="index-tag-cloud__li">
@@ -662,7 +662,7 @@
                 {/if}
 
                 <div class="index-tags-aside__section">
-                    <h5 class="index-tags-aside__heading">Címkék</h5>
+                    <h2 class="aside_heading">Címkék</h2>
                     {#if tagLabels.length}
                         <ul class="index-tag-cloud">
                             {#each tagLabels as label (label)}

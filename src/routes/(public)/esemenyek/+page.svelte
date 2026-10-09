@@ -1369,19 +1369,19 @@
         <div class="sidebar-box events-sidebar-months-box">
             <div class="sidebar-header events-calendar-header">
                 {#if sidebarCalendarMode === "month" && drillMonthYM}
-                    <h4 class="sidebar-heading">
+                    <h2 class="aside_heading">
                         {drillMonthTitleShort(drillMonthYM)}
-                    </h4>
+                    </h2>
                     {#if drillYearMonth}
                             <span class="events-calendar-year-static">{drillYearMonth.y}</span>
                         {/if}
                 {:else}
-                    <h4
-                        class="sidebar-heading"
+                    <h2
+                        class="aside_heading"
                         title="A Naptár nézet: Olyan hónapok, amelyekben van közelgő esemény. Válassz hónapot a napok megjelenítéséhez."
                     >
                         Naptár nézet
-                    </h4>
+                    </h2>
                     {#if yearsWithEvents.length > 1}
                         <div class="events-calendar-year-nav" aria-label="Év választása">
                             <button

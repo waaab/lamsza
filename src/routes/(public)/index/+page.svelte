@@ -754,7 +754,7 @@
         <aside class="sidebar index-tags-sidebar" aria-label={kind === "websites" ? "Weboldalak" : "Szolgáltatások"}>
             <div class="sidebar-box">
                 <div class="sidebar-header">
-                    <h4 class="sidebar-heading">{kind === "websites" ? "Weboldalak" : "Szolgáltatások"}</h4>
+                    <h2 class="aside_heading">{kind === "websites" ? "Weboldalak" : "Szolgáltatások"}</h2>
                 </div>
                 {#if kind === "websites"}
                     <ClaimStatusFilter

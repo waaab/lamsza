@@ -567,15 +567,6 @@
   margin-bottom: 0;
 }
 
-.index-tags-aside__heading {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  margin: 0 0 0.5rem;
-}
-
 .index-tag-cloud {
   display: flex;
   flex-wrap: wrap;
@@ -604,21 +595,10 @@
   border: 1px dashed var(--border-color);
 }
 
-.sidebar-heading {
-  margin: 0 0 1rem;
-  font-size: var(--text-base);
-  font-weight: 600;
-  text-transform: capitalize;
-}
-
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: 0;
-}
-
-.sidebar-header .sidebar-heading {
   margin: 0;
 }
 
