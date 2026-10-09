@@ -56,7 +56,8 @@
       "src/lib/components/Hero.svelte",
       "src/lib/games/catalog.js",
       "src/lib/games/GameIcon.svelte",
-      "src/lib/games/GameCard.svelte"
+      "src/lib/games/GameCard.svelte",
+      "src/lib/games/GameScene.svelte"
     ],
     "lamsza-jatszoter": [
       "src/lib/icons/AppIcon.svelte",
@@ -81,7 +82,8 @@
       "src/lib/components/Hero.svelte",
       "src/lib/games/catalog.js",
       "src/lib/games/GameIcon.svelte",
-      "src/lib/games/GameCard.svelte"
+      "src/lib/games/GameCard.svelte",
+      "src/lib/games/GameScene.svelte"
     ]
   },
   "modules": {
@@ -126,6 +128,7 @@
     "src/lib/components/Hero.svelte": "sha256:fc464f9b8aa0fd3578e16da84c4a8aeb8577d49fe9592841fb6e30e68b671a57",
     "src/lib/games/catalog.js": "sha256:bcfe005d75ef7c0a7b16f88a25edc16844c5fb54acf102f3be09041ddf73203a",
     "src/lib/games/GameIcon.svelte": "sha256:1f699e30db353a420d05228968cf7e08ce8a9f3ec9312acc8c72f91d8f6b04d6",
-    "src/lib/games/GameCard.svelte": "sha256:2efa07d40ef260b3e72333eb80486a50561459b07b5000c64d677c716439615b"
+    "src/lib/games/GameCard.svelte": "sha256:225bea81d68e908708082cb967cf04c4b24e93a31f4ec913eb2ba6dd1e1a0a43",
+    "src/lib/games/GameScene.svelte": "sha256:e7da41b31304af115d1b8bbf663d418963e5edc47b1acf9a8577dcccecc483e5"
   }
 }

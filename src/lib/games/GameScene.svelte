@@ -10,8 +10,8 @@
 	When the visitor prefers reduced motion the finished scene simply stands.
 	GameCard keeps it still until the card is hovered or focused; the game
 	page's starter (Játszótér's GameShell) lets it loop. Shared from lamsza
-	to Játszótér and Szótár. The static GameIcon stays for small places
-	(menus).
+	to Játszótér and Szótár. The static GameIcon is no longer drawn; it is
+	kept until its drawings move to AppIcon (OPEN_ITEMS).
 -->
 <script>
 	let { slug, size = 160 } = $props();
