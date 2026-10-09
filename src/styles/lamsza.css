@@ -992,3 +992,12 @@
     transition: none;
   }
 }
+
+/* The page area is at least a screen tall, so the footer always starts below
+   the fold: the FAQ and Megjegyzés block arrives after the page and would
+   otherwise push a footer that is already on screen (UI_BASELINE
+   "ld-reserve-space"). On a short page the footer sits under the screen's
+   bottom edge. */
+main.container {
+  min-height: 100vh;
+}

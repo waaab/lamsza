@@ -40,6 +40,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - `scripts/tests/sync-shared-frontend.test.sh`, the sync script's own test.
 
 ### Changed
+- The page area is at least a screen tall, so the footer always starts below the fold and the late FAQ / Megjegyzés block no longer pushes a visible footer (layout shift about 0.02 to 0 on short pages). [public]
 - Settlement and attraction pages in the redesign's look (UI_BASELINE `szf-pages`): the landscape header with the ♡ button, the overview, coat of arms and weather as cards, places as chips. An attraction shows its elevation, area and depth as tiles when set, its activities and prohibitions as ✓ and ✕ chips, and its description once (no longer repeated under the photos). The sun and ridges are now `LandscapeBackdrop`, shared by `PageHeader`. [public]
 - Székek, Megyék, Városok and Falvak in the redesign's look (UI_BASELINE `szf-pages`): a landscape header (sun, mountain ridges), a honeycomb map of the seats and counties beside navigation cards, town tiles with their type, village tiles with county filter chips (`/falvak?megye=hargita`). Placeholder tiles hold the lists while they load. `PageHeader` gains `landscape`; its other pages are pixel-identical. [public]
 - Shared `Hero.svelte`: `joined` puts the red accent inside one word ("Játszó**tér**"), with no gap. UI_BASELINE `home-jatszoter`.
