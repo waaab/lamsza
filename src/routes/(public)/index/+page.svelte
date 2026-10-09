@@ -497,6 +497,14 @@
 
         <div class="view-mode-toggle">
             <div class="index-location">
+                <span
+                    class="btn-tip"
+                    title={kind === "websites"
+                        ? "A weboldalak település szerint még nem szűrhetők."
+                        : selectedPlace
+                          ? selectedPlace.name
+                          : "Település"}
+                >
                 <button
                     type="button"
                     class="btn btn-sm"
@@ -504,11 +512,6 @@
                     disabled={kind === "websites"}
                     aria-expanded={kind !== "websites" && locationMenuKey === `${kind}:${bar}`}
                     aria-haspopup={kind === "websites" ? undefined : "listbox"}
-                    title={kind === "websites"
-                        ? "A weboldalak település szerint még nem szűrhetők."
-                        : selectedPlace
-                          ? selectedPlace.name
-                          : "Település"}
                     on:click={() => toggleLocationMenu(`${kind}:${bar}`)}
                 >
                     <svg
@@ -530,6 +533,7 @@
                     >
                     <span>{kind !== "websites" && selectedPlace ? selectedPlace.name : "Település"}</span>
                 </button>
+                </span>
                 {#if kind !== "websites" && locationMenuKey === `${kind}:${bar}`}
                     <ul class="index-location-menu" role="listbox">
                         {#if preferredLocation}
