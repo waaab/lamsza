@@ -84,9 +84,9 @@ ON CONFLICT (slug) DO NOTHING`)
 	for _, st := range seedSub {
 		if _, e := db.DB.Exec(`
 			INSERT INTO catalog_event_subtypes (event_type_id, slug, label_hu, sort_order)
-			SELECT t.id, $2, $3, $4::int FROM catalog_event_types t
-			WHERE t.slug = $1
-			  AND NOT EXISTS (SELECT 1 FROM catalog_event_subtypes s WHERE s.event_type_id = t.id AND s.slug = $2)
+			SELECT t.id, $2::text, $3::text, $4::int FROM catalog_event_types t
+			WHERE t.slug = $1::text
+			  AND NOT EXISTS (SELECT 1 FROM catalog_event_subtypes s WHERE s.event_type_id = t.id AND s.slug = $2::text)
 			ON CONFLICT (event_type_id, slug) DO NOTHING`,
 			st.typeSlug, st.slug, st.label, st.order); e != nil {
 			log.Printf("events.Migrate (seed subtype): %v", e)

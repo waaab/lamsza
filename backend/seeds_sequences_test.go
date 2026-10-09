@@ -52,6 +52,24 @@ func TestBootSeedsDoNotBurnSequences(t *testing.T) {
 		return out
 	}
 
+	// A missing seed row is put back (a seed that fails silently, as a
+	// mistyped query would, must not pass this test).
+	seed()
+	for _, del := range []struct{ table, where string }{
+		{"pages", "slug = 'terkep'"},
+		{"page_faq_sections", "section_key = 'terkep'"},
+		{"catalog_event_subtypes", "slug = 'charity'"},
+	} {
+		if _, err := db.DB.Exec(`DELETE FROM ` + del.table + ` WHERE ` + del.where); err != nil {
+			t.Fatalf("remove a %s seed row: %v", del.table, err)
+		}
+		seed()
+		var n int
+		if err := db.DB.QueryRow(`SELECT COUNT(*) FROM ` + del.table + ` WHERE ` + del.where).Scan(&n); err != nil || n != 1 {
+			t.Fatalf("%s: the seed did not put back the row %s (%d, %v)", del.table, del.where, n, err)
+		}
+	}
+
 	seed() // the first boot may insert what is missing
 	before := read()
 	seed() // a second boot finds everything in place

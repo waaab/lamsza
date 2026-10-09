@@ -55,7 +55,7 @@ func MigratePages() {
 			// Inserted only when missing: ON CONFLICT alone would take a
 			// sequence value on every boot for a row that already exists.
 			`INSERT INTO pages (slug, title, greeting)
-			 SELECT $1, $2, $3 WHERE NOT EXISTS (SELECT 1 FROM pages WHERE slug = $1)
+			 SELECT $1::text, $2::text, $3::text WHERE NOT EXISTS (SELECT 1 FROM pages WHERE slug = $1::text)
 			 ON CONFLICT (slug) DO NOTHING`,
 			s.slug, s.title, s.greeting,
 		)
