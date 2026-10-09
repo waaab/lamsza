@@ -90,8 +90,12 @@ does not go through SvelteKit. Take the exact value from a built page:
 grep -o 'content-security-policy" content="[^"]*"' /var/www/lamsza/public/index.html
 ```
 
-The admin, Szótár and Játszótér sites have no policy of their own yet; until they do, a header in
-their server blocks is the only cover they get.
+The admin, Szótár and Játszótér sites ship their own policies the same way (`kit.csp` in each
+frontend's `svelte.config.js`, a `meta` tag in every built page, the SPA fallback `app.html`
+included); Szótár's and Játszótér's since 2026-10-09. Beyond Lámsza's, they allow Google Fonts
+(the rovás font), and Szótár `media-src https://storage.googleapis.com` for its recordings. The
+same response-header to-do applies to their server blocks, with the value taken from each
+site's built `app.html`.
 
 ### Server Token Masking
 

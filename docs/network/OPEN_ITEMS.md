@@ -96,6 +96,12 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
   (Ubuntu 24.04), as a planned task with a backup (snapshot) and a rollback
   path, ideally together with the Node upgrade.
 
+- **[szotar] owner: three word videos are missing from the bucket.** `parapács`
+  (`video22.mp4`), `bidon` (`bidon.mp4`) and `buba` (`csecsmo.mp4`) point at
+  `storage.googleapis.com/lamsza_public_bucket/bg/video/`, which answers 404 for
+  all three (checked 2026-10-09). Upload the files or clear the words' video field
+  in admin `/dictionary`.
+
 ## Decisions
 
 - **[lamsza] owner: review branch `review/bog-32-seo-consent`** (pushed to origin
@@ -111,8 +117,6 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
 - **[jatszoter] owner: Szókereső has had one published puzzle (2026-09-28).**
   Its daily has been empty since; puzzles are published by hand in the
   admin app's `/games#szokereso`.
-- **[jatszoter] `DifficultyPicker.svelte` is unused.** Wire it into the game
-  shell or delete it.
 - **[network] owner: GA4 analytics, not started; nothing is implemented.**
   Order: first review `review/bog-32-seo-consent` (above), because GA4 may load
   only after cookie consent and that branch holds the consent work. Then decide:
@@ -136,48 +140,20 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
   (`https://szotar.lamsza.com/api/proverbs?date=`), for example with
   `host_permissions` for Szótár in `manifest.json`; Lámsza has no mondás
   endpoint once the item above is done.
-- **[admin] [szotar] [jatszoter] server timeouts.** lamsza got read, write and
-  idle timeouts (BOG-18); the other three backends still use a bare
-  `http.ListenAndServe`.
-- **[admin] CI runs no Postgres.** Admin's workflow has no `postgres:16` service,
-  so its DB-bound tests (about 44) skip in CI and run only locally
-  (`npm run test:backend`). lamsza, szotar and jatszoter run theirs in CI.
-- **[lamsza] [admin] test the `site_settings` contract.** Admin writes the
-  `weather_provider_*` and `social_*_url` keys that lamsza reads; no test pins
-  the key names on either side.
 - **[admin] Type-check errors, to work through gradually.** `npx svelte-check`
-  in `frontend/` reports 793 errors in 34 files (2026-10-07). They predate the
-  verification fixes: 786 were there before, and the 7 that the shared
-  `tests/noEmdash.test.js` adds are the same kind as the rest of the test files
-  (no Node type definitions, so `node:` imports do not resolve). Most are in
-  `src/routes/+page.svelte` (about 630). Start with the cheap, wide fix (Node
-  types for the tests), then the page; do not let the count grow.
-- **[lamsza] Catalog seeds burn sequence numbers on every backend start.** The
-  boot-time seeds insert with `ON CONFLICT DO NOTHING`, which takes a sequence
-  value even when the row already exists, so each start of the lamsza backend
-  moves `pages`, `page_faq_sections`, `historical_seats`,
-  `catalog_event_types`/`_subtypes`, `settlement_location_types` and `websites`
-  ahead (16, 16, 5, 5/16, 5 and 1 on 2026-10-07) with no row change. Seeds in
-  `internal/pages/pages.go`, `internal/pagefaq/pagefaq.go`,
-  `internal/events/migrate.go`, `internal/handlers/settlement_location_types.go`,
-  `internal/account/websites_migrate.go` and `internal/db/seed_historical_seats.go`. Make them
-  not burn IDs (insert only `WHERE NOT EXISTS`, or seed once from
-  `backend/schema/002_reference.sql`), with a test that a second boot leaves the
-  sequences where they were.
+  in `frontend/` reports 731 errors (2026-10-09), down from 787 once `@types/node`
+  made the test files' `node:` imports resolve. About 600 are in
+  `src/routes/+page.svelte`; 15 are small type slips in the test files that the
+  import errors used to hide. Work through them with JSDoc types only (no logic
+  changes), checked by the admin tests and screenshots of every tab, and do not
+  let the count grow.
 - **[szotar] Word and mondás links** (moved from `lamsza-szotar/docs/tasks.md`).
   The word page shows Példamondat and "Székely mondás ezzel a szóval" per sense,
   and the first sense lists mondások whose text mentions the headword (a text
   search on `/api/proverbs`). Still missing: explicit word↔mondás links stored
   in the data, and navigation both ways (from a word in a mondás to its entry).
-- **[szotar] [jatszoter] Content-Security-Policy.** lamsza and admin send one;
-  szotar and jatszoter do not.
-- **[jatszoter] archive before the first puzzle** answers "Játék hiba." instead
-  of "no puzzle for that day".
 - **[jatszoter] Szórejtő plan Task 13, step 5** (share copy to the clipboard)
   needs a browser check.
-- **[lamsza] Test claim and membership decisions** (planned in
-  `docs/superpowers/plans/2026-09-27-listing-claim-membership.md`, never
-  written): the `claim_pending` 409 and member accept/deny have no test.
 - **[network] Consider least-privilege CI tokens.** Switch the repos' default
   workflow permissions to read-only and grant `issues: write` only to the
   `ci-status` job in the workflow YAML, then prove the "CI is red on main"
@@ -236,13 +212,6 @@ follows `UI_BASELINE.md` when it is done.
   Kijelentkezés and Beállítások are cut off on phones, tablets and small
   laptops; with the apps launcher the signed-in limit is 1280px. Owner,
   2026-10-08: keep it as it is for now; the toolbar changes before go-live.
-- **[szotar] The Mondások page follows the default page layout.** Align
-  `/mondasok` with the network's standard structure (title, lead line, main
-  area with content and sidebar), the same way the other Szótár list pages
-  and Lámsza's list pages are built. Today it is inside `SidebarLayout` but
-  has only a title: no lead line under it, and `page-lead` is used for the
-  "Elérted a lista végét." line at the bottom instead.
-
 ## Feature ideas
 
 Ideas the owner wants kept, not scheduled. Each needs a plan before any work.
