@@ -125,19 +125,8 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
 
 ## Work
 
-- **[network] Weather section `/idojaras` (branch `weather-section` in lamsza).**
-  Owner's decisions, 2026-10-09: a section inside lamsza, not a new app; only
-  sources free for commercial use (MET Norway, then WeatherAPI.com and
-  OpenWeatherMap; Open-Meteo dropped); archive from launch; animated SVGs for
-  every weather element. Done on branches, not merged: lamsza `weather-section`
-  (backend, icons accepted by the owner, `/idojaras` pages, widgets) and
-  lamsza-admin `weather-settings` (settlement coordinates saved on edit, MET
-  Norway provider switches). Still to do: merge (lamsza first, R3) once the
-  main checkouts' uncommitted hero/PageHeader work is committed, rename
-  `PublicPageHero` to `PageHeader` in the four new `/idojaras` pages if that
-  rename lands first, then a browser check on the running network.
 - **[lamsza] owner: enter coordinates for the 27 settlements** in the admin
-  app's settlement form ("46.3593, 25.8017"), once `weather-settings` is merged. Until then the weather worker finds each settlement by name
+  app's settlement form ("46.3593, 25.8017"). Until then the weather worker finds each settlement by name
   (OpenWeatherMap's geocoder), which can land a village on a namesake.
 
 - **[lamsza] The browser extension (`extension/`, git-ignored, built by
@@ -180,9 +169,6 @@ Last updated: 2026-10-09 (weather section; Tájszórejtvény content and follow-
   and the first sense lists mondások whose text mentions the headword (a text
   search on `/api/proverbs`). Still missing: explicit word↔mondás links stored
   in the data, and navigation both ways (from a word in a mondás to its entry).
-- **[lamsza] two orphan images** in `backend/data/entry-images/`
-  (`990e305eead49770.png`, `verify-manifesto.png`, 2026-09-22): untracked and
-  referenced by no row. Delete them or find their owner.
 - **[szotar] [jatszoter] Content-Security-Policy.** lamsza and admin send one;
   szotar and jatszoter do not.
 - **[jatszoter] archive before the first puzzle** answers "Játék hiba." instead
@@ -245,10 +231,6 @@ go-live checklist is at the end of the plan). These are the agreed tasks outside
 UI changes the owner has asked for but not scheduled yet. Not implemented; each
 follows `UI_BASELINE.md` when it is done.
 
-- **[szotar] The letter above the headword.** The word page shows the entry's
-  first letter ("cs") as a small link above the headword. The 2026-10-05
-  word-entry-polish plan says to remove it; it was never done. Owner,
-  2026-10-08: remove it (on hold until the owner schedules it).
 - **[lamsza] The toolbar does not fit between 391 and about 1225 px.** The
   labels hide only at 768px and below and the row never wraps, so Fiók,
   Kijelentkezés and Beállítások are cut off on phones, tablets and small
@@ -265,6 +247,10 @@ follows `UI_BASELINE.md` when it is done.
 
 Ideas the owner wants kept, not scheduled. Each needs a plan before any work.
 
+- **[lamsza] Erdélyi Hírek redesign** (the owner's design artifact
+  ESGiDrAtMHEyqYYXRzxANz). Deferred by the owner on 2026-10-09 after the other
+  redesign phases (home pages, Székelyföld pages) shipped. Its regions, topics,
+  read counts and story clustering need backend work first.
 - **[network] Single sign-on across *.lamsza.com.** Today each app has its own Google OAuth client and its own
   sign-in; users are matched across apps by Google ID, Lámsza's display name is copied over the internal
   account API, and each app stores its own theme (UI_BASELINE `acc-page`, `set-theme-store`). One sign-in for
