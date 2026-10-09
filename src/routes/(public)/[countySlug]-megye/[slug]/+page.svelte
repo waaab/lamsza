@@ -26,6 +26,8 @@
     import { kindLabel } from "$lib/venueKindLabels.js";
     import AttractionSuggestionDialog from "$lib/components/AttractionSuggestionDialog.svelte";
     import NoticeDialog from "$lib/components/NoticeDialog.svelte";
+    import LandscapeBackdrop from "$lib/components/LandscapeBackdrop.svelte";
+    import { attractionFacts } from "$lib/attractionFacts.js";
 
     let settlementData = null;
     let attractionData = null;
@@ -138,6 +140,7 @@
 
     $: pageTitle = settlementData?.name || attractionData?.name || town;
     $: isAttraction = !!attractionData;
+    $: attractionStats = attractionFacts(attractionData);
     $: attractionActivities = Array.isArray(attractionData?.activities)
         ? attractionData.activities.map((item) => String(item ?? "").trim()).filter(Boolean)
         : [];
@@ -224,6 +227,8 @@
 </svelte:head>
 
 {#if attractionData}
+  <header class="page-header page-landscape page-landscape--action">
+    <LandscapeBackdrop />
     <Breadcrumbs
         label={attractionData.name}
         parentLabel={attractionData.county_name}
@@ -253,8 +258,9 @@
             Látnivaló {attractionData.county_name} megyében.
         {/if}
     </h2>
+  </header>
 
-    <div class="widgets-box widgets-box--attraction">
+    <div class="widgets-box widgets-box--panels widgets-box--attraction">
         <div id="attekintes" class="widget">
             <div class="widget-header">
                 <h3 class="widget-title">Áttekintés</h3>
@@ -271,6 +277,13 @@
                 {/if}
                 <span>Megye: <span><a href="/{$page.params.countySlug}-megye" class="parent-city-link">{attractionData.county_name}</a></span></span>
             </div>
+            {#if attractionStats.length}
+                <dl class="attraction-stats">
+                    {#each attractionStats as f (f.key)}
+                        <div class="attraction-stat"><dt>{f.label}</dt><dd>{f.value}</dd></div>
+                    {/each}
+                </dl>
+            {/if}
         </div>
 
         <WeatherWidget
@@ -292,10 +305,6 @@
         </section>
     {/if}
 
-    {#if attractionData.description}
-        <p class="attraction-desc">{attractionData.description}</p>
-    {/if}
-
     {#if attractionData.content}
         <div class="attraction-content">
             <Markdown source={attractionData.content} />
@@ -313,9 +322,9 @@
                 {#if attractionActivities.length === 0}
                     <span class="info-box"><p>Még nincs megadott tevékenység.</p></span>
                 {:else}
-                    <ul class="attraction-activity-list">
+                    <ul class="place-chips">
                         {#each attractionActivities as activity}
-                            <li>{activity}</li>
+                            <li><span class="place-chip place-chip--ok"><svg class="place-chip__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" /></svg>{activity}</span></li>
                         {/each}
                     </ul>
                 {/if}
@@ -334,9 +343,9 @@
                 {#if attractionProhibitions.length === 0}
                     <span class="info-box"><p>Még nincs megadva, mit nem szabad.</p></span>
                 {:else}
-                    <ul class="attraction-activity-list">
+                    <ul class="place-chips">
                         {#each attractionProhibitions as item}
-                            <li>{item}</li>
+                            <li><span class="place-chip place-chip--no"><svg class="place-chip__mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>{item}</span></li>
                         {/each}
                     </ul>
                 {/if}
@@ -360,13 +369,10 @@
                 {#if nearbyAttractions.length === 0}
                     <span class="info-box"><p>Nincs más látnivaló a közelben vagy a megyében.</p></span>
                 {:else}
-                    <ul class="attraction-activity-list">
+                    <ul class="place-chips">
                         {#each nearbyAttractions as att (att.id)}
                             <li>
-                                <a href="/{att.county_slug}-megye/{att.slug}">{att.name}</a>
-                                {#if att.county_slug !== $page.params.countySlug}
-                                    <span class="type-label">&nbsp;·&nbsp;{att.county_name}</span>
-                                {/if}
+                                <a class="btn btn-sm place-chip" href="/{att.county_slug}-megye/{att.slug}">{att.name}{#if att.county_slug !== $page.params.countySlug}<span class="place-chip__sub">&nbsp;·&nbsp;{att.county_name}</span>{/if}</a>
                             </li>
                         {/each}
                     </ul>
@@ -438,6 +444,8 @@
         <NoticeDialog onClose={() => (suggestionSent = false)} />
     {/if}
 {:else if settlementData}
+  <header class="page-header page-landscape page-landscape--action">
+    <LandscapeBackdrop />
     <Breadcrumbs
         label={settlementData.name}
         settlementType={settlementData.type}
@@ -465,8 +473,9 @@
     <p class="greeting">
         Helyi események, hírek, időjárás és címtár {settlementData.name} területén.
     </p>
+  </header>
 
-    <div class="widgets-box">
+    <div class="widgets-box widgets-box--panels">
         <div id="attekintes" class="widget">
             <div class="widget-header">
                 <h3 class="widget-title">Áttekintés</h3>
@@ -548,16 +557,11 @@
             <h2 class="aside-title">
                 Látnivalók {settlementData.county} megyében
             </h2>
-            <div class="settlements-grid">
+            <ul class="place-chips">
                 {#each countyAttractions as att (att.id)}
-                    <a
-                        href="/{$page.params.countySlug}-megye/{att.slug}"
-                        class="card sm settlement"
-                    >
-                        {att.name}
-                    </a>
+                    <li><a class="btn btn-sm place-chip" href="/{$page.params.countySlug}-megye/{att.slug}">{att.name}</a></li>
                 {/each}
-            </div>
+            </ul>
         </section>
     {/if}
 
@@ -750,8 +754,96 @@
         gap: 2rem;
         margin-bottom: 2rem;
     }
-    .widgets-box--attraction :global(#idojaras) {
-        grid-column: 3;
+    /* The overview, coat of arms and weather as cards (UI_BASELINE "szf-pages");
+       an attraction has two: overview and weather. */
+    .widgets-box--panels {
+        gap: 1rem;
+    }
+    .widgets-box--panels > :global(.widget) {
+        min-width: 0;
+        margin: 0;
+        padding: 1.25rem;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        background: var(--card-bg);
+    }
+    /* The weather card fills its cell like the others (lamsza.css pins it to
+       the top right of the plain widgets box). */
+    .widgets-box.widgets-box--panels > :global(.weather-card.simple),
+    .widgets-box.widgets-box--panels > :global(.weather-card.complex) {
+        align-self: stretch;
+        justify-self: stretch;
+        align-items: stretch;
+    }
+    .widgets-box--attraction {
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    }
+    .attraction-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+        gap: 0.6rem;
+        margin: 1.1rem 0 0;
+    }
+    .attraction-stat {
+        display: flex;
+        flex-direction: column-reverse;
+        padding: 0.7rem 0.8rem;
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+    }
+    .attraction-stat dd {
+        margin: 0;
+        font-size: var(--text-xl);
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--szekely-red);
+        white-space: nowrap;
+    }
+    .attraction-stat dt {
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+    }
+    /* Activities (✓), prohibitions (✕) and places as chips. */
+    .place-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .place-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        text-decoration: none;
+    }
+    span.place-chip {
+        padding: 0.4rem 0.9rem;
+        border: 1px solid currentColor;
+        border-radius: 999px;
+        font-size: var(--text-sm);
+        font-weight: 600;
+    }
+    .place-chip--ok {
+        color: var(--szekely-green);
+    }
+    .place-chip--no {
+        color: var(--szekely-red);
+    }
+    .place-chip__mark {
+        flex: none;
+        width: 1rem;
+        height: 1rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+    .place-chip__sub {
+        font-weight: 400;
+        color: var(--text-muted);
     }
     :global(.news-widget),
     :global(.event-widget) {
@@ -761,8 +853,8 @@
         .widgets-box {
             grid-template-columns: 1fr;
         }
-        .widgets-box--attraction :global(#idojaras) {
-            grid-column: auto;
+        .widgets-box--attraction {
+            grid-template-columns: 1fr;
         }
         :global(.news-widget),
         :global(.event-widget) {
@@ -788,16 +880,8 @@
     .attraction-photos {
         margin: 1.5rem 0 1rem;
     }
-    .attraction-desc {
-        margin: 1rem 0;
-        color: var(--text-faint);
-    }
     .attraction-content {
         margin: 1.5rem 0;
-    }
-    .attraction-activity-list {
-        margin: 0;
-        padding-left: 1.2rem;
     }
     .attraction-contributors-lead {
         margin: 0 0 0.75rem;

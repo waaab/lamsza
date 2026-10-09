@@ -866,6 +866,16 @@
   fill: var(--ridge-near);
 }
 
+/* A page with a button at the right of its title (the ♡ on settlement and
+   attraction pages): the sun sits left of it. */
+.page-landscape--action .page-landscape__sun {
+  right: calc(6% + 4.5rem);
+}
+
+.page-landscape--action .page-title {
+  max-width: none;
+}
+
 @media (max-width: 560px) {
   .page-header.page-landscape {
     padding-bottom: 5.5rem;
