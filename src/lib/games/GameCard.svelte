@@ -1,18 +1,18 @@
 <script>
-	import GameIcon from '$lib/games/GameIcon.svelte';
+	import GameScene from '$lib/games/GameScene.svelte';
 	import { gameBySlug } from '$lib/games/catalog.js';
 
 	/**
 	 * A game's card, the same everywhere (UI_BASELINE "game-look"): the
 	 * game's colour and icon, its name and line. Shared from lamsza to
 	 * Játszótér and Szótár, so Lámsza's home, Szótár's home and Játszótér's
-	 * lists draw one card. On hover or focus the icon hops and grows and a
-	 * round play button appears; the card itself stays put (owner,
-	 * 2026-10-09). Still when the visitor prefers reduced motion.
+	 * lists draw one card. Its art is the game's animated scene (GameScene,
+	 * after words.com's thumbnails; owner, 2026-10-09): only the scene moves,
+	 * the card never does. On hover or focus a round play button fades in.
 	 *
 	 * `href`: where it leads; Játszótér's own game page by default, the
 	 * caller passes Játszótér's full address from the other apps.
-	 * `featured`: Játszótér's home page's first game, a larger icon (the page
+	 * `featured`: Játszótér's home page's first game, a larger scene (the page
 	 * makes it two columns wide).
 	 *
 	 * @type {{ slug: string, title_hu: string, description_hu: string, featured?: boolean, href?: string }}
@@ -25,7 +25,7 @@
 
 <a href={link} class="game-poster" class:game-poster--featured={featured} style:--game-color={color}>
 	<span class="game-poster-art">
-		<span class="game-poster-icon"><GameIcon {slug} size={featured ? 96 : 72} /></span>
+		<span class="game-poster-scene"><GameScene {slug} size={featured ? 210 : 160} /></span>
 		<span class="game-poster-play" aria-hidden="true">
 			<svg viewBox="0 0 24 24" width="16" height="16"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
 		</span>
@@ -52,33 +52,13 @@
 		color: #fff;
 	}
 
-	.game-poster-icon {
+	.game-poster-scene {
 		display: grid;
 		place-items: center;
+		width: 100%;
+		padding: 0 0.75rem;
+		box-sizing: border-box;
 		line-height: 0;
-		transition: transform 0.25s ease;
-	}
-
-	/* Hover or focus: the icon hops, settles a little larger, and a round
-	   play button appears. The card does not move. */
-	.game-poster:hover .game-poster-icon,
-	.game-poster:focus-visible .game-poster-icon {
-		animation: game-icon-hop 0.55s cubic-bezier(0.3, 0.7, 0.4, 1) forwards;
-	}
-
-	@keyframes game-icon-hop {
-		0% {
-			transform: translateY(0) scale(1) rotate(0deg);
-		}
-		40% {
-			transform: translateY(-8px) scale(1.14) rotate(-6deg);
-		}
-		70% {
-			transform: translateY(0) scale(1.08) rotate(3deg);
-		}
-		100% {
-			transform: translateY(0) scale(1.1) rotate(0deg);
-		}
 	}
 
 	.game-poster-play {
@@ -93,14 +73,12 @@
 		background: rgba(255, 255, 255, 0.92);
 		color: #222;
 		opacity: 0;
-		transform: translateY(8px);
-		transition: opacity 0.2s ease, transform 0.2s ease;
+		transition: opacity 0.2s ease;
 	}
 
 	.game-poster:hover .game-poster-play,
 	.game-poster:focus-visible .game-poster-play {
 		opacity: 1;
-		transform: none;
 	}
 
 	.game-poster-name {
@@ -122,11 +100,6 @@
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.game-poster:hover .game-poster-icon,
-		.game-poster:focus-visible .game-poster-icon {
-			animation: none;
-		}
-
 		.game-poster-play {
 			transition: none;
 		}
