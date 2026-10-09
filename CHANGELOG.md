@@ -91,6 +91,7 @@ the footer version read (WAYS_OF_WORKING R17).
 - Open-Meteo as a weather source: its free API is for non-commercial use only, and the network will carry ads. The `weather_provider_default` setting is no longer read; `weather_provider_metno_enabled` joins the two fallback switches.
 
 ### Fixed
+- News: a feed item link whose host is written twice (Székelyföld.ma's feed sends `https://szekelyfold.maszekelyfold.ma/...`) is repaired to one host, and an `http://` feed image is asked for over https, so the pages' CSP (`img-src https:`) no longer blocks it. [public]
 - A game card's line no longer changes when Játszótér's list arrives (Akasztófa and Tájszórejtvény read differently while loading): every card and game page takes a game's name and line from the shared catalog only (`featuredGames`). [public]
 - Coats of arms from Wikimedia broke (429 Too Many Requests): `/api/proxy` fetched them on every page view with an anonymous User-Agent. It now sends a User-Agent Wikimedia's policy asks for, keeps successful image answers for a day (and serves a copy up to a week old when the host refuses or fails; capped at 64 MB; feeds and errors are not cached), and lets browsers keep them for a day. A crest that still fails to load shows the default shield instead of a broken image. Tests: `TestProxy*`. [public]
 - The settlement page's weather card had lost its icon: inside the new card its `z-index: -1` put it behind the card. The cards are their own stacking context now.

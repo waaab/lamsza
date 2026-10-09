@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sort"
 	"strconv"
@@ -242,6 +243,33 @@ func extractImage(item rssItem) string {
 	return ""
 }
 
+// cleanLink repairs an item link whose host is written twice, as
+// Székelyföld.ma's feed sends it ("https://szekelyfold.maszekelyfold.ma/...",
+// 2026-10-09); any other link is left as the feed gave it.
+func cleanLink(link string) string {
+	u, err := url.Parse(strings.TrimSpace(link))
+	if err != nil || u.Host == "" {
+		return link
+	}
+	h := u.Host
+	if n := len(h); n%2 == 0 && strings.Contains(h, ".") && h[:n/2] == h[n/2:] {
+		u.Host = h[:n/2]
+		return u.String()
+	}
+	return link
+}
+
+// secureImage asks for a feed image over https: the pages' CSP allows only
+// https images ("img-src 'self' data: https:"), so an http one would be
+// blocked in the browser.
+func secureImage(src string) string {
+	src = strings.TrimSpace(src)
+	if rest, ok := strings.CutPrefix(src, "http://"); ok {
+		return "https://" + rest
+	}
+	return src
+}
+
 func fetchAndParseFeed(feed models.NewsFeed, maxItems int) []newsItem {
 	client := &http.Client{Timeout: 8 * time.Second}
 	resp, err := client.Get(feed.FeedURL)
@@ -272,11 +300,11 @@ func fetchAndParseFeed(feed models.NewsFeed, maxItems int) []newsItem {
 	for _, item := range items {
 		result = append(result, newsItem{
 			Title:   item.Title,
-			Link:    item.Link,
+			Link:    cleanLink(item.Link),
 			PubDate: parsePubDate(item.PubDate),
 			Source:  feed.Title,
 			BgColor: feed.BgColor,
-			Image:   extractImage(item),
+			Image:   secureImage(extractImage(item)),
 		})
 	}
 	return result
