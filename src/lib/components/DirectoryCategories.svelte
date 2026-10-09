@@ -23,6 +23,13 @@
         "szakmai-szolgaltatasok": "category-szakma",
     };
 
+    /**
+     * `tiles`: the home page's "Böngéssz kategóriák szerint", one tile per main
+     * category (icon and name, no subcategories), as in the owner's design.
+     * @type {{ tiles?: boolean }}
+     */
+    let { tiles = false } = $props();
+
     let catalog = $state(DIRECTORY_CATALOG);
     /** @type {Array<{ category?: string }>} */
     let entries = $state([]);
@@ -45,6 +52,24 @@
     });
 </script>
 
+{#if tiles}
+<section class="home-section directory-tiles" aria-labelledby="directory-categories-title">
+    <div class="home-section__head">
+        <h2 id="directory-categories-title" class="widget-title">Böngéssz kategóriák szerint</h2>
+        <a class="home-section__more" href="/index">Indexelünk ›</a>
+    </div>
+    <ul class="directory-tiles__grid">
+        {#each groups as group (group.slug)}
+            <li>
+                <a class="card directory-tile" href="/index/{group.slug}">
+                    <AppIcon name={CATEGORY_ICONS[group.slug] || "category-default"} size={28} />
+                    <span>{group.name}</span>
+                </a>
+            </li>
+        {/each}
+    </ul>
+</section>
+{:else}
 <section class="directory-categories" aria-labelledby="directory-categories-title">
     <h2 id="directory-categories-title" class="directory-categories__title">Index bejegyzés kategóriák</h2>
     <ul class="directory-categories__grid">
@@ -67,8 +92,48 @@
         {/each}
     </ul>
 </section>
+{/if}
 
 <style>
+    .directory-tiles__grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 1rem;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .directory-tile {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        height: 100%;
+        box-sizing: border-box;
+        font-weight: 600;
+    }
+
+    .directory-tile span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .directory-tile:hover {
+        border-color: var(--szekely-red);
+    }
+
+    @media (max-width: 900px) {
+        .directory-tiles__grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 520px) {
+        .directory-tiles__grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
     .directory-categories {
         margin: 2rem 0 1.5rem;
     }

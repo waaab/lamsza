@@ -75,7 +75,9 @@
       "src/lib/components/AccountMenu.svelte",
       "tests/accountDetails.test.js",
       "src/lib/components/ThemeSettings.svelte",
-      "src/lib/components/Hero.svelte"
+      "src/lib/components/Hero.svelte",
+      "src/lib/games/catalog.js",
+      "src/lib/games/GameIcon.svelte"
     ]
   },
   "modules": {
@@ -117,6 +119,8 @@
     "src/lib/components/AccountMenu.svelte": "sha256:7dc000204f428c57a5cd7d7c2517b669ef7c9d80c2810034099a82807757998e",
     "tests/accountDetails.test.js": "sha256:fbf528ef1bcf4a13fe535f65fe6fdb54ff2db6cb2258c1f8f3eb47c9292a91ea",
     "src/lib/components/ThemeSettings.svelte": "sha256:b89af2d56662e6aa5b671d3e15148f2dc0b860ca7516dc095992a30e42acd31b",
-    "src/lib/components/Hero.svelte": "sha256:826391f03da9894beed0198cffcc372a62df40d81f323ec4317966ca80977fe7"
+    "src/lib/components/Hero.svelte": "sha256:826391f03da9894beed0198cffcc372a62df40d81f323ec4317966ca80977fe7",
+    "src/lib/games/catalog.js": "sha256:df7d927454656ec41c9f257723478e9d809cff4a63209bb484e2822d438573dc",
+    "src/lib/games/GameIcon.svelte": "sha256:1f699e30db353a420d05228968cf7e08ce8a9f3ec9312acc8c72f91d8f6b04d6"
   }
 }

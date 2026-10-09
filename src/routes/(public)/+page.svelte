@@ -7,9 +7,12 @@
     import MondasWidget from "$lib/components/MondasWidget.svelte";
     import WeatherWidget from "$lib/components/WeatherWidget.svelte";
     import DateTimeWidget from "$lib/components/DateTimeWidget.svelte";
-    import NewsWidget from "$lib/components/NewsWidget.svelte";
     import DirectoryCategories from "$lib/components/DirectoryCategories.svelte";
-    import EventsWidget from "$lib/components/EventsWidget.svelte";
+    import HomeCategoryChips from "$lib/components/home/HomeCategoryChips.svelte";
+    import HomeDailyWord from "$lib/components/home/HomeDailyWord.svelte";
+    import HomeGames from "$lib/components/home/HomeGames.svelte";
+    import HomeNews from "$lib/components/home/HomeNews.svelte";
+    import HomeEvents from "$lib/components/home/HomeEvents.svelte";
     import Hero from "$lib/components/Hero.svelte";
     import AppIcon from "$lib/icons/AppIcon.svelte";
     import { loadPageMeta, initialPageHeader } from "$lib/loadPageMeta.js";
@@ -293,6 +296,7 @@
     <Hero title={heroTitle} greeting={pageHeaderLoading ? "…" : pageHeader.greeting} />
 
     <SearchEngine />
+    <HomeCategoryChips />
 </section>
 
 <section id="home widgets" class="widgets-columns">
@@ -391,6 +395,13 @@
                 </div>
             </div>
         </div>
+    </div>
+</section>
+
+<MondasWidget />
+
+<section class="home-section home-today" aria-label="Ma">
+    <div class="card widgets-box--three-col home-today__row">
         <DateTimeWidget />
         {#if settlementPlaces.length === 0 && attractionWeatherPlaces.length === 0}
             <div class="weather-card simple widget weather-card--pending" aria-busy="true">
@@ -423,22 +434,17 @@
         {#each attractionWeatherPlaces as place (`${place.slug}-${place.lat}-${place.lon}`)}
             <WeatherWidget lat={place.lat} lon={place.lon} forecastSlug={place.slug} />
         {/each}
+        <HomeDailyWord />
     </div>
 </section>
 
-{#if eventPlace}
-    <EventsWidget ticker={true} settlementSlug={eventPlace.slug} locationName={eventPlace.name} />
-{:else}
-    <EventsWidget ticker={true} />
-{/if}
+<HomeGames />
 
-<MondasWidget />
+<HomeNews />
 
-<section id="hirek">
-    <NewsWidget limit={10} />
-</section>
+<HomeEvents settlementSlug={eventPlace?.slug ?? null} locationName={eventPlace?.name ?? null} />
 
-<DirectoryCategories />
+<DirectoryCategories tiles />
 
 <!-- Quick Link Add/Edit Dialog -->
 {#if linkDialogOpen}

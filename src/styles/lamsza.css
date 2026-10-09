@@ -121,6 +121,42 @@
   }
 }
 
+/* Home page sections below the hero (phase 1 of the redesign): a muted
+   uppercase heading like the widgets', a "more" link on the right. */
+.home-section {
+  margin-block: 2.5rem;
+}
+
+.home-section__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.home-section__more {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.home-section__more:hover {
+  color: var(--szekely-red);
+}
+
+/* The "Ma" strip: the clock, the weather and the word of the day in one card. */
+.widgets-box--three-col.home-today__row {
+  justify-content: space-between;
+  margin-bottom: 0;
+  padding: 1.5rem 2rem;
+}
+
+.widgets-box--three-col.home-today__row > .weather-card {
+  margin-left: 0;
+}
+
 .widget{
   display: flex;
   flex-direction: column;

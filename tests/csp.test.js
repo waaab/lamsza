@@ -62,5 +62,13 @@ test("connect-src admits Szótár's API, which serves the daily mondás, and no 
     assert.ok(list, "szotarConnectOrigins is missing");
     assert.match(list[1], /'https:\/\/szotar\.lamsza\.com'/);
     assert.doesNotMatch(list[1], /\*/);
-    assert.match(svelteConfig, /'connect-src':\s*\[[^\]]*\.\.\.szotarConnectOrigins\]/);
+    assert.match(svelteConfig, /'connect-src':\s*\[[^\]]*\.\.\.szotarConnectOrigins[,\]]/);
+});
+
+test("connect-src admits Játszótér's API, which lists the home page's games, and no wildcard", () => {
+    const list = svelteConfig.match(/const jatszoterConnectOrigins = \[([\s\S]*?)\];/);
+    assert.ok(list, "jatszoterConnectOrigins is missing");
+    assert.match(list[1], /'https:\/\/jatszoter\.lamsza\.com'/);
+    assert.doesNotMatch(list[1], /\*/);
+    assert.match(svelteConfig, /'connect-src':\s*\[[^\]]*\.\.\.jatszoterConnectOrigins\]/);
 });

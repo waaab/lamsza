@@ -11,6 +11,15 @@ const szotarConnectOrigins = [
 	...(process.env.VITE_SZOTAR_ORIGIN ? [process.env.VITE_SZOTAR_ORIGIN.trim().replace(/\/+$/, '')] : [])
 ];
 
+// Játszótér's API: Lámsza's home page lists the day's games from /api/games.
+// Same rules as Szótár above (VITE_JATSZOTER_ORIGIN, local hosts outside
+// production).
+const jatszoterConnectOrigins = [
+	'https://jatszoter.lamsza.com',
+	...(process.env.NODE_ENV === 'production' ? [] : ['https://jatszoter.lamsza.test', 'http://localhost:5176']),
+	...(process.env.VITE_JATSZOTER_ORIGIN ? [process.env.VITE_JATSZOTER_ORIGIN.trim().replace(/\/+$/, '')] : [])
+];
+
 const config = {
 	kit: {
 		appDir: 'app',
@@ -53,7 +62,7 @@ const config = {
 				// avatars, so the host cannot be listed one by one.
 				'img-src': ['self', 'data:', 'https:'],
 				'font-src': ['self', 'data:'],
-				'connect-src': ['self', 'https://accounts.google.com/gsi/', ...szotarConnectOrigins],
+				'connect-src': ['self', 'https://accounts.google.com/gsi/', ...szotarConnectOrigins, ...jatszoterConnectOrigins],
 				'frame-src': ['self', 'https://accounts.google.com/gsi/'],
 				'manifest-src': ['self'],
 				'worker-src': ['self']
