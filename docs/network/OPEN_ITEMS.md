@@ -5,7 +5,7 @@ One line per item, tagged with its app. Remove an item when it is done and say
 in the commit which item it closes. Items marked **owner** are the owner's to
 do or decide; agents do not do them.
 
-Last updated: 2026-10-10 (Szótár backlog from the code overview; weather section; Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos; UI batch: one icon system, apps launcher, Szótár add-word button done; Lámsza toolbar overflow noted).
+Last updated: 2026-10-10 (Szótár backlog from the code overview; Szótár quick wins done: indexes, stable daily word, accent-insensitive search, suggestion dialog and its pending state; weather section; Tájszórejtvény content and follow-ups; verification review; GA4 item; UI backlog; R18 production security steps; admin move done; R19 time zone and the Mondások move done; lamsza-admin's default branch is `main` and `extract-admin` is deleted; least-privilege CI tokens item; Mondások page layout; reactions idea; apps launcher; Workflow permissions set in all four repos; UI batch: one icon system, apps launcher, Szótár add-word button done; Lámsza toolbar overflow noted).
 
 ## Production and accounts (owner only; agents never touch production)
 
@@ -186,15 +186,11 @@ section 7); none is urgent at today's size. Paths are in `lamsza-szotar/`.
 
 - **[szotar] Every list request loads the whole dictionary.** `Store.List`
   (`backend/internal/dict/store.go`) reads every word with per-row subqueries, and `/api/words`,
-  `/api/letters`, `/api/daily` and `/api/daily/choices` then filter it in Go; `Filter` sorts the hits
-  with an insertion sort. Push `q`, `letter`, `speech` and a `limit` into SQL, or cache the list in
-  memory and drop it on every write (all writes go through the one process). Játszótér also reads
-  `/api/words`.
+  `/api/letters`, `/api/daily` and `/api/daily/choices` then filter it in Go. Push `q`, `letter`,
+  `speech` and a `limit` into SQL, or cache the list in memory and drop it on every write (all
+  writes go through the one process). Játszótér also reads `/api/words`.
 - **[szotar] The entry page downloads a whole letter to show 5 words.** `WordEntry.svelte` fetches
   `/api/words?letter=` for "További X betűs tájszavak". Ask for `limit=6` once the list takes one.
-- **[szotar] Missing indexes on the dictionary's foreign keys:** `definitions(word_id)` and
-  `definition_id` on `definition_locations`, `definition_tags`, `definition_relations`. Postgres does
-  not index foreign keys by itself. One migration; `suggestions` got its indexes in 011.
 - **[szotar] Loading one word takes many small queries.** `Store.Get` runs about four per sense
   plus four per word, and `ProverbsForHeadword` scans every mondás with `ILIKE '%…%'` (where a `%`
   or `_` in a headword acts as a wildcard). Load each child table once with `= ANY($1)`, escape
@@ -202,24 +198,18 @@ section 7); none is urgent at today's size. Paths are in `lamsza-szotar/`.
 
 ### Behaviour
 
-- **[szotar] The daily word can change during the day.** `PickDaily` (`store.go`) indexes the
-  list of words with a recording by day number, so adding or removing one shifts "today's" word.
-  Pick by a stable hash of (date, word id), or store the day's choice.
-- **[szotar] Search does not ignore accents:** "kenyer" does not find "kenyér". The server's
-  `Filter` lowercases only; the frontend folds accents just to highlight (`searchMatch.js`). Fold
-  in `Filter`, or search in SQL with `unaccent` and a trigram index (with the first Performance
-  item).
+- **[szotar] An older word that gets its first recording today can take over the day's word.**
+  `PickDaily` (`backend/internal/dict/store.go`) skips words created today, but a word created
+  earlier joins the ranking as soon as it has a recording, so it wins that day with a chance of
+  1 in the number of recorded words. Fully stable needs the day's choice stored (a table, and a
+  write on GET, an exception to R14).
 
 ### Suggestion form
 
-- **[szotar] No confirmation after sending a new word:** the dialog just closes
-  (`WordForm.svelte`). An edit already turns the button into "Javaslat elküldve".
-- **[szotar] The suggestion dialog loses a filled form on an outside click** and has no Escape
-  key, `aria-modal` or focus trap (`WordDialog.svelte`); `SignInDialog.svelte` already does it
-  right. Same gaps in `EntryMediaDialog.svelte`.
-- **[szotar] Other users see "Javaslat elküldve" as if they had sent it:** `suggestion_pending`
-  is true when anyone has an open suggestion for the word. Show the sender their own state and
-  others a neutral "Javaslat folyamatban".
+- **[szotar] "Javaslat módosításra" should warn up front when the word already has an open
+  suggestion.** The duplicate-headword notice (`WordForm.svelte`) opens the word's edit form
+  even then, and the visitor learns it only on sending (409 "Erre a szóra már van nyitott
+  javaslat."). Say so in the notice, or check `suggestion_pending` before opening the form.
 - **[szotar] `/uj` and `/szo/[id]/szerkesztes` only redirect** (to `/` and the entry) instead
   of opening the form; old links lose what the visitor came for.
 
